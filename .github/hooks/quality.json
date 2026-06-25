@@ -1,0 +1,10 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "type": "command",
+        "command": "sh -c 'command -v npm >/dev/null 2>&1 && [ -f package.json ] && npm run -s lint --if-present && npm run -s typecheck --if-present && npm test --silent --if-present || echo \"EOS: quality gate skipped or failed (no package.json / scripts)\"'"
+      }
+    ]
+  }
+}

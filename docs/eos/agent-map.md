@@ -1,0 +1,16 @@
+# EOS ↔ BMAD Reuse Map
+
+| Stage | Use (skills / agents) |
+|---|---|
+| Discovery | bmad-brainstorming, bmad-agent-analyst, bmad-forge-idea |
+| Requirements | bmad-agent-pm, bmad-create-prd, bmad-product-brief, eos-operational-readiness |
+| Spec | bmad-create-prd, bmad-validate-prd |
+| Architecture | bmad-architecture / bmad-create-architecture (Winston) |
+| Planning | bmad-create-epics-and-stories, bmad-create-story, bmad-sprint-planning, bmad-check-implementation-readiness |
+| Development | bmad-dev-story, bmad-agent-dev (Amelia), bmad-quick-dev |
+| Testing | bmad-tea (Murat), bmad-testarch-*, bmad-qa-generate-e2e-tests |
+| Release/Ops | EOS prompts: /release-gate, /runbook |
+| Observability | EOS prompt: /telemetry-plan |
+| Iteration | bmad-correct-course, bmad-retrospective, bmad-document-project, bmad-sprint-status |
+
+> 73 `bmad-*` skills are installed at `~/.agents/skills/` and `~/.claude/skills/` (user-level, shared across projects).
