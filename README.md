@@ -30,6 +30,8 @@ See [docs/eos/quickstart.md](docs/eos/quickstart.md). First command:
 node .github/hooks/validate-config.mjs    # expect PASS
 ```
 
+Corrected blueprint (verified Part 6/7/10): [docs/eos/blueprint.md](docs/eos/blueprint.md).
+
 ## Notes
 - No org/network dependencies: fully local & Git-portable.
 - Hooks are a VS Code **Preview** feature; `.github/hooks/*.json` load by default.
