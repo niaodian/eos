@@ -4,3 +4,7 @@ node_modules/
 dist/
 build/
 .DS_Store
+
+# generated docs (rebuild via docs/eos/tools/build-pdf.sh)
+docs/eos/*.pdf
+docs/eos/.user-manual.html
