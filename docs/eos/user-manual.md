@@ -560,7 +560,7 @@ node .github/hooks/validate-config.mjs
 | S3 | error | 非 `**` 文件无重复 glob（`**` 合法共存，被豁免） |
 | S4 | warn | 常见源码类型（如 .ts/.tsx/.py/.sql）都有规则覆盖 |
 | S6 | warn | 文件名符合 `NN-area[-stack].instructions.md` 规范 |
-| S7 | error | 必需路径/文件存在（copilot-instructions.md、AGENTS.md 等） |
+| S7 | error | 必需路径/文件存在（copilot-instructions.md、instructions/、prompts/、agents/、hooks/、docs/eos/agent-map.md） |
 | S9 | error | hook JSON 合法且 event 名有效 |
 
 > 期望输出：`PASS`。任何 **error** 必须先修复再继续；**warn** 视情况处理。

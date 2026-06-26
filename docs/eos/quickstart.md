@@ -27,4 +27,4 @@ Self-check:     node .github/hooks/validate-config.mjs
 - User-level (shared, already installed): `~/.agents/skills/`, `~/.claude/skills/` (73 bmad-*).
 - User-level agents location: `~/.copilot/agents`.
 - Workspace-level (travels with repo): everything under `.github/` + `docs/`.
-- New project: `npx degit <you>/template my-app` (after publishing this as a template repo).
+- New project: `npx degit <you>/template my-app` (after publishing this as a template repo). Private repo → add `--mode=git`: `npx degit --mode=git <you>/template my-app`.
