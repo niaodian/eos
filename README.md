@@ -30,7 +30,10 @@ See [docs/eos/quickstart.md](docs/eos/quickstart.md). First command:
 node .github/hooks/validate-config.mjs    # expect PASS
 ```
 
-Corrected blueprint (verified Part 6/7/10): [docs/eos/blueprint.md](docs/eos/blueprint.md).
+**Full user manual** (idea → launch → iteration, every command & gate explained):
+[docs/eos/user-manual.md](docs/eos/user-manual.md).
+
+Design rationale (why it's built this way): [docs/eos/blueprint.md](docs/eos/blueprint.md).
 
 ## Notes
 - No org/network dependencies: fully local & Git-portable.
