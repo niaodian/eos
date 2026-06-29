@@ -14,7 +14,7 @@ orchestrating the installed **BMAD** skills (73 `bmad-*`) across the full SDLC.
   hooks/                        # deterministic guardrails + validators (Preview)
 docs/
   checklists/                   # A-gap, B-rework, C-nfr, D-ops
-  eos/                          # agent-map, quickstart, VERSION
+  eos/                          # blueprint, user-manual, quickstart, stack-presets, agent-map, VERSION
   adr/ epics/ stories/          # SDD artifacts
 api/ ops/ src/
 ```
