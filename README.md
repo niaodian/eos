@@ -35,6 +35,8 @@ node .github/hooks/validate-config.mjs    # expect PASS
 
 Design rationale (why it's built this way): [docs/eos/blueprint.md](docs/eos/blueprint.md).
 
+Per-stack setup presets (Node/Python/Go/Java/Rust/.NET): [docs/eos/stack-presets.md](docs/eos/stack-presets.md).
+
 ## Notes
 - No org/network dependencies: fully local & Git-portable.
 - Hooks are a VS Code **Preview** feature; `.github/hooks/*.json` load by default.

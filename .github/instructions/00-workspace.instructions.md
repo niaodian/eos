@@ -11,7 +11,7 @@ applyTo: "**"
 
 ## Local commands (no remote CI assumed)
 - Install: `npm ci` · Lint: `npm run lint` · Test: `npm test` · Typecheck: `npm run typecheck`.
-- Adjust to your stack (e.g. Python: `ruff check . && mypy . && pytest`).
+- Adjust to your stack — ready presets (Node/Python/Go/Java/Rust/.NET) in `docs/eos/stack-presets.md`.
 
 ## Git
 - Conventional Commits. Branch: `feat/<story-id>-slug`. One story per PR.

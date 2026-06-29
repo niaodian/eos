@@ -155,7 +155,7 @@ node .github/hooks/validate-config.mjs      # 期望：PASS
 ## 3.3 填项目专属事实
 
 打开 `.github/instructions/00-workspace.instructions.md`，把它改成**你这个项目**的真实情况：
-- `Local commands`：换成你的栈（Node? Python? Go?）的 install/lint/test/typecheck 命令
+- `Local commands`：换成你的栈的 install/lint/test/typecheck 命令——**成品行直接抄** `docs/eos/stack-presets.md`（Node/Python/Go/Java/Rust/.NET 全栈配方册，复制对应一块即可）
 - `Layout`：若目录结构不同，更新
 - 其它跨项目通用信念**不要**写这里——那属于 R1（`copilot-instructions.md`）
 
@@ -686,6 +686,9 @@ EOS 的栈规则是**可插拔**的。新增一个栈 = 加一个 `*.instruction
 
 > 默认参考栈：前端 TS+Next.js、后端 Node/TS 或 Python/FastAPI、数据 PostgreSQL+OpenAPI。
 > 全部可替换——换栈只是换 `applyTo` 和正文，不动 EOS 骨架。
+>
+> **省事**：Go、Java/Spring 的 R3 规则已随模板发布；Node/Python/Go/Java/Rust/.NET 的成品
+> 命令行 + frontmatter 见 `docs/eos/stack-presets.md`（配方册），复制对应块即可，不用手写。
 
 ---
 

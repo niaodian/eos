@@ -9,6 +9,9 @@
    - Run `/spec` → `docs/prd.md` (reuses bmad-create-prd, validated by bmad-validate-prd).
 4. Commit.
 
+> First time: set project facts in `.github/instructions/00-workspace.instructions.md` —
+> copy your stack's preset from `docs/eos/stack-presets.md` (Node/Python/Go/Java/Rust/.NET).
+
 ## Happy Path (shortest entry)
 ```
 /requirements "<one-line feature>"

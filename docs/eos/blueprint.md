@@ -451,7 +451,7 @@ Agent 输出不符预期
 | D1 | 总体架构图（文字化） | `docs/eos/blueprint.md` Part 3 | 新建 |
 | D2 | 完整规则目录结构 | `docs/eos/blueprint.md` Part 7 / `README.md` | 新建 |
 | D3 | 规则文件模板（含真实 frontmatter） | `.github/instructions/**/*.instructions.md` | 新建 |
-| D4 | 主流技术栈子规则模板集 | `instructions/frontend/`、`backend/`、`data-api/` | 新建 |
+| D4 | 主流技术栈子规则模板集 + 配方册 | `instructions/frontend/`、`backend/`（node/python/go/java）、`data-api/`；`docs/eos/stack-presets.md` | 新建 |
 | D5 | 标准开发流程图（10 阶段） | 本文 Part 4 | 新建 |
 | D6 | 需求阶段缺口清单 | `docs/checklists/A-gap.md` | 新建 |
 | D7 | 非功能需求清单 | `docs/checklists/C-nfr.md` | 新建 |
