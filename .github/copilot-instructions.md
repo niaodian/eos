@@ -5,7 +5,7 @@ applyTo: "**"
 
 ## Source of Truth
 - Specs in `docs/` are the single source of truth. Never implement beyond the approved spec.
-- Sequence: discovery → requirements → PRD → architecture → stories → code. Don't skip gates.
+- Sequence: discovery → requirements → PRD → UX → architecture → stories → code. Don't skip gates.
 
 ## Reuse First (do not reinvent)
 - Prefer existing BMAD skills (`bmad-*`, 73 installed) over building new capabilities.

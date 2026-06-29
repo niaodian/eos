@@ -16,11 +16,11 @@
 ```
 /requirements "<one-line feature>"
 ```
-Then follow handoffs: → /spec → (agent) eos-architecture → (handoff) eos-plan → bmad-dev-story.
+Then follow handoffs: → /spec → /ux-spec (user-facing) → (agent) eos-architecture → (handoff) eos-plan → bmad-dev-story.
 
 ## Memory card
 ```
-New feature:   /requirements "<feature>" → /spec → (agent) eos-architecture
+New feature:   /requirements "<feature>" → /spec → /ux-spec → (agent) eos-architecture
                                           → (handoff) eos-plan → bmad-dev-story
 Before release: /release-gate
 Self-check:     node .github/hooks/validate-config.mjs

@@ -226,6 +226,7 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 | G1 | Discovery | 问题是一句可证伪陈述 + 成功指标可度量 |
 | **G2** | Requirements | **四张清单无未决 BLOCKER（必过硬门）** |
 | G3 | Spec | 每条需求有 ≥1 可度量验收标准 |
+| G-UX | UX & Design（条件） | 面向用户：每条需求有屏幕/流程/四态/a11y/视觉token；纯后端 SKIP+理由 |
 | G4 | Architecture | 不可逆决策有 ADR；NFR/扩展/容灾各有显式设计 |
 | G5 | Planning | 每个 story 上下文自包含、可独立实现、含 AC |
 | G6 | Development | lint/typecheck/单测全绿（hook 质量门） |
@@ -252,9 +253,9 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
  idea
   │
   ▼
-[1] Discovery ─G1→ [2] Requirements ─G2→ [3] Spec ─G3→ [4] Architecture ─G4→
-[5] Planning ─G5→ [6] Development ─G6→ [7] Testing ─G7→ [8] Release ─G8→
-[9] Observability ─G9→ [10] Iteration ─G10→（回流驱动下一轮 [2]）⟲
+[1] Discovery ─G1→ [2] Requirements ─G2→ [3] Spec ─G3→ [3.5] UX&Design ─G-UX→
+[4] Architecture ─G4→ [5] Planning ─G5→ [6] Development ─G6→ [7] Testing ─G7→
+[8] Release ─G8→ [9] Observability ─G9→ [10] Iteration ─G10→（回流驱动下一轮 [2]）⟲
 ```
 
 ---
@@ -330,6 +331,25 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 
 ---
 
+## 阶段 3.5 — UX & Design（视觉 + 体验契约）★ 条件门
+
+| 项 | 内容 |
+|---|---|
+| **目标** | 动手架构/实现前定下"长什么样 + 怎么交互"，产出两份对等契约 |
+| **何时进入** | G3 通过、`docs/prd.md` 就绪。**面向用户的产品必做**；纯后端/API/CLI 项目可 SKIP |
+| **怎么启动** | Chat 输入 **`/ux-spec`**（包裹 `bmad-ux`）或切到 **`（agent）eos-design`**；问题仍模糊用 `bmad-cis-design-thinking`(Maya)，要强主张用 `bmad-agent-ux-designer`(Sally) |
+| **输入** | `docs/prd.md` |
+| **产出** | `docs/DESIGN.md`（视觉身份：token/字体/色彩/间距）+ `docs/EXPERIENCE.md`（信息架构/用户流/屏幕状态/交互/a11y/旅程） |
+| **决策门 G-UX** | ☑ 每条面向用户需求有屏幕/流程 ☑ loading/empty/error/success 四态齐全 ☑ a11y 基线（键盘/焦点/标签/对比度）☑ 用 DESIGN.md 命名 token、不硬编码；纯后端 → 在 `EXPERIENCE.md` 写 `SKIP — 无用户界面（理由）` |
+| **必查项** | 每个屏幕的空/错/载入态都定义了吗？关键操作可纯键盘完成吗？颜色/间距是引用 token 还是写死？ |
+| **防返工** | UX 契约**先于**架构与实现：架构据此定 API/数据、story 据此引用屏幕、前端规则与埋点据此落地。两份契约对任何后来的 mock/import 有最终解释权。 |
+| **可跳过** | 纯后端/CLI：一行 `SKIP + 理由` 即过门，不阻塞。 |
+
+> 复用说明【BMAD + 补强】：能力来自 `bmad-ux` / `bmad-agent-ux-designer`(Sally) / `bmad-cis-design-thinking`(Maya)，
+> EOS 只新增编排（`/ux-spec` prompt + `eos-design` agent + G-UX 门），**不重建设计能力**。
+
+---
+
 ## 阶段 4 — Architecture（方案 + 数据模型 + API 契约 + ADR）
 
 | 项 | 内容 |
@@ -337,7 +357,7 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 | **目标** | 技术方案、数据模型、API 契约、NFR 落点、关键决策留痕（ADR） |
 | **何时进入** | G3 通过、`docs/prd.md` 就绪 |
 | **怎么启动** | Chat 切到 **`（agent）eos-architecture`**（调用 `bmad-architecture`/Winston）；对每个不可逆决策跑 **`/adr`** |
-| **输入** | `docs/prd.md`、`docs/checklists/C-nfr.md` |
+| **输入** | `docs/prd.md`、`docs/EXPERIENCE.md`+`docs/DESIGN.md`（若做了 UX 阶段）、`docs/checklists/C-nfr.md` |
 | **产出** | `docs/architecture.md`、`docs/data-model.md`、`api/openapi.yaml`、`docs/adr/NNN-*.md` |
 | **决策门 G4** | ☑ 扩展性/弹性/容灾/安全各有显式设计（不是"以后再说"）☑ 每个不可逆决策有 ADR |
 | **必查项** | API 契约**先于**实现写好了吗？ADR 有没有列备选方案和 trade-off？NFR 每项有落点吗？ |
@@ -457,6 +477,7 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 | 1 Discovery | `（agent）eos-discovery` | `docs/discovery.md` | G1 |
 | 2 Requirements | `/requirements "<f>"` | `docs/requirements.md` | **G2★** |
 | 3 Spec | `/spec` | `docs/prd.md` | G3 |
+| 3.5 UX & Design | `/ux-spec`（或 `（agent）eos-design`） | `DESIGN.md`+`EXPERIENCE.md` | G-UX（条件） |
 | 4 Architecture | `（agent）eos-architecture` + `/adr` | `architecture.md`+`openapi.yaml`+`adr/*` | G4 |
 | 5 Planning | `（agent）eos-plan` | `docs/stories/*` | G5 |
 | 6 Development | `bmad-dev-story` | `src/*` | G6 |
@@ -475,6 +496,7 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 |---|---|---|---|
 | `/requirements` | 需求分析 + 运营前置（包裹 bmad-create-prd） | `<feature 或 docs/discovery.md 路径>` | `docs/requirements.md` |
 | `/spec` | 产出 PRD 真相源（bmad-create-prd + bmad-validate-prd） | `<docs/requirements.md 路径>` | `docs/prd.md` |
+| `/ux-spec` | 设计 UX/UI 视觉+体验契约（包裹 bmad-ux） | `<docs/prd.md 路径>` | `docs/DESIGN.md` + `docs/EXPERIENCE.md` |
 | `/adr` | 记录一条架构决策 | `<决策标题>` | `docs/adr/NNN-*.md` |
 | `/nfr` | 把 C-nfr 逐行填具体目标值 | — | 更新 `C-nfr.md` + PRD NFR 段 |
 | `/telemetry-plan` | 设计埋点并对齐成功指标 | — | `docs/telemetry-plan.md` |
@@ -487,6 +509,7 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 | Agent | 阶段 | 复用的 BMAD | handoff 去向 |
 |---|---|---|---|
 | `eos-discovery` | 1 问题定义 | bmad-brainstorming, bmad-agent-analyst, bmad-forge-idea | → `/requirements` |
+| `eos-design` | 3.5 UX/设计 | bmad-ux, bmad-agent-ux-designer(Sally), bmad-cis-design-thinking(Maya) | → `eos-architecture` |
 | `eos-architecture` | 4 架构 | bmad-architecture（Winston） | → `eos-plan` |
 | `eos-plan` | 5 计划 | bmad-create-epics-and-stories, bmad-create-story, bmad-sprint-planning | → `bmad-dev-story` |
 | `eos-review` | 10 迭代 | bmad-correct-course, bmad-retrospective, bmad-document-project | → `/requirements`（下一轮） |
@@ -745,6 +768,7 @@ npm audit                                           # 发布前依赖审计
 （agent）eos-discovery        # 阶段1：问题定义        → G1
 /requirements "<feature>"    # 阶段2：需求+运营前置    → G2★
 /spec                        # 阶段3：PRD 真相源       → G3
+/ux-spec                     # 阶段3.5：UX 视觉+体验契约 → G-UX（面向用户必做，纯后端跳过）
 （agent）eos-architecture     # 阶段4：架构            → G4
   /adr "<decision>"          #   └ 每个不可逆决策
   /nfr                       #   └ 填 NFR 目标值

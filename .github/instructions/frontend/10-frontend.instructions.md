@@ -22,6 +22,8 @@ applyTo: "**/*.{tsx,jsx}"
 ## Accessibility & UX
 - All interactive elements keyboard-accessible; provide aria-labels.
 - Always handle loading / empty / error states explicitly.
+- Source of truth is `docs/EXPERIENCE.md` (flows + states + a11y) and `docs/DESIGN.md`
+  (visual tokens) from the `/ux-spec` stage. Use named tokens; do not hardcode design values.
 
 ## Tooling (local)
 - Format: Prettier. Lint: ESLint (`eslint-config-next`, `@typescript-eslint`).

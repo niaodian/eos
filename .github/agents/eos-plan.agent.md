@@ -9,7 +9,8 @@ handoffs:
 ---
 # EOS Planning Agent
 
-Input: `docs/prd.md`, `docs/architecture.md`.
+Input: `docs/prd.md`, `docs/architecture.md`, and `docs/EXPERIENCE.md` (so stories
+reference concrete screens, flows, and states).
 
 Use `bmad-create-epics-and-stories` -> `bmad-create-story` -> `bmad-sprint-planning`.
 Verify readiness with `bmad-check-implementation-readiness`.

@@ -279,7 +279,7 @@ git config --global init.templateDir ~/.git-templates/eos
 │ L6 协作层  bmad-agent-*(Mary/John/Winston/Amelia/Murat)        │
 │            eos-*.agent.md 调度入口 + handoffs 串成工作流         │
 └──────────────────────────────────────────────────────────────┘
-数据流: discovery→requirements→prd→architecture→stories→code→test→release→telemetry→iterate ⟲
+数据流: discovery→requirements→prd→ux→architecture→stories→code→test→release→telemetry→iterate ⟲
 ```
 
 **各层机制对照**（官方已核验，VS Code 1.120.0）：
@@ -307,6 +307,7 @@ git config --global init.templateDir ~/.git-templates/eos
 | 1 Discovery | 收敛为单句可证伪问题+可度量成功指标 | `bmad-brainstorming`、`bmad-agent-analyst`(Mary)、`bmad-forge-idea` | G1：问题可证伪 + 指标可度量 | `I:00-workspace` | 最廉价纠错点：锁定问题不漂移 |
 | 2 Requirement | 展开功能+NFR+**运营前置** | `/requirements`（包裹 `bmad-create-prd`） + skill `eos-operational-readiness` | **G2：四张清单全过审（必过项）** | `P:requirements`、`P:nfr`、`I:security` | 主闸门：阻断上线后大规模返工 |
 | 3 Spec | PRD 成为唯一真相源 | `bmad-create-prd`；校验 `bmad-validate-prd` | G3：每条需求有验收标准 | `P:spec` | Spec 即契约，下游只认 `docs/prd.md` |
+| 3.5 UX & Design（条件） | 视觉+体验契约（面向用户必做） | `/ux-spec`（包裹 `bmad-ux`）、`bmad-agent-ux-designer`(Sally)、`bmad-cis-design-thinking`(Maya) | **G-UX：每条面向用户需求有屏幕/流程/三态/a11y/视觉token；纯后端 SKIP+理由** | `P:ux-spec`、`A:eos-design`、`I:frontend` | UI/UX 前置：防"实现完才发现交互/信息架构错" |
 | 4 Architecture | 技术方案+数据模型+API 契约+NFR 落点+ADR | `eos-architecture`（包裹 `bmad-architecture` Winston）；`/adr` | G4：关键不可逆决策有 ADR；NFR 有落点 | `I:data-api`、`A:eos-architecture` | API 契约先于实现；扩展性显式审查 |
 | 5 Planning | Epics→Stories，各 story 上下文自包含 | `bmad-create-epics-and-stories`→`bmad-create-story`→`bmad-sprint-planning`；`bmad-check-implementation-readiness` | G5：story 就绪 | `A:eos-plan` | 就绪门防止开发中途缺上下文 |
 | 6 Development | 按 story 实现，受栈规则+护栏约束 | `bmad-dev-story`、`bmad-agent-dev`(Amelia) | G6：lint/typecheck/单测全绿 | `I:frontend/backend/data-api`（`applyTo`自动注入）+ `H:guardrails`（PreToolUse）+ `H:quality`（PostToolUse） | Hooks 把约束从"自觉"变为确定性 |
@@ -314,6 +315,10 @@ git config --global init.templateDir ~/.git-templates/eos
 | 8 Release | 过质量/安全/回滚/灰度门后发布 | `/release-gate`；`/runbook` | **G8：4 项门禁全过（必过项）** | `I:release-ops`、`H:quality` | 无回滚/无灰度不得发布 |
 | 9 Observability | 埋点上线、指标可见、运营闭环 | `/telemetry-plan` | G9：关键路径埋点在产 | `I:release-ops` | 埋点需求阶段设计，此处只做落实校验 |
 | 10 Iteration | 指标回流驱动下轮需求；管理架构演进 | `bmad-correct-course`、`bmad-retrospective`、`bmad-document-project`、`bmad-sprint-status` | G10：变更回写 Spec | `A:eos-review`（handoff 回 requirements） | 变更必须回写 Spec，防"代码与真相源漂移" |
+
+> 主轴是 10 个门（G1–G10）。**3.5 UX & Design 是条件子阶段**（面向用户的产品必做，纯后端/CLI 项目 SKIP+理由），
+> 插在 Spec(G3) 与 Architecture(G4) 之间——PRD 定义*做什么*、UX 定义*长什么样/怎么交互*、架构定义*怎么实现*，
+> 顺序不可省，否则 story 切出来没有屏幕/状态依据。全部复用 `bmad-ux`，不重建能力。
 
 ---
 
@@ -465,6 +470,7 @@ Agent 输出不符预期
 | D11 | 新项目 Quickstart + 跨项目移植指南 | `docs/eos/quickstart.md` | 新建 |
 | D12 | 端到端落地走查 | 本文 Part 4 × Part 8 rubric（用"用户登录"dry-run） | 新建 |
 | D13 | MVP vs Enterprise 方案对比 | 见下表 | 新建 |
+| — | UX/设计规划阶段（视觉+体验契约） | `/ux-spec`、`A:eos-design`；产 `docs/DESIGN.md`+`docs/EXPERIENCE.md` | 复用BMAD（bmad-ux/Sally）+补强 |
 | — | BMAD reuse map（73 bmad-*） | `docs/eos/agent-map.md` | 复用BMAD |
 | — | 运营前置 skill | `.github/skills/eos-operational-readiness/SKILL.md` | 新建 |
 | — | Hooks 护栏 | `.github/hooks/guardrails.json` + `deny-dangerous.js` | 新建 |

@@ -5,6 +5,7 @@
 | Discovery | bmad-brainstorming, bmad-agent-analyst, bmad-forge-idea |
 | Requirements | bmad-agent-pm, bmad-create-prd, bmad-product-brief, eos-operational-readiness |
 | Spec | bmad-create-prd, bmad-validate-prd |
+| UX/Design | bmad-ux, bmad-agent-ux-designer (Sally), bmad-cis-design-thinking (Maya) |
 | Architecture | bmad-architecture / bmad-create-architecture (Winston) |
 | Planning | bmad-create-epics-and-stories, bmad-create-story, bmad-sprint-planning, bmad-check-implementation-readiness |
 | Development | bmad-dev-story, bmad-agent-dev (Amelia), bmad-quick-dev |

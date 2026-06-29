@@ -9,7 +9,8 @@ handoffs:
 ---
 # EOS Architecture Agent
 
-Input: `docs/prd.md`.
+Input: `docs/prd.md`. Honor the UX contracts `docs/EXPERIENCE.md` + `docs/DESIGN.md`
+(flows, screen states, accessibility) when they exist — the API/data design must serve them.
 
 Use skill `bmad-architecture` (Winston) to produce architecture + data model + API contract.
 Then run `/adr` for each irreversible decision. Enforce NFR mapping against docs/checklists/C-nfr.md.
