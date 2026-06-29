@@ -8,10 +8,10 @@
 ## 怎么用（3 步）
 
 1. 打开 `.github/instructions/00-workspace.instructions.md`，把 `## Local commands` 那一行换成下面你这个栈的成品行。
-2. 启用对应的 **R3 栈规则文件**（随模板发布的留着即可；标 ➕ 的从本册「stub」自建）。其余不用的栈规则文件是**惰性的**——只有当仓库里真有对应后缀文件时才生效，留着无害，想删也行。
+2. 启用对应的 **R3 栈规则文件**（六大后端栈 Node/Python/Go/Java/Rust/.NET + 前端 React 均随模板发布，留着即可）。其余不用的栈规则文件是**惰性的**——只有当仓库里真有对应后缀文件时才生效，留着无害，想删也行。
 3.（可选）若用非 Node 栈又想让自动质量门禁生效，按下表替换 `.github/hooks/quality.json` 里 `PostToolUse` 的命令（现有那条是 Node 专用：探测 `npm`+`package.json`，非 Node 自动 no-op）。
 
-> **互斥提醒**：每个 R3 文件的 `applyTo` glob 必须互不重叠（`**/*.ts` / `**/*.py` / `**/*.go` / `**/*.java` / `**/*.{tsx,jsx}`）。改完跑 `node .github/hooks/validate-config.mjs` 验 S3。
+> **互斥提醒**：每个 R3 文件的 `applyTo` glob 必须互不重叠（`**/*.ts` / `**/*.py` / `**/*.go` / `**/*.java` / `**/*.rs` / `**/*.cs` / `**/*.{tsx,jsx}`）。改完跑 `node .github/hooks/validate-config.mjs` 验 S3。
 
 ---
 
@@ -24,8 +24,8 @@
 | Go | `backend/10-backend-go`（`**/*.go`） | ✅ |
 | Java / Spring Boot | `backend/10-backend-java`（`**/*.java`） | ✅ |
 | 前端 React | `frontend/10-frontend`（`**/*.{tsx,jsx}`） | ✅ |
-| Rust | `backend/10-backend-rust`（`**/*.rs`） | ➕ 自建（stub 见下） |
-| .NET / C# | `backend/10-backend-dotnet`（`**/*.cs`） | ➕ 自建（stub 见下） |
+| Rust | `backend/10-backend-rust`（`**/*.rs`） | ✅ |
+| .NET / C# | `backend/10-backend-dotnet`（`**/*.cs`） | ✅ |
 
 ---
 
@@ -72,39 +72,23 @@
 - **Layout**：`src/main/java` · `src/test/java`
 - **quality.json 内层命令**：`mvn -q spotless:check && mvn -q test`
 
-### Rust（stub 需自建）
+### Rust
 
 - **Local commands**：
   ```
   - Install: `cargo fetch` · Lint: `cargo clippy -- -D warnings` · Test: `cargo test` · Typecheck: `cargo check`.
   ```
-- **R3 stub**：新建 `backend/10-backend-rust.instructions.md`，frontmatter：
-  ```yaml
-  ---
-  name: 'Backend (Rust)'
-  description: 'Rust service conventions (optional reference stack)'
-  applyTo: "**/*.rs"
-  ---
-  ```
-  正文写：模块分层 / 边界校验 / `Result` 错误传播（`?` + `thiserror`）/ `tracing` 日志 / tooling。
+- **R3**：`backend/10-backend-rust.instructions.md`（已发布，`**/*.rs`）
 - **Layout**：`src/` · `tests/`
 - **quality.json 内层命令**：`cargo clippy -- -D warnings && cargo test`
 
-### .NET / C#（stub 需自建）
+### .NET / C#
 
 - **Local commands**：
   ```
   - Install: `dotnet restore` · Lint: `dotnet format --verify-no-changes` · Test: `dotnet test` · Build: `dotnet build`.
   ```
-- **R3 stub**：新建 `backend/10-backend-dotnet.instructions.md`，frontmatter：
-  ```yaml
-  ---
-  name: 'Backend (.NET/C#)'
-  description: '.NET service conventions (optional reference stack)'
-  applyTo: "**/*.cs"
-  ---
-  ```
-  正文写：Controller→Service→Repository / 边界校验 / 全局异常处理 / `ILogger` 结构化日志 / tooling。
+- **R3**：`backend/10-backend-dotnet.instructions.md`（已发布，`**/*.cs`）
 - **Layout**：`src/` · `tests/`
 - **quality.json 内层命令**：`dotnet format --verify-no-changes && dotnet test`
 

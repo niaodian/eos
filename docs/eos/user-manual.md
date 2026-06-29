@@ -687,8 +687,8 @@ EOS 的栈规则是**可插拔**的。新增一个栈 = 加一个 `*.instruction
 > 默认参考栈：前端 TS+Next.js、后端 Node/TS 或 Python/FastAPI、数据 PostgreSQL+OpenAPI。
 > 全部可替换——换栈只是换 `applyTo` 和正文，不动 EOS 骨架。
 >
-> **省事**：Go、Java/Spring 的 R3 规则已随模板发布；Node/Python/Go/Java/Rust/.NET 的成品
-> 命令行 + frontmatter 见 `docs/eos/stack-presets.md`（配方册），复制对应块即可，不用手写。
+> **省事**：Node/Python/Go/Java/Rust/.NET 六大后端栈 + React 前端的 R3 规则均已随模板发布；
+> 各栈成品命令行 + frontmatter 见 `docs/eos/stack-presets.md`（配方册），复制对应块即可，不用手写。
 
 ---
 
