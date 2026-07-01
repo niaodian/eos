@@ -229,6 +229,7 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 | **G2** | Requirements | **四张清单无未决 BLOCKER（必过硬门）** |
 | G3 | Spec | 每条需求有 ≥1 可度量验收标准 |
 | G-UX | UX & Design（条件） | 面向用户：每条需求有屏幕/流程/四态/a11y/视觉token；纯后端 SKIP+理由 |
+| G-EVAL | Eval（条件·LLM/agentic） | 每条 LLM 支撑的 AC 有 eval 用例+grader+阈值；含注入/成本用例；纯确定性功能 SKIP+理由 |
 | G4 | Architecture | 不可逆决策有 ADR；NFR/扩展/容灾各有显式设计 |
 | G5 | Planning | 每个 story 上下文自包含、可独立实现、含 AC |
 | G6 | Development | lint/typecheck/单测全绿（hook 质量门）+ 代码审查无阻断项 |
@@ -376,12 +377,12 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 |---|---|
 | **目标** | 把架构拆成可独立实现、上下文自包含的 story |
 | **何时进入** | G4 通过 |
-| **怎么启动** | Chat 切到 **`（agent）eos-plan`**（`bmad-create-epics-and-stories` → `bmad-create-story` → `bmad-sprint-planning`），对每条 AC 用 **`bmad-testarch-atdd`** 先设计验收测试，再用 `bmad-check-implementation-readiness` 验就绪 |
+| **怎么启动** | Chat 切到 **`（agent）eos-plan`**（`bmad-create-epics-and-stories` → `bmad-create-story` → `bmad-sprint-planning`），对每条 AC 用 **`bmad-testarch-atdd`** 先设计验收测试；**若含 LLM/agentic 组件,再跑 `/eval-spec` 设计评估集(G-EVAL)**;最后用 `bmad-check-implementation-readiness` 验就绪 |
 | **输入** | `docs/prd.md`、`docs/architecture.md`、`docs/EXPERIENCE.md`（若做了 UX 阶段） |
-| **产出** | `docs/epics/*`、`docs/stories/*.md`（每个含**验收测试大纲**） |
-| **决策门 G5** | ☑ 每个 story 上下文自包含 ☑ 可独立实现 ☑ 含 AC **且每条 AC 有验收测试设计（ATDD）** ☑ 把 telemetry/authz/rollback 落成具体任务 |
-| **必查项** | 开发者拿到这个 story，**不回头翻别处**就能开工吗？DoD 写了吗？**每条 AC 的验收测试意图定义了吗**？ |
-| **防返工** | "就绪门"防开发中途缺上下文；**测试左移**让验收标准在写码前就可测，防"事后补测凑覆盖率"。 |
+| **产出** | `docs/epics/*`、`docs/stories/*.md`（每个含**验收测试大纲**）**、`docs/eval-plan.md`（LLM 功能）** |
+| **决策门 G5** | ☑ 每个 story 上下文自包含 ☑ 可独立实现 ☑ 含 AC **且每条 AC 有验收测试设计（ATDD）** ☑ 把 telemetry/authz/rollback 落成具体任务 **☑ LLM 功能有 eval-plan（G-EVAL）或显式 SKIP** |
+| **必查项** | 开发者拿到这个 story，**不回头翻别处**就能开工吗？DoD 写了吗？**每条 AC 的验收测试意图定义了吗**？**LLM 功能的 eval 集/grader/阈值定了吗**？ |
+| **防返工** | "就绪门"防开发中途缺上下文；**测试左移**让验收标准在写码前就可测，防"事后补测凑覆盖率"；**eval 左移**让非确定的 LLM 输出在写码前就有可度量基线。 |
 | **样例** | `my-app/docs/stories/story-001-auth.md`（AC + 自包含 context + DoD = Ready） |
 
 ---
@@ -413,13 +414,13 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 |---|---|
 | **目标** | 按测试策略验证，建立 spec↔test 可追溯，并**验证 NFR 目标** |
 | **何时进入** | G6 通过 |
-| **怎么启动** | Chat 输入 **`bmad-tea`**（Murat）/ `bmad-testarch-test-design` / `bmad-testarch-automate` / `bmad-testarch-trace` / **`bmad-testarch-nfr`** / `bmad-qa-generate-e2e-tests` |
-| **输入** | `docs/prd.md`（AC 清单）、**`docs/checklists/C-nfr.md`（NFR 目标值）**、`src/` 代码 |
-| **产出** | 测试套件 + `docs/trace-matrix.md`（AC ↔ 测试映射）+ **NFR 验证结果** |
-| **生效规则 R6** | 金字塔结构；**每条 AC ≥1 测试**；`describe(<criterion id>)` 命名；无真实计时器/无顺序依赖；改动行覆盖率 ≥80%；**NFR 目标用 `bmad-testarch-nfr` 验证** |
-| **决策门 G7** | ☑ 每条 AC ≥1 测试 ☑ 全绿 ☑ trace 矩阵完整 ☑ **NFR 目标已验证或显式标 deferred+trigger** |
-| **必查项** | 有没有"没被任何测试覆盖的 AC"？**C-nfr 里定的 P95/吞吐/SLO 有没有被验证**（而不是定了就忘）？延后的有没有显式标 trigger？ |
-| **防返工** | trace 矩阵让"漏测的验收标准"无所遁形；**NFR 验证让"定了目标却没人验"无所遁形**。 |
+| **怎么启动** | Chat 输入 **`bmad-tea`**（Murat）/ `bmad-testarch-test-design` / `bmad-testarch-automate` / `bmad-testarch-trace` / **`bmad-testarch-nfr`** / `bmad-qa-generate-e2e-tests`；**LLM 功能:按 `docs/eval-plan.md` 跑 eval 集 + 回归基线** |
+| **输入** | `docs/prd.md`（AC 清单）、**`docs/checklists/C-nfr.md`（NFR 目标值）**、**`docs/eval-plan.md`（LLM 功能）**、`src/` 代码 |
+| **产出** | 测试套件 + `docs/trace-matrix.md`（AC ↔ 测试映射）+ **NFR 验证结果** + **eval 结果（LLM 功能）** |
+| **生效规则 R6** | 金字塔结构；**每条 AC ≥1 测试**；`describe(<criterion id>)` 命名；无真实计时器/无顺序依赖；改动行覆盖率 ≥80%；**NFR 目标用 `bmad-testarch-nfr` 验证**；**LLM 输出用 eval 集+grader 验(非 exact-match),见 `ai/10-ai-llm` 规则** |
+| **决策门 G7** | ☑ 每条 AC ≥1 测试 ☑ 全绿 ☑ trace 矩阵完整 ☑ **NFR 目标已验证或显式标 deferred+trigger** ☑ **LLM 功能:eval 达基线阈值、无回归(G-EVAL)** |
+| **必查项** | 有没有"没被任何测试覆盖的 AC"？**C-nfr 里定的 P95/吞吐/SLO 有没有被验证**（而不是定了就忘）？延后的有没有显式标 trigger？**LLM 的 eval 分达阈值了吗?prompt/模型改动有没有跑回归?** |
+| **防返工** | trace 矩阵让"漏测的验收标准"无所遁形；**NFR 验证让"定了目标却没人验"无所遁形**；**eval 回归让"改 prompt 改崩了别处"无所遁形**。 |
 | **样例** | `my-app/test/auth.test.js`（10 个 AC-traced 测试全绿）、`my-app/docs/trace-matrix.md`（11/12 AC 有测试，1 个性能项显式 deferred） |
 
 ---
@@ -499,6 +500,7 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 | `/requirements` | 需求分析 + 运营前置（包裹 bmad-create-prd） | `<feature 或 docs/discovery.md 路径>` | `docs/requirements.md` |
 | `/spec` | 产出 PRD 真相源（bmad-create-prd + bmad-validate-prd） | `<docs/requirements.md 路径>` | `docs/prd.md` |
 | `/ux-spec` | 设计 UX/UI 视觉+体验契约（包裹 bmad-ux） | `<docs/prd.md 路径>` | `docs/DESIGN.md` + `docs/EXPERIENCE.md` |
+| `/eval-spec` | 设计 LLM/agentic 评估计划（条件门 G-EVAL） | `<docs/prd.md 路径>` | `docs/eval-plan.md` |
 | `/adr` | 记录一条架构决策 | `<决策标题>` | `docs/adr/NNN-*.md` |
 | `/nfr` | 把 C-nfr 逐行填具体目标值 | — | 更新 `C-nfr.md` + PRD NFR 段 |
 | `/telemetry-plan` | 设计埋点并对齐成功指标 | — | `docs/telemetry-plan.md` |

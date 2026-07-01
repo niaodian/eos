@@ -26,6 +26,7 @@
 | 前端 React | `frontend/10-frontend`（`**/*.{tsx,jsx}`） | ✅ |
 | Rust | `backend/10-backend-rust`（`**/*.rs`） | ✅ |
 | .NET / C# | `backend/10-backend-dotnet`（`**/*.cs`） | ✅ |
+| AI / LLM & Agentic | `ai/10-ai-llm`（`**/{ai,llm,rag}/**`，附加层） | ✅ |
 
 ---
 
@@ -91,6 +92,19 @@
 - **R3**：`backend/10-backend-dotnet.instructions.md`（已发布，`**/*.cs`）
 - **Layout**：`src/` · `tests/`
 - **quality.json 内层命令**：`dotnet format --verify-no-changes && dotnet test`
+
+### AI / LLM & Agentic（附加层，与后端栈叠加）
+
+> 这是**附加层**，不替代后端栈：LLM 产品通常是"Python 后端 + AI 层"。把 AI 代码放 `ai/`/`llm/`/`rag/` 目录,该目录文件同时吃后端栈规则 + 这条 AI 规则。
+
+- **Local commands**（在后端栈基础上加评估）：
+  ```
+  - Install: `pip install -r requirements.txt` · Lint: `ruff check .` · Test: `pytest` · Eval: `pytest evals/ -q`.
+  ```
+- **R3**：`ai/10-ai-llm.instructions.md`（已发布，`**/{ai,llm,rag}/**`）——prompt 即制品、tool/agent 架构、非确定性评估、可复现、LLM 安全、tracing/成本
+- **Layout**：`ai/`（agents/tools/chains）· `ai/prompts/`（版本化 prompt）· `evals/`（评估集+grader）
+- **配套门**：`/eval-spec` 产 `docs/eval-plan.md`（条件门 **G-EVAL**，非 LLM 功能 SKIP+理由）；C-nfr 加成本/token/延迟/质量阈值
+- **quality.json 内层命令**：`ruff check . && pytest -q && pytest evals/ -q`
 
 ---
 

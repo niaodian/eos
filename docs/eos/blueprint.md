@@ -53,6 +53,7 @@
 ├─ backend/10-backend-java.instructions.md   # applyTo: "**/*.java"
 ├─ backend/10-backend-rust.instructions.md   # applyTo: "**/*.rs"
 ├─ backend/10-backend-dotnet.instructions.md # applyTo: "**/*.cs"
+├─ ai/10-ai-llm.instructions.md          # applyTo: "**/{ai,llm,rag}/**"（附加层）
 ├─ data-api/20-data-api.instructions.md  # applyTo: "**/*.{sql,prisma}"
 ├─ testing/30-testing.instructions.md    # applyTo: "**/*.{test,spec}.*"
 ├─ security/40-security.instructions.md  # applyTo: "**"
@@ -319,6 +320,11 @@ git config --global init.templateDir ~/.git-templates/eos
 > 主轴是 10 个门（G1–G10）。**3.5 UX & Design 是条件子阶段**（面向用户的产品必做，纯后端/CLI 项目 SKIP+理由），
 > 插在 Spec(G3) 与 Architecture(G4) 之间——PRD 定义*做什么*、UX 定义*长什么样/怎么交互*、架构定义*怎么实现*，
 > 顺序不可省，否则 story 切出来没有屏幕/状态依据。全部复用 `bmad-ux`，不重建能力。
+>
+> **另一条件门 G-EVAL（LLM/agentic 产品专用）**：`/eval-spec` 产 `docs/eval-plan.md`，在 Planning(G5) 设计
+> 评估集（eval-driven，类比 ATDD），在 Testing(G7) 运行。LLM 输出非确定，不能用 exact-match 单测——必须
+> eval 集 + grader + 回归基线。纯确定性功能 SKIP+理由。配套 `ai/10-ai-llm` 规则 + C-nfr 成本/延迟维度 +
+> security LLM 红线 + telemetry LLM tracing。此块以 `【新建补强】` 为主（BMAD 无产品级 eval 能力，仅借鉴 `bmad-eval-runner` 模式）。
 
 ---
 
@@ -460,7 +466,7 @@ Agent 输出不符预期
 | D1 | 总体架构图（文字化） | `docs/eos/blueprint.md` Part 3 | 新建 |
 | D2 | 完整规则目录结构 | `docs/eos/blueprint.md` Part 7 / `README.md` | 新建 |
 | D3 | 规则文件模板（含真实 frontmatter） | `.github/instructions/**/*.instructions.md` | 新建 |
-| D4 | 主流技术栈子规则模板集 + 配方册 | `instructions/frontend/`、`backend/`（node/python/go/java/rust/dotnet）、`data-api/`；`docs/eos/stack-presets.md` | 新建 |
+| D4 | 主流技术栈子规则模板集 + 配方册 | `instructions/frontend/`、`backend/`（node/python/go/java/rust/dotnet）、`ai/`、`data-api/`；`docs/eos/stack-presets.md` | 新建 |
 | D5 | 标准开发流程图（10 阶段） | 本文 Part 4 | 新建 |
 | D6 | 需求阶段缺口清单 | `docs/checklists/A-gap.md` | 新建 |
 | D7 | 非功能需求清单 | `docs/checklists/C-nfr.md` | 新建 |
@@ -471,6 +477,7 @@ Agent 输出不符预期
 | D12 | 端到端落地走查 | 本文 Part 4 × Part 8 rubric（用"用户登录"dry-run） | 新建 |
 | D13 | MVP vs Enterprise 方案对比 | 见下表 | 新建 |
 | — | UX/设计规划阶段（视觉+体验契约） | `/ux-spec`、`A:eos-design`；产 `docs/DESIGN.md`+`docs/EXPERIENCE.md` | 复用BMAD（bmad-ux/Sally）+补强 |
+| — | Agentic Engineering 扩展包（LLM/agent 产品） | `ai/10-ai-llm` 规则、`/eval-spec`(G-EVAL)、C-nfr/security/telemetry 扩展；产 `docs/eval-plan.md` | 新建补强（借鉴 bmad-eval-runner） |
 | — | BMAD reuse map（73 bmad-*） | `docs/eos/agent-map.md` | 复用BMAD |
 | — | 运营前置 skill | `.github/skills/eos-operational-readiness/SKILL.md` | 新建 |
 | — | Hooks 护栏 | `.github/hooks/guardrails.json` + `deny-dangerous.js` | 新建 |

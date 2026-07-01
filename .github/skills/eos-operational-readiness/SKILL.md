@@ -28,6 +28,7 @@ For each concern below, require one explicit decision: **ADOPT** (write requirem
 | multi-tenancy | isolation level (row/db/instance) | tenant context propagation |
 | capacity/SLO | latency/throughput targets | capacity model, caching/sharding |
 | DR | RTO/RPO targets | backup / failover |
+| LLM/agentic (if applicable) | eval set + cost/token budget + safety (injection/PII) | model pinning, eval harness, tracing, output moderation |
 
 ## Output
 A decision table embedded at the top of `docs/requirements.md`, plus NFR entries in
