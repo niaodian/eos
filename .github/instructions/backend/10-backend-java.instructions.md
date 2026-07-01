@@ -14,6 +14,7 @@ applyTo: "**/*.java"
 ## Validation & Errors
 - Bean Validation (`@Valid` + constraints) at controllers.
 - Centralize handling in `@RestControllerAdvice` → consistent error envelope. Never leak stack traces.
+- Time in UTC (`Instant`/`OffsetDateTime`); money as `BigDecimal` or minor units + ISO currency (never float/double).
 
 ## Transactions & Persistence
 - `@Transactional` at the service layer, not repositories. Mark read-only where applicable.

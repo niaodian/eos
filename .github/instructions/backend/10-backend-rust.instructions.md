@@ -14,6 +14,7 @@ applyTo: "**/*.rs"
 ## Validation & Errors
 - Validate input at the boundary; reject invalid early.
 - Propagate with `Result<T, E>` + `?`. Domain errors via `thiserror`; app boundaries may use `anyhow`.
+- Time in UTC (`chrono`/`time` UTC); money as integer minor units or a decimal crate + ISO currency (never float).
 - No `unwrap()`/`expect()` on fallible runtime paths; map errors to HTTP status in one place.
 
 ## Concurrency & Safety

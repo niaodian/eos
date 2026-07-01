@@ -14,6 +14,7 @@ applyTo: "**/*.cs"
 ## Validation & Errors
 - Validate input at the boundary (DataAnnotations / FluentValidation). Reject invalid early.
 - Centralize handling with exception-handler middleware / `IExceptionHandler` → consistent ProblemDetails.
+- Time in UTC (`DateTimeOffset`/`DateTime.UtcNow`); money as `decimal` or minor units + ISO currency (never float/double).
 - Never leak stack traces to clients.
 
 ## Async & Persistence

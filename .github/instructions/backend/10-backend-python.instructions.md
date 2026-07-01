@@ -12,6 +12,7 @@ applyTo: "**/*.py"
 ## Validation & Errors
 - Pydantic v2 validation at boundaries. Custom exception handlers → consistent error envelope.
 - Never return raw tracebacks to clients.
+- Time in UTC (aware datetimes); money as integer minor units or `Decimal` + ISO currency (never float).
 
 ## Logging & Observability
 - structlog / std logging in JSON. Correlation-id middleware. No PII in logs.

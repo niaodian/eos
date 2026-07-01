@@ -37,6 +37,24 @@ applyTo: "**/*.{tsx,jsx}"
 - Verify the target device matrix from `docs/EXPERIENCE.md` (phone/tablet/desktop, orientation).
 - Honor `prefers-reduced-motion` and `prefers-color-scheme` where applicable.
 
+## Accessibility (WCAG 2.1 AA)
+- Target WCAG 2.1 AA. Semantic HTML first; ARIA only to fill gaps, never to paper over non-semantic markup.
+- Contrast ≥ 4.5:1 (text) / 3:1 (large text & UI). Visible focus. Full keyboard operability; logical tab order.
+- Label every input; associate errors via `aria-describedby`. Don't convey meaning by color alone.
+- Check locally (optional installs): axe DevTools / `@axe-core/playwright`, Lighthouse a11y.
+
+## Internationalization (i18n)
+- No hardcoded user-facing strings — externalize to message catalogs; keys, not sentences, in code.
+- Format dates/numbers/currency via `Intl` (`Intl.DateTimeFormat`/`NumberFormat`), not manual concatenation.
+- Never assume LTR — support RTL (logical CSS props: `margin-inline`, `padding-inline`). No text baked into images.
+- Render times in the user's timezone from UTC; show currency with its ISO code. Plurals via `Intl.PluralRules`.
+
+## Performance budget & Core Web Vitals
+- Budgets (field targets): LCP ≤ 2.5s, INP ≤ 200ms, CLS ≤ 0.1. Regressions past budget block merge (advisory locally).
+- JS bundle budget per route (e.g. ≤ 170KB gzip initial); code-split + lazy-load below-the-fold/route-level.
+- Images: right-sized, lazy, modern formats (AVIF/WebP), explicit width/height to avoid layout shift.
+- No render-blocking work in the critical path; measure with Lighthouse / web-vitals before release.
+
 ## Tooling (local)
 - Format: Prettier. Lint: ESLint (`eslint-config-next`, `@typescript-eslint`).
 - Test: Vitest + React Testing Library. E2E: Playwright.

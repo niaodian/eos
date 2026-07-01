@@ -15,6 +15,7 @@ applyTo: "**/*.ts"
 ## Validation & Errors
 - Validate all input at the boundary with zod. Reject invalid early.
 - Typed error hierarchy; map to HTTP status in one place. Never leak stack traces to clients.
+- Time in UTC across the wire/DB (convert at edges); money as integer minor units or a decimal type + ISO currency (never float).
 
 ## Logging & Observability
 - Structured JSON logs with request id. No PII in logs.

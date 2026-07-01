@@ -14,6 +14,7 @@ applyTo: "**/*.go"
 ## Validation & Errors
 - Validate input at the boundary; reject invalid early.
 - Wrap errors with `fmt.Errorf("...: %w", err)`; never discard with `_`.
+- Time in UTC (`time.Time` UTC); money as integer minor units or a decimal type + ISO currency (never float).
 - Map errors to HTTP status in one place. Never leak internals to clients.
 
 ## Concurrency

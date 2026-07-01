@@ -7,6 +7,8 @@ applyTo: "**"
 
 - Validate & sanitize all external input at boundaries.
 - Enforce authz at every state-changing operation; deny by default.
+- Multi-tenant: scope every data access by tenant from the authenticated context (never client-supplied);
+  deny cross-tenant by default (a missing tenant scope must fail, not return everything).
 - Secrets only via env/secret store; never in code, logs, fixtures, or the frontend bundle.
   Keep a committed `.env.example` (placeholders) and gitignore the real `.env`.
 - Run dependency audit before release (`npm audit` / `pip-audit`). Needs a lockfile
