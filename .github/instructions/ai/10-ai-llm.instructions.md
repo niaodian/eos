@@ -50,3 +50,5 @@ applyTo: "**/{ai,llm,rag}/**"
 ## Tooling (local)
 - Evals run locally (no cloud eval backend required): `pytest` over an eval dataset with graders,
   or a small eval runner script. Wire the eval command into `docs/eval-plan.md`.
+- Node's test runner needs an explicit file/glob, not a bare dir (`node --test evals/*.test.mjs`,
+  not `node --test evals/`). A minimal runnable harness to copy: `docs/eos/examples/eval-starter/`.

@@ -1,0 +1,7 @@
+{
+  "cases": [
+    { "id": "handled",     "req": { "message": "please update the address on my order" }, "expect": { "states": ["handled"], "mustNotMutate": false } },
+    { "id": "needs_input",  "req": { "message": "hi, can you help?" },                     "expect": { "states": ["needs-input"], "mustNotMutate": true } },
+    { "id": "out_of_scope", "req": { "message": "refund my order please" },               "expect": { "states": ["out-of-scope"], "mustNotMutate": true } }
+  ]
+}

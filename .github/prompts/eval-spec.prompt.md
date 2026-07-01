@@ -27,6 +27,13 @@ For each LLM-backed acceptance criterion:
 4. **Cost/latency budget** — max tokens & cost per request, p95 per-call latency (ties to C-nfr).
 5. **Safety checks** — prompt-injection resistance, no secret/PII leakage, output moderation.
 
+## How to run (local, offline)
+- Node: `node --test evals/*.test.mjs` (pass an explicit file/glob — a bare `evals/` dir errors
+  under Node 23's `--test`; wrap it in an npm script `"eval": "node --test evals/*.test.mjs"`).
+- Python: `pytest evals/ -q`.
+- Don't start from scratch: copy `docs/eos/examples/eval-starter/` (a tiny runnable harness —
+  dataset + graders + runner + stub) and replace the stub with your agent.
+
 ## Gate G-EVAL (for LLM/agentic work)
 - [ ] Every LLM-backed AC has ≥1 eval case with a grader and a pass threshold.
 - [ ] A regression baseline exists; the eval command runs locally.
