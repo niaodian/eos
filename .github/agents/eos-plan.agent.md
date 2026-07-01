@@ -4,7 +4,7 @@ tools: ['search', 'editFiles']
 handoffs:
   - label: Start Development
     agent: agent
-    prompt: Implement the next ready story with bmad-dev-story.
+    prompt: Implement the next ready story with bmad-dev-story, then run bmad-code-review and resolve blocking findings before the story is done (G6).
     send: false
 ---
 # EOS Planning Agent

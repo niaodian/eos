@@ -77,9 +77,11 @@ node .github/hooks/validate-config.mjs   # 配置自检，期望输出 PASS
 （切换 agent）eos-discovery        → docs/discovery.md      (Gate G1)
 /requirements "<feature>"          → docs/requirements.md   (Gate G2)
 /spec                              → docs/prd.md            (Gate G3)
+/ux-spec（面向用户，纯后端跳过）   → docs/DESIGN.md + docs/EXPERIENCE.md (Gate G-UX)
 （切换 agent）eos-architecture     → docs/architecture.md + api/openapi.yaml + ADR (Gate G4)
 （handoff）eos-plan                → docs/stories/*.md      (Gate G5)
 （handoff）bmad-dev-story          → src/ 代码             (Gate G6)
+bmad-code-review                   → 审查无阻断项           (Gate G6)
 ```
 
 > 每个 `→` 都是一道门。**没过门不要进下一阶段**——这正是 EOS 防返工的核心。
@@ -229,7 +231,7 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 | G-UX | UX & Design（条件） | 面向用户：每条需求有屏幕/流程/四态/a11y/视觉token；纯后端 SKIP+理由 |
 | G4 | Architecture | 不可逆决策有 ADR；NFR/扩展/容灾各有显式设计 |
 | G5 | Planning | 每个 story 上下文自包含、可独立实现、含 AC |
-| G6 | Development | lint/typecheck/单测全绿（hook 质量门） |
+| G6 | Development | lint/typecheck/单测全绿（hook 质量门）+ 代码审查无阻断项 |
 | G7 | Testing | 每条 AC ≥1 测试且全绿；trace 矩阵完整 |
 | **G8** | Release | **质量+审计+回滚+灰度+NFR 五项门禁全过（必过硬门）** |
 | G9 | Observability | 关键路径埋点在产、指标可见 |
@@ -388,16 +390,16 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 
 | 项 | 内容 |
 |---|---|
-| **目标** | 实现 story，受栈规则 + 护栏约束 |
+| **目标** | 实现 story，受栈规则 + 护栏约束，**完成前过代码审查** |
 | **何时进入** | G5 通过、story = Ready |
-| **怎么启动** | Chat 输入 **`bmad-dev-story`**（或 `（agent）eos-plan` 的 handoff "Start Development"；快速场景用 `bmad-quick-dev`） |
+| **怎么启动** | Chat 输入 **`bmad-dev-story`** 实现（快速场景用 `bmad-quick-dev`）；实现后跑 **`bmad-code-review`**（三路对抗审查：Blind Hunter / Edge Case Hunter / Acceptance Auditor），解掉阻断项再进 G7 |
 | **输入** | `docs/stories/story-XXX.md` |
-| **产出** | `src/` 代码 + 对应测试 |
+| **产出** | `src/` 代码 + 对应测试 + **代码审查结论（阻断项已解）** |
 | **自动生效的规则** | 编辑 `.tsx/.jsx`→R3 前端规则；`.ts`→R4 后端；`.sql/.prisma`→R5；`.test.*`→R6；**全部** `**`→R1+R2+R7（按 applyTo 自动注入，你无需手动加载） |
 | **护栏（自动）** | **PreToolUse** `deny-dangerous.js` 拦截 `rm -rf /`、`DROP TABLE`、`git push --force` 等；**PostToolUse** `quality.json` 跑 lint+typecheck+test |
-| **决策门 G6** | ☑ lint/typecheck/单测全绿（质量门 hook 放行） |
-| **必查项** | 危险操作真的被拦了吗？质量门是不是因为缺 `package.json` test 脚本而空跑？ |
-| **防返工** | Hooks 把约束从"靠 Agent 自觉"变成"确定性拦截"。 |
+| **决策门 G6** | ☑ lint/typecheck/单测全绿（质量门 hook 放行）☑ **代码审查无阻断项（`bmad-code-review`）** |
+| **必查项** | 危险操作真的被拦了吗？质量门是不是因为缺 `package.json` test 脚本而空跑？**代码审查跑了吗？阻断项都解了还是被无声跳过**？ |
+| **防返工** | Hooks 把约束从"靠 Agent 自觉"变成"确定性拦截"；**代码审查补上自动化查不出的设计/逻辑/边界/安全盲区**——两者互补，缺一不可。 |
 | **样例** | `my-app/src/auth.js`（零依赖 `node:crypto`）；质量门模拟 exit 0、10/10 测试通过 |
 
 > 质量门要真正生效，项目 `package.json` 需有 `test`（及可选 `lint`/`typecheck`）脚本，
@@ -480,7 +482,7 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 | 3.5 UX & Design | `/ux-spec`（或 `（agent）eos-design`） | `DESIGN.md`+`EXPERIENCE.md` | G-UX（条件） |
 | 4 Architecture | `（agent）eos-architecture` + `/adr` | `architecture.md`+`openapi.yaml`+`adr/*` | G4 |
 | 5 Planning | `（agent）eos-plan` | `docs/stories/*` | G5 |
-| 6 Development | `bmad-dev-story` | `src/*` | G6 |
+| 6 Development | `bmad-dev-story` → `bmad-code-review` | `src/*` + 审查结论 | G6 |
 | 7 Testing | `bmad-tea`/`bmad-testarch-*` | tests + `trace-matrix.md` | G7 |
 | 8 Release | `/release-gate`（+`/runbook`） | 门禁报告 + runbook | **G8★** |
 | 9 Observability | `/telemetry-plan` | `docs/telemetry-plan.md` | G9 |
@@ -511,7 +513,7 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 | `eos-discovery` | 1 问题定义 | bmad-brainstorming, bmad-agent-analyst, bmad-forge-idea | → `/requirements` |
 | `eos-design` | 3.5 UX/设计 | bmad-ux, bmad-agent-ux-designer(Sally), bmad-cis-design-thinking(Maya) | → `eos-architecture` |
 | `eos-architecture` | 4 架构 | bmad-architecture（Winston） | → `eos-plan` |
-| `eos-plan` | 5 计划 | bmad-create-epics-and-stories, bmad-create-story, bmad-sprint-planning | → `bmad-dev-story` |
+| `eos-plan` | 5 计划 | bmad-create-epics-and-stories, bmad-create-story, bmad-sprint-planning, bmad-testarch-atdd | → `bmad-dev-story` → `bmad-code-review` |
 | `eos-review` | 10 迭代 | bmad-correct-course, bmad-retrospective, bmad-document-project | → `/requirements`（下一轮） |
 
 > **如何切换 agent**：Copilot Chat 顶部的 agent 选择器 → 选中目标 agent。切换后该 persona
@@ -774,6 +776,7 @@ npm audit                                           # 发布前依赖审计
   /nfr                       #   └ 填 NFR 目标值
 （agent）eos-plan             # 阶段5：拆 story         → G5
 bmad-dev-story               # 阶段6：实现            → G6
+bmad-code-review             #   └ 完成前代码审查(无阻断项) → G6
 bmad-tea / bmad-testarch-*   # 阶段7：测试+追溯        → G7
 /runbook <service>           # 阶段8：先备 runbook
 /release-gate                # 阶段8：发布门禁         → G8★
