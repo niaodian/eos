@@ -33,7 +33,7 @@ jobs:
       - name: EOS SDLC gate doctor (G-EVAL / G-UX wiring + secret hygiene)
         run: node .github/hooks/eos-doctor.mjs
 
-      - name: EOS secret scan (no hardcoded secrets in tracked files)
+      - name: EOS secret scan (built-in patterns + gitleaks if available)
         run: node .github/hooks/secret-scan.mjs
 
       - name: Quality gate + evals (only if the project has a package.json)

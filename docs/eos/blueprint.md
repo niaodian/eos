@@ -163,7 +163,7 @@ mkdir -p ~/.git-templates/eos && cp -R <golden>/.github ~/.git-templates/eos/
 git config --global init.templateDir ~/.git-templates/eos
 ```
 
-版本化：`docs/eos/VERSION`（当前 `eos-1.2.0`）。升级用 `degit` 拉新版到 /tmp 后 `diff -ru` 合并，
+版本化：`docs/eos/VERSION`（当前 `eos-1.2.1`）。升级用 `degit` 拉新版到 /tmp 后 `diff -ru` 合并，
 再跑 `validate-config.mjs` + `bmad-code-review`。
 
 ---
@@ -275,7 +275,7 @@ git config --global init.templateDir ~/.git-templates/eos
 │ L5 治理层  .github/hooks/guardrails.json (PreToolUse 拦截)     │
 │            .github/hooks/quality.json   (PostToolUse 质量门)   │
 │            .github/hooks/config-check.json (配置自检+门诊)     │
-│            .github/hooks/secret-scan.mjs (密钥/投毒扫描)        │
+│            .github/hooks/secret-scan.mjs (密钥扫描+gitleaks可选)│
 │            .github/workflows/eos-ci.yml (act 本地 CI 批量门)    │
 │            ▲ 三层强制：实时Hook＋配置静态＋CI全仓批量           │
 ├──────────────────────────────────────────────────────────────┤

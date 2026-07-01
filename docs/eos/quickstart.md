@@ -5,7 +5,7 @@
 |---|---|---|
 | **Node.js** (18+) | validators, hooks, JS/TS tests & evals | required — the only hard dependency |
 | **Docker** + `act` | local CI (`act push`) — runs GitHub Actions locally | **optional**: skip CI and run the same checks directly (below) |
-| stack toolchains (pnpm, python/pytest, go, spectral, golangci-lint…) | only the stack you actually use | install on demand; each is optional per stack |
+| stack toolchains (pnpm, python/pytest, go, spectral, golangci-lint, gitleaks…) | only the stack you use; `gitleaks` deepens secret scanning | install on demand; each is optional (secret-scan falls back to built-in patterns without gitleaks) |
 
 - **No network required** for the core flow (validators, hooks, tests, evals all run offline).
 - **One-time online step**: the *first* `act` run pulls a runner image + actions (cached afterwards);

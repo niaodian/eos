@@ -1,9 +1,10 @@
 #!/usr/bin/env node
-// EOS secret scanner — zero external deps. Static defense-in-depth for hardcoded secrets.
+// EOS secret scanner — zero external deps for the baseline; auto-enhances with gitleaks if present.
 // Scans git-tracked text files (and the working tree if not a repo) for secret literals and
 // for a committed .env. Complements the PreToolUse guardrail (real-time) and CI (batch).
 //   node .github/hooks/secret-scan.mjs
-// Exit 1 on any finding. Redacts matches in output (never prints the secret).
+// If `gitleaks` is on PATH it ALSO runs a deeper scan (optional enhancement — never required;
+// absence degrades gracefully to the built-in patterns). Exit 1 on any finding. Matches redacted.
 import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 import { join, extname } from 'node:path';
@@ -73,10 +74,36 @@ for (const rel of listFiles()) {
   });
 }
 
+// --- Optional deeper scan: gitleaks (if installed). Enhancement only — never required. ---
+let gitleaksRan = false;
+let gitleaksFailed = false;
+function hasGitleaks() {
+  try { execSync('gitleaks version', { stdio: 'ignore' }); return true; } catch { return false; }
+}
+if (hasGitleaks()) {
+  gitleaksRan = true;
+  const cfg = join(root, '.gitleaks.toml');
+  const cfgArg = existsSync(cfg) ? `--config ${JSON.stringify(cfg)}` : '';
+  const isRepo = existsSync(join(root, '.git'));
+  // `dir` scans the filesystem (works with or without git history); redaction on.
+  const cmd = `gitleaks dir . ${cfgArg} --no-banner --redact --exit-code 2`.replace(/\s+/g, ' ').trim();
+  try {
+    execSync(cmd, { cwd: root, stdio: 'ignore' });
+  } catch (e) {
+    // gitleaks exits non-zero (2) when it finds leaks; treat as failure.
+    if (e && e.status === 2) gitleaksFailed = true;
+    else gitleaksFailed = false; // other errors (e.g. usage) shouldn't hard-fail the baseline
+  }
+}
+
 console.log('EOS secret scan\n');
-if (findings.length) {
+const engine = gitleaksRan ? 'built-in patterns + gitleaks' : 'built-in patterns (install gitleaks for deeper scan)';
+console.log(`  engine: ${engine}`);
+if (findings.length || gitleaksFailed) {
   for (const f of findings) console.log(`  LEAK  ${f.file}:${f.line}  ${f.kind}${f.sample ? `  (${f.sample})` : ''}`);
-  console.log(`\nFAIL: ${findings.length} potential secret(s). Move to env vars / a secret store; add a .env.example instead.`);
+  if (gitleaksFailed) console.log('  LEAK  gitleaks reported findings — run `gitleaks dir . --redact` for details.');
+  const n = findings.length + (gitleaksFailed ? 1 : 0);
+  console.log(`\nFAIL: ${n} potential secret source(s). Move to env vars / a secret store; add a .env.example instead.`);
   process.exit(1);
 }
 console.log('PASS — no hardcoded secrets found in tracked files.');

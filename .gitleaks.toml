@@ -1,0 +1,25 @@
+# EOS gitleaks config — optional deeper secret scan (used by secret-scan.mjs if gitleaks is installed).
+# Extends gitleaks' built-in ruleset and allowlists the template's intentional placeholders/patterns.
+# Docs: https://github.com/gitleaks/gitleaks
+[extend]
+useDefault = true
+
+[allowlist]
+description = "EOS intentional placeholders and pattern files (not real secrets)"
+paths = [
+  # Placeholder env template (values are <your-key>/changeme etc., never real).
+  '''\.env\.example$''',
+  # Runnable eval-starter stubs and any example dirs.
+  '''docs/eos/examples/.*''',
+  # The scanners themselves contain secret-shaped REGEXES, not secrets.
+  '''\.github/hooks/secret-scan\.mjs$''',
+  '''\.github/hooks/deny-dangerous\.js$''',
+  # Generated PDF/HTML artifacts.
+  '''docs/eos/.*\.(pdf|html)$''',
+]
+regexes = [
+  # Allow obvious placeholder / env-reference forms anywhere.
+  '''(process\.env|os\.environ|import\.meta\.env|System\.getenv)''',
+  '''<[A-Z0-9_]+>''',
+  '''(example|placeholder|changeme|your[_-]|xxx+|redacted)''',
+]

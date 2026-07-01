@@ -3,7 +3,7 @@
 > Walk at G2 (requirements) and re-verify at G8 (release). Supply-chain + secret hygiene.
 
 ## Secrets & config isolation
-- [ ] No secret in code / logs / fixtures / frontend bundle (`node .github/hooks/secret-scan.mjs` PASS)
+- [ ] No secret in code / logs / fixtures / frontend bundle (`node .github/hooks/secret-scan.mjs` PASS; deeper: `gitleaks` if installed)
 - [ ] `.env` gitignored; `.env.example` committed with placeholders only
 - [ ] No secret behind `NEXT_PUBLIC_` / `VITE_` (those ship to the browser)
 - [ ] Secrets sourced from env / a secret store; injected at runtime, not baked into images

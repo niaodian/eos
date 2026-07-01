@@ -15,6 +15,8 @@ applyTo: "**"
   distrust install scripts from unknown packages (`npm ci --ignore-scripts` when vetting); watch for
   typosquatted/newly-published deps. Never pipe a remote script into a shell (`curl … | bash`).
 - Scan for leaked secrets: `node .github/hooks/secret-scan.mjs` (also run by CI + eos-doctor).
+  Optional deeper scan: install `gitleaks` and secret-scan.mjs auto-uses it (allowlist in `.gitleaks.toml`);
+  absence degrades gracefully to the built-in patterns.
 - Classify data (public/internal/PII); encrypt PII at rest & in transit.
 - Config isolation: separate dev/staging/prod config; least-privilege credentials per environment;
   rotate keys; never reuse prod secrets locally. See `docs/checklists/E-security.md`.

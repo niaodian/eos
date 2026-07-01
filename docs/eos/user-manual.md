@@ -1,6 +1,6 @@
 # EOS 用户手册（Engineering Operating System User Manual）
 
-> 版本：与 `docs/eos/VERSION` 同步（当前 `eos-1.2.0`）
+> 版本：与 `docs/eos/VERSION` 同步（当前 `eos-1.2.1`）
 > 适用：VS Code 1.120.0 + GitHub Copilot + 已安装 73 个 `bmad-*` skill（用户级）
 > 定位：本手册是**操作指南（怎么用）**；设计原理与取舍见同目录 `blueprint.md`（为什么这么设计）。
 > 约定：正文中文；文件名/路径/命令/配置键保留英文原文。
@@ -556,7 +556,7 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 | `config-check.json` | PostToolUse | 每次编辑后自动跑 `validate-config.mjs`（配置 S1–S9）**＋ `eos-doctor.mjs`（SDLC 门诊 / G-EVAL 连线 / 密钥扫描）** |
 | `validate-config.mjs` | 手动/被 hook 调用 | 零依赖静态验证器（S1–S9） |
 | `eos-doctor.mjs` | **PostToolUse（逐编辑，经 `config-check.json`）** / 手动 / 被 CI 调用 | 零依赖 SDLC 门诊：G-EVAL、G-UX、**D4 密钥扫描（调 `secret-scan.mjs`）** |
-| `secret-scan.mjs` | 手动 / 被 eos-doctor + CI 调用 | 零依赖密钥扫描：追踪文件里的硬编码密钥/私钥、误提交的 `.env`（命中即 exit 1，输出脱敏） |
+| `secret-scan.mjs` | 手动 / 被 eos-doctor + CI 调用 | 密钥扫描：内置零依赖正则（硬编码密钥/私钥、误提交 `.env`）**＋ 若装了 `gitleaks` 自动叠加深度扫描**（`.gitleaks.toml` 白名单）；命中 exit 1、输出脱敏 |
 
 **手动测试护栏**（终端）：
 ```sh
@@ -702,7 +702,7 @@ gh repo create my-app --template niaodian/eos-template --private --clone
 
 ## 10.4 版本化与升级
 
-- 每次改 EOS 配置：改 `docs/eos/VERSION`（如 `eos-1.2.0`→`eos-1.3.0`），跑 `validate-config.mjs`，Conventional Commits 提交。
+- 每次改 EOS 配置：改 `docs/eos/VERSION`（如 `eos-1.2.1`→`eos-1.3.0`），跑 `validate-config.mjs`，Conventional Commits 提交。
 - 升级既有项目：从新版模板 diff `.github/`，挑选合并；用户级 `bmad-*` 独立升级。
 
 ---
