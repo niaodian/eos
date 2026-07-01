@@ -36,4 +36,10 @@ Any unmet item => BLOCKER. These contracts win over any later mock or import,
 and they are the source of truth for the frontend rules (a11y + loading/empty/error states)
 and for `/telemetry-plan` instrumentation of user actions.
 
-Output: `docs/DESIGN.md`, `docs/EXPERIENCE.md`. Next: architecture honors these contracts.
+Output: `docs/DESIGN.md`, `docs/EXPERIENCE.md`.
+
+> **Next (after G-UX):** switch to the `eos-architecture` agent in the Chat mode picker
+> (this hop is manual — a prompt workflow can't render a handoff button). That agent honors
+> `docs/EXPERIENCE.md` + `docs/DESIGN.md` as contracts and produces the architecture (Gate G4);
+> run `/adr` for each irreversible decision. From `eos-architecture` onward the chain is
+> button-driven: `eos-architecture → eos-plan → (dev)`.

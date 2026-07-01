@@ -24,3 +24,5 @@ Any unresolved item => mark BLOCKER. Do not proceed to Spec until cleared.
 
 ## Output
 Write `docs/requirements.md` with an "Operational Pre-Flight Decision Table" at the top.
+
+> **Next (after G2 clears):** run `/spec` to turn this into the PRD (Gate G3).

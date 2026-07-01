@@ -13,3 +13,8 @@ tools: ['search', 'editFiles']
 4. Validate with skill `bmad-validate-prd`. Any failed criterion => BLOCKER.
 
 Output: `docs/prd.md`.
+
+> **Next (after G3):** if the product is user-facing, run `/ux-spec` (Gate G-UX).
+> For a pure backend / API / CLI, skip UX and **switch to the `eos-architecture` agent**
+> in the Chat mode picker (Gate G4) — this is a manual hop, because a prompt workflow
+> cannot render a handoff button.
