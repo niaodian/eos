@@ -1,6 +1,6 @@
 # EOS 用户手册（Engineering Operating System User Manual）
 
-> 版本：与 `docs/eos/VERSION` 同步（当前 `eos-1.1.0`）
+> 版本：与 `docs/eos/VERSION` 同步（当前 `eos-1.1.1`）
 > 适用：VS Code 1.120.0 + GitHub Copilot + 已安装 73 个 `bmad-*` skill（用户级）
 > 定位：本手册是**操作指南（怎么用）**；设计原理与取舍见同目录 `blueprint.md`（为什么这么设计）。
 > 约定：正文中文；文件名/路径/命令/配置键保留英文原文。
@@ -552,9 +552,9 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 |---|---|---|
 | `guardrails.json` + `deny-dangerous.js` | PreToolUse | 拦截危险操作（输出 `hookSpecificOutput.permissionDecision:"deny"`） |
 | `quality.json` | PostToolUse | 写文件后跑 lint+typecheck+test 质量门 |
-| `config-check.json` | PostToolUse | 改规则文件后自动跑 `validate-config.mjs` |
+| `config-check.json` | PostToolUse | 每次编辑后自动跑 `validate-config.mjs`（配置 S1–S9）**＋ `eos-doctor.mjs`（SDLC 门诊 / G-EVAL 连线）** |
 | `validate-config.mjs` | 手动/被 hook 调用 | 零依赖静态验证器（S1–S9） |
-| `eos-doctor.mjs` | 手动/被 CI 调用 | 零依赖 SDLC 门诊：G-EVAL（有 `ai/llm/rag` 代码 ⇒ 必须有 `docs/eval-plan.md`）、G-UX 提醒 |
+| `eos-doctor.mjs` | **PostToolUse（逐编辑，经 `config-check.json`）** / 手动 / 被 CI 调用 | 零依赖 SDLC 门诊：G-EVAL（有 `ai/llm/rag` 代码 ⇒ 必须有 `docs/eval-plan.md`）、G-UX 提醒 |
 
 **手动测试护栏**（终端）：
 ```sh
@@ -569,7 +569,7 @@ echo '{"tool_input":{"command":"ls"}}' | node .github/hooks/deny-dangerous.js
 act push -j verify            # 跑 .github/workflows/eos-ci.yml：validate-config + eos-doctor + tests + evals
 act push --pull=false --action-offline-mode   # 首次拉过镜像后可完全离线
 ```
-> 三道强制层各司其职：**Hook**=逐编辑实时 · **validate-config/eos-doctor**=静态门诊 · **act CI**=合并/发布前全仓批量。
+> 三道强制层各司其职：**Hook（逐编辑实时）**=`config-check.json` 每次编辑跑 `validate-config.mjs`+`eos-doctor.mjs`（配置合规 + G-EVAL 连线）、`quality.json` 跑质量门、`guardrails.json` 拦危险操作 · **静态校验（手动/按需）**=同两个脚本可随时手跑 · **act CI（合并/发布前全仓批量）**=`eos-ci.yml` 跑 validate-config+eos-doctor+tests+evals。同一门（如 G-EVAL）在逐编辑与 CI 两处都强制，早发现也防漏网。
 
 ## 7.6 四张需求清单（`docs/checklists/`）
 
@@ -699,7 +699,7 @@ gh repo create my-app --template niaodian/eos-template --private --clone
 
 ## 10.4 版本化与升级
 
-- 每次改 EOS 配置：改 `docs/eos/VERSION`（如 `eos-1.1.0`→`eos-1.2.0`），跑 `validate-config.mjs`，Conventional Commits 提交。
+- 每次改 EOS 配置：改 `docs/eos/VERSION`（如 `eos-1.1.1`→`eos-1.2.0`），跑 `validate-config.mjs`，Conventional Commits 提交。
 - 升级既有项目：从新版模板 diff `.github/`，挑选合并；用户级 `bmad-*` 独立升级。
 
 ---
