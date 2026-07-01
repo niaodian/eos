@@ -62,6 +62,11 @@
 
 > 多个 `applyTo: "**"` 的薄规则（如 workspace + security）覆盖**不同主题**时是**叠加而非冲突**，
 > 属合法模式（`validate-config.mjs` 对 `**` 豁免 S3 重复检测）。
+>
+> **双范式隔离**（确定性 SaaS ↔ 概率性 Agentic）：后端栈规则管确定性侧（事务/幂等、断路器+指数退避+超时、
+> OTel RED 信号）；`ai/10-ai-llm` 管概率性侧（认知反思重试、记忆分层 短期/长期向量库/强一致 SQL、异步解耦、
+> token/context/tool tracing）。**两侧的容错与状态机制显式禁止互换**；混合项目在 G4 由 `eos-architecture`
+> 检查异步解耦点与范式隔离。
 
 R1（Global）模板不变：仅放全项目公约数，引用 `docs/eos/agent-map.md` 复用 73 个 bmad-*。
 
@@ -163,7 +168,7 @@ mkdir -p ~/.git-templates/eos && cp -R <golden>/.github ~/.git-templates/eos/
 git config --global init.templateDir ~/.git-templates/eos
 ```
 
-版本化：`docs/eos/VERSION`（当前 `eos-1.3.1`）。升级用 `degit` 拉新版到 /tmp 后 `diff -ru` 合并，
+版本化：`docs/eos/VERSION`（当前 `eos-1.4.0`）。升级用 `degit` 拉新版到 /tmp 后 `diff -ru` 合并，
 再跑 `validate-config.mjs` + `bmad-code-review`。
 
 ---

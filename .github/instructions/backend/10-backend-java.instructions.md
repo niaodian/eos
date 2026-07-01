@@ -22,6 +22,9 @@ applyTo: "**/*.java"
 
 ## Logging & Observability
 - SLF4J + JSON encoder, MDC request id. No PII. Micrometer metrics at boundaries.
+- Resilience (deterministic, not AI reflection): timeout + backoff-with-jitter + circuit breaker
+  (Resilience4j) on external calls (idempotent retries); `@Transactional` boundary kept short; long/
+  blocking work off the request thread via a queue. Export OpenTelemetry RED signals (QPS/5xx/p95-p99).
 
 ## AuthZ
 - Method/endpoint security; deny by default. Authorize in the service layer.

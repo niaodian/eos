@@ -23,6 +23,9 @@ applyTo: "**/*.go"
 
 ## Logging & Observability
 - Structured logs via `log/slog` (JSON) with request id. No PII. Emit metrics at boundaries.
+- Resilience (deterministic, not AI reflection): timeout + backoff-with-jitter + circuit breaker on
+  external calls (idempotent retries); short transactions with an explicit atomic boundary; long/blocking
+  work off the request path via a queue. Instrument with OpenTelemetry (RED signals: QPS/5xx/p95-p99).
 
 ## AuthZ
 - Enforce authorization in the service layer; deny by default.

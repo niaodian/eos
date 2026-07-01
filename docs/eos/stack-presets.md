@@ -103,6 +103,7 @@
   ```
 - **R3**：`ai/10-ai-llm.instructions.md`（已发布，`**/{ai,llm,rag}/**`）——prompt 即制品、tool/agent 架构、非确定性评估、可复现、LLM 安全、tracing/成本
 - **Layout**：`ai/`（agents/tools/chains）· `ai/prompts/`（版本化 prompt）· `evals/`（评估集+grader）
+- **常见依赖治理**（按需，pin 版本）：编排 LangChain / LlamaIndex；向量库 Chroma(本地)/ Pinecone·Qdrant·Weaviate(托管)；provider SDK OpenAI/Anthropic。**同步阻塞的 LLM 调用不得在 Web 请求线程内**——走异步队列(Celery/BullMQ)，见 `ai/10-ai-llm` 的 Execution model。
 - **配套门**：`/eval-spec` 产 `docs/eval-plan.md`（条件门 **G-EVAL**，非 LLM 功能 SKIP+理由）；C-nfr 加成本/token/延迟/质量阈值
 - **起步骨架**：拷 `docs/eos/examples/eval-starter/`（零依赖可跑的 dataset+graders+runner+stub），换掉 stub 即用
 - **quality.json 内层命令**：`ruff check . && pytest -q && pytest evals/ -q`

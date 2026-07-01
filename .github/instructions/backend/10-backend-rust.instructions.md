@@ -23,6 +23,9 @@ applyTo: "**/*.rs"
 
 ## Logging & Observability
 - Structured logs via `tracing` (JSON subscriber) with request id. No PII. Metrics at boundaries.
+- Resilience (deterministic, not AI reflection): timeout + backoff-with-jitter + circuit breaker on
+  external calls (idempotent retries); short transactional boundary; long/blocking work off the request
+  path via a queue/worker. Instrument with OpenTelemetry (RED signals: QPS/5xx/p95-p99).
 
 ## AuthZ
 - Enforce authorization in the service layer; deny by default.

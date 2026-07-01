@@ -7,6 +7,11 @@ applyTo: "**/*.{test,spec}.*"
 
 - Pyramid: many unit, fewer integration, few E2E. No network in unit tests.
 - Each PRD acceptance criterion maps to >=1 test (traceability). Name: `describe(<criterion id>)`.
+- Stateful/SaaS modules: assert the **API contract** against `api/openapi.yaml` and the **DB state**
+  (transactions commit/rollback, constraints, idempotency) in integration tests — determinism gets the
+  same rigor the eval set gives the probabilistic side.
+- Dual-track: deterministic code → exact-assert unit/integration tests; LLM/agent code → the eval set
+  (graders + baseline, see `ai/10-ai-llm` + `/eval-spec`). Never exact-assert probabilistic output.
 - No flaky patterns: no real timers (use fakes), no order-dependent tests.
 - Coverage gate: changed lines >= 80% (enforced locally; see hooks/quality.json).
 - For test design/automation, invoke `bmad-testarch-test-design` / `bmad-testarch-automate`.

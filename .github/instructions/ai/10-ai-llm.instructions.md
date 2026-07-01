@@ -22,6 +22,11 @@ applyTo: "**/{ai,llm,rag}/**"
   per agent/node. Bound loops and recursion depth; never allow unbounded agent self-invocation.
 - Manage context deliberately: cap context-window assembly, summarize/trim, and record what went
   into each call. Treat memory/state stores as first-class (define read/write/evict policy).
+- Memory layering (do not conflate with SaaS persistence): keep three kinds distinct —
+  **short-term** (the context window / conversation scratch — ephemeral, rebuildable),
+  **long-term** (a vector store / retrieved knowledge — eventually-consistent, approximate recall),
+  and **strong-consistency** business state (that still belongs in SQL, not in a vector DB).
+  Never treat a vector store as a source of truth for transactional data.
 - Memory & self-improvement (be explicit, not magical): decide the scope of any persistent memory
   (session-only vs cross-session vs per-user), where it lives, its TTL/eviction, and PII rules —
   never silently accumulate user data. "Self-improvement" here means a bounded data flywheel:
@@ -47,10 +52,30 @@ applyTo: "**/{ai,llm,rag}/**"
 - Moderate/validate outputs before acting on them (especially tool calls, code exec, SQL, shell).
 - Ground answers in retrieved context; require citations where factual accuracy matters.
 
+## Fault tolerance (cognitive — distinct from deterministic retry)
+- Two failure classes, two mechanisms — never mix them:
+  - **Transport/provider errors** (timeout, 429, 5xx): deterministic retry with exponential backoff +
+    jitter + a per-call timeout and a circuit breaker, exactly like any network call. This does NOT
+    involve the model "thinking".
+  - **Cognitive failures** (hallucination, invalid tool args, schema-invalid output, failed grader):
+    a bounded **reflection** loop — capture the concrete error, inject it back into the prompt as
+    feedback, let the model correct, retry ≤ N times (small, e.g. 1–2), then **degrade** (fallback
+    answer / human handoff). Never loop unbounded; never "reflect" on a plain network timeout, and
+    never exponential-backoff-spam a model to fix a logic error (it burns tokens and rarely converges).
+- Validate tool output against its schema; a schema failure feeds the reflection loop, not a raw retry.
+
+## Execution model (don't block the request thread)
+- Any LLM/agent/tool call that can exceed ~1s must run OFF the web request path: enqueue to an async
+  worker/queue (e.g. Celery, BullMQ, a task runner) and return a job id; stream/poll results. A
+  high-concurrency web framework calling a synchronous multi-second LLM inline will exhaust the pool.
+- Bound concurrency to the provider's rate limits; apply the circuit breaker at the queue/worker layer.
+
 ## Observability & cost
 - Trace every chain/agent run (spans for each model/tool call). Log prompt id + version, model,
   tokens in/out, cost, latency, and outcome. Capture user feedback → eval/data flywheel.
-- Enforce token/cost budgets and per-call timeouts; add retry/fallback for provider errors.
+- Enforce token/cost budgets and per-call timeouts; add retry/fallback for provider errors (transport
+  class above). Emit spans in OpenTelemetry format so agent traces sit alongside service traces
+  (LangSmith/Phoenix/Langfuse can consume OTel); watch tokens, context-window occupancy, tool-use chains.
 
 ## Tooling (local)
 - Evals run locally (no cloud eval backend required): `pytest` over an eval dataset with graders,

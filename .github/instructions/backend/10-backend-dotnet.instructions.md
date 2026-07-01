@@ -23,6 +23,9 @@ applyTo: "**/*.cs"
 
 ## Logging & Observability
 - `ILogger<T>` structured logging with scopes (request id). No PII. Metrics/traces at boundaries.
+- Resilience (deterministic, not AI reflection): timeout + backoff-with-jitter + circuit breaker (Polly)
+  on external calls (idempotent retries); short transaction boundary; long/blocking work off the request
+  path via a queue/hosted service. Export OpenTelemetry RED signals (QPS/5xx/p95-p99).
 
 ## AuthZ
 - Authorization policies; deny by default. Authorize in the service layer, not just attributes.
