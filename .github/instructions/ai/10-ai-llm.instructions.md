@@ -22,6 +22,11 @@ applyTo: "**/{ai,llm,rag}/**"
   per agent/node. Bound loops and recursion depth; never allow unbounded agent self-invocation.
 - Manage context deliberately: cap context-window assembly, summarize/trim, and record what went
   into each call. Treat memory/state stores as first-class (define read/write/evict policy).
+- Memory & self-improvement (be explicit, not magical): decide the scope of any persistent memory
+  (session-only vs cross-session vs per-user), where it lives, its TTL/eviction, and PII rules —
+  never silently accumulate user data. "Self-improvement" here means a bounded data flywheel:
+  telemetry + user feedback → new eval cases → re-baseline (G-EVAL); model/prompt changes are
+  reviewed and versioned (ADR + prompt file), never auto-applied without passing the eval gate.
 
 ## Determinism & reproducibility
 - Pin model version/provider explicitly; do not float on "latest". Record it with outputs.

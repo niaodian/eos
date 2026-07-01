@@ -30,6 +30,13 @@ applyTo: "**/*.{tsx,jsx}"
 - Source of truth is `docs/EXPERIENCE.md` (flows + states + a11y) and `docs/DESIGN.md`
   (visual tokens) from the `/ux-spec` stage. Use named tokens; do not hardcode design values.
 
+## Responsive & multi-device
+- Mobile-first, fluid layouts. Design to breakpoints (e.g. sm/md/lg/xl), not fixed pixel widths.
+- No horizontal scroll at 320px; tap targets ≥ 44px; respect safe-area insets on mobile.
+- Use relative units (rem/%/clamp) + CSS grid/flex; avoid hardcoded heights that clip content.
+- Verify the target device matrix from `docs/EXPERIENCE.md` (phone/tablet/desktop, orientation).
+- Honor `prefers-reduced-motion` and `prefers-color-scheme` where applicable.
+
 ## Tooling (local)
 - Format: Prettier. Lint: ESLint (`eslint-config-next`, `@typescript-eslint`).
 - Test: Vitest + React Testing Library. E2E: Playwright.

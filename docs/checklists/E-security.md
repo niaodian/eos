@@ -17,6 +17,7 @@
 - [ ] Install scripts distrusted for unvetted packages (`--ignore-scripts` when auditing)
 - [ ] Dependency audit clean (`npm audit` / `pip-audit`); typosquat/new-maintainer check for critical deps
 - [ ] No `curl … | bash` / remote-script-to-shell in setup or CI
+- [ ] `【optional·maturity】` SBOM generated + artifacts/commits signed + provenance (regulated/enterprise delivery)
 
 ## AuthZ & data
 - [ ] Deny-by-default authz on every state-changing operation

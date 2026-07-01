@@ -28,6 +28,8 @@ For each concern below, require one explicit decision: **ADOPT** (write requirem
 | multi-tenancy | isolation level (row/db/instance) | tenant context propagation |
 | capacity/SLO | latency/throughput targets | capacity model, caching/sharding |
 | DR | RTO/RPO targets | backup / failover |
+| data lifecycle | retention/archive/deletion per data class; GDPR erasure/export | retention jobs, archival store, soft/hard-delete + audit |
+| high availability | redundancy / failover target (if the SLO needs it) | multi-instance, health checks, no single point of failure |
 | LLM/agentic (if applicable) | eval set + cost/token budget + safety (injection/PII) | model pinning, eval harness, tracing, output moderation |
 
 ## Output

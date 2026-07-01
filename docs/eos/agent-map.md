@@ -9,7 +9,7 @@
 | Architecture | bmad-architecture / bmad-create-architecture (Winston) |
 | Planning | bmad-create-epics-and-stories, bmad-create-story, bmad-sprint-planning, bmad-testarch-atdd, bmad-check-implementation-readiness |
 | Development | bmad-dev-story, bmad-agent-dev (Amelia), bmad-quick-dev, bmad-code-review |
-| Testing | bmad-tea (Murat), bmad-testarch-*, bmad-qa-generate-e2e-tests |
+| Testing | bmad-tea (Murat), bmad-testarch-*, bmad-qa-generate-e2e-tests; EOS `/spec-align` (AC coverage / first-pass rate) |
 | LLM Eval (if agentic) | EOS `/eval-spec` → docs/eval-plan.md; bmad-eval-runner (pattern ref only) |
 | Release/Ops | EOS prompts: /release-gate, /runbook |
 | Observability | EOS prompt: /telemetry-plan |

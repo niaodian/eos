@@ -163,7 +163,7 @@ mkdir -p ~/.git-templates/eos && cp -R <golden>/.github ~/.git-templates/eos/
 git config --global init.templateDir ~/.git-templates/eos
 ```
 
-版本化：`docs/eos/VERSION`（当前 `eos-1.2.1`）。升级用 `degit` 拉新版到 /tmp 后 `diff -ru` 合并，
+版本化：`docs/eos/VERSION`（当前 `eos-1.3.0`）。升级用 `degit` 拉新版到 /tmp 后 `diff -ru` 合并，
 再跑 `validate-config.mjs` + `bmad-code-review`。
 
 ---
@@ -314,7 +314,7 @@ git config --global init.templateDir ~/.git-templates/eos
 | 4 Architecture | 技术方案+数据模型+API 契约+NFR 落点+ADR | `eos-architecture`（包裹 `bmad-architecture` Winston）；`/adr` | G4：关键不可逆决策有 ADR；NFR 有落点 | `I:data-api`、`A:eos-architecture` | API 契约先于实现；扩展性显式审查 |
 | 5 Planning | Epics→Stories，各 story 上下文自包含 + 验收测试先行(ATDD) | `bmad-create-epics-and-stories`→`bmad-create-story`→`bmad-sprint-planning`；`bmad-testarch-atdd`；`bmad-check-implementation-readiness` | G5：story 就绪 + 每条 AC 有验收测试设计 | `A:eos-plan` | 就绪门防缺上下文；测试左移防"事后补测" |
 | 6 Development | 按 story 实现，受栈规则+护栏约束，**完成前过代码审查** | `bmad-dev-story`、`bmad-agent-dev`(Amelia)、**`bmad-code-review`** | G6：lint/typecheck/单测全绿 **且代码审查无阻断项** | `I:frontend/backend/data-api`（`applyTo`自动注入）+ `H:guardrails`（PreToolUse）+ `H:quality`（PostToolUse） | Hooks 确定性拦截 + 审查补自动化查不出的设计/逻辑/边界/安全问题 |
-| 7 Testing | 按测试策略验证+spec↔test 可追溯+**NFR 验证** | `bmad-tea`(Murat)、`bmad-testarch-trace`、`bmad-testarch-nfr`、`bmad-qa-generate-e2e-tests` | G7：每条验收≥1测试且全绿；**NFR 目标已验证或显式 deferred** | `I:testing` | trace 矩阵确保无未被测试的验收标准；**NFR 定了就必须验** |
+| 7 Testing | 按测试策略验证+spec↔test 可追溯+**NFR 验证**+**规范对齐量化** | `bmad-tea`(Murat)、`bmad-testarch-trace`、`bmad-testarch-nfr`、`bmad-qa-generate-e2e-tests`、`/spec-align` | G7：每条验收≥1测试且全绿；**NFR 已验**；**spec-alignment：AC 覆盖率/一次过率/无漂移** | `I:testing` | trace 矩阵确保无未测 AC；**spec-align 量化 Agent 输出的规范对齐度与一次过率** |
 | 8 Release | 过质量/安全/回滚/灰度/NFR 门后发布 | `/release-gate`；`/runbook` | **G8：5 项门禁全过（必过项）** | `I:release-ops`、`H:quality` | 无回滚/无灰度不得发布；NFR 未验不得发布 |
 | 9 Observability | 埋点上线、指标可见、运营闭环 | `/telemetry-plan` | G9：关键路径埋点在产 | `I:release-ops` | 埋点需求阶段设计，此处只做落实校验 |
 | 10 Iteration | 指标回流驱动下轮需求；管理架构演进 | `bmad-correct-course`、`bmad-retrospective`、`bmad-document-project`、`bmad-sprint-status` | G10：变更回写 Spec | `A:eos-review`（handoff 回 requirements） | 变更必须回写 Spec，防"代码与真相源漂移" |

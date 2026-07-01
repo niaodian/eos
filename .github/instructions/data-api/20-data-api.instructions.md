@@ -18,6 +18,13 @@ applyTo: "**/*.{sql,prisma}"
 - Every migration must be reversible (up/down). No destructive change without a rollback path.
 - Backfill large changes in batches; never lock critical tables at peak.
 
+## Data lifecycle & compliance
+- Define retention per data class (how long, then archive or purge). Don't keep PII "forever" by default.
+- Support subject deletion / export where PII is stored (GDPR/CCPA-style "right to erasure/access").
+- Archive cold data instead of unbounded growth; document the archival + restore path.
+- Backups: state cadence + restore test; encrypt backups; backups inherit the same PII rules.
+- Every deletion of user data is audited (who/when/what), without logging the data itself.
+
 ## API Contract (contract-first)
 - Define `api/openapi.yaml` BEFORE implementation. Version with `/v1` path prefix.
 - Breaking changes require a new version; deprecate, don't mutate.

@@ -1,6 +1,6 @@
 # EOS 用户手册（Engineering Operating System User Manual）
 
-> 版本：与 `docs/eos/VERSION` 同步（当前 `eos-1.2.1`）
+> 版本：与 `docs/eos/VERSION` 同步（当前 `eos-1.3.0`）
 > 适用：VS Code 1.120.0 + GitHub Copilot + 已安装 73 个 `bmad-*` skill（用户级）
 > 定位：本手册是**操作指南（怎么用）**；设计原理与取舍见同目录 `blueprint.md`（为什么这么设计）。
 > 约定：正文中文；文件名/路径/命令/配置键保留英文原文。
@@ -421,7 +421,7 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 | **输入** | `docs/prd.md`（AC 清单）、**`docs/checklists/C-nfr.md`（NFR 目标值）**、**`docs/eval-plan.md`（LLM 功能）**、`src/` 代码 |
 | **产出** | 测试套件 + `docs/trace-matrix.md`（AC ↔ 测试映射）+ **NFR 验证结果** + **eval 结果（LLM 功能）** |
 | **生效规则 R6** | 金字塔结构；**每条 AC ≥1 测试**；`describe(<criterion id>)` 命名；无真实计时器/无顺序依赖；改动行覆盖率 ≥80%；**NFR 目标用 `bmad-testarch-nfr` 验证**；**LLM 输出用 eval 集+grader 验(非 exact-match),见 `ai/10-ai-llm` 规则** |
-| **决策门 G7** | ☑ 每条 AC ≥1 测试 ☑ 全绿 ☑ trace 矩阵完整 ☑ **NFR 目标已验证或显式标 deferred+trigger** ☑ **LLM 功能:eval 达基线阈值、无回归(G-EVAL)** |
+| **决策门 G7** | ☑ 每条 AC ≥1 测试 ☑ 全绿 ☑ trace 矩阵完整 ☑ **NFR 目标已验证或显式标 deferred+trigger** ☑ **LLM 功能:eval 达基线阈值、无回归(G-EVAL)** ☑ **spec-alignment 量化（`/spec-align`：AC 覆盖率/一次过率/无漂移）** |
 | **必查项** | 有没有"没被任何测试覆盖的 AC"？**C-nfr 里定的 P95/吞吐/SLO 有没有被验证**（而不是定了就忘）？延后的有没有显式标 trigger？**LLM 的 eval 分达阈值了吗?prompt/模型改动有没有跑回归?** |
 | **防返工** | trace 矩阵让"漏测的验收标准"无所遁形；**NFR 验证让"定了目标却没人验"无所遁形**；**eval 回归让"改 prompt 改崩了别处"无所遁形**。 |
 | **样例** | `my-app/test/auth.test.js`（10 个 AC-traced 测试全绿）、`my-app/docs/trace-matrix.md`（11/12 AC 有测试，1 个性能项显式 deferred） |
@@ -504,6 +504,7 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 | `/spec` | 产出 PRD 真相源（bmad-create-prd + bmad-validate-prd） | `<docs/requirements.md 路径>` | `docs/prd.md` |
 | `/ux-spec` | 设计 UX/UI 视觉+体验契约（包裹 bmad-ux） | `<docs/prd.md 路径>` | `docs/DESIGN.md` + `docs/EXPERIENCE.md` |
 | `/eval-spec` | 设计 LLM/agentic 评估计划（条件门 G-EVAL） | `<docs/prd.md 路径>` | `docs/eval-plan.md` |
+| `/spec-align` | 量化规范对齐度（AC 覆盖率/一次过率/漂移，G7 度量） | — | 对齐度报告（`spec-align.mjs`） |
 | `/adr` | 记录一条架构决策 | `<决策标题>` | `docs/adr/NNN-*.md` |
 | `/nfr` | 把 C-nfr 逐行填具体目标值 | — | 更新 `C-nfr.md` + PRD NFR 段 |
 | `/telemetry-plan` | 设计埋点并对齐成功指标 | — | `docs/telemetry-plan.md` |
@@ -702,7 +703,7 @@ gh repo create my-app --template niaodian/eos-template --private --clone
 
 ## 10.4 版本化与升级
 
-- 每次改 EOS 配置：改 `docs/eos/VERSION`（如 `eos-1.2.1`→`eos-1.3.0`），跑 `validate-config.mjs`，Conventional Commits 提交。
+- 每次改 EOS 配置：改 `docs/eos/VERSION`（如 `eos-1.3.0`→`eos-1.4.0`），跑 `validate-config.mjs`，Conventional Commits 提交。
 - 升级既有项目：从新版模板 diff `.github/`，挑选合并；用户级 `bmad-*` 独立升级。
 
 ---

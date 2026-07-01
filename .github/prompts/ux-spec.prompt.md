@@ -15,7 +15,8 @@ use `bmad-cis-design-thinking` / Maya when the problem is still fuzzy):
 
 - `docs/DESIGN.md` — visual identity (owns *how it looks*: design tokens, type, color, spacing).
 - `docs/EXPERIENCE.md` — information architecture, user flows, screen states, interactions,
-  accessibility, journeys (owns *how it works*). Cross-reference DESIGN.md tokens by name.
+  accessibility, journeys, **target device matrix (phone/tablet/desktop + breakpoints)** (owns
+  *how it works*). Cross-reference DESIGN.md tokens by name.
 
 ## Scope decision (conditional gate)
 This stage is **conditional**. For a pure backend / API / CLI project with no user-facing
@@ -28,6 +29,8 @@ For EACH user-facing requirement in the PRD, verify:
 - [ ] All states are defined: loading / empty / error / success.
 - [ ] Accessibility baseline is stated (keyboard path, focus, labels, contrast).
 - [ ] Visual tokens it needs exist in `DESIGN.md` (referenced by name, not hardcoded).
+- [ ] Responsive/multi-device behavior is stated: target devices + breakpoints, and how the
+      layout adapts (or `single-target` with a reason for a fixed-surface app).
 
 Any unmet item => BLOCKER. These contracts win over any later mock or import,
 and they are the source of truth for the frontend rules (a11y + loading/empty/error states)
