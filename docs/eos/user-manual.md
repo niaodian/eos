@@ -30,6 +30,7 @@
 - [第 4 章 核心概念（五种机制）](#第-4-章-核心概念（五种机制）)
 - [第 5 章 心智模型：分层规则 + 决策门](#第-5-章-心智模型：分层规则--决策门)
 - [第 6 章 全生命周期实操（idea → 迭代）](#第-6-章-全生命周期实操（idea-→-迭代）)
+- [第 6.5 章 两条上手路径（SaaS vs Agentic · 小白友好）](#第-65-章-两条上手路径（saas-vs-agentic-·-小白友好）)
 - [第 7 章 完整参考（速查）](#第-7-章-完整参考（速查）)
 - [第 8 章 配置质检与验收](#第-8-章-配置质检与验收)
 - [第 9 章 故障定位与排错](#第-9-章-故障定位与排错)
@@ -494,6 +495,169 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 
 ---
 
+# 第 6.5 章 两条上手路径（SaaS vs Agentic · 小白友好）
+
+> 前面第 6 章讲了完整的 10 阶段。这一章把它落成**两条可照抄的具体路径**：一条做**传统 SaaS 软件**
+> （确定性），一条做 **Agentic/LLM 产品**（概率性）。两条路径**主干相同**（都走 G1→G10），只在
+> 少数阶段有专属动作。**你不需要背这些——照着抄命令即可。**
+
+## 6.5.0 先搞清：我这个项目是哪一类？
+
+| 问自己 | 传统 SaaS | Agentic/LLM |
+|---|---|---|
+| 核心逻辑是确定的吗？（同样输入→同样输出） | ✅ 是 | ❌ 否（LLM 有随机性） |
+| 有没有"调用大模型/RAG/agent"？ | 否 | ✅ 有 |
+| 例子 | 电商后台、CRM、订单系统、管理面板 | 智能客服、RAG 问答、AI 助手、多 agent 工作流 |
+| 关键难点 | 事务一致性、并发、权限 | 幻觉、评估、成本、prompt 注入 |
+
+> **混合项目**（如"SaaS 后台 + 一个 AI 客服模块"）：主体走 SaaS 路径，AI 模块那部分**额外**走
+> Agentic 路径的专属步骤（下面标 🟣 的）。EOS 的规则是**按目录自动生效**的——AI 代码放 `ai/`/`llm/`/`rag/`
+> 目录，就会自动叠加 Agentic 规则，其余代码走后端栈规则。两套机制**不会打架**（见第 6.5.3）。
+
+---
+
+## 6.5.1 路径 A — 传统 SaaS 软件（确定性）
+
+**示例目标**：做一个"待办事项 API"（增删改查 + 用户隔离）。全程复制命令即可。
+
+### 第 0 步：建项目 + 选栈（5 分钟）
+```sh
+npx degit --mode=git niaodian/eos-template todo-api && cd todo-api
+node .github/hooks/validate-config.mjs          # 期望 PASS
+```
+打开 `.github/instructions/00-workspace.instructions.md`，把 `Local commands` 换成你的栈。
+后端选 Node？从 `docs/eos/stack-presets.md` 抄 Node 那块。（Python/Go/Java/Rust/.NET 同理。）
+
+### 第 1–3 步：想清楚要做什么（Chat 里逐条输入）
+```
+（切到 agent）eos-discovery        → 产出 docs/discovery.md（问题+成功指标）
+/requirements "待办事项的增删改查，支持多用户隔离"   → docs/requirements.md（G2 硬门：五张清单）
+/spec                              → docs/prd.md（每条需求带验收标准 AC）
+```
+> **G2 硬门必过**：五张清单 A/B/C/D/E 无未决项。SaaS 项目尤其注意 **C-nfr 的性能/容灾**、
+> **D-ops 的权限矩阵/数据生命周期**、**E-security 的多租户隔离**。
+
+### 🔵 第 4 步：架构（SaaS 专属重点）
+```
+（切到 agent）eos-architecture     → architecture.md + data-model + api/openapi.yaml
+/adr "数据库选型"                   → 每个不可逆决策留一份 ADR
+```
+架构 agent 在 **G4** 会强制你的 SaaS 设计包含：
+- **事务边界**（哪些写操作必须原子）、**幂等键**（重试安全）
+- **确定性容错**：外部调用要有超时 + 指数退避 + 断路器（**不是** AI 那种反思重试）
+- **API 契约先行**：`openapi.yaml` 先于实现；破坏性变更走新版本 + 弃用政策
+- **多租户隔离**（若多租户）：每个查询按租户作用域，默认拒绝跨租户
+
+### 第 5–6 步：拆 story + 写代码
+```
+（切到 agent）eos-plan             → docs/stories/*（每个 story 含验收测试设计 ATDD）
+bmad-dev-story                     → src/ 代码（自动受后端栈规则约束）
+bmad-code-review                   → 代码审查，解掉阻断项（G6 完成定义）
+```
+写代码时**自动生效**的 SaaS 规则（你无需手动加载，编辑对应文件就触发）：分层（Routes→Services→Repos）、
+输入校验、事务/幂等、UTC 时间 + 货币用整数分/Decimal、OTel 可观测。
+
+### 🔵 第 7 步：测试（SaaS 专属：契约 + DB 状态）
+```
+bmad-tea / bmad-testarch-*         → 单元 + 集成测试
+/spec-align                        → 量化：AC 覆盖率 / 一次过率 / 漂移
+```
+SaaS 的 **G7** 要求：每条 AC ≥1 测试、**API 契约测试**（对 openapi.yaml）、**DB 状态集成测试**
+（事务 commit/rollback、约束、幂等）、NFR 目标已验证。
+
+### 第 8–10 步：发布 + 观测 + 迭代
+```
+/runbook todo-api                  → ops/runbook-todo-api.md（含回滚步骤）
+/release-gate                      → G8 五项门禁（质量+审计+NFR+回滚+灰度）
+/telemetry-plan                    → 埋点（SaaS 侧：QPS/延迟/5xx 黄金信号）
+（切到 agent）eos-review            → 迭代回写 PRD
+```
+
+---
+
+## 6.5.2 路径 B — Agentic / LLM 产品（概率性）
+
+**示例目标**：做一个"智能客服 agent"（改订单地址，带工具调用）。与路径 A **主干相同**，
+标 🟣 的是 **Agentic 专属**步骤。
+
+### 第 0 步：建项目 + 建 AI 目录
+```sh
+npx degit --mode=git niaodian/eos-template cs-agent && cd cs-agent
+mkdir -p ai/prompts evals                       # AI 代码放这里，自动叠加 Agentic 规则
+node .github/hooks/validate-config.mjs          # 期望 PASS
+```
+栈选 Python（LLM 产品最常见）：从 stack-presets 抄 **Python + AI/LLM 附加层**那两块。
+
+### 第 1–3 步：同路径 A（discovery → requirements → spec）
+```
+（切到 agent）eos-discovery
+/requirements "客服 agent：用户下单后改寄送地址，需鉴权、防越权、防注入"
+/spec
+```
+> Agentic 项目在 **G2** 尤其要在 requirements 里把 **eval 成功指标**（准确率/一次过率）、
+> **成本/token 预算**、**注入防御**写清楚——这些是概率性产品的命脉。
+
+### 🟣 第 4 步：架构（Agentic 专属重点）
+```
+（切到 agent）eos-architecture     → architecture.md（agent 编排图 + 工具 allow-list）
+/adr "编排策略：单趟状态机 vs ReAct 循环"
+```
+架构 agent 在 **G4** 会强制 Agentic 设计包含：
+- **工具 allow-list**（typed schema，agent 只能调白名单内的工具）
+- **有界编排**（状态机/图，禁止无界 self-invocation）
+- **记忆分层**：短期（上下文窗口）/ 长期（向量库，最终一致）/ 强一致（仍归 SQL，**别拿向量库当真相源**）
+- **异步解耦**：>1s 的 LLM 调用**不得**卡在 Web 请求线程里，走异步队列（Celery/BullMQ）
+- **认知容错**（**不是** SaaS 那种退避）：工具/LLM 失败 → 捕获错误 → 注入 prompt → 有界反思重试 ≤N 次 → 降级
+
+### 🟣 第 5 步：拆 story + **设计评估集（G-EVAL）**
+```
+（切到 agent）eos-plan
+/eval-spec                         → docs/eval-plan.md（G-EVAL 条件门）
+```
+`/eval-spec` 让你**在写代码前**先定评估集——这是概率性系统的"ATDD"。评估集必须含：
+黄金用例、**prompt 注入对抗用例**、RAG 召回率(recall@k)、工具调用准确率、成本/延迟预算。
+> **不想从零写评估器？** 拷 `docs/eos/examples/eval-starter/`（零依赖可跑）改改即用。
+
+### 🟣 第 6–7 步：写 AI 代码 + 跑评估
+```
+bmad-dev-story                     → ai/ 下的 agent/tools/chains + ai/prompts/ 版本化 prompt
+bmad-code-review
+node --test evals/*.test.mjs       → 跑评估基线（G-EVAL 机器强制：达标才能过）
+```
+写 AI 代码时**自动生效**的 Agentic 规则：prompt 存成文件（不内联字符串）、工具 typed schema、
+temperature=0 可复现、把模型输出当**不可信**（防注入、输出审核、不放密钥/PII 进 prompt）、
+LLM tracing（token/成本/context/tool-span）。
+
+> **关键**：LLM 输出**不能用 exact-match 单测**（它是概率性的）——必须用**评估集 + grader + 回归基线**。
+> 改了 prompt/模型跌破基线 = 不许发布。这是 SaaS 与 Agentic 最根本的测试差异。
+
+### 第 8–10 步：发布 + LLM 观测 + 评估飞轮
+```
+/release-gate                      → G8（含 secret-scan + 评估基线）
+/telemetry-plan                    → LLM 侧：token 消耗/context 占用/tool 链路 tracing
+（切到 agent）eos-review            → 用户反馈 → 新评估用例 → 重定基线（评估飞轮）
+```
+
+---
+
+## 6.5.3 两条路径的关键差异（一表看懂 · 避免范式污染）
+
+| 维度 | 🔵 SaaS（确定性） | 🟣 Agentic（概率性） |
+|---|---|---|
+| **状态** | SQL 事务 + 幂等，强一致 | 短期上下文 / 长期向量库 / 强一致仍归 SQL |
+| **容错** | 超时 + 指数退避 + 断路器 | 捕获错误 → 注入 prompt → 有界反思 → 降级 |
+| **测试** | 单元 + **契约测试 + DB 状态集成测试**（exact-assert） | **评估集 + grader + 回归基线**（禁 exact-match） |
+| **专属门** | G4 事务/韧性 | **G-EVAL**（评估）+ G4 异步解耦 |
+| **可观测** | OTel + QPS/延迟/5xx | token/成本/context/tool-span |
+| **执行模型** | 请求-响应即可 | >1s 调用走异步队列，别卡请求线程 |
+| **命脉风险** | 事务不一致、并发、越权 | 幻觉、评估缺失、成本失控、prompt 注入 |
+
+> ⚠️ **严禁互换**：别拿 SaaS 的指数退避去反复刷模型改逻辑错（烧 token 且不收敛）；也别拿 AI 的
+> 反思去处理一个纯网络超时（那该用断路器）。EOS 的规则已把两套机制显式隔离，混合项目在 G4
+> 由 `eos-architecture` 检查隔离点——但**你照抄上面的路径就不会错**。
+
+---
+
 # 第 7 章 完整参考（速查）
 
 ## 7.1 斜杠命令（`.github/prompts/`）
@@ -530,12 +694,17 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 | 文件 | `applyTo` | 管什么 |
 |---|---|---|
 | `00-workspace.instructions.md` | `**` | 本仓库事实：目录布局、本地命令、Git 约定 |
-| `frontend/10-frontend.instructions.md` | `**/*.{tsx,jsx}` | React/Next.js 组件规范 |
-| `backend/10-backend-node.instructions.md` | `**/*.ts` | Node/TS 分层（Routes→Controllers→Services→Repos） |
-| `backend/10-backend-python.instructions.md` | `**/*.py` | FastAPI 路由→服务→仓储、Pydantic |
-| `data-api/20-data-api.instructions.md` | `**/*.{sql,prisma}` | 数据建模、迁移、API 契约 |
-| `testing/30-testing.instructions.md` | `**/*.{test,spec}.*` | 测试金字塔、AC 可追溯、覆盖率门 |
-| `security/40-security.instructions.md` | `**` | 输入校验、deny-by-default、密钥、数据分级（薄护栏） |
+| `frontend/10-frontend.instructions.md` | `**/*.{tsx,jsx}` | React/Next.js 组件规范、响应式/多端、a11y(WCAG AA)、i18n、性能预算/CWV |
+| `backend/10-backend-node.instructions.md` | `**/*.ts` | Node/TS 分层、确定性韧性(断路器/退避)、事务/幂等、UTC/货币、OTel |
+| `backend/10-backend-python.instructions.md` | `**/*.py` | FastAPI 路由→服务→仓储、Pydantic、韧性、事务、OTel |
+| `backend/10-backend-go.instructions.md` | `**/*.go` | Go 分层、并发、韧性、OTel |
+| `backend/10-backend-java.instructions.md` | `**/*.java` | Spring Boot 分层、事务、Resilience4j、Micrometer/OTel |
+| `backend/10-backend-rust.instructions.md` | `**/*.rs` | Rust 分层、并发安全、韧性、tracing/OTel |
+| `backend/10-backend-dotnet.instructions.md` | `**/*.cs` | .NET 分层、async/持久化、Polly、OTel |
+| `ai/10-ai-llm.instructions.md` | `**/{ai,llm,rag}/**` | **Agentic 附加层**：prompt 即制品、tool/agent 架构、认知反思容错、记忆分层、异步解耦、评估、LLM 安全、tracing |
+| `data-api/20-data-api.instructions.md` | `**/*.{sql,prisma}` | 数据建模、迁移、数据生命周期、多租户隔离、API 契约/弃用、时区/货币存储 |
+| `testing/30-testing.instructions.md` | `**/*.{test,spec}.*` | 测试金字塔、AC 可追溯、契约+DB 状态集成测试、覆盖率门、NFR/eval 双轨 |
+| `security/40-security.instructions.md` | `**` | 输入校验、deny-by-default、多租户、密钥、供应链、数据分级（薄护栏） |
 | `release-ops/50-release-ops.instructions.md` | `**/{Dockerfile,*.yml,*.yaml}` | 可复现构建、发布前置、health 端点 |
 
 > R1 全局信念在 `.github/copilot-instructions.md`（不在上表，因为它是 always-on 顶层文件）。
@@ -558,6 +727,7 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 | `validate-config.mjs` | 手动/被 hook 调用 | 零依赖静态验证器（S1–S9） |
 | `eos-doctor.mjs` | **PostToolUse（逐编辑，经 `config-check.json`）** / 手动 / 被 CI 调用 | 零依赖 SDLC 门诊：G-EVAL、G-UX、**D4 密钥扫描（调 `secret-scan.mjs`）** |
 | `secret-scan.mjs` | 手动 / 被 eos-doctor + CI 调用 | 密钥扫描：内置零依赖正则（硬编码密钥/私钥、误提交 `.env`）**＋ 若装了 `gitleaks` 自动叠加深度扫描**（`.gitleaks.toml` 白名单）；命中 exit 1、输出脱敏 |
+| `spec-align.mjs` | 手动（`/spec-align`）/ 被 CI 调用 | 规范对齐量化：解析 `prd.md`+`trace-matrix.md` → AC 覆盖率 / 一次过率 / 漂移；`--strict` 命中即 exit 1 |
 
 **手动测试护栏**（终端）：
 ```sh
