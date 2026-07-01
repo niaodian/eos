@@ -24,4 +24,4 @@ applyTo: "**/*.{sql,prisma}"
 - Standard error envelope: { code, message, details, traceId }.
 
 ## Tooling (local)
-- Lint OpenAPI: `spectral lint api/openapi.yaml`. Migrations: Prisma Migrate / Alembic.
+- Lint OpenAPI: `spectral lint api/openapi.yaml` (optional install: `npm i -D @stoplight/spectral-cli`). Migrations: Prisma Migrate / Alembic.

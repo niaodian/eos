@@ -3,8 +3,13 @@ name: EOS CI
 #   act push            # run the whole workflow locally in Docker
 #   act -j verify       # run just the verify job
 #   act -l              # list jobs (fast, no Docker execution)
-# Requires Docker. The first run pulls a runner image + actions; afterwards you can go
-# fully offline: `act push --pull=false --action-offline-mode`.
+#
+# PREREQUISITE: Docker must be running. FIRST RUN needs network ONCE to pull a runner
+# image (~500MB) + the actions (checkout, setup-node); they are cached under ~/.cache/act
+# and ~/Library/Containers/com.docker.*, so EVERY LATER RUN is fully offline:
+#   act push --pull=false --action-offline-mode
+# No Docker? Skip CI and run the same checks directly (see docs/eos/quickstart.md Prerequisites):
+#   node .github/hooks/validate-config.mjs && node .github/hooks/eos-doctor.mjs && npm run -s verify --if-present
 # This is the batch, whole-repo gate (complements per-edit hooks + validate-config.mjs).
 
 on:
@@ -32,7 +37,10 @@ jobs:
         shell: bash
         run: |
           if [ -f package.json ]; then
-            npm ci --no-audit --no-fund 2>/dev/null || npm install --no-audit --no-fund || true
+            # Offline-tolerant install: prefer cache, fall back, never hard-fail the gate on network.
+            npm ci --prefer-offline --no-audit --no-fund 2>/dev/null \
+              || npm install --prefer-offline --no-audit --no-fund 2>/dev/null \
+              || echo "EOS: dependency install skipped (offline / no lockfile) — continuing."
             npm run -s lint --if-present
             npm run -s typecheck --if-present
             npm test --silent --if-present

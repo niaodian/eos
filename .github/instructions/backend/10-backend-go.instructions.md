@@ -27,5 +27,5 @@ applyTo: "**/*.go"
 - Enforce authorization in the service layer; deny by default.
 
 ## Tooling (local)
-- Format: `gofmt`/`goimports`. Lint: `golangci-lint`. Test: `go test ./... -race -cover`.
+- Format: `gofmt`/`goimports`. Lint: `golangci-lint` (optional install: `brew install golangci-lint`; `go vet` is built-in). Test: `go test ./... -race -cover`.
 - `golangci-lint run && go vet ./... && go test ./...`
