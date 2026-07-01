@@ -107,6 +107,27 @@ if (existsSync(hooksDir)) {
   }
 }
 
+// S10 agent files must have name + description frontmatter (VS Code lists/switches by name)
+const agentsDir = join(root, '.github/agents');
+if (existsSync(agentsDir)) {
+  for (const f of readdirSync(agentsDir).filter((f) => f.endsWith('.agent.md'))) {
+    const head = fm(readFileSync(join(agentsDir, f), 'utf8'));
+    if (!head) { errors.push(`S10 agents/${f}: missing YAML frontmatter`); continue; }
+    if (!/^name:\s*\S/m.test(head)) errors.push(`S10 agents/${f}: missing "name" (agent won't list/switch by name in Chat)`);
+    if (!/^description:\s*\S/m.test(head)) warns.push(`S10 agents/${f}: missing "description"`);
+  }
+}
+
+// S11 prompt files must have name + description frontmatter
+const promptsDir = join(root, '.github/prompts');
+if (existsSync(promptsDir)) {
+  for (const f of readdirSync(promptsDir).filter((f) => f.endsWith('.prompt.md'))) {
+    const head = fm(readFileSync(join(promptsDir, f), 'utf8'));
+    if (!head) { errors.push(`S11 prompts/${f}: missing YAML frontmatter`); continue; }
+    if (!/^description:\s*\S/m.test(head)) warns.push(`S11 prompts/${f}: missing "description"`);
+  }
+}
+
 // Report
 console.log(`EOS config check — ${files.length} instruction file(s) scanned\n`);
 for (const w of warns) console.log('  WARN  ' + w);

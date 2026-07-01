@@ -1,4 +1,5 @@
 ---
+name: eos-design
 description: UX & design-spec orchestrator (reuses bmad-ux / Sally; sits between Spec and Architecture)
 tools: ['search', 'editFiles']
 handoffs:

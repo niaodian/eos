@@ -1,4 +1,5 @@
 ---
+name: eos-architecture
 description: Architecture stage orchestrator (reuses bmad-architecture / Winston)
 tools: ['search', 'editFiles']
 handoffs:

@@ -1,4 +1,5 @@
 ---
+name: eos-plan
 description: Implementation planning orchestrator (reuses bmad story skills)
 tools: ['search', 'editFiles']
 handoffs:

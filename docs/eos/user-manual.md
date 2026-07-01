@@ -1,6 +1,6 @@
 # EOS 用户手册（Engineering Operating System User Manual）
 
-> 版本：与 `docs/eos/VERSION` 同步（当前 `eos-1.4.0`）
+> 版本：与 `docs/eos/VERSION` 同步（当前 `eos-1.4.1`）
 > 适用：VS Code 1.120.0 + GitHub Copilot + 已安装 73 个 `bmad-*` skill（用户级）
 > 定位：本手册是**操作指南（怎么用）**；设计原理与取舍见同目录 `blueprint.md`（为什么这么设计）。
 > 约定：正文中文；文件名/路径/命令/配置键保留英文原文。
@@ -241,7 +241,7 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 
 **G2 和 G8 是两道硬门**：前者堵"上线后返工"，后者堵"带病上线"。
 
-> **哪些门可机器强制**：配置合规（`validate-config.mjs`，S1–S9）、G-EVAL（`eos-doctor.mjs`：有 `ai/llm/rag` 代码却无 `docs/eval-plan.md` → 报错）、G6 质量与 G7 测试/评估（`npm test`/evals）——这些都由本地 CI `.github/workflows/eos-ci.yml`（`act push`，需 Docker）在合并/发布前批量跑。其余偏内容/判断的门（G1/G3/G4/G5/G-UX/G10）靠 prompt+清单+人审。
+> **哪些门可机器强制**：配置合规（`validate-config.mjs`，S1–S11）、G-EVAL（`eos-doctor.mjs`：有 `ai/llm/rag` 代码却无 `docs/eval-plan.md` → 报错）、G6 质量与 G7 测试/评估（`npm test`/evals）——这些都由本地 CI `.github/workflows/eos-ci.yml`（`act push`，需 Docker）在合并/发布前批量跑。其余偏内容/判断的门（G1/G3/G4/G5/G-UX/G10）靠 prompt+清单+人审。
 
 ---
 
@@ -686,8 +686,24 @@ LLM tracing（token/成本/context/tool-span）。
 | `eos-plan` | 5 计划 | bmad-create-epics-and-stories, bmad-create-story, bmad-sprint-planning, bmad-testarch-atdd | → `bmad-dev-story` → `bmad-code-review` |
 | `eos-review` | 10 迭代 | bmad-correct-course, bmad-retrospective, bmad-document-project | → `/requirements`（下一轮） |
 
-> **如何切换 agent**：Copilot Chat 顶部的 agent 选择器 → 选中目标 agent。切换后该 persona
-> 持续生效（含其 `tools` 限制与 `handoffs`），直到你再次切换。
+> **如何切换 agent**：Copilot Chat 输入框的 mode/agent 选择器 → 选中目标 agent（如 `eos-discovery`）。
+> 切换后该 persona 持续生效（含其 `tools` 限制与 `handoffs`），直到你再次切换。
+>
+> **⚠️ 只看到 "Agent / Ask / Plan"、找不到 eos-* 自定义 agent？** 这三个是内置聊天模式，自定义 agent
+> 列在同一选择器里（通常在下方或需展开）。若确实没有，按下面顺序排查（**不需要**把 `.github/agents/`
+> 复制到用户级目录——`.github/agents/*.agent.md` 就是官方默认识别位置，`chat.agentFilesLocations` 默认含它）：
+>
+> | 排查 | 做法 |
+> |---|---|
+> | ① agent 文件有 `name` 字段吗 | 每个 `.agent.md` 的 frontmatter 必须有 `name:`（否则不按名列出）。跑 `node .github/hooks/validate-config.mjs`，S10 会报缺失。 |
+> | ② 重载窗口 | 新建/degit 项目后：命令面板 `Developer: Reload Window`，让 VS Code 扫描到新 agent 文件。 |
+> | ③ 确认在**工作区根**打开 | 必须把项目根目录（含 `.github/`）作为工作区打开，不是它的父/子目录。 |
+> | ④ 版本 | 自定义 agent 需较新的 VS Code + Copilot Chat。用「关于」看真实版本（`code --version` 是 shim，不准）。本模板实测于 1.120+/1.126。`【需在你的版本中核实】` UI 入口位置随版本略有差异。 |
+> | ⑤ 设置未被覆盖 | 检查 user/workspace `settings.json` 没有把 `chat.agentFilesLocations` 改成不含 `.github/agents`。 |
+>
+> 仍不出现时的**替代路径**：直接用斜杠命令走流程——`/requirements`、`/spec`、`/ux-spec`、`/eval-spec`、
+> `/release-gate` 等 prompt 文件不依赖 agent 选择器，输入 `/` 即可看到。agent 只是"编排 persona"，
+> 其能力都能用对应 prompt/skill 手动触发（见 7.1 与 `docs/eos/agent-map.md`）。
 
 ## 7.3 规则文件（`.github/instructions/`）
 
@@ -723,8 +739,8 @@ LLM tracing（token/成本/context/tool-span）。
 |---|---|---|
 | `guardrails.json` + `deny-dangerous.js` | PreToolUse | 拦截危险操作 + **供应链投毒（`curl\|bash`/`--unsafe-perm`）+ 硬编码密钥字面量**（输出 `permissionDecision:"deny"`） |
 | `quality.json` | PostToolUse | 写文件后跑 lint+typecheck+test 质量门 |
-| `config-check.json` | PostToolUse | 每次编辑后自动跑 `validate-config.mjs`（配置 S1–S9）**＋ `eos-doctor.mjs`（SDLC 门诊 / G-EVAL 连线 / 密钥扫描）** |
-| `validate-config.mjs` | 手动/被 hook 调用 | 零依赖静态验证器（S1–S9） |
+| `config-check.json` | PostToolUse | 每次编辑后自动跑 `validate-config.mjs`（配置 S1–S11）**＋ `eos-doctor.mjs`（SDLC 门诊 / G-EVAL 连线 / 密钥扫描）** |
+| `validate-config.mjs` | 手动/被 hook 调用 | 零依赖静态验证器（S1–S11：规则/agent/prompt frontmatter、glob、必需路径、hook 事件） |
 | `eos-doctor.mjs` | **PostToolUse（逐编辑，经 `config-check.json`）** / 手动 / 被 CI 调用 | 零依赖 SDLC 门诊：G-EVAL、G-UX、**D4 密钥扫描（调 `secret-scan.mjs`）** |
 | `secret-scan.mjs` | 手动 / 被 eos-doctor + CI 调用 | 密钥扫描：内置零依赖正则（硬编码密钥/私钥、误提交 `.env`）**＋ 若装了 `gitleaks` 自动叠加深度扫描**（`.gitleaks.toml` 白名单）；命中 exit 1、输出脱敏 |
 | `spec-align.mjs` | 手动（`/spec-align`）/ 被 CI 调用 | 规范对齐量化：解析 `prd.md`+`trace-matrix.md` → AC 覆盖率 / 一次过率 / 漂移；`--strict` 命中即 exit 1 |
@@ -773,6 +789,8 @@ node .github/hooks/validate-config.mjs
 | S6 | warn | 文件名符合 `NN-area[-stack].instructions.md` 规范 |
 | S7 | error | 必需路径/文件存在（copilot-instructions.md、instructions/、prompts/、agents/、hooks/、docs/eos/agent-map.md） |
 | S9 | error | hook JSON 合法且 event 名有效 |
+| S10 | error/warn | 每个 `.agent.md` 有 `name`（error，缺则 Chat 不按名列出）+ `description`（warn） |
+| S11 | warn | 每个 `.prompt.md` 有 `description` |
 
 > 期望输出：`PASS`。任何 **error** 必须先修复再继续；**warn** 视情况处理。
 > （以上为当前 `validate-config.mjs` 实际实现的检查项。）
@@ -873,7 +891,7 @@ gh repo create my-app --template niaodian/eos-template --private --clone
 
 ## 10.4 版本化与升级
 
-- 每次改 EOS 配置：改 `docs/eos/VERSION`（如 `eos-1.4.0`→`eos-1.5.0`），跑 `validate-config.mjs`，Conventional Commits 提交。
+- 每次改 EOS 配置：改 `docs/eos/VERSION`（如 `eos-1.4.1`→`eos-1.5.0`），跑 `validate-config.mjs`，Conventional Commits 提交。
 - 升级既有项目：从新版模板 diff `.github/`，挑选合并；用户级 `bmad-*` 独立升级。
 
 ---

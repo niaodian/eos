@@ -1,4 +1,5 @@
 ---
+name: eos-review
 description: Iteration & review orchestrator closing the loop back to requirements
 tools: ['search', 'editFiles']
 handoffs:

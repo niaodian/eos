@@ -1,7 +1,7 @@
 # EOS Template — Engineering Operating System
 
 A portable, **local-first** engineering operating system for VS Code + GitHub Copilot,
-orchestrating the installed **BMAD** skills (73 `bmad-*`) across the full SDLC. Version: **eos-1.4.0**.
+orchestrating the installed **BMAD** skills (73 `bmad-*`) across the full SDLC. Version: **eos-1.4.1**.
 
 **Supports two paradigms in one framework:**
 - **Traditional SaaS** (deterministic): transactions, resilience (circuit-breaker/backoff), REST/OpenAPI, RBAC/multi-tenancy, OTel observability.
@@ -31,7 +31,7 @@ api/ ops/ src/
 ## Three enforcement layers (all local)
 1. **Per-edit hooks** (real-time): guardrail denies destructive / supply-chain-poison / secret-leak ops;
    quality + config-check run validators after each edit.
-2. **Static validators** (on demand): `validate-config.mjs` (config S1–S9), `eos-doctor.mjs` (SDLC gates
+2. **Static validators** (on demand): `validate-config.mjs` (config S1–S11), `eos-doctor.mjs` (SDLC gates
    incl. G-EVAL), `secret-scan.mjs` (+gitleaks), `spec-align.mjs` (spec-alignment metric).
 3. **Whole-repo CI** (before merge/release): `act push` runs `.github/workflows/eos-ci.yml`.
 

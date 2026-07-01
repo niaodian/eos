@@ -1,4 +1,5 @@
 ---
+name: eos-discovery
 description: Discovery & problem-framing orchestrator (reuses bmad-brainstorming / analyst)
 tools: ['search', 'editFiles']
 handoffs:

@@ -27,7 +27,7 @@ jobs:
         with:
           node-version: '20'
 
-      - name: EOS config validation (S1–S9)
+      - name: EOS config validation (S1–S11)
         run: node .github/hooks/validate-config.mjs
 
       - name: EOS SDLC gate doctor (G-EVAL / G-UX wiring + secret hygiene)
