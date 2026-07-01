@@ -107,6 +107,7 @@
 - **起步骨架**：拷 `docs/eos/examples/eval-starter/`（零依赖可跑的 dataset+graders+runner+stub），换掉 stub 即用
 - **quality.json 内层命令**：`ruff check . && pytest -q && pytest evals/ -q`
   （Node 项目改用 `node --test evals/*.test.mjs`——须给显式 glob,裸 `evals/` 目录在 Node 23 会报错）
+- **CI**：`.github/workflows/eos-ci.yml`（`act push` 本地跑）会执行 evals + `eos-doctor`（G-EVAL 机器强制）,回归即失败
 
 ---
 

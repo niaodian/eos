@@ -16,5 +16,7 @@ Verify and report PASS/FAIL for each:
 - [ ] Canary/gradual rollout strategy documented.
 - [ ] Health/readiness endpoints present.
 - [ ] Config validation passes: `node .github/hooks/validate-config.mjs`.
+- [ ] SDLC gate wiring passes: `node .github/hooks/eos-doctor.mjs` (G-EVAL: LLM code ⇒ eval-plan).
+- [ ] Local CI green: `act push -j verify` (validate-config + eos-doctor + tests + evals). Needs Docker.
 
 Any FAIL blocks release. Summarize as a gate report.

@@ -1,0 +1,81 @@
+#!/usr/bin/env node
+// EOS SDLC gate doctor — zero external deps.
+// Statically enforces CONDITIONAL-GATE wiring that lives in project structure
+// (complements validate-config.mjs, which checks EOS *config*). Run from project root:
+//   node .github/hooks/eos-doctor.mjs
+// Designed to run in local CI (act) and as a manual pre-release check.
+import { readdirSync, existsSync } from 'node:fs';
+import { join } from 'node:path';
+
+const root = process.cwd();
+const errors = [];
+const warns = [];
+const SKIP_DIRS = new Set(['node_modules', '.git', '.github', 'dist', 'build', '.next', 'coverage']);
+
+function walkDirs(onDir, maxDepth = 5) {
+  (function rec(dir, depth) {
+    if (depth > maxDepth) return;
+    let entries;
+    try { entries = readdirSync(dir, { withFileTypes: true }); } catch { return; }
+    for (const e of entries) {
+      if (!e.isDirectory() || SKIP_DIRS.has(e.name)) continue;
+      const full = join(dir, e.name);
+      onDir(e.name, full);
+      rec(full, depth + 1);
+    }
+  })(root, 0);
+}
+
+function anyFile(pred, maxDepth = 6) {
+  let found = false;
+  (function rec(dir, depth) {
+    if (found || depth > maxDepth) return;
+    let entries;
+    try { entries = readdirSync(dir, { withFileTypes: true }); } catch { return; }
+    for (const e of entries) {
+      if (found) return;
+      const full = join(dir, e.name);
+      if (e.isDirectory()) { if (!SKIP_DIRS.has(e.name)) rec(full, depth + 1); }
+      else if (pred(e.name)) found = true;
+    }
+  })(root, 0);
+  return found;
+}
+
+// --- D1/D2: G-EVAL — an LLM/agent product component requires an eval plan + runner ---
+// Detection set mirrors the AI rule's applyTo glob (**/{ai,llm,rag}/**) for consistency.
+const aiDirs = [];
+walkDirs((name, full) => { if (['ai', 'llm', 'rag'].includes(name)) aiDirs.push(full); });
+const hasEvalPlan = existsSync(join(root, 'docs/eval-plan.md'));
+
+if (aiDirs.length) {
+  const rel = aiDirs.map((d) => d.replace(root + '/', '')).join(', ');
+  if (!hasEvalPlan) {
+    errors.push(`D1 G-EVAL: found LLM/agent code (${rel}) but no docs/eval-plan.md. Design evals before shipping (run /eval-spec).`);
+  }
+  const evalsDir = join(root, 'evals');
+  const hasRunner = existsSync(evalsDir)
+    && readdirSync(evalsDir).some((f) => /\.(test|spec)\.[mc]?[jt]s$/.test(f) || /(^test_.*|.*_test)\.py$/.test(f));
+  if (!hasRunner) {
+    warns.push('D2 G-EVAL: no eval runner found under evals/. Add a runnable harness (copy docs/eos/examples/eval-starter/).');
+  }
+} else if (hasEvalPlan) {
+  warns.push('D2 G-EVAL: docs/eval-plan.md exists but no ai/llm/rag/agents code dir was found (ok if code lives elsewhere).');
+}
+
+// --- D3: G-UX (conditional) — real frontend components should have a UX contract ---
+const hasComponents = anyFile((n) => /\.(tsx|jsx)$/.test(n));
+if (hasComponents && !existsSync(join(root, 'docs/EXPERIENCE.md'))) {
+  warns.push('D3 G-UX: found React component files but no docs/EXPERIENCE.md. User-facing work needs the UX contract (run /ux-spec) or an explicit SKIP.');
+}
+
+// --- Report (same shape as validate-config.mjs) ---
+console.log('EOS SDLC gate doctor\n');
+for (const w of warns) console.log('  WARN  ' + w);
+for (const e of errors) console.log('  ERROR ' + e);
+console.log('');
+if (errors.length) {
+  console.log(`FAIL: ${errors.length} error(s), ${warns.length} warning(s)`);
+  process.exit(1);
+}
+console.log(`PASS${warns.length ? ` (${warns.length} warning(s))` : ''}`);

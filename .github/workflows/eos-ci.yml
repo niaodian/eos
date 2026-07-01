@@ -1,0 +1,42 @@
+name: EOS CI
+# Local-first CI. Runnable with `act` (nektos/act) — no cloud runner required:
+#   act push            # run the whole workflow locally in Docker
+#   act -j verify       # run just the verify job
+#   act -l              # list jobs (fast, no Docker execution)
+# Requires Docker. The first run pulls a runner image + actions; afterwards you can go
+# fully offline: `act push --pull=false --action-offline-mode`.
+# This is the batch, whole-repo gate (complements per-edit hooks + validate-config.mjs).
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: EOS config validation (S1–S9)
+        run: node .github/hooks/validate-config.mjs
+
+      - name: EOS SDLC gate doctor (G-EVAL / G-UX wiring)
+        run: node .github/hooks/eos-doctor.mjs
+
+      - name: Quality gate + evals (only if the project has a package.json)
+        shell: bash
+        run: |
+          if [ -f package.json ]; then
+            npm ci --no-audit --no-fund 2>/dev/null || npm install --no-audit --no-fund || true
+            npm run -s lint --if-present
+            npm run -s typecheck --if-present
+            npm test --silent --if-present
+            npm run -s eval --if-present   # G-EVAL: runs the eval baseline (fails on regression)
+          else
+            echo "No package.json — config-only template; skipping tests/evals."
+          fi

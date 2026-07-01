@@ -9,9 +9,10 @@ applyTo: "**"
 ## Layout
 - `src/` app code · `docs/` specs & ADRs · `api/` OpenAPI · `ops/` runbooks · `.github/` EOS config.
 
-## Local commands (no remote CI assumed)
+## Local commands (local CI via act; no cloud runner assumed)
 - Install: `npm ci` · Lint: `npm run lint` · Test: `npm test` · Typecheck: `npm run typecheck`.
 - Adjust to your stack — ready presets (Node/Python/Go/Java/Rust/.NET) in `docs/eos/stack-presets.md`.
+- Local CI: `act push` runs `.github/workflows/eos-ci.yml` in Docker (validate-config + eos-doctor + tests + evals).
 
 ## Git
 - Conventional Commits. Branch: `feat/<story-id>-slug`. One story per PR.

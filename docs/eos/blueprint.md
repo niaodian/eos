@@ -163,7 +163,7 @@ mkdir -p ~/.git-templates/eos && cp -R <golden>/.github ~/.git-templates/eos/
 git config --global init.templateDir ~/.git-templates/eos
 ```
 
-版本化：`docs/eos/VERSION`（当前 `eos-1.0.0`）。升级用 `degit` 拉新版到 /tmp 后 `diff -ru` 合并，
+版本化：`docs/eos/VERSION`（当前 `eos-1.1.0`）。升级用 `degit` 拉新版到 /tmp 后 `diff -ru` 合并，
 再跑 `validate-config.mjs` + `bmad-code-review`。
 
 ---
@@ -200,7 +200,7 @@ git config --global init.templateDir ~/.git-templates/eos
 - 痛点：需求前置不足、运营需求未前置、1-N 扩展性不足、缺 SDLC 治理、缺多栈规则分层
 
 **② 合理假设**
-- 单人/小团队起步；本地 CI = npm scripts / Makefile 等纯本地校验
+- 单人/小团队起步；本地 CI = npm scripts + Hooks + `act`（本地跑 GitHub Actions，需 Docker）
 - 默认参考栈（可插拔）：前端 TypeScript + Next.js；后端 Node.js/TypeScript 或 Python/FastAPI；数据 PostgreSQL + OpenAPI/REST
 - `~/.agents/skills/` 与 `~/.claude/skills/` 是 VS Code 识别的 personal skills 合法路径
 
@@ -275,7 +275,8 @@ git config --global init.templateDir ~/.git-templates/eos
 │ L5 治理层  .github/hooks/guardrails.json (PreToolUse 拦截)     │
 │            .github/hooks/quality.json   (PostToolUse 质量门)   │
 │            .github/hooks/config-check.json (配置自检)          │
-│            ▲ 确定性护栏，不靠 Agent 自觉                        │
+│            .github/workflows/eos-ci.yml (act 本地 CI 批量门)    │
+│            ▲ 三层强制：实时Hook＋配置静态＋CI全仓批量           │
 ├──────────────────────────────────────────────────────────────┤
 │ L6 协作层  bmad-agent-*(Mary/John/Winston/Amelia/Murat)        │
 │            eos-*.agent.md 调度入口 + handoffs 串成工作流         │
@@ -325,6 +326,7 @@ git config --global init.templateDir ~/.git-templates/eos
 > 评估集（eval-driven，类比 ATDD），在 Testing(G7) 运行。LLM 输出非确定，不能用 exact-match 单测——必须
 > eval 集 + grader + 回归基线。纯确定性功能 SKIP+理由。配套 `ai/10-ai-llm` 规则 + C-nfr 成本/延迟维度 +
 > security LLM 红线 + telemetry LLM tracing。此块以 `【新建补强】` 为主（BMAD 无产品级 eval 能力，仅借鉴 `bmad-eval-runner` 模式）。
+> **G-EVAL 现由本地 CI 机器强制**：`eos-doctor.mjs`（有 `ai/llm/rag` 代码却无 `docs/eval-plan.md` → 报错）+ `eos-ci.yml`（`act` 跑评估基线，回归即失败）。起步骨架见 `docs/eos/examples/eval-starter/`。
 
 ---
 
@@ -481,6 +483,7 @@ Agent 输出不符预期
 | — | BMAD reuse map（73 bmad-*） | `docs/eos/agent-map.md` | 复用BMAD |
 | — | 运营前置 skill | `.github/skills/eos-operational-readiness/SKILL.md` | 新建 |
 | — | Hooks 护栏 | `.github/hooks/guardrails.json` + `deny-dangerous.js` | 新建 |
+| — | 本地 CI（act 可跑）+ SDLC 门诊 | `.github/workflows/eos-ci.yml` + `.github/hooks/eos-doctor.mjs`（validate-config+doctor+tests+evals；G-EVAL 机器强制） | 新建补强（复用 bmad-testarch-ci） |
 | — | 配置静态验证器 | `.github/hooks/validate-config.mjs` | 新建 |
 
 **D13：MVP vs Enterprise 对比**
@@ -490,7 +493,7 @@ Agent 输出不符预期
 | 规则分发 | Git template / degit | `【需企业环境】` 组织级 instructions |
 | AI Agent 后端 | Copilot（本地） | `【需企业环境】` 私有模型后端 |
 | 外部集成 | 无 / mock | `【需企业环境】` 真实 MCP servers |
-| 质量门 | npm scripts + Hooks | `【需企业环境】` CI/CD pipeline 集成 |
+| 质量门 | npm scripts + Hooks + **act 本地 CI**（`eos-ci.yml`，需 Docker） | `【需企业环境】` 托管 runner / 组织级流水线 |
 | 监控 | console / 本地 mock | `【需企业环境】` 云 observability 平台 |
 | 规则审核 | validate-config.mjs（本地） | `【需企业环境】` 组织级策略扫描 |
 

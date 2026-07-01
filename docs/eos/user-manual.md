@@ -1,6 +1,6 @@
 # EOS 用户手册（Engineering Operating System User Manual）
 
-> 版本：与 `docs/eos/VERSION` 同步（当前 `eos-1.0.0`）
+> 版本：与 `docs/eos/VERSION` 同步（当前 `eos-1.1.0`）
 > 适用：VS Code 1.120.0 + GitHub Copilot + 已安装 73 个 `bmad-*` skill（用户级）
 > 定位：本手册是**操作指南（怎么用）**；设计原理与取舍见同目录 `blueprint.md`（为什么这么设计）。
 > 约定：正文中文；文件名/路径/命令/配置键保留英文原文。
@@ -239,6 +239,8 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 | G10 | Iteration | 每个变更回写 Spec 真相源 |
 
 **G2 和 G8 是两道硬门**：前者堵"上线后返工"，后者堵"带病上线"。
+
+> **哪些门可机器强制**：配置合规（`validate-config.mjs`，S1–S9）、G-EVAL（`eos-doctor.mjs`：有 `ai/llm/rag` 代码却无 `docs/eval-plan.md` → 报错）、G6 质量与 G7 测试/评估（`npm test`/evals）——这些都由本地 CI `.github/workflows/eos-ci.yml`（`act push`，需 Docker）在合并/发布前批量跑。其余偏内容/判断的门（G1/G3/G4/G5/G-UX/G10）靠 prompt+清单+人审。
 
 ---
 
@@ -552,6 +554,7 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 | `quality.json` | PostToolUse | 写文件后跑 lint+typecheck+test 质量门 |
 | `config-check.json` | PostToolUse | 改规则文件后自动跑 `validate-config.mjs` |
 | `validate-config.mjs` | 手动/被 hook 调用 | 零依赖静态验证器（S1–S9） |
+| `eos-doctor.mjs` | 手动/被 CI 调用 | 零依赖 SDLC 门诊：G-EVAL（有 `ai/llm/rag` 代码 ⇒ 必须有 `docs/eval-plan.md`）、G-UX 提醒 |
 
 **手动测试护栏**（终端）：
 ```sh
@@ -560,6 +563,13 @@ echo '{"tool_input":{"command":"rm -rf /tmp/x"}}' | node .github/hooks/deny-dang
 echo '{"tool_input":{"command":"ls"}}' | node .github/hooks/deny-dangerous.js
 # → {}
 ```
+
+**本地 CI（第三道强制层，需 Docker）**：EOS 除"实时 Hook + 配置静态校验"外，还提供 `act` 跑的全仓批量门。
+```sh
+act push -j verify            # 跑 .github/workflows/eos-ci.yml：validate-config + eos-doctor + tests + evals
+act push --pull=false --action-offline-mode   # 首次拉过镜像后可完全离线
+```
+> 三道强制层各司其职：**Hook**=逐编辑实时 · **validate-config/eos-doctor**=静态门诊 · **act CI**=合并/发布前全仓批量。
 
 ## 7.6 四张需求清单（`docs/checklists/`）
 
@@ -689,7 +699,7 @@ gh repo create my-app --template niaodian/eos-template --private --clone
 
 ## 10.4 版本化与升级
 
-- 每次改 EOS 配置：改 `docs/eos/VERSION`（如 `eos-1.0.0`→`eos-1.1.0`），跑 `validate-config.mjs`，Conventional Commits 提交。
+- 每次改 EOS 配置：改 `docs/eos/VERSION`（如 `eos-1.1.0`→`eos-1.2.0`），跑 `validate-config.mjs`，Conventional Commits 提交。
 - 升级既有项目：从新版模板 diff `.github/`，挑选合并；用户级 `bmad-*` 独立升级。
 
 ---

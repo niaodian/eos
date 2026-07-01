@@ -12,3 +12,6 @@ applyTo: "**/*.{test,spec}.*"
 - For test design/automation, invoke `bmad-testarch-test-design` / `bmad-testarch-automate`.
 - Verify NFR targets from `docs/checklists/C-nfr.md` (latency/throughput, SLO/RTO/RPO, etc.)
   with `bmad-testarch-nfr`; each adopted NFR needs a check or an explicitly-deferred trigger.
+- Local CI (no cloud runner): `.github/workflows/eos-ci.yml` runs the aggregate gate
+  (validate-config + eos-doctor + tests + evals) via `act push` (needs Docker). Scaffold richer
+  pipelines with `bmad-testarch-ci`.

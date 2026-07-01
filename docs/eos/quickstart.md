@@ -24,6 +24,7 @@ New feature:   /requirements "<feature>" → /spec → /ux-spec → (agent) eos-
                                           → (handoff) eos-plan → bmad-dev-story → bmad-code-review
 Before release: /release-gate
 Self-check:     node .github/hooks/validate-config.mjs
+Local CI:       act push -j verify   (validate-config + eos-doctor + tests + evals; needs Docker)
 ```
 
 ## Reuse across projects

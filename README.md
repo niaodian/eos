@@ -12,6 +12,7 @@ orchestrating the installed **BMAD** skills (73 `bmad-*`) across the full SDLC.
   agents/                       # R9 orchestrator agents with handoffs
   skills/                       # project-level new capabilities (e.g. operational-readiness)
   hooks/                        # deterministic guardrails + validators (Preview)
+  workflows/                    # local CI (eos-ci.yml) — runnable via act, no cloud runner
 docs/
   checklists/                   # A-gap, B-rework, C-nfr, D-ops
   eos/                          # blueprint, user-manual, quickstart, stack-presets, agent-map, VERSION
@@ -39,5 +40,7 @@ Per-stack setup presets (Node/Python/Go/Java/Rust/.NET): [docs/eos/stack-presets
 
 ## Notes
 - No org/network dependencies: fully local & Git-portable.
+- Local CI runs via `act` (GitHub Actions locally, needs Docker) — `.github/workflows/eos-ci.yml`;
+  three enforcement layers: per-edit hooks + static validators + whole-repo CI. No cloud runner.
 - Hooks are a VS Code **Preview** feature; `.github/hooks/*.json` load by default.
 - There is **no native rule priority** — control is via `applyTo` scope + conventions + hooks.
