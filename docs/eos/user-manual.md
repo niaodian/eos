@@ -1,7 +1,7 @@
 # EOS 用户手册（Engineering Operating System User Manual）
 
-> 版本：与 `docs/eos/VERSION` 同步（当前 `eos-1.4.1`）
-> 适用：VS Code 1.120.0 + GitHub Copilot + 已安装 73 个 `bmad-*` skill（用户级）
+> 版本：与 `docs/eos/VERSION` 同步（当前 `eos-1.4.2`）
+> 适用：较新版本的 VS Code + GitHub Copilot Chat（自定义 agent / hooks 属近版能力，用「关于 VS Code」面板确认版本）+ 已安装 73 个 `bmad-*` skill（用户级）
 > 定位：本手册是**操作指南（怎么用）**；设计原理与取舍见同目录 `blueprint.md`（为什么这么设计）。
 > 约定：正文中文；文件名/路径/命令/配置键保留英文原文。
 
@@ -86,6 +86,10 @@ bmad-code-review                   → 审查无阻断项           (Gate G6)
 ```
 
 > 每个 `→` 都是一道门。**没过门不要进下一阶段**——这正是 EOS 防返工的核心。
+>
+> **⚠️ 用 agent 前的头号前提**：在 VS Code 里必须把**项目文件夹本身**（含 `.github/` 的那一层）
+> 作为工作区根打开——`File > Open Folder…` 选中它，或终端 `cd my-app && code .`。若你打开的是它的
+> **父目录**，`eos-*` 自定义 agent 及 `.github/instructions|hooks` 会**全部静默失效**（详见 7.2 排障）。
 
 ---
 
@@ -98,7 +102,7 @@ bmad-code-review                   → 审查无阻断项           (Gate G6)
 | 组件 | 要求 | 自检命令 |
 |---|---|---|
 | macOS | 任意近期版本（zsh） | `sw_vers` |
-| VS Code | 1.120.0+ | 关于面板查看真实版本（`code --version` 可能是 shim，不准） |
+| VS Code | 较新版本（自定义 agent / hooks 需近版） | 关于面板查看真实版本（`code --version` 可能是 shim，不准） |
 | GitHub Copilot | 已登录（企业 license 仅作 license，不作配置依赖） | Chat 面板可用 |
 | Node.js | 18+（验证器与 hooks 用） | `node -v` |
 | BMAD skills | 73 个 `bmad-*`（用户级） | `ls ~/.agents/skills | grep -c '^bmad-'` |
@@ -168,7 +172,8 @@ node .github/hooks/validate-config.mjs      # 期望：PASS
 npx degit --mode=git niaodian/eos-template my-new-app && cd my-new-app
 git init && git add -A && git commit -q -m "chore: scaffold from eos-template"
 node .github/hooks/validate-config.mjs
-# 然后打开 VS Code，在 Copilot Chat 切到 eos-discovery agent，开始第 6 章的流程
+# 关键：从项目目录内执行 `code .`，让 my-new-app 成为工作区根（含 .github/）。
+# 不要打开它的父目录，否则自定义 agent / instructions / hooks 都不会被发现。
 code .
 ```
 
@@ -275,6 +280,7 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 | **产出** | 完整 `.github/` + `docs/` 骨架 |
 | **门** | `node .github/hooks/validate-config.mjs` → **PASS** |
 | **必查** | PASS 0 errors；改 `00-workspace` 填本项目 install/lint/test 命令 |
+| **打开方式** | 从 `my-app/` 内执行 `code .`——让**项目本身**成为工作区根。打开父目录会导致 agent/instructions/hooks 全部不生效（见 7.2）。 |
 | **样例** | `my-app/` 全树（44 文件，validate PASS） |
 
 ---
@@ -689,17 +695,29 @@ LLM tracing（token/成本/context/tool-span）。
 > **如何切换 agent**：Copilot Chat 输入框的 mode/agent 选择器 → 选中目标 agent（如 `eos-discovery`）。
 > 切换后该 persona 持续生效（含其 `tools` 限制与 `handoffs`），直到你再次切换。
 >
-> **⚠️ 只看到 "Agent / Ask / Plan"、找不到 eos-* 自定义 agent？** 这三个是内置聊天模式，自定义 agent
-> 列在同一选择器里（通常在下方或需展开）。若确实没有，按下面顺序排查（**不需要**把 `.github/agents/`
-> 复制到用户级目录——`.github/agents/*.agent.md` 就是官方默认识别位置，`chat.agentFilesLocations` 默认含它）：
+> **⚠️ 只看到 "Agent / Ask / Plan" + 「Configure Custom Agents…」，找不到 eos-* 自定义 agent？**
+> **头号原因（90% 是这个）：你在 VS Code 里打开的不是项目根，而是它的父目录。** VS Code 只在**已打开的
+> 工作区根**下扫描 `.github/agents/`（单层、非递归）。如果你打开的是一个「包含很多项目」的父文件夹
+> （例如 `~/Developer/Projects/`，而项目在其子目录 `my-app/`），那么 `.github/` 不在根上 →
+> **自定义 agent、`.github/instructions/`、`.github/hooks/` 会全部静默失效**（状态栏可能仍显示某个子仓库的
+> git 分支名，很有迷惑性）。
+>
+> **30 秒自检（最重要）**：
+> 1. VS Code 左侧 Explorer **顶层第一屏**能直接看到 `.github/`、`README.md` 吗？能 → 根正确；
+>    看到的是一堆项目文件夹（`my-app/`、`other-app/` …）→ 你打开错了父目录。
+> 2. 打开集成终端跑 `ls .github/agents`：若列出 5 个 `eos-*.agent.md` 但选择器仍空，几乎可断定是根打开错了。
+> 3. **修复**：`File > Open Folder…` 选中**项目文件夹本身**（含 `.github/` 的那一层），或终端 `cd my-app && code .`。
+>
+> 排除"根"因素后，再按下面顺序排查（**不需要**把 `.github/agents/` 复制到用户级目录——
+> `.github/agents/*.agent.md` 就是官方默认识别位置）：
 >
 > | 排查 | 做法 |
 > |---|---|
-> | ① agent 文件有 `name` 字段吗 | 每个 `.agent.md` 的 frontmatter 必须有 `name:`（否则不按名列出）。跑 `node .github/hooks/validate-config.mjs`，S10 会报缺失。 |
-> | ② 重载窗口 | 新建/degit 项目后：命令面板 `Developer: Reload Window`，让 VS Code 扫描到新 agent 文件。 |
-> | ③ 确认在**工作区根**打开 | 必须把项目根目录（含 `.github/`）作为工作区打开，不是它的父/子目录。 |
-> | ④ 版本 | 自定义 agent 需较新的 VS Code + Copilot Chat。用「关于」看真实版本（`code --version` 是 shim，不准）。本模板实测于 1.120+/1.126。`【需在你的版本中核实】` UI 入口位置随版本略有差异。 |
-> | ⑤ 设置未被覆盖 | 检查 user/workspace `settings.json` 没有把 `chat.agentFilesLocations` 改成不含 `.github/agents`。 |
+> | ① 确认在**工作区根**打开 | 见上方 30 秒自检——这是最常见原因，务必先排除。 |
+> | ② agent 文件有合法 `name` 吗 | 每个 `.agent.md` 的 frontmatter 必须有 `name:`，且只含小写字母/数字/连字符（`^[a-z0-9-]+$`）。跑 `node .github/hooks/validate-config.mjs`，S10 会报缺失/非法/重名。 |
+> | ③ 重载窗口 | 新建/degit 项目后：命令面板 `Developer: Reload Window`，让 VS Code 重新扫描 agent 文件。 |
+> | ④ 版本 | 自定义 agent 需较新的 VS Code + Copilot Chat。用「关于 VS Code」看真实版本（`code --version` 是 shim，不准）。`【需在你的版本中核实】` UI 入口位置随版本略有差异。 |
+> | ⑤ 设置未被覆盖 | 检查 user/workspace `settings.json` 没有把 `chat.agentFilesLocations` 改成不含 `.github/agents`（默认即含，一般无需设置）。 |
 >
 > 仍不出现时的**替代路径**：直接用斜杠命令走流程——`/requirements`、`/spec`、`/ux-spec`、`/eval-spec`、
 > `/release-gate` 等 prompt 文件不依赖 agent 选择器，输入 `/` 即可看到。agent 只是"编排 persona"，
@@ -850,7 +868,8 @@ Agent 输出不符预期
 
 ## 9.3 常见坑（实测）
 
-- `code --version` 返回 `3.0.12` 是 shim，**不是真实版本**；真实版本看 VS Code 关于面板（1.120.0）。
+- **VS Code 打开的是父目录而非项目根** → `eos-*` agent、`.github/instructions`、`.github/hooks` 全部静默失效（最常见坑）。从项目目录内 `code .`，Explorer 顶层应能直接看到 `.github/`（见 7.2 的 30 秒自检）。
+- `code --version` 返回 `3.0.12` 是 shim，**不是真实版本**；真实版本看 VS Code 关于面板。
 - 私有模板 `npx degit user/repo` 会失败 → 必须 `npx degit --mode=git user/repo`。
 - PreToolUse 用错 schema（`decision:"block"` 是 PostToolUse 的）→ 拦不住。正确是 `hookSpecificOutput.permissionDecision:"deny"`。
 - 多个 `applyTo:"**"` 文件**不是**冲突（薄、互补、单一职责），验证器 S3 已豁免。

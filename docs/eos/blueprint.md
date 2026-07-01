@@ -1,7 +1,7 @@
 # EOS Blueprint — 完整蓝图（全 12 Part）
 
 > 单文件完整版 Engineering Operating System 设计蓝图。
-> 标注 `【已实测 · VS Code 1.120.0】` 的条目在本机验证通过，不再是纸面推断。
+> 标注 `【已实测 · 近版 VS Code】` 的条目在本机验证通过，不再是纸面推断。
 > 标注 `【可选扩展·需企业/网络环境】` 的条目不在主路径，按需扩展。
 > 官方**无原生规则优先级**（多份 instructions 合并且顺序不保证）——所有"优先级"均为团队约定。
 
@@ -40,7 +40,7 @@
 控制原则不变：**官方无原生优先级**，多份 instructions 合并且顺序不保证。用
 **作用域（applyTo glob）+ 单一关注点 + 命名约定** 替代优先级，Hooks 做确定性兜底。
 
-`【已实测 · VS Code 1.120.0】` **子文件夹组织合法且推荐**。官方文档明确 VS Code 递归扫描
+`【已实测 · 近版 VS Code】` **子文件夹组织合法且推荐**。官方文档明确 VS Code 递归扫描
 `.github/instructions/` 子目录，因此按领域分文件夹组织规则文件是受支持的标准做法：
 
 ```
@@ -72,7 +72,7 @@ R1（Global）模板不变：仅放全项目公约数，引用 `docs/eos/agent-m
 
 ## 6.2 主流全栈子规则（修正版关键点）
 
-`【已实测 · VS Code 1.120.0】` **花括号多扩展名 `**/*.{ts,tsx}` 可靠生效**。因此：
+`【已实测 · 近版 VS Code】` **花括号多扩展名 `**/*.{ts,tsx}` 可靠生效**。因此：
 
 - ✅ **同一扩展名集合** → 用花括号：`"**/*.{tsx,jsx}"`、`"**/*.{sql,prisma}"`、`"**/*.{test,spec}.*"`。
 - ⚠️ **跨不同路径/领域** → **不要用逗号串**（官方未记载逗号多 glob，未验证）。改为
@@ -94,7 +94,7 @@ R1（Global）模板不变：仅放全项目公约数，引用 `docs/eos/agent-m
 
 ## 7.7 Hooks 护栏（修正版 · 已实测）
 
-`【已实测 · VS Code 1.120.0】`
+`【已实测 · 近版 VS Code】`
 - **`.github/hooks/*.json` 默认加载**（官方 `chat.hookFilesLocations` 默认含 `.github/hooks`）。
   **工作区 hooks 无需任何 Preview 开关**。（`chat.useCustomAgentHooks` 只管写在 `.agent.md`
   frontmatter 里的 agent 内嵌 hooks，与工作区 hooks 无关。）
@@ -168,7 +168,7 @@ mkdir -p ~/.git-templates/eos && cp -R <golden>/.github ~/.git-templates/eos/
 git config --global init.templateDir ~/.git-templates/eos
 ```
 
-版本化：`docs/eos/VERSION`（当前 `eos-1.4.1`）。升级用 `degit` 拉新版到 /tmp 后 `diff -ru` 合并，
+版本化：`docs/eos/VERSION`（当前 `eos-1.4.2`）。升级用 `degit` 拉新版到 /tmp 后 `diff -ru` 合并，
 再跑 `validate-config.mjs` + `bmad-code-review`。
 
 ---
@@ -199,7 +199,7 @@ git config --global init.templateDir ~/.git-templates/eos
 # Part 1. 假设与边界
 
 **① 已明确提供的前提（事实）**
-- OS：macOS · IDE：VS Code 1.120.0 · AI：GitHub Copilot（企业 license，仅作 license）
+- OS：macOS · IDE：VS Code（近版本，自定义 agent/hooks 需近版） · AI：GitHub Copilot（企业 license，仅作 license）
 - BMAD：73 个 `bmad-*` skill 已安装于 `~/.agents/skills/`、`~/.claude/skills/`（总 121 个）
 - 目标：规范化 SDD 环境，分层规范 Agent 全生命周期；覆盖 0-1 + 1-N + 规模化；可跨项目复用
 - 痛点：需求前置不足、运营需求未前置、1-N 扩展性不足、缺 SDLC 治理、缺多栈规则分层
@@ -263,7 +263,7 @@ git config --global init.templateDir ~/.git-templates/eos
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│ L1 环境层  macOS · VS Code 1.120.0 · Copilot(license only)    │
+│ L1 环境层  macOS · VS Code · Copilot(license only)            │
 │            BMAD 73 bmad-* skills (用户级，全项目共享)          │
 ├──────────────────────────────────────────────────────────────┤
 │ L2 规则层  R1 copilot-instructions.md (always-on, 极简)        │
@@ -290,7 +290,7 @@ git config --global init.templateDir ~/.git-templates/eos
 数据流: discovery→requirements→prd→ux→architecture→stories→code→test→release→telemetry→iterate ⟲
 ```
 
-**各层机制对照**（官方已核验，VS Code 1.120.0）：
+**各层机制对照**（官方已核验，近版 VS Code）：
 
 | 子层 | 真实机制 | 来源 |
 |---|---|---|

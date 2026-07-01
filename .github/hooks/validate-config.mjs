@@ -107,13 +107,23 @@ if (existsSync(hooksDir)) {
   }
 }
 
-// S10 agent files must have name + description frontmatter (VS Code lists/switches by name)
+// S10 agent files must have valid name + description frontmatter (VS Code lists/switches by name)
+// VS Code accepts agent names matching /^[a-z0-9-]+$/ and de-dupes by name; guard both.
 const agentsDir = join(root, '.github/agents');
 if (existsSync(agentsDir)) {
+  const seenNames = new Map();
   for (const f of readdirSync(agentsDir).filter((f) => f.endsWith('.agent.md'))) {
     const head = fm(readFileSync(join(agentsDir, f), 'utf8'));
     if (!head) { errors.push(`S10 agents/${f}: missing YAML frontmatter`); continue; }
-    if (!/^name:\s*\S/m.test(head)) errors.push(`S10 agents/${f}: missing "name" (agent won't list/switch by name in Chat)`);
+    const nameM = head.match(/^name:\s*(.+?)\s*$/m);
+    if (!nameM) {
+      errors.push(`S10 agents/${f}: missing "name" (agent won't list/switch by name in Chat)`);
+    } else {
+      const name = nameM[1].replace(/^['"]|['"]$/g, '');
+      if (!/^[a-z0-9-]+$/.test(name)) errors.push(`S10 agents/${f}: name "${name}" must match ^[a-z0-9-]+$ (no uppercase/spaces) or Chat drops it`);
+      if (seenNames.has(name)) errors.push(`S10 agents/${f}: duplicate name "${name}" (also in ${seenNames.get(name)}) — collides in the Chat picker`);
+      else seenNames.set(name, f);
+    }
     if (!/^description:\s*\S/m.test(head)) warns.push(`S10 agents/${f}: missing "description"`);
   }
 }
@@ -132,6 +142,11 @@ if (existsSync(promptsDir)) {
 console.log(`EOS config check — ${files.length} instruction file(s) scanned\n`);
 for (const w of warns) console.log('  WARN  ' + w);
 for (const e of errors) console.log('  ERROR ' + e);
+console.log('');
+// Non-failing reminder: VS Code only discovers .github/{agents,instructions,hooks,prompts}
+// at the OPENED workspace root. Opening a PARENT folder makes all of them silently inactive.
+console.log('  NOTE  In VS Code, open THIS folder as the workspace root (File > Open Folder > select it).');
+console.log('        If you open a parent folder, custom agents/instructions/hooks are NOT discovered.');
 console.log('');
 if (errors.length) {
   console.log(`FAIL: ${errors.length} error(s), ${warns.length} warning(s)`);

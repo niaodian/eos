@@ -1,7 +1,7 @@
 # EOS Template — Engineering Operating System
 
 A portable, **local-first** engineering operating system for VS Code + GitHub Copilot,
-orchestrating the installed **BMAD** skills (73 `bmad-*`) across the full SDLC. Version: **eos-1.4.1**.
+orchestrating the installed **BMAD** skills (73 `bmad-*`) across the full SDLC. Version: **eos-1.4.2**.
 
 **Supports two paradigms in one framework:**
 - **Traditional SaaS** (deterministic): transactions, resilience (circuit-breaker/backoff), REST/OpenAPI, RBAC/multi-tenancy, OTel observability.
@@ -36,7 +36,7 @@ api/ ops/ src/
 3. **Whole-repo CI** (before merge/release): `act push` runs `.github/workflows/eos-ci.yml`.
 
 ## Verified on this machine
-- VS Code 1.120.0 · brace globs (`**/*.{ts,tsx}`) load correctly.
+- A recent VS Code + Copilot Chat build · brace globs (`**/*.{ts,tsx}`) load correctly.
 - PreToolUse guardrail blocks destructive/poison/secret ops (`permissionDecision: "deny"`).
 - `act` runs the CI offline after a one-time image pull; 73 `bmad-*` skills load from user-level dirs.
 
@@ -45,6 +45,10 @@ See [docs/eos/quickstart.md](docs/eos/quickstart.md) (Prerequisites + Day-1). Fi
 ```
 node .github/hooks/validate-config.mjs    # expect PASS
 ```
+
+> **Open the project folder itself as the workspace root** (`code .` from inside it). VS Code discovers
+> `.github/{agents,instructions,hooks,prompts}` only at the opened root — open a **parent** folder and the
+> custom agents, instructions, and hooks all silently go inactive.
 
 **Full user manual** (idea → launch → iteration; includes step-by-step **SaaS** and **Agentic** tracks
 for beginners): [docs/eos/user-manual.md](docs/eos/user-manual.md).
