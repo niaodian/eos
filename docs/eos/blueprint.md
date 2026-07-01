@@ -309,10 +309,10 @@ git config --global init.templateDir ~/.git-templates/eos
 | 3 Spec | PRD 成为唯一真相源 | `bmad-create-prd`；校验 `bmad-validate-prd` | G3：每条需求有验收标准 | `P:spec` | Spec 即契约，下游只认 `docs/prd.md` |
 | 3.5 UX & Design（条件） | 视觉+体验契约（面向用户必做） | `/ux-spec`（包裹 `bmad-ux`）、`bmad-agent-ux-designer`(Sally)、`bmad-cis-design-thinking`(Maya) | **G-UX：每条面向用户需求有屏幕/流程/三态/a11y/视觉token；纯后端 SKIP+理由** | `P:ux-spec`、`A:eos-design`、`I:frontend` | UI/UX 前置：防"实现完才发现交互/信息架构错" |
 | 4 Architecture | 技术方案+数据模型+API 契约+NFR 落点+ADR | `eos-architecture`（包裹 `bmad-architecture` Winston）；`/adr` | G4：关键不可逆决策有 ADR；NFR 有落点 | `I:data-api`、`A:eos-architecture` | API 契约先于实现；扩展性显式审查 |
-| 5 Planning | Epics→Stories，各 story 上下文自包含 | `bmad-create-epics-and-stories`→`bmad-create-story`→`bmad-sprint-planning`；`bmad-check-implementation-readiness` | G5：story 就绪 | `A:eos-plan` | 就绪门防止开发中途缺上下文 |
+| 5 Planning | Epics→Stories，各 story 上下文自包含 + 验收测试先行(ATDD) | `bmad-create-epics-and-stories`→`bmad-create-story`→`bmad-sprint-planning`；`bmad-testarch-atdd`；`bmad-check-implementation-readiness` | G5：story 就绪 + 每条 AC 有验收测试设计 | `A:eos-plan` | 就绪门防缺上下文；测试左移防"事后补测" |
 | 6 Development | 按 story 实现，受栈规则+护栏约束 | `bmad-dev-story`、`bmad-agent-dev`(Amelia) | G6：lint/typecheck/单测全绿 | `I:frontend/backend/data-api`（`applyTo`自动注入）+ `H:guardrails`（PreToolUse）+ `H:quality`（PostToolUse） | Hooks 把约束从"自觉"变为确定性 |
-| 7 Testing | 按测试策略验证+spec↔test 可追溯 | `bmad-tea`(Murat)、`bmad-testarch-trace`、`bmad-testarch-nfr`、`bmad-qa-generate-e2e-tests` | G7：每条验收≥1测试且全绿 | `I:testing` | trace 矩阵确保无未被测试的验收标准 |
-| 8 Release | 过质量/安全/回滚/灰度门后发布 | `/release-gate`；`/runbook` | **G8：4 项门禁全过（必过项）** | `I:release-ops`、`H:quality` | 无回滚/无灰度不得发布 |
+| 7 Testing | 按测试策略验证+spec↔test 可追溯+**NFR 验证** | `bmad-tea`(Murat)、`bmad-testarch-trace`、`bmad-testarch-nfr`、`bmad-qa-generate-e2e-tests` | G7：每条验收≥1测试且全绿；**NFR 目标已验证或显式 deferred** | `I:testing` | trace 矩阵确保无未被测试的验收标准；**NFR 定了就必须验** |
+| 8 Release | 过质量/安全/回滚/灰度/NFR 门后发布 | `/release-gate`；`/runbook` | **G8：5 项门禁全过（必过项）** | `I:release-ops`、`H:quality` | 无回滚/无灰度不得发布；NFR 未验不得发布 |
 | 9 Observability | 埋点上线、指标可见、运营闭环 | `/telemetry-plan` | G9：关键路径埋点在产 | `I:release-ops` | 埋点需求阶段设计，此处只做落实校验 |
 | 10 Iteration | 指标回流驱动下轮需求；管理架构演进 | `bmad-correct-course`、`bmad-retrospective`、`bmad-document-project`、`bmad-sprint-status` | G10：变更回写 Spec | `A:eos-review`（handoff 回 requirements） | 变更必须回写 Spec，防"代码与真相源漂移" |
 
@@ -444,7 +444,7 @@ Agent 输出不符预期
 | P8 | 规则膨胀，单文件超 300 词 | Token 超预算，规则被截断 | S10 词数检查；按"单一职责"拆分文件 |
 | P9 | 无 ADR 就做不可逆架构决策 | 团队失忆，演进时没有决策上下文 | G4 必须有 ADR；`/adr` prompt |
 | P10 | 让 Agent 直接生成代码跳过 Spec | 代码与需求漂移，测试无可追溯目标 | G3 是 G5 前置门；无 `docs/prd.md` 不得进入 Planning |
-| P11 | 无回滚/灰度就发布 | 出问题无法撤，用户全部受影响 | G8 四项门禁；`/release-gate` prompt 强制 |
+| P11 | 无回滚/灰度就发布 | 出问题无法撤，用户全部受影响 | G8 五项门禁；`/release-gate` prompt 强制 |
 | P12 | 把企业/内网接口写进本地规则 | 离开企业环境配置损坏，不可移植 | 工作约定 B；本地配置只写本地可验证内容 |
 | P13 | 用户级 skills/agents 做项目专属配置 | 跨项目污染，新开项目受旧项目约束 | 用户级放通用能力；项目专属放 `.github/` |
 | P14 | 不验证就发布 EOS 配置更新 | 规则静默失效无感知 | 每次修改规则文件后跑 `validate-config.mjs` + rubric |

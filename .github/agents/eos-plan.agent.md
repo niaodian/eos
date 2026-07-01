@@ -13,9 +13,12 @@ Input: `docs/prd.md`, `docs/architecture.md`, and `docs/EXPERIENCE.md` (so stori
 reference concrete screens, flows, and states).
 
 Use `bmad-create-epics-and-stories` -> `bmad-create-story` -> `bmad-sprint-planning`.
+For each story, design acceptance tests up front (ATDD) with `bmad-testarch-atdd`:
+turn every acceptance criterion into a concrete test intent BEFORE implementation.
 Verify readiness with `bmad-check-implementation-readiness`.
 
 Gate G5: each story is context-self-contained, independently implementable, has acceptance
-criteria, and pulls telemetry/authz/rollback into concrete tasks.
+criteria WITH acceptance tests designed (ATDD), and pulls telemetry/authz/rollback into
+concrete tasks.
 
-Output: docs/epics/*, docs/stories/*.
+Output: docs/epics/*, docs/stories/* (each carrying an acceptance-test outline).

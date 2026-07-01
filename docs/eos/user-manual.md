@@ -231,7 +231,7 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 | G5 | Planning | 每个 story 上下文自包含、可独立实现、含 AC |
 | G6 | Development | lint/typecheck/单测全绿（hook 质量门） |
 | G7 | Testing | 每条 AC ≥1 测试且全绿；trace 矩阵完整 |
-| **G8** | Release | **质量+审计+回滚+灰度四项门禁全过（必过硬门）** |
+| **G8** | Release | **质量+审计+回滚+灰度+NFR 五项门禁全过（必过硬门）** |
 | G9 | Observability | 关键路径埋点在产、指标可见 |
 | G10 | Iteration | 每个变更回写 Spec 真相源 |
 
@@ -374,12 +374,12 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 |---|---|
 | **目标** | 把架构拆成可独立实现、上下文自包含的 story |
 | **何时进入** | G4 通过 |
-| **怎么启动** | Chat 切到 **`（agent）eos-plan`**（`bmad-create-epics-and-stories` → `bmad-create-story` → `bmad-sprint-planning`），用 `bmad-check-implementation-readiness` 验就绪 |
-| **输入** | `docs/prd.md`、`docs/architecture.md` |
-| **产出** | `docs/epics/*`、`docs/stories/*.md` |
-| **决策门 G5** | ☑ 每个 story 上下文自包含 ☑ 可独立实现 ☑ 含 AC ☑ 把 telemetry/authz/rollback 落成具体任务 |
-| **必查项** | 开发者拿到这个 story，**不回头翻别处**就能开工吗？DoD 写了吗？ |
-| **防返工** | "就绪门"防止开发到一半发现缺上下文、缺决策。 |
+| **怎么启动** | Chat 切到 **`（agent）eos-plan`**（`bmad-create-epics-and-stories` → `bmad-create-story` → `bmad-sprint-planning`），对每条 AC 用 **`bmad-testarch-atdd`** 先设计验收测试，再用 `bmad-check-implementation-readiness` 验就绪 |
+| **输入** | `docs/prd.md`、`docs/architecture.md`、`docs/EXPERIENCE.md`（若做了 UX 阶段） |
+| **产出** | `docs/epics/*`、`docs/stories/*.md`（每个含**验收测试大纲**） |
+| **决策门 G5** | ☑ 每个 story 上下文自包含 ☑ 可独立实现 ☑ 含 AC **且每条 AC 有验收测试设计（ATDD）** ☑ 把 telemetry/authz/rollback 落成具体任务 |
+| **必查项** | 开发者拿到这个 story，**不回头翻别处**就能开工吗？DoD 写了吗？**每条 AC 的验收测试意图定义了吗**？ |
+| **防返工** | "就绪门"防开发中途缺上下文；**测试左移**让验收标准在写码前就可测，防"事后补测凑覆盖率"。 |
 | **样例** | `my-app/docs/stories/story-001-auth.md`（AC + 自包含 context + DoD = Ready） |
 
 ---
@@ -409,15 +409,15 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 
 | 项 | 内容 |
 |---|---|
-| **目标** | 按测试策略验证，建立 spec↔test 可追溯 |
+| **目标** | 按测试策略验证，建立 spec↔test 可追溯，并**验证 NFR 目标** |
 | **何时进入** | G6 通过 |
-| **怎么启动** | Chat 输入 **`bmad-tea`**（Murat）/ `bmad-testarch-test-design` / `bmad-testarch-automate` / `bmad-testarch-trace` / `bmad-qa-generate-e2e-tests` |
-| **输入** | `docs/prd.md`（AC 清单）、`src/` 代码 |
-| **产出** | 测试套件 + `docs/trace-matrix.md`（AC ↔ 测试映射） |
-| **生效规则 R6** | 金字塔结构；**每条 AC ≥1 测试**；`describe(<criterion id>)` 命名；无真实计时器/无顺序依赖；改动行覆盖率 ≥80% |
-| **决策门 G7** | ☑ 每条 AC ≥1 测试 ☑ 全绿 ☑ trace 矩阵完整 |
-| **必查项** | 有没有"没被任何测试覆盖的 AC"？延后的（如性能压测）有没有显式标 trigger，而不是悄悄漏掉？ |
-| **防返工** | trace 矩阵让"漏测的验收标准"无所遁形。 |
+| **怎么启动** | Chat 输入 **`bmad-tea`**（Murat）/ `bmad-testarch-test-design` / `bmad-testarch-automate` / `bmad-testarch-trace` / **`bmad-testarch-nfr`** / `bmad-qa-generate-e2e-tests` |
+| **输入** | `docs/prd.md`（AC 清单）、**`docs/checklists/C-nfr.md`（NFR 目标值）**、`src/` 代码 |
+| **产出** | 测试套件 + `docs/trace-matrix.md`（AC ↔ 测试映射）+ **NFR 验证结果** |
+| **生效规则 R6** | 金字塔结构；**每条 AC ≥1 测试**；`describe(<criterion id>)` 命名；无真实计时器/无顺序依赖；改动行覆盖率 ≥80%；**NFR 目标用 `bmad-testarch-nfr` 验证** |
+| **决策门 G7** | ☑ 每条 AC ≥1 测试 ☑ 全绿 ☑ trace 矩阵完整 ☑ **NFR 目标已验证或显式标 deferred+trigger** |
+| **必查项** | 有没有"没被任何测试覆盖的 AC"？**C-nfr 里定的 P95/吞吐/SLO 有没有被验证**（而不是定了就忘）？延后的有没有显式标 trigger？ |
+| **防返工** | trace 矩阵让"漏测的验收标准"无所遁形；**NFR 验证让"定了目标却没人验"无所遁形**。 |
 | **样例** | `my-app/test/auth.test.js`（10 个 AC-traced 测试全绿）、`my-app/docs/trace-matrix.md`（11/12 AC 有测试，1 个性能项显式 deferred） |
 
 ---
@@ -426,15 +426,15 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 
 | 项 | 内容 |
 |---|---|
-| **目标** | 过质量/安全/回滚/灰度门后才发布 |
+| **目标** | 过质量/安全/回滚/灰度/NFR 门后才发布 |
 | **何时进入** | G7 通过 |
 | **怎么启动** | Chat 输入 **`/release-gate`**；缺 runbook 就先 **`/runbook <service>`** |
-| **输入** | 测试结果、`ops/runbook-*.md` |
+| **输入** | 测试结果、NFR 验证结果、`ops/runbook-*.md` |
 | **产出** | 发布门禁报告（逐项 PASS/FAIL）、`ops/runbook-<service>.md` |
-| **决策门 G8（硬门）** | 逐项核验：① 质量门绿（lint+typecheck+test）② 依赖审计干净（`npm audit`/`pip-audit`）③ 回滚预案可执行 ④ 灰度策略有文档 ⑤ health/readiness 端点 ⑥ `validate-config.mjs` PASS。**任一 FAIL 阻断发布** |
-| **必查项** | 回滚步骤是"可执行的精确步骤"还是空话？灰度延后的有没有写 trigger？审计 0 漏洞吗？ |
-| **防返工** | 无回滚/无灰度不得上线——堵"带病上线"。 |
-| **样例** | `my-app/docs/release-gate.md`（4/4 适用项 PASS、`npm audit` 0 vulns）、`my-app/ops/runbook-auth.md`（`FEATURE_LOGIN=off` 回滚） |
+| **决策门 G8（硬门）** | 逐项核验：① 质量门绿（lint+typecheck+test）② 依赖审计干净（`npm audit`/`pip-audit`）③ **NFR 目标已验证（G7 的 `bmad-testarch-nfr`，延后项带 trigger）** ④ 回滚预案可执行 ⑤ 灰度策略有文档 ⑥ health/readiness 端点 ⑦ `validate-config.mjs` PASS。**任一 FAIL 阻断发布** |
+| **必查项** | 回滚步骤是"可执行的精确步骤"还是空话？灰度延后的有没有写 trigger？审计 0 漏洞吗？**NFR 目标验了没**？ |
+| **防返工** | 无回滚/无灰度/NFR 未验不得上线——堵"带病上线"。 |
+| **样例** | `my-app/docs/release-gate.md`（适用项全过、`npm audit` 0 vulns）、`my-app/docs/trace-matrix.md`（性能 NFR 项显式 deferred+trigger）、`my-app/ops/runbook-auth.md`（`FEATURE_LOGIN=off` 回滚） |
 
 ---
 
@@ -607,7 +607,7 @@ Chat 输入 **`/validate-config`**：让 Agent 读 `.github/` 全量，检测规
 | Planning | story 列表 | ☐ 每 story 含 AC+context |
 | Development | 代码 + 过 hook | ☐ 合规代码不被拦 ☐ 危险指令被拦 |
 | Testing | 测试 + trace | ☐ 每 AC ≥1 测试 ☐ 全绿 |
-| Release | 门禁报告 | ☐ 四项门禁全过 |
+| Release | 门禁报告 | ☐ 五项门禁全过 |
 | Observability | 埋点在产 | ☐ 关键路径可见 |
 | Iteration | 回写 Spec | ☐ `docs/prd.md` 已更新 |
 
@@ -729,7 +729,7 @@ EOS 的栈规则是**可插拔**的。新增一个栈 = 加一个 `*.instruction
 | P8 | 规则膨胀单文件超长 | token 超预算被截断 | 单一职责拆分 |
 | P9 | 无 ADR 做不可逆决策 | 团队失忆 | G4 必须有 ADR；`/adr` |
 | P10 | 跳过 Spec 直接出码 | 代码与需求漂移 | G3 是 G5 前置；无 prd.md 不进 Planning |
-| P11 | 无回滚/灰度就发布 | 出事无法撤 | G8 四项门禁；`/release-gate` |
+| P11 | 无回滚/灰度就发布 | 出事无法撤 | G8 五项门禁；`/release-gate` |
 | P12 | 本地配置硬编码企业接口 | 离开内网即损坏 | 纯本地约束；只写可本地验证内容 |
 | P13 | 用户级放项目专属配置 | 跨项目污染 | 通用放用户级，专属放 `.github/` |
 | P14 | 改规则不验证就发布 | 静默失效 | 每次改完跑 `validate-config.mjs` + rubric |
