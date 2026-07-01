@@ -163,7 +163,7 @@ mkdir -p ~/.git-templates/eos && cp -R <golden>/.github ~/.git-templates/eos/
 git config --global init.templateDir ~/.git-templates/eos
 ```
 
-版本化：`docs/eos/VERSION`（当前 `eos-1.1.2`）。升级用 `degit` 拉新版到 /tmp 后 `diff -ru` 合并，
+版本化：`docs/eos/VERSION`（当前 `eos-1.2.0`）。升级用 `degit` 拉新版到 /tmp 后 `diff -ru` 合并，
 再跑 `validate-config.mjs` + `bmad-code-review`。
 
 ---
@@ -275,6 +275,7 @@ git config --global init.templateDir ~/.git-templates/eos
 │ L5 治理层  .github/hooks/guardrails.json (PreToolUse 拦截)     │
 │            .github/hooks/quality.json   (PostToolUse 质量门)   │
 │            .github/hooks/config-check.json (配置自检+门诊)     │
+│            .github/hooks/secret-scan.mjs (密钥/投毒扫描)        │
 │            .github/workflows/eos-ci.yml (act 本地 CI 批量门)    │
 │            ▲ 三层强制：实时Hook＋配置静态＋CI全仓批量           │
 ├──────────────────────────────────────────────────────────────┤
@@ -482,7 +483,8 @@ Agent 输出不符预期
 | — | Agentic Engineering 扩展包（LLM/agent 产品） | `ai/10-ai-llm` 规则、`/eval-spec`(G-EVAL)、C-nfr/security/telemetry 扩展；产 `docs/eval-plan.md`；起步骨架 `docs/eos/examples/eval-starter/` | 新建补强（借鉴 bmad-eval-runner） |
 | — | BMAD reuse map（73 bmad-*） | `docs/eos/agent-map.md` | 复用BMAD |
 | — | 运营前置 skill | `.github/skills/eos-operational-readiness/SKILL.md` | 新建 |
-| — | Hooks 护栏 | `.github/hooks/guardrails.json` + `deny-dangerous.js` | 新建 |
+| — | Hooks 护栏 | `.github/hooks/guardrails.json` + `deny-dangerous.js`（危险操作+供应链投毒+密钥泄漏） | 新建 |
+| — | 安全门禁 | `secret-scan.mjs`（密钥扫描）+ `E-security.md`（清单）+ security/frontend 红线；复用 `bmad-review-adversarial-general` 人审 | 新建补强+复用BMAD |
 | — | 本地 CI（act 可跑）+ SDLC 门诊 | `.github/workflows/eos-ci.yml` + `.github/hooks/eos-doctor.mjs`（validate-config+doctor+tests+evals；G-EVAL 机器强制） | 新建补强（复用 bmad-testarch-ci） |
 | — | 配置静态验证器 | `.github/hooks/validate-config.mjs` | 新建 |
 

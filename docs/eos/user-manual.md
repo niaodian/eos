@@ -1,6 +1,6 @@
 # EOS 用户手册（Engineering Operating System User Manual）
 
-> 版本：与 `docs/eos/VERSION` 同步（当前 `eos-1.1.2`）
+> 版本：与 `docs/eos/VERSION` 同步（当前 `eos-1.2.0`）
 > 适用：VS Code 1.120.0 + GitHub Copilot + 已安装 73 个 `bmad-*` skill（用户级）
 > 定位：本手册是**操作指南（怎么用）**；设计原理与取舍见同目录 `blueprint.md`（为什么这么设计）。
 > 约定：正文中文；文件名/路径/命令/配置键保留英文原文。
@@ -226,7 +226,7 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 | 门 | 阶段 | 通过标准（不过则不进下一阶段） |
 |---|---|---|
 | G1 | Discovery | 问题是一句可证伪陈述 + 成功指标可度量 |
-| **G2** | Requirements | **四张清单无未决 BLOCKER（必过硬门）** |
+| **G2** | Requirements | **五张清单无未决 BLOCKER（必过硬门）** |
 | G3 | Spec | 每条需求有 ≥1 可度量验收标准 |
 | G-UX | UX & Design（条件） | 面向用户：每条需求有屏幕/流程/四态/a11y/视觉token；纯后端 SKIP+理由 |
 | G-EVAL | Eval（条件·LLM/agentic） | 每条 LLM 支撑的 AC 有 eval 用例+grader+阈值；含注入/成本用例；纯确定性功能 SKIP+理由 |
@@ -305,16 +305,17 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 | **怎么启动** | Chat 输入 **`/requirements "<feature>"`**（包裹 `bmad-create-prd` + skill `eos-operational-readiness`） |
 | **输入** | `docs/discovery.md` |
 | **产出** | `docs/requirements.md`，**顶部带"Operational Pre-Flight Decision Table"** |
-| **决策门 G2（硬门）** | 四张清单 A/B/C/D 全部走查，**任何未决项 = BLOCKER，不清零不得进 Spec** |
+| **决策门 G2（硬门）** | 五张清单 A/B/C/D/E 全部走查，**任何未决项 = BLOCKER，不清零不得进 Spec** |
 | **必查项** | 运营前置 11 项（telemetry/authz/audit/rollback/monitoring/canary/quota/i18n/multi-tenancy/capacity-SLO/DR）每项三选一：**ADOPT / SKIP+理由 / DEFER+触发条件**，禁止留空 |
 | **防返工** | 用"反向提问法"逼出隐性需求：谁**无权**做？做错怎么**回滚**？怎么**知道**线上有没有用？×100 用户会怎样？ |
 | **样例** | `my-app/docs/requirements.md`（11 项决策表 + authz 矩阵 + A/B/C/D 走查结论无 BLOCKER） |
 
-**四张清单**（完整内容在 `docs/checklists/`）：
+**五张清单**（完整内容在 `docs/checklists/`）：
 - **A-gap**：需求缺口（可证伪、验收可度量、边界/异常/并发、依赖、scope-out、重叠排查）
 - **B-rework**：上线后高概率补做（埋点/authz/审计/回滚/告警/灰度/限流/i18n/空错态/迁移可逆）
 - **C-nfr**：非功能需求（性能/容量/可用性容灾/安全合规/可观测/可维护/a11y，逐项填目标值）
 - **D-ops**：运营前置（埋点↔指标闭合/权限矩阵/审计范围/回滚预案/灰度阈值/配额/多租户/i18n/容量告警/Runbook 责任人）
+- **E-security**：安全与机密（密钥不入代码/前端、`.env` 治理、供应链投毒防护、配置权限隔离、密钥轮换）
 
 > 配套命令：`/nfr` 专门把 C-nfr 逐行填上具体目标值。
 
@@ -550,11 +551,12 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 
 | 文件 | 事件 | 作用 |
 |---|---|---|
-| `guardrails.json` + `deny-dangerous.js` | PreToolUse | 拦截危险操作（输出 `hookSpecificOutput.permissionDecision:"deny"`） |
+| `guardrails.json` + `deny-dangerous.js` | PreToolUse | 拦截危险操作 + **供应链投毒（`curl\|bash`/`--unsafe-perm`）+ 硬编码密钥字面量**（输出 `permissionDecision:"deny"`） |
 | `quality.json` | PostToolUse | 写文件后跑 lint+typecheck+test 质量门 |
-| `config-check.json` | PostToolUse | 每次编辑后自动跑 `validate-config.mjs`（配置 S1–S9）**＋ `eos-doctor.mjs`（SDLC 门诊 / G-EVAL 连线）** |
+| `config-check.json` | PostToolUse | 每次编辑后自动跑 `validate-config.mjs`（配置 S1–S9）**＋ `eos-doctor.mjs`（SDLC 门诊 / G-EVAL 连线 / 密钥扫描）** |
 | `validate-config.mjs` | 手动/被 hook 调用 | 零依赖静态验证器（S1–S9） |
-| `eos-doctor.mjs` | **PostToolUse（逐编辑，经 `config-check.json`）** / 手动 / 被 CI 调用 | 零依赖 SDLC 门诊：G-EVAL（有 `ai/llm/rag` 代码 ⇒ 必须有 `docs/eval-plan.md`）、G-UX 提醒 |
+| `eos-doctor.mjs` | **PostToolUse（逐编辑，经 `config-check.json`）** / 手动 / 被 CI 调用 | 零依赖 SDLC 门诊：G-EVAL、G-UX、**D4 密钥扫描（调 `secret-scan.mjs`）** |
+| `secret-scan.mjs` | 手动 / 被 eos-doctor + CI 调用 | 零依赖密钥扫描：追踪文件里的硬编码密钥/私钥、误提交的 `.env`（命中即 exit 1，输出脱敏） |
 
 **手动测试护栏**（终端）：
 ```sh
@@ -571,7 +573,7 @@ act push --pull=false --action-offline-mode   # 首次拉过镜像后可完全�
 ```
 > 三道强制层各司其职：**Hook（逐编辑实时）**=`config-check.json` 每次编辑跑 `validate-config.mjs`+`eos-doctor.mjs`（配置合规 + G-EVAL 连线）、`quality.json` 跑质量门、`guardrails.json` 拦危险操作 · **静态校验（手动/按需）**=同两个脚本可随时手跑 · **act CI（合并/发布前全仓批量）**=`eos-ci.yml` 跑 validate-config+eos-doctor+tests+evals。同一门（如 G-EVAL）在逐编辑与 CI 两处都强制，早发现也防漏网。
 
-## 7.6 四张需求清单（`docs/checklists/`）
+## 7.6 五张需求清单（`docs/checklists/`）
 
 | 文件 | 名称 | 用途 | 在哪个门用 |
 |---|---|---|---|
@@ -579,6 +581,7 @@ act push --pull=false --action-offline-mode   # 首次拉过镜像后可完全�
 | `B-rework.md` | 上线后高概率补做 | 埋点/authz/审计/回滚/告警/灰度/限流/i18n/空错态/迁移可逆 | G2 |
 | `C-nfr.md` | 非功能需求 | 性能/容量/容灾/安全/可观测/可维护/a11y 逐项填目标 | G2 + G4 |
 | `D-ops.md` | 运营前置 | 埋点↔指标/权限矩阵/审计/回滚/灰度/配额/多租户/i18n/容量告警/Runbook | G2 |
+| `E-security.md` | 安全与机密 | 密钥不入代码/前端/`.env` 治理、供应链投毒防护、配置权限隔离、密钥轮换 | G2 + G8 |
 
 ---
 
@@ -699,7 +702,7 @@ gh repo create my-app --template niaodian/eos-template --private --clone
 
 ## 10.4 版本化与升级
 
-- 每次改 EOS 配置：改 `docs/eos/VERSION`（如 `eos-1.1.2`→`eos-1.2.0`），跑 `validate-config.mjs`，Conventional Commits 提交。
+- 每次改 EOS 配置：改 `docs/eos/VERSION`（如 `eos-1.2.0`→`eos-1.3.0`），跑 `validate-config.mjs`，Conventional Commits 提交。
 - 升级既有项目：从新版模板 diff `.github/`，挑选合并；用户级 `bmad-*` 独立升级。
 
 ---

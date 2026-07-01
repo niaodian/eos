@@ -14,6 +14,7 @@
 | Release/Ops | EOS prompts: /release-gate, /runbook |
 | Observability | EOS prompt: /telemetry-plan |
 | Iteration | bmad-correct-course, bmad-retrospective, bmad-document-project, bmad-sprint-status |
-| CI (local, via act) | bmad-testarch-ci (scaffold); `.github/workflows/eos-ci.yml` runs validate-config + eos-doctor + tests + evals |
+| CI (local, via act) | bmad-testarch-ci (scaffold); `.github/workflows/eos-ci.yml` runs validate-config + eos-doctor + secret-scan + tests + evals |
+| Security review | bmad-review-adversarial-general, bmad-code-review; EOS secret-scan.mjs + E-security checklist + guardrail |
 
 > 73 `bmad-*` skills are installed at `~/.agents/skills/` and `~/.claude/skills/` (user-level, shared across projects).

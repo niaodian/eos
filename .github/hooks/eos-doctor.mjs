@@ -6,6 +6,7 @@
 // Designed to run in local CI (act) and as a manual pre-release check.
 import { readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { execSync } from 'node:child_process';
 
 const root = process.cwd();
 const errors = [];
@@ -67,6 +68,16 @@ if (aiDirs.length) {
 const hasComponents = anyFile((n) => /\.(tsx|jsx)$/.test(n));
 if (hasComponents && !existsSync(join(root, 'docs/EXPERIENCE.md'))) {
   warns.push('D3 G-UX: found React component files but no docs/EXPERIENCE.md. User-facing work needs the UX contract (run /ux-spec) or an explicit SKIP.');
+}
+
+// --- D4: secret hygiene — delegate to secret-scan.mjs if present (error on leak) ---
+const scanner = join(root, '.github/hooks/secret-scan.mjs');
+if (existsSync(scanner)) {
+  try {
+    execSync(`node ${JSON.stringify(scanner)}`, { cwd: root, stdio: 'ignore' });
+  } catch {
+    errors.push('D4 Security: secret-scan.mjs found potential hardcoded secret(s). Run `node .github/hooks/secret-scan.mjs` for details.');
+  }
 }
 
 // --- Report (same shape as validate-config.mjs) ---

@@ -19,6 +19,11 @@ applyTo: "**/*.{tsx,jsx}"
 - Strict TypeScript: no `any`, prefer `unknown` + narrowing. Explicit return types on exported fns.
 - Form state via `react-hook-form` + zod schema validation.
 
+## Secrets (client bundle is public)
+- Never put secrets in client code. Anything prefixed `NEXT_PUBLIC_` / `VITE_` ships to the browser —
+  only put non-sensitive, public values there. API keys, DB creds, and tokens stay server-side
+  (route handlers / server components / a backend), reached via server env vars.
+
 ## Accessibility & UX
 - All interactive elements keyboard-accessible; provide aria-labels.
 - Always handle loading / empty / error states explicitly.

@@ -18,8 +18,8 @@ For EACH item, output one of [ADOPT / SKIP+reason / DEFER+trigger] plus an archi
 telemetry, authz, audit, rollback/flag, monitoring/alerting, canary,
 rate-limit/quota, i18n/l10n, multi-tenancy, capacity/SLO, DR (RTO/RPO).
 
-## Step 3 — Gate G2: walk the four checklists
-Check every item in docs/checklists/{A-gap,B-rework,C-nfr,D-ops}.md.
+## Step 3 — Gate G2: walk the five checklists
+Check every item in docs/checklists/{A-gap,B-rework,C-nfr,D-ops,E-security}.md.
 Any unresolved item => mark BLOCKER. Do not proceed to Spec until cleared.
 
 ## Output

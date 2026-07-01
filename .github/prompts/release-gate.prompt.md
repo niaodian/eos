@@ -8,6 +8,8 @@ tools: ['search', 'runCommands']
 
 Verify and report PASS/FAIL for each:
 - [ ] Quality gate green (lint + typecheck + tests). Run locally.
+- [ ] No leaked secrets: `node .github/hooks/secret-scan.mjs` PASS (no hardcoded creds/keys/`.env`).
+- [ ] Supply chain: lockfile committed, versions pinned, deps vetted (no typosquat / remote-script-to-shell).
 - [ ] Dependency audit clean (`npm audit` / `pip-audit`). Needs a lockfile: if missing, run
       `npm i --package-lock-only` first. Offline: `npm audit` returns clean for zero-dep projects;
       with deps it needs the registry, so treat a network failure as "deferred, re-run when online"
