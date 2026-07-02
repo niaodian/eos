@@ -1,6 +1,6 @@
 # EOS 用户手册（Engineering Operating System User Manual）
 
-> 版本：与 `docs/eos/VERSION` 同步（当前 `eos-1.4.3`）
+> 版本：与 `docs/eos/VERSION` 同步（当前 `eos-1.4.4`）
 > 适用：较新版本的 VS Code + GitHub Copilot Chat（自定义 agent / hooks 属近版能力，用「关于 VS Code」面板确认版本）+ 已安装 73 个 `bmad-*` skill（用户级）
 > 定位：本手册是**操作指南（怎么用）**；设计原理与取舍见同目录 `blueprint.md`（为什么这么设计）。
 > 约定：正文中文；文件名/路径/命令/配置键保留英文原文。
@@ -312,17 +312,21 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 | **怎么启动** | Chat 输入 **`/requirements "<feature>"`**（包裹 `bmad-create-prd` + skill `eos-operational-readiness`） |
 | **输入** | `docs/discovery.md` |
 | **产出** | `docs/requirements.md`，**顶部带"Operational Pre-Flight Decision Table"** |
-| **决策门 G2（硬门）** | 五张清单 A/B/C/D/E 全部走查，**任何未决项 = BLOCKER，不清零不得进 Spec** |
+| **决策门 G2（硬门）** | 五张清单 A/B/C/D/E 全部走查（**受监管行业再加第六张 F-compliance**），**任何未决项 = BLOCKER，不清零不得进 Spec** |
 | **必查项** | 运营前置 11 项（telemetry/authz/audit/rollback/monitoring/canary/quota/i18n/multi-tenancy/capacity-SLO/DR）每项三选一：**ADOPT / SKIP+理由 / DEFER+触发条件**，禁止留空 |
 | **防返工** | 用"反向提问法"逼出隐性需求：谁**无权**做？做错怎么**回滚**？怎么**知道**线上有没有用？×100 用户会怎样？ |
 | **样例** | `my-app/docs/requirements.md`（11 项决策表 + authz 矩阵 + A/B/C/D 走查结论无 BLOCKER） |
 
-**五张清单**（完整内容在 `docs/checklists/`）：
+**五张清单**（完整内容在 `docs/checklists/`；**受监管行业再加第六张 F**）：
 - **A-gap**：需求缺口（可证伪、验收可度量、边界/异常/并发、依赖、scope-out、重叠排查）
 - **B-rework**：上线后高概率补做（埋点/authz/审计/回滚/告警/灰度/限流/i18n/空错态/迁移可逆）
 - **C-nfr**：非功能需求（性能/容量/可用性容灾/安全合规/可观测/可维护/a11y，逐项填目标值）
 - **D-ops**：运营前置（埋点↔指标闭合/权限矩阵/审计范围/回滚预案/灰度阈值/配额/多租户/i18n/容量告警/Runbook 责任人）
 - **E-security**：安全与机密（密钥不入代码/前端、`.env` 治理、供应链投毒防护、配置权限隔离、密钥轮换）
+- **F-compliance**（**仅受监管行业**）：具名制度选择（HIPAA/PCI-DSS/SOC2/SOX/GDPR/CCPA/PIPL）→ 级联控制（数据驻留、审计留存期、最小必要、供应商 **BAA/DPA**、**Agentic 数据出境**决策）
+
+> **受监管行业（医疗/金融等）请在需求阶段就定制度**：`/requirements` 的 **Step 2.5 制度前置**逼你先答"是否适用 HIPAA/PCI-DSS/SOC2/SOX/GDPR/CCPA/PIPL"，选中即走 `F-compliance.md`，把数据驻留、审计留存、同意/DSAR、供应商 BAA/DPA 等**在架构定型前**落地——避免上线后推倒重来。**尤其**：LLM/agent 产品若涉 PHI/PAN/受监管个人数据，必须当场定"数据出境"方案（签 BAA/DPA · 自托管模型 · 脱敏网关 · 排除受监管数据），晚决 = 换模型换架构。结果记入 `docs/compliance-profile.md`。
+> **非法律意见**：EOS 只强制早期工程决策，**不替代**合规官/法务/审计师签核。`【新建补强】`
 
 > 配套命令：`/nfr` 专门把 C-nfr 逐行填上具体目标值。
 
@@ -778,7 +782,7 @@ act push --pull=false --action-offline-mode   # 首次拉过镜像后可完全�
 ```
 > 三道强制层各司其职：**Hook（逐编辑实时）**=`config-check.json` 每次编辑跑 `validate-config.mjs`+`eos-doctor.mjs`（配置合规 + G-EVAL 连线）、`quality.json` 跑质量门、`guardrails.json` 拦危险操作 · **静态校验（手动/按需）**=同两个脚本可随时手跑 · **act CI（合并/发布前全仓批量）**=`eos-ci.yml` 跑 validate-config+eos-doctor+tests+evals。同一门（如 G-EVAL）在逐编辑与 CI 两处都强制，早发现也防漏网。
 
-## 7.6 五张需求清单（`docs/checklists/`）
+## 7.6 六张需求清单（`docs/checklists/`；第六张仅受监管行业）
 
 | 文件 | 名称 | 用途 | 在哪个门用 |
 |---|---|---|---|
@@ -787,6 +791,7 @@ act push --pull=false --action-offline-mode   # 首次拉过镜像后可完全�
 | `C-nfr.md` | 非功能需求 | 性能/容量/容灾/安全/可观测/可维护/a11y 逐项填目标 | G2 + G4 |
 | `D-ops.md` | 运营前置 | 埋点↔指标/权限矩阵/审计/回滚/灰度/配额/多租户/i18n/容量告警/Runbook | G2 |
 | `E-security.md` | 安全与机密 | 密钥不入代码/前端/`.env` 治理、供应链投毒防护、配置权限隔离、密钥轮换 | G2 + G8 |
+| `F-compliance.md` | 受监管行业合规（**仅受监管**） | 制度选择(HIPAA/PCI/SOC2/SOX/GDPR/CCPA/PIPL)→数据驻留/审计留存/最小必要/BAA·DPA/Agentic 数据出境 | G2 + G8 |
 
 ---
 

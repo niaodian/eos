@@ -29,6 +29,7 @@ For each concern below, require one explicit decision: **ADOPT** (write requirem
 | capacity/SLO | latency/throughput targets | capacity model, caching/sharding |
 | DR | RTO/RPO targets | backup / failover |
 | data lifecycle | retention/archive/deletion per data class; GDPR erasure/export | retention jobs, archival store, soft/hard-delete + audit |
+| regulatory compliance (if regulated) | named regime + per-control decision — walk `docs/checklists/F-compliance.md` | data residency, audit retention, consent/DSAR, vendor BAA/DPA, redaction gateway for the AI path |
 | high availability | redundancy / failover target (if the SLO needs it) | multi-instance, health checks, no single point of failure |
 | LLM/agentic (if applicable) | eval set + cost/token budget + safety (injection/PII) | model pinning, eval harness, tracing, output moderation |
 

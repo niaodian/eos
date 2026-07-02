@@ -168,7 +168,7 @@ mkdir -p ~/.git-templates/eos && cp -R <golden>/.github ~/.git-templates/eos/
 git config --global init.templateDir ~/.git-templates/eos
 ```
 
-版本化：`docs/eos/VERSION`（当前 `eos-1.4.3`）。升级用 `degit` 拉新版到 /tmp 后 `diff -ru` 合并，
+版本化：`docs/eos/VERSION`（当前 `eos-1.4.4`）。升级用 `degit` 拉新版到 /tmp 后 `diff -ru` 合并，
 再跑 `validate-config.mjs` + `bmad-code-review`。
 
 ---
@@ -185,7 +185,7 @@ git config --global init.templateDir ~/.git-templates/eos
 3. **误把"优先级"当原生特性**：依赖规则 A 覆盖规则 B 的隐式假设在版本变化时静默失效。
 
 **最需优先补强的三个环节**：
-- 需求阶段运营前置（四张清单，阻断"上线后大规模返工"主闸门）
+- 需求阶段运营前置（五张清单 A–E，受监管加 F，阻断"上线后大规模返工"主闸门）
 - 配置质检 + 行为验收（让你能客观判断 EOS 是否按预期工作）
 - 跨项目移植机制（用户级 vs 工作区级正确分层 + template repo）
 
@@ -313,7 +313,7 @@ git config --global init.templateDir ~/.git-templates/eos
 | 阶段 | 目标 | 主要执行体 | 决策门 | 生效规则 | 防返工关键 |
 |---|---|---|---|---|---|
 | 1 Discovery | 收敛为单句可证伪问题+可度量成功指标 | `bmad-brainstorming`、`bmad-agent-analyst`(Mary)、`bmad-forge-idea` | G1：问题可证伪 + 指标可度量 | `I:00-workspace` | 最廉价纠错点：锁定问题不漂移 |
-| 2 Requirement | 展开功能+NFR+**运营前置** | `/requirements`（包裹 `bmad-create-prd`） + skill `eos-operational-readiness` | **G2：四张清单全过审（必过项）** | `P:requirements`、`P:nfr`、`I:security` | 主闸门：阻断上线后大规模返工 |
+| 2 Requirement | 展开功能+NFR+**运营前置** | `/requirements`（包裹 `bmad-create-prd`） + skill `eos-operational-readiness` | **G2：五张清单全过审（受监管加 F）** | `P:requirements`、`P:nfr`、`I:security` | 主闸门：阻断上线后大规模返工 |
 | 3 Spec | PRD 成为唯一真相源 | `bmad-create-prd`；校验 `bmad-validate-prd` | G3：每条需求有验收标准 | `P:spec` | Spec 即契约，下游只认 `docs/prd.md` |
 | 3.5 UX & Design（条件） | 视觉+体验契约（面向用户必做） | `/ux-spec`（包裹 `bmad-ux`）、`bmad-agent-ux-designer`(Sally)、`bmad-cis-design-thinking`(Maya) | **G-UX：每条面向用户需求有屏幕/流程/三态/a11y/视觉token；纯后端 SKIP+理由** | `P:ux-spec`、`A:eos-design`、`I:frontend` | UI/UX 前置：防"实现完才发现交互/信息架构错" |
 | 4 Architecture | 技术方案+数据模型+API 契约+NFR 落点+ADR | `eos-architecture`（包裹 `bmad-architecture` Winston）；`/adr` | G4：关键不可逆决策有 ADR；NFR 有落点 | `I:data-api`、`A:eos-architecture` | API 契约先于实现；扩展性显式审查 |
@@ -346,7 +346,7 @@ git config --global init.templateDir ~/.git-templates/eos
    - 做错了怎么**回滚**？（→ 暴露 rollback 缺口）
    - 怎么**知道**它在线上有没有用？（→ 暴露 telemetry 缺口）
    - 用户量 ×100 会怎样？（→ 暴露 scaling 缺口）
-3. **四张清单触发器**：把老手才记得的隐性需求显性化为必答题。
+3. **五张清单触发器**：把老手才记得的隐性需求显性化为必答题。
 
 ## 5.2 运营前置映射表
 
@@ -362,8 +362,9 @@ git config --global init.templateDir ~/.git-templates/eos
 | multi-tenancy | 隔离级别（行/库/实例） | 租户上下文贯穿 |
 | capacity/SLO | SLO/SLA 目标 | 容量模型、缓存/分片 |
 | DR | RTO/RPO 目标 | 备份/故障转移 |
+| regulatory（如受监管） | 具名制度 + 逐控制项决策（走 `F-compliance`） | 数据驻留、审计留存、同意/DSAR、供应商 BAA/DPA、AI 脱敏网关 |
 
-## 5.3 四张清单（可直接使用，完整版在 docs/checklists/）
+## 5.3 六张清单（可直接使用，完整版在 docs/checklists/）
 
 **A. 需求缺口**（`docs/checklists/A-gap.md`）：问题陈述可证伪 / 验收标准可度量 /
 边界/异常/并发已定义 / 依赖已列明 / scope-out 已明确 / 重叠已排查。
@@ -378,13 +379,22 @@ rollback-flag / monitoring-alerting / canary / rate-limit-quota / i18n-l10n /
 **D. 运营前置**（`docs/checklists/D-ops.md`）：埋点↔指标闭合 / 权限矩阵 / 审计范围 /
 回滚预案 / 灰度维度+阈值 / 配额/限流 / 多租户隔离 / i18n / 容量模型+告警 / Runbook。
 
+**E. 安全与机密**（`docs/checklists/E-security.md`）：密钥不入代码/前端 / `.env` 治理 /
+供应链投毒防护 / 最小权限凭据 / 密钥轮换 / 敏感操作审计。
+
+**F. 受监管行业合规**（`docs/checklists/F-compliance.md`，**仅在选中具名制度时走查**）：
+制度选择（HIPAA/PCI-DSS/SOC2/SOX/GDPR/CCPA/PIPL）→ 级联具体控制（数据驻留、审计留存期、
+最小必要访问、供应商 **BAA/DPA**、**Agentic 数据出境**决策：BAA·自托管·脱敏网关·排除受监管数据）。
+> **非法律意见**：仅强制早期工程决策，仍需合规/法务人工签核。`【新建补强】`
+
 > 每项三选一：**采纳**（写需求）/ **不采纳+理由** / **延后+触发条件**。禁止留空。
 
 ## 5.4 挂接片段（`/requirements` prompt 中的 Step 2 + Step 3）
 
 见 `.github/prompts/requirements.prompt.md`：
 - Step 2 强制对 5.2 表格逐行输出决策，不允许留空。
-- Step 3 逐条核对四张清单，任一未决项标 BLOCKER，对应 G2 决策门。
+- Step 2.5 **受监管行业制度前置**：选定 regime → 走 `F-compliance`；LLM 产品且涉受监管数据须当场定 Agentic 数据出境。
+- Step 3 逐条核对五张清单（A–E，受监管再加 F），任一未决项标 BLOCKER，对应 G2 决策门。
 
 
 ---
@@ -422,7 +432,7 @@ rollback-flag / monitoring-alerting / canary / rate-limit-quota / i18n-l10n /
 | 阶段 | 期望产出 | 通过标准 |
 |---|---|---|
 | Discovery | 单句问题+成功指标 | ☐ 可证伪 ☐ 有度量 |
-| Requirements | PRD draft + 四张清单 | ☐ 清单无未决 BLOCKER |
+| Requirements | PRD draft + 五张清单 | ☐ 清单无未决 BLOCKER |
 | Spec | 标准 `docs/prd.md` | ☐ 每条需求有验收标准 |
 | Architecture | ADR + API contract | ☐ ADR 决策有 trade-off ☐ API 先于实现 |
 | Planning | Story 列表 | ☐ 每 story 含 AC + context |
@@ -485,6 +495,7 @@ Agent 输出不符预期
 | D12 | 端到端落地走查 | 本文 Part 4 × Part 8 rubric（用"用户登录"dry-run） | 新建 |
 | D13 | MVP vs Enterprise 方案对比 | 见下表 | 新建 |
 | — | UX/设计规划阶段（视觉+体验契约） | `/ux-spec`、`A:eos-design`；产 `docs/DESIGN.md`+`docs/EXPERIENCE.md` | 复用BMAD（bmad-ux/Sally）+补强 |
+| D14 | 受监管行业合规清单 + 制度前置 + Agentic 数据出境门 | `docs/checklists/F-compliance.md`；`/requirements` Step 2.5；`eos-doctor` D5 | 新建 |
 | — | Agentic Engineering 扩展包（LLM/agent 产品） | `ai/10-ai-llm` 规则、`/eval-spec`(G-EVAL)、C-nfr/security/telemetry 扩展；产 `docs/eval-plan.md`；起步骨架 `docs/eos/examples/eval-starter/` | 新建补强（借鉴 bmad-eval-runner） |
 | — | BMAD reuse map（73 bmad-*） | `docs/eos/agent-map.md` | 复用BMAD |
 | — | 运营前置 skill | `.github/skills/eos-operational-readiness/SKILL.md` | 新建 |

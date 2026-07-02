@@ -22,6 +22,9 @@ applyTo: "**"
   Optional deeper scan: install `gitleaks` and secret-scan.mjs auto-uses it (allowlist in `.gitleaks.toml`);
   absence degrades gracefully to the built-in patterns.
 - Classify data (public/internal/PII); encrypt PII at rest & in transit.
+- Regulated industry (healthcare/finance/etc.)? If a named regime applies (HIPAA/PCI-DSS/SOC2/SOX/GDPR/CCPA/PIPL),
+  walk `docs/checklists/F-compliance.md` at G2 and treat its BLOCKER items as deny-by-default. In particular,
+  never send PHI/PAN/regulated personal data to a third-party LLM without a signed BAA/DPA (self-host or redact instead).
 - Config isolation: separate dev/staging/prod config; least-privilege credentials per environment;
   rotate keys; never reuse prod secrets locally. See `docs/checklists/E-security.md`.
 - LLM features: treat model output as untrusted; guard against prompt injection; never put

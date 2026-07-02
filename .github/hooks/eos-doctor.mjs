@@ -4,7 +4,7 @@
 // (complements validate-config.mjs, which checks EOS *config*). Run from project root:
 //   node .github/hooks/eos-doctor.mjs
 // Designed to run in local CI (act) and as a manual pre-release check.
-import { readdirSync, existsSync } from 'node:fs';
+import { readdirSync, existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { execSync } from 'node:child_process';
 
@@ -77,6 +77,25 @@ if (existsSync(scanner)) {
     execSync(`node ${JSON.stringify(scanner)}`, { cwd: root, stdio: 'ignore' });
   } catch {
     errors.push('D4 Security: secret-scan.mjs found potential hardcoded secret(s). Run `node .github/hooks/secret-scan.mjs` for details.');
+  }
+}
+
+// --- D5: Compliance data-boundary — a regulated regime + third-party LLM must decide the data boundary ---
+// Reads ONLY project output files (never docs/eos or the checklists), so it can't false-fire on the
+// template's own docs. Fires the Agentic landmine: PHI/PAN to a third-party model needs a boundary decision.
+const readIf = (p) => { try { return readFileSync(join(root, p), 'utf8'); } catch { return ''; } };
+const regimeText = readIf('docs/compliance-profile.md') + '\n' + readIf('docs/requirements.md');
+const REGULATED = /\b(HIPAA|PCI[\s-]?DSS|SOC\s?2|SOX|GDPR|CCPA|CPRA|PIPL)\b|个人信息保护/i;
+if (regimeText.trim() && REGULATED.test(regimeText) && aiDirs.length) {
+  let boundaryText = regimeText;
+  const adrDir = join(root, 'docs/adr');
+  if (existsSync(adrDir)) {
+    for (const f of readdirSync(adrDir)) if (f.endsWith('.md')) boundaryText += '\n' + readIf(`docs/adr/${f}`);
+  }
+  boundaryText += '\n' + readIf('docs/architecture.md');
+  const BOUNDARY = /\bBAA\b|\bDPA\b|self[\s-]?host|on[\s-]?prem|redact|tokeniz|de[\s-]?identif|exclude regulated|no PHI|no PAN|脱敏|不出境|本地模型|自托管/i;
+  if (!BOUNDARY.test(boundaryText)) {
+    warns.push('D5 Compliance: a regulated regime is declared and LLM/agent code exists, but no data-boundary decision was found (BAA/DPA · self-host · redaction · exclude regulated data). Resolve F-compliance.md "Agentic data-boundary" before shipping.');
   }
 }
 

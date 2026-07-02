@@ -17,6 +17,10 @@ Verify and report PASS/FAIL for each:
 - [ ] NFR targets from `docs/checklists/C-nfr.md` verified (perf P95/throughput,
       availability SLO/RTO/RPO) — via `bmad-testarch-nfr` at G7; any deferral carries an
       explicit trigger, never silent.
+- [ ] Regulatory controls verified: if a regime was selected (see `docs/compliance-profile.md`),
+      every item in `docs/checklists/F-compliance.md` is ADOPT / N/A+reason (no unresolved BLOCKER).
+      For regulated + LLM/agent: the data-boundary (BAA/DPA · self-host · redaction) is **implemented,
+      not deferred**. If regime = none, state so.
 - [ ] Rollback plan exists and is executable (link `ops/runbook-*.md`).
 - [ ] Canary/gradual rollout strategy documented.
 - [ ] Health/readiness endpoints present.
