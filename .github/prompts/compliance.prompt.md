@@ -41,8 +41,9 @@ model is often prohibited or needs a signed BAA/DPA. Choose and record ONE (not 
 tokenization gateway before any provider call, or **(d)** exclude regulated data from the AI path.
 Land the choice in an ADR (`/adr`) and `docs/architecture.md` so `eos-doctor` D5 can see it.
 > **Building the 🟡 items?** Skill `eos-compliance-skeletons` points at runnable, zero-dep starters
-> in `docs/eos/examples/compliance-starter/` (redaction/consent/DSAR/audit). Option **(c)** = the
-> `redaction.mjs` `assertClean()` boundary guard.
+> in `docs/eos/examples/compliance-starter/` (redaction/consent/DSAR/audit — a port per default
+> reference stack: Node/ESM · Python · Go · Java). Option **(c)** = the `redaction` `assertClean()`
+> boundary guard.
 
 ## Step 4 — Wire into gates
 - **G2 (requirements):** any unresolved regulated item = **BLOCKER**; do not proceed to Spec.

@@ -17,9 +17,10 @@ launch (the expensive time). `【新建补强】`
 - Right after `/compliance` selects a regime with 🟡 items to build.
 
 ## Procedure
-1. Copy `docs/eos/examples/compliance-starter/` into the project (e.g. `src/compliance/`). Two
-   parallel ports ship: **Node/ESM** (`*.mjs`) and **Python/stdlib** (`*.py`) — take the one that
-   matches your stack; both have the same regime profiles, seams, and tests.
+1. Copy `docs/eos/examples/compliance-starter/` into the project (e.g. `src/compliance/`). Four
+   parallel ports ship, one per EOS default reference stack: **Node/ESM** (`*.mjs`),
+   **Python/stdlib** (`*.py`), **Go** (`*.go` + `go.mod`), **Java/JDK** (`*.java`) — take the one
+   that matches your stack; all four have the same regime profiles, seams, and 6 tests.
 2. Map each control to its skeleton and adapt (swap in-memory stubs for the real DB):
 
 | Need | Skeleton | Adapt |
@@ -29,10 +30,11 @@ launch (the expensive time). `【新建补强】`
 | DSAR export / erasure | `dsar.mjs` → `exportSubject()` / `eraseSubject()` | register one `source` adapter per table/service |
 | Audit trail (who/when/what, no PII) | `audit.mjs` → `audit()` | point `record()` at a WORM / append-only table |
 
-3. Wire the run command into `quality.json` / npm scripts so it runs at G7.
+3. Wire the run command into `quality.json` / npm scripts (or `go test` / `javac && java`) so it runs at G7.
 
 ## Output
-Working `src/compliance/*` modules + a passing `*.test.mjs`, referenced from the project's
+Working `src/compliance/*` modules + the port's passing test (`compliance.test.mjs` /
+`test_compliance.py` / `go test` / `ComplianceTest`), referenced from the project's
 `docs/compliance-profile.md` 🟡 rows so the gate can see them landed.
 
 > Reuse note: composes with `eos-operational-readiness` (decides *what* to build) and `/compliance`

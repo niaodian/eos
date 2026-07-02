@@ -16,6 +16,14 @@ dist/
 build/
 .DS_Store
 
+# compiled Java class files (compliance-starter is source-only; compile out-of-tree)
+*.class
+
+# Python bytecode cache (compliance-starter Python port)
+__pycache__/
+*.pyc
+.pytest_cache/
+
 # generated docs (rebuild via docs/eos/tools/build-pdf.sh)
 docs/eos/*.pdf
 docs/eos/.user-manual.html

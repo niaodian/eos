@@ -1,6 +1,6 @@
 # EOS 用户手册（Engineering Operating System User Manual）
 
-> 版本：与 `docs/eos/VERSION` 同步（当前 `eos-1.5.0`）
+> 版本：与 `docs/eos/VERSION` 同步（当前 `eos-1.6.0`）
 > 适用：较新版本的 VS Code + GitHub Copilot Chat（自定义 agent / hooks 属近版能力，用「关于 VS Code」面板确认版本）+ 已安装 73 个 `bmad-*` skill（用户级）
 > 定位：本手册是**操作指南（怎么用）**；设计原理与取舍见同目录 `blueprint.md`（为什么这么设计）。
 > 约定：正文中文；文件名/路径/命令/配置键保留英文原文。
@@ -755,7 +755,7 @@ LLM tracing（token/成本/context/tool-span）。
 | Skill | 何时用 | 作用 |
 |---|---|---|
 | `eos-operational-readiness` | 阶段 2/4 | 强制对 10 项运营/NFR 做 ADOPT/SKIP/DEFER 决策，无空白 |
-| `eos-compliance-skeletons` | 开发阶段（建 🟡 隐私控制时） | 指向可跑起步骨架（redaction/consent/DSAR/audit，Node/ESM + Python/stdlib 双实现），把"该建什么"变成"起步脚手架" |
+| `eos-compliance-skeletons` | 开发阶段（建 🟡 隐私控制时） | 指向可跑起步骨架（redaction/consent/DSAR/audit，四默认参考栈全实现：Node/ESM · Python/stdlib · Go · Java/JDK），把"该建什么"变成"起步脚手架" |
 
 > 73 个用户级 `bmad-*` skill 见 `docs/eos/agent-map.md` 的阶段映射表。
 
@@ -922,7 +922,7 @@ gh repo create my-app --template niaodian/eos-template --private --clone
 
 ## 10.4 版本化与升级
 
-- 每次改 EOS 配置：改 `docs/eos/VERSION`（如 `eos-1.4.1`→`eos-1.5.0`），跑 `validate-config.mjs`，Conventional Commits 提交。
+- 每次改 EOS 配置：改 `docs/eos/VERSION`（如 `eos-1.4.1`→`eos-1.6.0`），跑 `validate-config.mjs`，Conventional Commits 提交。
 - 升级既有项目：从新版模板 diff `.github/`，挑选合并；用户级 `bmad-*` 独立升级。
 
 ---
