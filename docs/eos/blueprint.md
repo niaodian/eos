@@ -168,7 +168,7 @@ mkdir -p ~/.git-templates/eos && cp -R <golden>/.github ~/.git-templates/eos/
 git config --global init.templateDir ~/.git-templates/eos
 ```
 
-版本化：`docs/eos/VERSION`（当前 `eos-1.6.0`）。升级用 `degit` 拉新版到 /tmp 后 `diff -ru` 合并，
+版本化：`docs/eos/VERSION`（当前 `eos-1.6.1`）。升级用 `degit` 拉新版到 /tmp 后 `diff -ru` 合并，
 再跑 `validate-config.mjs` + `bmad-code-review`。
 
 ---
@@ -499,7 +499,7 @@ Agent 输出不符预期
 | — | Agentic Engineering 扩展包（LLM/agent 产品） | `ai/10-ai-llm` 规则、`/eval-spec`(G-EVAL)、C-nfr/security/telemetry 扩展；产 `docs/eval-plan.md`；起步骨架 `docs/eos/examples/eval-starter/` | 新建补强（借鉴 bmad-eval-runner） |
 | — | BMAD reuse map（73 bmad-*） | `docs/eos/agent-map.md` | 复用BMAD |
 | — | 运营前置 skill | `.github/skills/eos-operational-readiness/SKILL.md` | 新建 |
-| — | 合规代码起步骨架（🟡→脚手架） | skill `.github/skills/eos-compliance-skeletons/` + `docs/eos/examples/compliance-starter/`（redaction/consent/DSAR/audit，**四默认参考栈全实现：Node/ESM · Python/stdlib · Go · Java/JDK**，零依赖可跑；redaction 即 D5 数据出境门的代码形态，按 HIPAA/PCI/GDPR-PIPL 分档） | 新建补强 |
+| — | 合规代码起步骨架（🟡→脚手架） | skill `.github/skills/eos-compliance-skeletons/` + `docs/eos/examples/compliance-starter/`（redaction/consent/DSAR/audit，**四默认参考栈全实现：Node/ESM · Python/stdlib · Go · Java/JDK**，零依赖可跑；redaction 即 D5 数据出境门的代码形态，按 HIPAA/PCI/GDPR-PIPL 分档，且 `redactorFromProfile()` 自动读 `/compliance` 产出的 **Regulatory regime:** 行选档、免硬编码） | 新建补强 |
 | — | Hooks 护栏 | `.github/hooks/guardrails.json` + `deny-dangerous.js`（危险操作+供应链投毒+密钥泄漏） | 新建 |
 | — | 安全门禁 | `secret-scan.mjs`（密钥扫描）+ `E-security.md`（清单）+ security/frontend 红线；复用 `bmad-review-adversarial-general` 人审 | 新建补强+复用BMAD |
 | — | 本地 CI（act 可跑）+ SDLC 门诊 | `.github/workflows/eos-ci.yml` + `.github/hooks/eos-doctor.mjs`（validate-config+doctor+tests+evals；G-EVAL 机器强制） | 新建补强（复用 bmad-testarch-ci） |

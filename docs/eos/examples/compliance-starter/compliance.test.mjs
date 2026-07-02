@@ -3,7 +3,19 @@
 // (Pass an explicit file/glob — a bare directory path errors under Node 23's --test.)
 import { test } from 'node:test';
 import assert from 'node:assert';
-import { redact, scan, assertClean, luhnValid, createRedactor, PROFILES } from './redaction.mjs';
+import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import {
+  redact,
+  scan,
+  assertClean,
+  luhnValid,
+  createRedactor,
+  PROFILES,
+  parseRegimes,
+  redactorFromProfile,
+} from './redaction.mjs';
 import { createConsentStore } from './consent.mjs';
 import { exportSubject, eraseSubject } from './dsar.mjs';
 
@@ -87,4 +99,34 @@ test('dsar: export gathers all sources (portable); erase runs + audits each', as
   assert.deepStrictEqual(erased.sort(), ['orders', 'profiles']);
   assert.deepStrictEqual(receipt.erased, { profiles: 1, orders: 1 });
   assert.strictEqual(receipt.reason, 'user-request');
+});
+
+test('profile: parseRegimes + redactorFromProfile pick the regime from /compliance output', () => {
+  // Pure parse: canonical line -> resolved profile names; rationale words are ignored.
+  assert.deepStrictEqual(
+    parseRegimes('# Compliance profile\n\n**Regulatory regime:** HIPAA, PCI-DSS\n'),
+    ['HIPAA', 'PCI'],
+  );
+  // Slash / plus separators and mixed case also resolve.
+  assert.deepStrictEqual(parseRegimes('Regulatory regime: gdpr / pipl'), ['GDPR_PIPL']);
+  // Explicit `none` (with parenthetical rationale mentioning a regime) -> base only.
+  assert.deepStrictEqual(parseRegimes('Regulatory regime: none (generic PII, no PCI applies)'), []);
+
+  // File round-trip: write a profile, build the redactor straight from it.
+  const dir = mkdtempSync(join(tmpdir(), 'eos-profile-'));
+  try {
+    const f = join(dir, 'compliance-profile.md');
+    writeFileSync(f, '# Compliance profile\n\n**Regulatory regime:** HIPAA\n\nRationale: PHI.\n');
+    const r = redactorFromProfile(f);
+    assert.deepStrictEqual(r.regimes, ['HIPAA'], 'redactor scoped to the profile regime');
+
+    // Missing file -> fail-safe: all regimes (never silently under-redact).
+    const strict = redactorFromProfile(join(dir, 'nope.md'));
+    assert.deepStrictEqual(strict.regimes, ['HIPAA', 'PCI', 'GDPR_PIPL']);
+    // Opt-in softer fallbacks.
+    assert.deepStrictEqual(redactorFromProfile(join(dir, 'nope.md'), { fallback: 'base' }).regimes, []);
+    assert.throws(() => redactorFromProfile(join(dir, 'nope.md'), { fallback: 'throw' }), /run \/compliance first/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

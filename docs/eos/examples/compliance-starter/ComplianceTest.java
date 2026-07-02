@@ -1,11 +1,14 @@
 // ComplianceTest.java — proves the Java skeletons run out of the box. Zero-dependency: a plain
 // main() harness (no JUnit, no build tool), mirroring how the Node/Python ports use their
-// built-in runners. Mirrors compliance.test.mjs / test_compliance.py one-for-one (same 6 cases).
+// built-in runners. Mirrors compliance.test.mjs / test_compliance.py one-for-one (same 7 cases).
 //
 // Compile + run (UTF-8 for the «REDACTED» mask):
 //   javac -encoding UTF-8 *.java && java ComplianceTest
 //
 // In a real project you'd promote these to JUnit 5; the shapes are identical.
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -23,10 +26,11 @@ public final class ComplianceTest {
         assertCleanBoundaryGuard();
         consent();
         dsar();
+        profileAutoSelect();
 
         System.out.println();
         System.out.println((failed == 0 ? "OK" : "FAILED")
-                + " — " + passed + " checks passed, " + failed + " failed across 6 tests");
+                + " — " + passed + " checks passed, " + failed + " failed across 7 tests");
         if (failed > 0) {
             System.exit(1);
         }
@@ -157,6 +161,46 @@ public final class ComplianceTest {
         check(Integer.valueOf(1).equals(er.get("profiles")) && Integer.valueOf(1).equals(er.get("orders")),
                 "erase counts recorded");
         check("user-request".equals(receipt.get("reason")), "reason recorded");
+    }
+
+    private static void profileAutoSelect() {
+        // Pure parse: canonical line -> resolved profile names; rationale words are ignored.
+        check(Redaction.parseRegimes("# Compliance profile\n\n**Regulatory regime:** HIPAA, PCI-DSS\n")
+                .equals(List.of("HIPAA", "PCI")), "parse multi-regime line");
+        // Slash / plus separators and mixed case also resolve.
+        check(Redaction.parseRegimes("Regulatory regime: gdpr / pipl").equals(List.of("GDPR_PIPL")),
+                "parse gdpr/pipl");
+        // Explicit `none` (with parenthetical rationale naming a regime) -> base only (empty).
+        check(Redaction.parseRegimes("Regulatory regime: none (generic PII, no PCI applies)").isEmpty(),
+                "none parses to empty");
+
+        try {
+            // File round-trip: write a profile, build the redactor straight from it.
+            Path f = Files.createTempFile("eos-profile-", ".md");
+            try {
+                Files.writeString(f, "# Compliance profile\n\n**Regulatory regime:** HIPAA\n\nRationale: PHI.\n");
+                check(Redaction.redactorFromProfile(f.toString()).regimes.equals(List.of("HIPAA")),
+                        "redactorFromProfile scopes to the profile regime");
+            } finally {
+                Files.deleteIfExists(f);
+            }
+
+            // Missing file -> fail-safe: all regimes (never silently under-redact).
+            String missing = f.getParent().resolve("eos-nope-" + System.nanoTime() + ".md").toString();
+            check(Redaction.redactorFromProfile(missing).regimes.equals(List.of("HIPAA", "PCI", "GDPR_PIPL")),
+                    "missing profile fails safe to all regimes");
+            // Opt-in softer fallbacks.
+            check(Redaction.redactorFromProfile(missing, "base").regimes.isEmpty(), "fallback=base -> base only");
+            boolean threw = false;
+            try {
+                Redaction.redactorFromProfile(missing, "throw");
+            } catch (RuntimeException e) {
+                threw = true;
+            }
+            check(threw, "fallback=throw raises");
+        } catch (IOException e) {
+            check(false, "temp-file round-trip: " + e.getMessage());
+        }
     }
 
     /** A DSAR source adapter: name + export(subject) + erase(subject), recording erase order. */

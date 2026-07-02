@@ -13,6 +13,10 @@
 //
 // The values walked are decoded-JSON shapes: Map<String,Object>, List<Object>, String, scalars.
 // A Redactor exposes redact / scan / assertClean.
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -328,6 +332,81 @@ public final class Redaction {
     /** Build a redactor for the selected regimes (names/aliases; empty list == base only). */
     public static Redactor createRedactor(List<String> regimes) {
         return new Redactor(regimes);
+    }
+
+    // ── Auto-select the regime(s) from the /compliance output ──────────────────────────
+    // `/compliance` writes docs/compliance-profile.md with a canonical machine-readable line:
+    //   **Regulatory regime:** HIPAA, PCI-DSS      (or `none` for generic PII handling)
+    private static final Pattern REGIME_LINE =
+            Pattern.compile("(?i)regulatory\\s+regime\\s*[:\uFF1A]\\s*(.+)");
+    private static final Pattern REGIME_SPLIT = Pattern.compile("[\\s,/+&]+");
+    private static final Pattern NONE_PREFIX = Pattern.compile("(?i)^none\\b");
+
+    /**
+     * Extract resolved regime names from the profile's "Regulatory regime:" line. Only tokens
+     * that resolve to a known regime are kept, so free-text rationale is ignored; an explicit
+     * {@code none} (or no match) yields an empty list, which createRedactor scopes to base
+     * credentials only.
+     */
+    public static List<String> parseRegimes(String profileText) {
+        List<String> out = new ArrayList<>();
+        if (profileText == null) {
+            return out;
+        }
+        Matcher m = REGIME_LINE.matcher(profileText);
+        if (!m.find()) {
+            return out;
+        }
+        String val = m.group(1).replaceFirst("^[*_\\s]+", ""); // drop leading **bold**
+        for (String p : new String[] {"(", "\uFF08"}) {        // drop parenthetical rationale
+            int i = val.indexOf(p);
+            if (i >= 0) {
+                val = val.substring(0, i);
+            }
+        }
+        val = val.trim();
+        if (NONE_PREFIX.matcher(val).find()) {
+            return out;
+        }
+        for (String tok : REGIME_SPLIT.split(val)) {
+            if (tok.isEmpty()) {
+                continue;
+            }
+            String n = toProfileName(tok);
+            if (n != null && !n.equals("base") && !out.contains(n)) {
+                out.add(n);
+            }
+        }
+        return out;
+    }
+
+    /** Build a redactor from the /compliance profile doc (default fallback: all regimes). */
+    public static Redactor redactorFromProfile(String path) {
+        return redactorFromProfile(path, "all");
+    }
+
+    /**
+     * Build a redactor straight from the /compliance profile doc.
+     * <ul>
+     *   <li>file lists regimes -&gt; scope to them
+     *   <li>file says {@code none} -&gt; base credentials only (honours the human decision)
+     *   <li>file missing -&gt; {@code fallback}: {@code "all"} (default, fail-safe — never
+     *       silently under-redact), {@code "base"}, or {@code "throw"}.
+     * </ul>
+     */
+    public static Redactor redactorFromProfile(String path, String fallback) {
+        String p = (path != null && !path.isEmpty()) ? path : "docs/compliance-profile.md";
+        String text;
+        try {
+            text = Files.readString(Path.of(p));
+        } catch (IOException e) {
+            if ("throw".equals(fallback)) {
+                throw new UncheckedIOException(
+                        "redactorFromProfile: " + p + " not found — run /compliance first", e);
+            }
+            return createRedactor("base".equals(fallback) ? List.of() : null);
+        }
+        return createRedactor(parseRegimes(text));
     }
 
     // ── Default instance = all regimes. Static convenience API. ────────────────────────

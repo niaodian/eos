@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Callable, Iterable, NamedTuple
 
 
@@ -215,6 +216,58 @@ class Redactor:
 def create_redactor(regimes: Iterable[str] | None = None) -> Redactor:
     """Build a redactor bound to the selected regimes. Main entry point."""
     return Redactor(regimes)
+
+
+# ── Auto-select the regime(s) from the /compliance output ──────────────────────────────
+# ``/compliance`` writes docs/compliance-profile.md with a canonical machine-readable line::
+#
+#     **Regulatory regime:** HIPAA, PCI-DSS      (or ``none`` for generic PII handling)
+#
+# ``parse_regimes`` reads that line and resolves it to profile names. Only tokens that
+# resolve to a *known* regime are kept, so free-text rationale on the line is ignored; an
+# explicit ``none`` short-circuits to ``[]`` (base credentials only).
+_REGIME_LINE = re.compile(r"regulatory\s+regime\s*[:：]\s*(.+)", re.IGNORECASE)
+_REGIME_SPLIT = re.compile(r"[\s,/+&]+")
+
+
+def parse_regimes(profile_text: str) -> list[str]:
+    """Extract resolved regime names from a /compliance profile's regime line."""
+    m = _REGIME_LINE.search(profile_text or "")
+    if not m:
+        return []
+    val = re.sub(r"^[*_\s]+", "", m.group(1))  # drop leading markdown emphasis (**bold**)
+    val = re.split(r"[(（]", val)[0]  # drop parenthetical rationale before tokenizing
+    if re.match(r"none\b", val.strip(), re.IGNORECASE):
+        return []
+    out: list[str] = []
+    for tok in _REGIME_SPLIT.split(val):
+        if not tok:
+            continue
+        n = _to_profile_name(tok)
+        if n and n != "base" and n not in out:
+            out.append(n)
+    return out
+
+
+def redactor_from_profile(
+    path: str | Path = "docs/compliance-profile.md", *, fallback: str = "all"
+) -> Redactor:
+    """Build a redactor straight from the /compliance profile doc.
+
+    * file lists regimes -> scope to them
+    * file says ``none``  -> base credentials only (honours the human decision)
+    * file missing        -> ``fallback``: ``"all"`` (default, fail-safe — never silently
+      under-redact), ``"base"``, or ``"throw"``.
+    """
+    try:
+        text = Path(path).read_text(encoding="utf-8")
+    except FileNotFoundError:
+        if fallback == "throw":
+            raise FileNotFoundError(
+                f"redactor_from_profile: {path} not found — run /compliance first"
+            ) from None
+        return create_redactor([] if fallback == "base" else None)
+    return create_redactor(parse_regimes(text))
 
 
 # ── Default instance = all regimes. Module-level convenience API. ──────────────────────

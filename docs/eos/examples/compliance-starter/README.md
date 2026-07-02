@@ -8,7 +8,7 @@ your project (e.g. `src/compliance/`), swap the in-memory stubs for your DB, and
 already shaped.
 
 > All four ports are behaviour-for-behaviour parallel (same regime profiles, same function shapes,
-> the same 6 tests). Each uses only its language's standard library / built-in test runner — no
+> the same 7 tests). Each uses only its language's standard library / built-in test runner — no
 > `npm install`, `pip install`, or third-party test framework required. Keep the shapes; replace
 > the storage.
 
@@ -77,6 +77,31 @@ identical. Java `.class` files are build artifacts (git-ignored); compile to an 
 > the optional consent args; **Java** uses camelCase (`createRedactor` / `assertClean` throws
 > `IllegalStateException`) with overloads for the optional args. Storage backing differs by idiom
 > (JS `Map`, Python `dict`, Go `map`, Java `HashMap`) — same shapes otherwise.
+
+## Auto-select the regime from `/compliance`
+Instead of hardcoding `createRedactor(['HIPAA'])`, let the redactor read the regime the
+`/compliance` workflow already decided. That workflow writes `docs/compliance-profile.md` whose
+first content line is a canonical, machine-readable anchor:
+
+```
+**Regulatory regime:** HIPAA, PCI-DSS      # or `none` for generic PII handling
+```
+
+`redactorFromProfile()` reads that line (via the pure, testable `parseRegimes()`), resolves the
+names/aliases through `PROFILES`/`REGIME_ALIASES`, and builds a scoped redactor. Only tokens that
+resolve to a known regime are honoured, so free-text rationale on the line is ignored; an explicit
+`none` yields base-credentials-only.
+
+| Port | Call | Missing-file behaviour |
+| --- | --- | --- |
+| Node | `redactorFromProfile('docs/compliance-profile.md', { fallback: 'all' })` | fail-safe: all regimes (also `'base'` / `'throw'`) |
+| Python | `redactor_from_profile('docs/compliance-profile.md', fallback='all')` | fail-safe: all regimes (also `'base'` / `'throw'`) |
+| Go | `RedactorFromProfile("docs/compliance-profile.md")` → `(*Redactor, error)` | returns the all-regime redactor **and** the read error — caller ignores it to keep strict |
+| Java | `redactorFromProfile("docs/compliance-profile.md", "all")` | fail-safe: all regimes (also `"base"` / `"throw"`) |
+
+The policy is deliberate: a **present** profile scopes to exactly what the human selected (or `none`
+→ base only), while a **missing** profile fails safe to *all* regimes so a forgotten `/compliance`
+run can never silently under-redact. Pass `''`/`""` (or omit in Node/Python) for the default path.
 
 ## Why this shape
 These are the three items that, left as prose in a checklist, get rebuilt ad-hoc per project and

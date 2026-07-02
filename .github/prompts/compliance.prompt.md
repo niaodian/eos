@@ -22,9 +22,18 @@ skill `eos-operational-readiness` for the operational overlap.
 ## Step 1 — Regime selection (F-compliance Step 0)
 Determine which named regime(s) apply and WHY (data types, users, geography, industry):
 `none` / HIPAA / PCI-DSS / SOC 2 / SOX / GDPR / CCPA-CPRA / PIPL / other.
-- If **none applies**: write `docs/compliance-profile.md` stating
-  "Regulatory regime: none (generic PII handling per the security rule + E-security.md)" and STOP.
-- If **any regime applies**: continue. Record the selected regime(s) + rationale.
+
+Record the decision on the **first content line** of `docs/compliance-profile.md` as a canonical,
+machine-readable line — the compliance-starter redactors parse it, so keep the exact shape
+(comma/`/`-separated regime names, or `none`; rationale goes on the following lines):
+
+```
+**Regulatory regime:** HIPAA, PCI-DSS
+```
+
+- If **none applies**: the line is `**Regulatory regime:** none` (generic PII handling per the
+  security rule + `E-security.md`); record the rationale below it and STOP.
+- If **any regime applies**: continue, and keep that line updated with every regime you adopt.
 
 ## Step 2 — Walk the controls (decision per item, no blanks)
 For the cross-cutting controls AND each selected regime's pack in `F-compliance.md`, emit one of
@@ -43,7 +52,8 @@ Land the choice in an ADR (`/adr`) and `docs/architecture.md` so `eos-doctor` D5
 > **Building the 🟡 items?** Skill `eos-compliance-skeletons` points at runnable, zero-dep starters
 > in `docs/eos/examples/compliance-starter/` (redaction/consent/DSAR/audit — a port per default
 > reference stack: Node/ESM · Python · Go · Java). Option **(c)** = the `redaction` `assertClean()`
-> boundary guard.
+> boundary guard, and `redactorFromProfile('docs/compliance-profile.md')` auto-scopes the redactor
+> to the **Regulatory regime:** line this workflow writes (Step 1) — no hardcoded regime list.
 
 ## Step 4 — Wire into gates
 - **G2 (requirements):** any unresolved regulated item = **BLOCKER**; do not proceed to Spec.
@@ -52,8 +62,9 @@ Land the choice in an ADR (`/adr`) and `docs/architecture.md` so `eos-doctor` D5
 - `node .github/hooks/eos-doctor.mjs` D5 flags regulated + LLM code with no boundary decision.
 
 ## Output
-Write `docs/compliance-profile.md` (regime + rationale + control decision table + data-boundary choice)
-and add one summary line to `docs/requirements.md`.
+Write `docs/compliance-profile.md` — **first content line** is the canonical `**Regulatory regime:**`
+line from Step 1 (the anchor the compliance-starter `redactorFromProfile()` reads), followed by the
+rationale + control decision table + data-boundary choice — and add one summary line to `docs/requirements.md`.
 
 > **Next:** unresolved BLOCKERs → resolve before `/spec` (G3). Irreversible boundary choice → `/adr`.
 > Regulated + LLM/agent → confirm the data-boundary lands in `docs/architecture.md` (checked by eos-doctor D5).

@@ -5,10 +5,21 @@ Or under pytest:            pytest docs/eos/examples/compliance-starter/test_com
 
 Written as unittest.TestCase so it runs under BOTH the stdlib runner and pytest.
 """
+import os
+import tempfile
 import unittest
 from types import SimpleNamespace
 
-from redaction import redact, scan, assert_clean, luhn_valid, create_redactor, PROFILES
+from redaction import (
+    redact,
+    scan,
+    assert_clean,
+    luhn_valid,
+    create_redactor,
+    PROFILES,
+    parse_regimes,
+    redactor_from_profile,
+)
 from consent import create_consent_store
 from dsar import export_subject, erase_subject
 
@@ -103,6 +114,34 @@ class Dsar(unittest.TestCase):
         self.assertEqual(sorted(erased), ["orders", "profiles"])
         self.assertEqual(receipt["erased"], {"profiles": 1, "orders": 1})
         self.assertEqual(receipt["reason"], "user-request")
+
+
+class ProfileAutoSelect(unittest.TestCase):
+    def test_parse_and_build_from_profile(self):
+        # Pure parse: canonical line -> resolved profile names; rationale words are ignored.
+        self.assertEqual(
+            parse_regimes("# Compliance profile\n\n**Regulatory regime:** HIPAA, PCI-DSS\n"),
+            ["HIPAA", "PCI"],
+        )
+        # Slash / plus separators and mixed case also resolve.
+        self.assertEqual(parse_regimes("Regulatory regime: gdpr / pipl"), ["GDPR_PIPL"])
+        # Explicit `none` (with parenthetical rationale naming a regime) -> base only.
+        self.assertEqual(parse_regimes("Regulatory regime: none (generic PII, no PCI applies)"), [])
+
+        # File round-trip: write a profile, build the redactor straight from it.
+        with tempfile.TemporaryDirectory() as d:
+            f = os.path.join(d, "compliance-profile.md")
+            with open(f, "w", encoding="utf-8") as fh:
+                fh.write("# Compliance profile\n\n**Regulatory regime:** HIPAA\n\nRationale: PHI.\n")
+            self.assertEqual(redactor_from_profile(f).regimes, ["HIPAA"])
+
+            # Missing file -> fail-safe: all regimes (never silently under-redact).
+            missing = os.path.join(d, "nope.md")
+            self.assertEqual(redactor_from_profile(missing).regimes, ["HIPAA", "PCI", "GDPR_PIPL"])
+            # Opt-in softer fallbacks.
+            self.assertEqual(redactor_from_profile(missing, fallback="base").regimes, [])
+            with self.assertRaises(FileNotFoundError):
+                redactor_from_profile(missing, fallback="throw")
 
 
 if __name__ == "__main__":

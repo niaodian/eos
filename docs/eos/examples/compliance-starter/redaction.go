@@ -18,6 +18,7 @@ package compliance
 
 import (
 	"fmt"
+	"os"
 	"regexp"
 	"sort"
 	"strings"
@@ -311,6 +312,60 @@ func (r *Redactor) AssertClean(value any) error {
 
 // ── Default instance = all regimes. Package-level convenience API. ─────────────────────
 var defaultRedactor = CreateRedactor(nil)
+
+var (
+	reRegimeLine   = regexp.MustCompile(`(?i)regulatory\s+regime\s*[:：]\s*(.+)`)
+	reRegimeSplit  = regexp.MustCompile(`[\s,/+&]+`)
+	reLeadEmphasis = regexp.MustCompile(`^[*_\s]+`)
+	reNonePrefix   = regexp.MustCompile(`(?i)^none\b`)
+)
+
+// ParseRegimes extracts resolved regime names from the "Regulatory regime:" line that
+// /compliance writes into docs/compliance-profile.md. Only tokens that resolve to a known
+// regime are kept, so free-text rationale on the line is ignored; an explicit `none` (or no
+// match) yields a non-nil empty slice, which CreateRedactor scopes to base credentials only.
+func ParseRegimes(profileText string) []string {
+	out := []string{}
+	m := reRegimeLine.FindStringSubmatch(profileText)
+	if m == nil {
+		return out
+	}
+	val := reLeadEmphasis.ReplaceAllString(m[1], "") // drop leading **bold**
+	for _, p := range []string{"(", "（"} {           // drop parenthetical rationale
+		if i := strings.Index(val, p); i >= 0 {
+			val = val[:i]
+		}
+	}
+	val = strings.TrimSpace(val)
+	if reNonePrefix.MatchString(val) {
+		return out
+	}
+	for _, tok := range reRegimeSplit.Split(val, -1) {
+		if tok == "" {
+			continue
+		}
+		if n := toProfileName(tok); n != "" && n != "base" && !contains(out, n) {
+			out = append(out, n)
+		}
+	}
+	return out
+}
+
+// RedactorFromProfile builds a redactor from the /compliance profile doc. Pass "" to use the
+// default path (docs/compliance-profile.md). A present file scopes to its regimes (or base
+// only for `none`); a missing file returns the fail-safe all-regime redactor together with the
+// read error, so a caller may surface it or ignore it and keep the strict default — never
+// silently under-redacting.
+func RedactorFromProfile(path string) (*Redactor, error) {
+	if path == "" {
+		path = "docs/compliance-profile.md"
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return CreateRedactor(nil), err
+	}
+	return CreateRedactor(ParseRegimes(string(data))), nil
+}
 
 // Redact masks regulated fields using the all-regime default instance.
 func Redact(v any) any { return defaultRedactor.Redact(v) }

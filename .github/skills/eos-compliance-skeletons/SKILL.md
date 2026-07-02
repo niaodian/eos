@@ -20,12 +20,12 @@ launch (the expensive time). `【新建补强】`
 1. Copy `docs/eos/examples/compliance-starter/` into the project (e.g. `src/compliance/`). Four
    parallel ports ship, one per EOS default reference stack: **Node/ESM** (`*.mjs`),
    **Python/stdlib** (`*.py`), **Go** (`*.go` + `go.mod`), **Java/JDK** (`*.java`) — take the one
-   that matches your stack; all four have the same regime profiles, seams, and 6 tests.
+   that matches your stack; all four have the same regime profiles, seams, and 7 tests.
 2. Map each control to its skeleton and adapt (swap in-memory stubs for the real DB):
 
 | Need | Skeleton | Adapt |
 |---|---|---|
-| Strip PII/PHI/PAN before send/log | `redaction.mjs` → `createRedactor([regime])` + `assertClean()` | pick regime preset(s) from `PROFILES` (base+HIPAA/PCI/GDPR_PIPL) or extend a profile; call `assertClean()` before any provider call |
+| Strip PII/PHI/PAN before send/log | `redaction.mjs` → `createRedactor([regime])` + `assertClean()` | pick regime preset(s) from `PROFILES` (base+HIPAA/PCI/GDPR_PIPL) or extend a profile; call `assertClean()` before any provider call. Or auto-scope from the `/compliance` output with `redactorFromProfile('docs/compliance-profile.md')` (reads its **Regulatory regime:** line — no hardcoded regime) |
 | Consent (versioned, revocable, per-purpose) | `consent.mjs` → `createConsentStore()` | back with `(subject_id, purpose, granted, basis, version, at)`; keep purposes separate (PIPL) |
 | DSAR export / erasure | `dsar.mjs` → `exportSubject()` / `eraseSubject()` | register one `source` adapter per table/service |
 | Audit trail (who/when/what, no PII) | `audit.mjs` → `audit()` | point `record()` at a WORM / append-only table |

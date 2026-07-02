@@ -1,9 +1,11 @@
 // compliance_test.go — proves the Go skeletons run out of the box. Zero-dependency (stdlib
 // `testing`). Run: `go test ./...` (or `go test -v`) from this directory.
-// Mirrors compliance.test.mjs / test_compliance.py one-for-one (same 6 cases).
+// Mirrors compliance.test.mjs / test_compliance.py one-for-one (same 7 cases).
 package compliance
 
 import (
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"testing"
@@ -173,5 +175,43 @@ func TestDSAR(t *testing.T) {
 	}
 	if receipt.Reason != "user-request" {
 		t.Fatalf("reason not recorded: %v", receipt.Reason)
+	}
+}
+
+func TestProfileAutoSelect(t *testing.T) {
+	// Pure parse: canonical line -> resolved profile names; rationale words are ignored.
+	if got := strings.Join(ParseRegimes("# Compliance profile\n\n**Regulatory regime:** HIPAA, PCI-DSS\n"), ","); got != "HIPAA,PCI" {
+		t.Fatalf("multi-regime parse wrong: %q", got)
+	}
+	// Slash / plus separators and mixed case also resolve.
+	if got := strings.Join(ParseRegimes("Regulatory regime: gdpr / pipl"), ","); got != "GDPR_PIPL" {
+		t.Fatalf("gdpr/pipl parse wrong: %q", got)
+	}
+	// Explicit `none` (with parenthetical rationale naming a regime) -> base only (empty).
+	if got := ParseRegimes("Regulatory regime: none (generic PII, no PCI applies)"); len(got) != 0 {
+		t.Fatalf("none must parse to empty, got %v", got)
+	}
+
+	// File round-trip: write a profile, build the redactor straight from it.
+	dir := t.TempDir()
+	f := filepath.Join(dir, "compliance-profile.md")
+	if err := os.WriteFile(f, []byte("# Compliance profile\n\n**Regulatory regime:** HIPAA\n\nRationale: PHI.\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	r, err := RedactorFromProfile(f)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if strings.Join(r.Regimes, ",") != "HIPAA" {
+		t.Fatalf("redactor should scope to HIPAA, got %v", r.Regimes)
+	}
+
+	// Missing file -> fail-safe: all regimes + the read error (never silently under-redact).
+	strict, err := RedactorFromProfile(filepath.Join(dir, "nope.md"))
+	if err == nil {
+		t.Fatal("missing profile should return the read error")
+	}
+	if strings.Join(strict.Regimes, ",") != "HIPAA,PCI,GDPR_PIPL" {
+		t.Fatalf("missing profile must fail safe to all regimes, got %v", strict.Regimes)
 	}
 }

@@ -15,6 +15,8 @@
 //   scan(value)         -> array of leak locations (empty == clean)
 //   assertClean(value)  -> throws if regulated data would leave the boundary
 
+import { readFileSync } from 'node:fs';
+
 // ── Luhn (card) check so we only redact real PANs, not any 13–19 digit id ──────────────
 export function luhnValid(digits) {
   if (!/^\d{13,19}$/.test(digits)) return false;
@@ -173,6 +175,45 @@ export function createRedactor(regimes = DEFAULT_REGIMES) {
     scan: (v) => scanValue(v, cfg),
     assertClean,
   };
+}
+
+// ── Auto-select the regime(s) from the /compliance output ──────────────────────────────
+// `/compliance` writes docs/compliance-profile.md with a canonical machine-readable line:
+//   **Regulatory regime:** HIPAA, PCI-DSS      (or `none` for generic PII handling)
+// parseRegimes reads that line and resolves it to profile names. Only tokens that resolve
+// to a *known* regime are kept, so free-text rationale on the line is ignored; an explicit
+// `none` short-circuits to [] (base credentials only).
+export function parseRegimes(profileText) {
+  const m = /regulatory\s+regime\s*[:：]\s*(.+)/i.exec(String(profileText || ''));
+  if (!m) return [];
+  let val = m[1].replace(/^[*_\s]+/, ''); // drop leading markdown emphasis (**bold**)
+  val = val.split(/[(（]/)[0]; // drop parenthetical rationale before tokenizing
+  if (/^none\b/i.test(val.trim())) return [];
+  const out = [];
+  for (const tok of val.split(/[\s,/+&]+/)) {
+    if (!tok) continue;
+    const n = toProfileName(tok);
+    if (n && n !== 'base' && !out.includes(n)) out.push(n);
+  }
+  return out;
+}
+
+// Build a redactor straight from the /compliance profile doc.
+//   file lists regimes  -> scope to them
+//   file says `none`     -> base credentials only (honours the human decision)
+//   file missing         -> fallback: 'all' (default, fail-safe — never silently under-redact),
+//                           'base', or 'throw'
+export function redactorFromProfile(path = 'docs/compliance-profile.md', { fallback = 'all' } = {}) {
+  let text;
+  try {
+    text = readFileSync(path, 'utf8');
+  } catch {
+    if (fallback === 'throw') {
+      throw new Error(`redactorFromProfile: ${path} not found — run /compliance first`);
+    }
+    return createRedactor(fallback === 'base' ? [] : undefined); // 'all' -> default regimes
+  }
+  return createRedactor(parseRegimes(text));
 }
 
 // ── Default instance = all regimes. Back-compat top-level exports. ─────────────────────
