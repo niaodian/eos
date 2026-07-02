@@ -19,9 +19,9 @@ telemetry, authz, audit, rollback/flag, monitoring/alerting, canary,
 rate-limit/quota, i18n/l10n, multi-tenancy, capacity/SLO, DR (RTO/RPO).
 
 ## Step 2.5 — Regulatory regime pre-flight (constrain EARLY, avoid a rewrite)
-Decide the regime(s) NOW, not after launch. Tick what applies in `docs/checklists/F-compliance.md`
-Step 0 (none / HIPAA / PCI-DSS / SOC2 / SOX / GDPR / CCPA / PIPL / other) and record it in
-`docs/compliance-profile.md` + one line in `docs/requirements.md`.
+Decide the regime(s) NOW, not after launch. Run the dedicated **`/compliance`** workflow (or inline it here):
+tick what applies in `docs/checklists/F-compliance.md` Step 0 (none / HIPAA / PCI-DSS / SOC2 / SOX /
+GDPR / CCPA / PIPL / other) and record it in `docs/compliance-profile.md` + one line in `docs/requirements.md`.
 - If a regulated regime applies: walk the matching pack(s) in `F-compliance.md`; each control is
   ADOPT / N/A+reason / DEFER+trigger with an architecture landing point. Unresolved = **BLOCKER**.
 - **If this is an LLM/agent product AND regulated data is involved**: resolve the *Agentic data-boundary*

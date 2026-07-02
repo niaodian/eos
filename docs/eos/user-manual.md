@@ -1,6 +1,6 @@
 # EOS 用户手册（Engineering Operating System User Manual）
 
-> 版本：与 `docs/eos/VERSION` 同步（当前 `eos-1.4.4`）
+> 版本：与 `docs/eos/VERSION` 同步（当前 `eos-1.4.5`）
 > 适用：较新版本的 VS Code + GitHub Copilot Chat（自定义 agent / hooks 属近版能力，用「关于 VS Code」面板确认版本）+ 已安装 73 个 `bmad-*` skill（用户级）
 > 定位：本手册是**操作指南（怎么用）**；设计原理与取舍见同目录 `blueprint.md`（为什么这么设计）。
 > 约定：正文中文；文件名/路径/命令/配置键保留英文原文。
@@ -325,7 +325,7 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 - **E-security**：安全与机密（密钥不入代码/前端、`.env` 治理、供应链投毒防护、配置权限隔离、密钥轮换）
 - **F-compliance**（**仅受监管行业**）：具名制度选择（HIPAA/PCI-DSS/SOC2/SOX/GDPR/CCPA/PIPL）→ 级联控制（数据驻留、审计留存期、最小必要、供应商 **BAA/DPA**、**Agentic 数据出境**决策）
 
-> **受监管行业（医疗/金融等）请在需求阶段就定制度**：`/requirements` 的 **Step 2.5 制度前置**逼你先答"是否适用 HIPAA/PCI-DSS/SOC2/SOX/GDPR/CCPA/PIPL"，选中即走 `F-compliance.md`，把数据驻留、审计留存、同意/DSAR、供应商 BAA/DPA 等**在架构定型前**落地——避免上线后推倒重来。**尤其**：LLM/agent 产品若涉 PHI/PAN/受监管个人数据，必须当场定"数据出境"方案（签 BAA/DPA · 自托管模型 · 脱敏网关 · 排除受监管数据），晚决 = 换模型换架构。结果记入 `docs/compliance-profile.md`。
+> **受监管行业（医疗/金融等）请在需求阶段就定制度**：`/requirements` 的 **Step 2.5 制度前置**逼你先答"是否适用 HIPAA/PCI-DSS/SOC2/SOX/GDPR/CCPA/PIPL"，选中即走 `F-compliance.md`（专用命令 **`/compliance`**：制度选择→数据驻留/审计留存/最小必要/供应商 BAA/DPA/Agentic 数据出境），把这些**在架构定型前**落地——避免上线后推倒重来。**尤其**：LLM/agent 产品若涉 PHI/PAN/受监管个人数据，必须当场定"数据出境"方案（签 BAA/DPA · 自托管模型 · 脱敏网关 · 排除受监管数据），晚决 = 换模型换架构。结果记入 `docs/compliance-profile.md`。
 > **非法律意见**：EOS 只强制早期工程决策，**不替代**合规官/法务/审计师签核。`【新建补强】`
 
 > 配套命令：`/nfr` 专门把 C-nfr 逐行填上具体目标值。
@@ -542,6 +542,7 @@ node .github/hooks/validate-config.mjs          # 期望 PASS
 ```
 （切到 agent）eos-discovery        → 产出 docs/discovery.md（问题+成功指标）
 /requirements "待办事项的增删改查，支持多用户隔离"   → docs/requirements.md（G2 硬门：五张清单）
+/compliance "医疗/金融等受监管才需"                → docs/compliance-profile.md（受监管加第六张 F；否则跳过）
 /spec                              → docs/prd.md（每条需求带验收标准 AC）
 ```
 > **G2 硬门必过**：五张清单 A/B/C/D/E 无未决项。SaaS 项目尤其注意 **C-nfr 的性能/容灾**、
@@ -602,6 +603,7 @@ node .github/hooks/validate-config.mjs          # 期望 PASS
 ```
 （切到 agent）eos-discovery
 /requirements "客服 agent：用户下单后改寄送地址，需鉴权、防越权、防注入"
+/compliance "涉 PHI/PAN/受监管个人数据才需"   → 受监管则当场定 Agentic 数据出境方案
 /spec
 ```
 > Agentic 项目在 **G2** 尤其要在 requirements 里把 **eval 成功指标**（准确率/一次过率）、
@@ -681,6 +683,7 @@ LLM tracing（token/成本/context/tool-span）。
 | `/spec-align` | 量化规范对齐度（AC 覆盖率/一次过率/漂移，G7 度量） | — | 对齐度报告（`spec-align.mjs`） |
 | `/adr` | 记录一条架构决策 | `<决策标题>` | `docs/adr/NNN-*.md` |
 | `/nfr` | 把 C-nfr 逐行填具体目标值 | — | 更新 `C-nfr.md` + PRD NFR 段 |
+| `/compliance` | 受监管行业合规前置（制度选择+边界控制，条件用；走 F-compliance） | `<制度名 或 领域描述>` | `docs/compliance-profile.md` |
 | `/telemetry-plan` | 设计埋点并对齐成功指标 | — | `docs/telemetry-plan.md` |
 | `/release-gate` | 跑发布门禁（G8） | — | 门禁报告 |
 | `/runbook` | 生成运维 runbook（含回滚步骤） | `<service 名>` | `ops/runbook-<service>.md` |
@@ -723,7 +726,7 @@ LLM tracing（token/成本/context/tool-span）。
 > | ④ 版本 | 自定义 agent 需较新的 VS Code + Copilot Chat。用「关于 VS Code」看真实版本（`code --version` 是 shim，不准）。`【需在你的版本中核实】` UI 入口位置随版本略有差异。 |
 > | ⑤ 设置未被覆盖 | 检查 user/workspace `settings.json` 没有把 `chat.agentFilesLocations` 改成不含 `.github/agents`（默认即含，一般无需设置）。 |
 >
-> 仍不出现时的**替代路径**：直接用斜杠命令走流程——`/requirements`、`/spec`、`/ux-spec`、`/eval-spec`、
+> 仍不出现时的**替代路径**：直接用斜杠命令走流程——`/requirements`、`/compliance`、`/spec`、`/ux-spec`、`/eval-spec`、
 > `/release-gate` 等 prompt 文件不依赖 agent 选择器，输入 `/` 即可看到。agent 只是"编排 persona"，
 > 其能力都能用对应 prompt/skill 手动触发（见 7.1 与 `docs/eos/agent-map.md`）。
 
