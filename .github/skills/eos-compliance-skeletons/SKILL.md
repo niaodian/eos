@@ -17,7 +17,9 @@ launch (the expensive time). `【新建补强】`
 - Right after `/compliance` selects a regime with 🟡 items to build.
 
 ## Procedure
-1. Copy `docs/eos/examples/compliance-starter/` into the project (e.g. `src/compliance/`).
+1. Copy `docs/eos/examples/compliance-starter/` into the project (e.g. `src/compliance/`). Two
+   parallel ports ship: **Node/ESM** (`*.mjs`) and **Python/stdlib** (`*.py`) — take the one that
+   matches your stack; both have the same regime profiles, seams, and tests.
 2. Map each control to its skeleton and adapt (swap in-memory stubs for the real DB):
 
 | Need | Skeleton | Adapt |
