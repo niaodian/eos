@@ -70,6 +70,7 @@ Choose and implement one (not "decide later"):
 - [ ] (a) **BAA/DPA signed** with the model provider covering the regulated data, **or**
 - [ ] (b) **Self-hosted / on-prem model** so regulated data never leaves the boundary, **or**
 - [ ] (c) **Redaction / tokenization gateway** strips regulated fields before any provider call, **or**
+  > Runnable starter: `docs/eos/examples/compliance-starter/redaction.mjs` (`assertClean()` boundary guard) — skill `eos-compliance-skeletons`.
 - [ ] (d) **Exclude regulated data** from the AI path entirely (design the feature around it)
 
 ---

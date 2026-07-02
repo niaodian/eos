@@ -27,6 +27,8 @@
 | ☐ | Minor's consent | GDPR ≤16 需监护人；PIPL **≤14 属敏感信息**需监护人单独同意 | 🟡 project age-gating + guardian consent path |
 | ☐ | Purpose limitation & minimization | 只收集声明目的所需的最小数据 | 🟢 `data-api` "don't keep PII forever" + 🟡 project schema review |
 
+> 🟡 起步骨架：`docs/eos/examples/compliance-starter/consent.mjs`（版本化/可撤回/**分目的**同意，可跑）— skill `eos-compliance-skeletons`。
+
 ## DSAR / 个人权利（access / erasure / portability / rectification）
 | ✔ | Control | Requirement | Landing point |
 |---|---|---|---|
@@ -36,6 +38,8 @@
 | ☐ | **Rectification** (GDPR Art.16 / PIPL 46) | 更正不准确数据 | 🟡 project update path + 🟢 `data-api` `updated_at` audit |
 | ☐ | Response SLA & identity verification | 有时限地响应（GDPR 通常 1 个月）；先核验请求者身份 | 🟡 project DSAR workflow + 🟢 `security` deny-by-default authz（防冒领他人数据） |
 | ☐ | Automated-decision / profiling safeguards | 自动化决策/画像的知情与人工复核权 | 🟡 project + 🟢 `ai/llm` "moderate/validate outputs before acting" |
+
+> 🟡 起步骨架：`docs/eos/examples/compliance-starter/dsar.mjs`（export/erase over pluggable sources，含审计）+ `redaction.mjs`（导出前脱敏）— skill `eos-compliance-skeletons`。
 
 ## Cross-border transfer（跨境传输 — 最容易返工，尤其 PIPL）
 | ✔ | Control | Requirement | Landing point |

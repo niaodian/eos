@@ -40,6 +40,9 @@ model is often prohibited or needs a signed BAA/DPA. Choose and record ONE (not 
 **(a)** BAA/DPA signed with the provider, **(b)** self-hosted / on-prem model, **(c)** redaction /
 tokenization gateway before any provider call, or **(d)** exclude regulated data from the AI path.
 Land the choice in an ADR (`/adr`) and `docs/architecture.md` so `eos-doctor` D5 can see it.
+> **Building the 🟡 items?** Skill `eos-compliance-skeletons` points at runnable, zero-dep starters
+> in `docs/eos/examples/compliance-starter/` (redaction/consent/DSAR/audit). Option **(c)** = the
+> `redaction.mjs` `assertClean()` boundary guard.
 
 ## Step 4 — Wire into gates
 - **G2 (requirements):** any unresolved regulated item = **BLOCKER**; do not proceed to Spec.

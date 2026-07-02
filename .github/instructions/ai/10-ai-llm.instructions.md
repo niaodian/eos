@@ -49,6 +49,7 @@ applyTo: "**/{ai,llm,rag}/**"
 - Defend against prompt injection: never let retrieved/user content silently become instructions;
   keep system/developer prompts separate from user data; constrain tool use with allow-lists.
 - Never place secrets or PII in prompts or logs. Redact before sending to the provider.
+  Runnable starter: `docs/eos/examples/compliance-starter/redaction.mjs` (`assertClean()` before any provider call) — skill `eos-compliance-skeletons`.
 - Moderate/validate outputs before acting on them (especially tool calls, code exec, SQL, shell).
 - Ground answers in retrieved context; require citations where factual accuracy matters.
 
