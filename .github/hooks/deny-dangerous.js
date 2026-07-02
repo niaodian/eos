@@ -12,10 +12,10 @@ process.stdin.on('end', () => {
   try { payload = JSON.parse(s || '{}'); } catch { }
   const text = JSON.stringify(payload); // scans tool_name + tool_input
   const danger = [
-    /\brm\s+-[a-zA-Z]*[rf]/,   // rm -rf / -fr / -r / -f (any flag order)
+    /\brm\s+(-[a-z]*[rf]|--(?:recursive|force))/i, // rm -rf/-fr/-r/-f/-R (any order) + long flags
     /\bfind\b[^\n]*-delete/i,  // mass delete via find
     /DROP\s+TABLE/i,           // destructive SQL
-    /\bgit\s+push\b[^\n]*\s(--force\b|-f\b)/, // force push (long or short flag)
+    /\bgit\s+push\b[^\n]*\s(-f|--force)(?![\w-])/, // force push (blocks --force/-f; ALLOWS the safer --force-with-lease)
     /\bgit\s+reset\s+--hard\b/, // discard local work
     /:\s*>\s*\//,              // truncate a root file
     /\bdd\s+if=/i,             // raw disk overwrite

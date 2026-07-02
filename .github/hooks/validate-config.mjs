@@ -2,7 +2,7 @@
 // EOS static config validator — zero external deps.
 // Run from project root: node .github/hooks/validate-config.mjs
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, relative } from 'node:path';
 
 const root = process.cwd();
 const errors = [];
@@ -43,7 +43,7 @@ const files = walk(instrDir);
 const globsByArea = {};
 
 for (const full of files) {
-  const rel = full.replace(root + '/', '');
+  const rel = relative(root, full).split(/[\\/]/).join('/');
   const base = rel.split('/').pop();
   const txt = readFileSync(full, 'utf8');
   const head = fm(txt);

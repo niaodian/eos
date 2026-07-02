@@ -7,7 +7,7 @@
 // absence degrades gracefully to the built-in patterns). Exit 1 on any finding. Matches redacted.
 import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { execSync } from 'node:child_process';
-import { join, extname } from 'node:path';
+import { join, extname, relative } from 'node:path';
 
 const root = process.cwd();
 const findings = [];
@@ -26,7 +26,10 @@ const PATTERNS = [
 const ENV_REF = /(process\.env|os\.environ|import\.meta\.env|System\.getenv|getenv\(|ENV\[)/i;
 // A matched VALUE that is itself an obvious placeholder — skip only that match (not the whole line,
 // so a real secret sharing a line with a `# example` comment is still caught). [audit D4]
-const PLACEHOLDER = /(\$\{|<[A-Z_]+>|example|placeholder|changeme|change[_-]?me|x{3,}|your[_-]|dummy|sample|redacted|\*{3,}|REPLACE|TODO)/i;
+// Strong markers (${...}, <UPPER>, example, placeholder…) match as substrings; generic words that
+// could appear INSIDE a real secret (xxx/dummy/sample/redacted/replace/todo) are word-bounded to
+// shrink the false-negative surface. Residual heuristic gap is backstopped by opt-in gitleaks. [round-2 N3]
+const PLACEHOLDER = /\$\{|<[A-Z_]+>|example|placeholder|change[_-]?me|your[_-]|\*{3,}|\b(?:x{3,}|dummy|sample|redacted|replace|todo)\b/i;
 
 const TEXT_EXT = new Set(['.js', '.mjs', '.cjs', '.ts', '.tsx', '.jsx', '.py', '.go', '.java', '.rs', '.cs', '.rb', '.php', '.sh', '.bash', '.zsh', '.ps1', '.psm1', '.env', '.json', '.yaml', '.yml', '.toml', '.ini', '.conf', '.cfg', '.tf', '.tfvars', '.hcl', '.xml', '.gradle', '.md', '.txt', '.sql', '.properties']);
 // Secret-bearing files with no (or an unusual) extension — matched by exact basename. [audit D3]
@@ -42,7 +45,7 @@ function listFiles() {
     (function rec(dir) {
       for (const e of readdirSync(dir, { withFileTypes: true })) {
         if (e.isDirectory()) { if (!SKIP_DIRS.has(e.name)) rec(join(dir, e.name)); }
-        else acc.push(join(dir, e.name).replace(root + '/', ''));
+        else acc.push(relative(root, join(dir, e.name)).split(/[\\/]/).join('/'));
       }
     })(root);
     return acc;

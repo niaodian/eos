@@ -29,14 +29,19 @@
     "sudo": false,
     "dd": false,
     "mkfs": false,
-    "/\\brm\\s+-[a-z]*[rf]/i": false,
-    "/git\\s+push\\b.*\\s(--force|-f)\\b/i": false,
+    "/\\brm\\s+(-[a-z]*[rf]|--(recursive|force))/i": false,
+    "/git\\s+push\\b.*\\s(-f|--force)(?![\\w-])/i": false,
     "/git\\s+reset\\s+--hard/i": false,
     "/(curl|wget).*\\|\\s*(sudo\\s+)?(ba|z|k|c)?sh/i": false,
     "/(curl|wget).*\\|\\s*(python3?|node|perl|ruby)\\b/i": false,
     "/find\\b.*-delete/i": false,
     "/^Remove-Item\\b/i": false
-  }
+  },
+
+  // Supply-chain: VS Code auto-approves npm/pnpm/yarn scripts declared in package.json BY DEFAULT
+  // (official release-notes v1.108). A poisoned package.json script would then run without a prompt.
+  // Disable that convenience for defense-in-depth (re-check the key on your VS Code version).
+  "chat.tools.terminal.autoApproveWorkspaceNpmScripts": false
 
   // OPTIONAL — protect governance files from unreviewed agent edits (a local mirror of CODEOWNERS).
   // `chat.tools.edits.autoApprove` uses glob patterns to mark paths handling before an edit applies.

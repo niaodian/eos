@@ -5,7 +5,7 @@
 //   node .github/hooks/eos-doctor.mjs
 // Designed to run in local CI (act) and as a manual pre-release check.
 import { readdirSync, existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, relative } from 'node:path';
 import { execSync } from 'node:child_process';
 
 const root = process.cwd();
@@ -44,25 +44,33 @@ function anyFile(pred, maxDepth = 6) {
 }
 
 // --- D1/D2: G-EVAL — an LLM/agent product component requires an eval plan + runner ---
-// Detection mirrors the AI rule's applyTo glob (**/{ai,llm,rag,agents}/**) AND a dependency
-// signal (an LLM SDK named in a manifest), so LLM code can't silently escape the gate by living
-// outside a conventioned directory (e.g. src/agents/, inference/, packages/chatbot/). [audit H2/E4]
-const aiDirs = [];
-walkDirs((name, full) => { if (['ai', 'llm', 'rag', 'agents'].includes(name)) aiDirs.push(full); });
+// Detection = unambiguous AI dirs (ai/llm/rag) OR an LLM SDK dependency in a manifest, so LLM code
+// can't silently escape the gate by living outside a conventioned dir (src/agents/, inference/…).
+// `agents` is a common domain noun (insurance/sales agents ≠ LLM agents), so it counts as an LLM
+// signal ONLY when an LLM SDK dependency is ALSO present — otherwise a traditional-SaaS src/agents/
+// would false-trip D1 (and the D5 compliance BLOCKER). [audit H2/E4 · round-2 N2]
+const strongAiDirs = [];   // ai / llm / rag — unambiguous LLM signal
+const agentDirs = [];      // agents — ambiguous; needs a dependency signal to count
+walkDirs((name, full) => {
+  if (['ai', 'llm', 'rag'].includes(name)) strongAiDirs.push(full);
+  else if (name === 'agents') agentDirs.push(full);
+});
 const readManifest = (p) => { try { return readFileSync(join(root, p), 'utf8'); } catch { return ''; } };
 const manifestText = ['package.json', 'requirements.txt', 'pyproject.toml', 'go.mod', 'pom.xml', 'build.gradle']
   .map(readManifest).join('\n');
 // High-signal LLM SDK names across JS/Python/Go/Java ecosystems (kept tight to avoid false positives).
 const LLM_SDK = /\b(openai|anthropic|langchain|llama[-_]?index|llamaindex|cohere-ai|mistralai|groq-sdk|ollama|generative-ai|google\/genai|huggingface|go-openai|langchain4j)\b/i;
 const hasLlmDep = LLM_SDK.test(manifestText);
-const llmPresent = aiDirs.length > 0 || hasLlmDep;
+// agents/ only becomes LLM evidence when a dependency confirms it; ai/llm/rag always count.
+const aiDirs = [...strongAiDirs, ...(hasLlmDep ? agentDirs : [])];
+const llmPresent = strongAiDirs.length > 0 || hasLlmDep;
 const hasEvalPlan = existsSync(join(root, 'docs/eval-plan.md'));
 let hasEvalScript = false;
 try { const pj = JSON.parse(readManifest('package.json') || '{}'); hasEvalScript = !!(pj.scripts && pj.scripts.eval); } catch { /* no / invalid package.json */ }
 
 if (llmPresent) {
   const why = aiDirs.length
-    ? `LLM/agent code (${aiDirs.map((d) => d.replace(root + '/', '')).join(', ')})`
+    ? `LLM/agent code (${aiDirs.map((d) => relative(root, d).split(/[\\/]/).join('/')).join(', ')})`
     : 'an LLM SDK dependency (package.json / requirements / go.mod)';
   if (!hasEvalPlan) {
     errors.push(`D1 G-EVAL: found ${why} but no docs/eval-plan.md. Design evals before shipping (run /eval-spec).`);

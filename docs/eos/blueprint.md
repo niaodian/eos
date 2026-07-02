@@ -113,7 +113,7 @@ PreToolUse 与 PostToolUse 的输出 schema **不同**，这是初稿的关键 b
 let s = ''; process.stdin.on('data', d => (s += d)); process.stdin.on('end', () => {
   let payload = {}; try { payload = JSON.parse(s || '{}'); } catch {}
   const text = JSON.stringify(payload);
-  const danger = [/\brm\s+-[a-zA-Z]*[rf]/, /DROP\s+TABLE/i, /git\s+push\b[^\n]*\s(--force|-f)\b/, /:\s*>\s*\//];
+  const danger = [/\brm\s+(-[a-z]*[rf]|--(?:recursive|force))/i, /DROP\s+TABLE/i, /\bgit\s+push\b[^\n]*\s(-f|--force)(?![\w-])/, /:\s*>\s*\//];
   if (danger.some(r => r.test(text))) {
     process.stdout.write(JSON.stringify({
       hookSpecificOutput: {
@@ -173,7 +173,7 @@ mkdir -p ~/.git-templates/eos && cp -R <golden>/.github ~/.git-templates/eos/
 git config --global init.templateDir ~/.git-templates/eos
 ```
 
-版本化：`docs/eos/VERSION`（当前 `eos-1.9.0`）。升级用 `degit` 拉新版到 /tmp 后 `diff -ru` 合并，
+版本化：`docs/eos/VERSION`（当前 `eos-1.9.1`）。升级用 `degit` 拉新版到 /tmp 后 `diff -ru` 合并，
 再跑 `validate-config.mjs` + `bmad-code-review`。
 
 ---
@@ -508,6 +508,7 @@ Agent 输出不符预期
 | D14 | 受监管行业合规清单 + 制度前置 + Agentic 数据出境门 | `docs/checklists/F-compliance.md`（+ 附录 `F-compliance-hipaa.md`/`F-compliance-pci-dss.md`/`F-compliance-gdpr-pipl.md`）；`/compliance` + `/requirements` Step 2.5；`eos-doctor` D5 | 新建 |
 | D15 | 部署拓扑决策清单 + 选型门（阶段 4/G4） | `docs/checklists/G-deployment.md`；`/deploy-topology`；接入 `eos-architecture`(G4) + `/release-gate`(G8) + R8 `release-ops` 规则 | 新建补强（配合 bmad-architecture） |
 | D16 | 第三方审计硬化（enforcement authority / portability / detection coverage） | keystone 脚手架 `.github/CODEOWNERS` + `.vscode/settings.json.example` + user-manual 附录 D；`eos-doctor` D5 warn→error（受监管+LLM+无边界）、D1/D2 依赖信号消目录名逃逸；`secret-scan` 扩展名/无扩展名覆盖 + 同行假阴性收紧；`deny-dangerous` denylist 补漏 + 诚实定位；CI 有 package.json 则要求 test 脚本；`/release-gate` 接 `spec-align --strict`；G1 事件名核对官方 `hooks-reference.md`（审计假阳性）+ Preview 口径统一 | 新建补强（审计驱动） |
+| D17 | 第二轮复审精修（eos-1.9.1，Low/info） | N2：`agents` 目录仅在**共现 LLM 依赖**时才算 LLM 信号（`ai/llm/rag` 维持 OR），消除传统 SaaS `src/agents/` 对 D1/D5 的假阳性；N1：`quality.json` 由 `sh -c` 改 `node quality.mjs`（原生 Windows 可运行）+ 三核心 hook 用 `path.relative` 归一化路径；N4：`settings.json.example` 增 `autoApproveWorkspaceNpmScripts:false`（官方 v1.108 核实）；`deny-dangerous` 允许更安全的 `--force-with-lease`、补 `rm` 长旗/`-R`；N3：`secret-scan` PLACEHOLDER 通用词加词界收窄假阴性面；附录 D.4 补 Windows/gitleaks 取舍行 | 新建补强（复审驱动） |
 | — | Agentic Engineering 扩展包（LLM/agent 产品） | `ai/10-ai-llm` 规则、`/eval-spec`(G-EVAL)、C-nfr/security/telemetry 扩展；产 `docs/eval-plan.md`；起步骨架 `docs/eos/examples/eval-starter/` | 新建补强（借鉴 bmad-eval-runner） |
 | — | BMAD reuse map（73 bmad-*） | `docs/eos/agent-map.md` | 复用BMAD |
 | — | 运营前置 skill | `.github/skills/eos-operational-readiness/SKILL.md` | 新建 |
