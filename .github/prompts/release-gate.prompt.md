@@ -24,6 +24,9 @@ Verify and report PASS/FAIL for each:
 - [ ] Rollback plan exists and is executable (link `ops/runbook-*.md`).
 - [ ] Canary/gradual rollout strategy documented.
 - [ ] Health/readiness endpoints present.
+- [ ] Deployment topology matches the Phase-4 decision: the rollback / canary / health mechanisms
+      above are the ones the chosen topology actually uses (see `docs/checklists/G-deployment.md`
+      + `docs/adr/*-deployment-topology.md`). Its real cluster/registry/cloud stays `【需企业环境】`.
 - [ ] Config validation passes: `node .github/hooks/validate-config.mjs`.
 - [ ] SDLC gate wiring passes: `node .github/hooks/eos-doctor.mjs` (G-EVAL: LLM code ⇒ eval-plan).
 - [ ] Local CI green: `act push -j verify` (validate-config + eos-doctor + tests + evals). Needs Docker.

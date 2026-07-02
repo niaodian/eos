@@ -168,7 +168,7 @@ mkdir -p ~/.git-templates/eos && cp -R <golden>/.github ~/.git-templates/eos/
 git config --global init.templateDir ~/.git-templates/eos
 ```
 
-版本化：`docs/eos/VERSION`（当前 `eos-1.7.1`）。升级用 `degit` 拉新版到 /tmp 后 `diff -ru` 合并，
+版本化：`docs/eos/VERSION`（当前 `eos-1.8.0`）。升级用 `degit` 拉新版到 /tmp 后 `diff -ru` 合并，
 再跑 `validate-config.mjs` + `bmad-code-review`。
 
 ---
@@ -316,7 +316,7 @@ git config --global init.templateDir ~/.git-templates/eos
 | 2 Requirement | 展开功能+NFR+**运营前置** | `/requirements`（包裹 `bmad-create-prd`） + skill `eos-operational-readiness` | **G2：五张清单全过审（受监管加 F）** | `P:requirements`、`P:nfr`、`I:security` | 主闸门：阻断上线后大规模返工 |
 | 3 Spec | PRD 成为唯一真相源 | `bmad-create-prd`；校验 `bmad-validate-prd` | G3：每条需求有验收标准 | `P:spec` | Spec 即契约，下游只认 `docs/prd.md` |
 | 3.5 UX & Design（条件） | 视觉+体验契约（面向用户必做） | `/ux-spec`（包裹 `bmad-ux`）、`bmad-agent-ux-designer`(Sally)、`bmad-cis-design-thinking`(Maya) | **G-UX：每条面向用户需求有屏幕/流程/三态/a11y/视觉token；纯后端 SKIP+理由** | `P:ux-spec`、`A:eos-design`、`I:frontend` | UI/UX 前置：防"实现完才发现交互/信息架构错" |
-| 4 Architecture | 技术方案+数据模型+API 契约+NFR 落点+ADR+**锁定技术栈** | `eos-architecture`（包裹 `bmad-architecture` Winston）；`/adr` | G4：关键不可逆决策有 ADR；NFR 有落点；**技术栈已锁**（更新 `00-workspace` + 启用对应 R3 + 写 tech-stack ADR） | `I:data-api`、`A:eos-architecture` | API 契约先于实现；扩展性显式审查；**栈在此锁定**——阶段 0 只留 Node 占位，避免 always-on 规则与真实栈冲突 |
+| 4 Architecture | 技术方案+数据模型+API 契约+NFR 落点+ADR+**锁定技术栈**+**部署拓扑** | `eos-architecture`（包裹 `bmad-architecture` Winston）；`/adr`；`/deploy-topology` | G4：关键不可逆决策有 ADR；NFR 有落点；**技术栈已锁**（更新 `00-workspace` + 启用对应 R3 + 写 tech-stack ADR）；**部署拓扑已选**（NFR 依据 + deployment-topology ADR） | `I:data-api`、`A:eos-architecture` | API 契约先于实现；扩展性显式审查；**栈在此锁定**——阶段 0 只留 Node 占位，避免 always-on 规则与真实栈冲突；**拓扑选最简满足 NFR，不默认上 K8s** |
 | 5 Planning | Epics→Stories，各 story 上下文自包含 + 验收测试先行(ATDD) | `bmad-create-epics-and-stories`→`bmad-create-story`→`bmad-sprint-planning`；`bmad-testarch-atdd`；`bmad-check-implementation-readiness` | G5：story 就绪 + 每条 AC 有验收测试设计 | `A:eos-plan` | 就绪门防缺上下文；测试左移防"事后补测" |
 | 6 Development | 按 story 实现，受栈规则+护栏约束，**完成前过代码审查** | `bmad-dev-story`、`bmad-agent-dev`(Amelia)、**`bmad-code-review`** | G6：lint/typecheck/单测全绿 **且代码审查无阻断项** | `I:frontend/backend/data-api`（`applyTo`自动注入）+ `H:guardrails`（PreToolUse）+ `H:quality`（PostToolUse） | Hooks 确定性拦截 + 审查补自动化查不出的设计/逻辑/边界/安全问题 |
 | 7 Testing | 按测试策略验证+spec↔test 可追溯+**NFR 验证**+**规范对齐量化** | `bmad-tea`(Murat)、`bmad-testarch-trace`、`bmad-testarch-nfr`、`bmad-qa-generate-e2e-tests`、`/e2e`（Playwright 框架+E2E+trace；开发期 Playwright MCP 驱动浏览器，**阶段 7 opt-in**）、`/spec-align` | G7：每条验收≥1测试且全绿；**面向用户流程 E2E 绿**；**NFR 已验**；**spec-alignment：AC 覆盖率/一次过率/无漂移** | `I:testing` | trace 矩阵确保无未测 AC；**spec-align 量化 Agent 输出的规范对齐度与一次过率** |
@@ -364,7 +364,7 @@ git config --global init.templateDir ~/.git-templates/eos
 | DR | RTO/RPO 目标 | 备份/故障转移 |
 | regulatory（如受监管） | 具名制度 + 逐控制项决策（走 `F-compliance`） | 数据驻留、审计留存、同意/DSAR、供应商 BAA/DPA、AI 脱敏网关 |
 
-## 5.3 六张清单（可直接使用，完整版在 docs/checklists/）
+## 5.3 七张清单（A–F 于需求门 G2 走查；G 于架构门 G4 走查；完整版在 docs/checklists/）
 
 **A. 需求缺口**（`docs/checklists/A-gap.md`）：问题陈述可证伪 / 验收标准可度量 /
 边界/异常/并发已定义 / 依赖已列明 / scope-out 已明确 / 重叠已排查。
@@ -386,6 +386,11 @@ rollback-flag / monitoring-alerting / canary / rate-limit-quota / i18n-l10n /
 制度选择（HIPAA/PCI-DSS/SOC2/SOX/GDPR/CCPA/PIPL）→ 级联具体控制（数据驻留、审计留存期、
 最小必要访问、供应商 **BAA/DPA**、**Agentic 数据出境**决策：BAA·自托管·脱敏网关·排除受监管数据）。
 > **非法律意见**：仅强制早期工程决策，仍需合规/法务人工签核。`【新建补强】`
+
+**G. 部署拓扑决策**（`docs/checklists/G-deployment.md`，**阶段 4 架构期走查、门 G4**，非 G2）：
+选型矩阵（裸进程/Docker/K8s/serverless/PaaS）× NFR 触发条件 × 回滚/灰度/health 契约 × 团队规模成本。
+规则：**选满足 NFR 的最简拓扑，不默认上 K8s**；配套 `/deploy-topology` 走查并落 `deployment-topology` ADR。
+真实 cluster/registry/cloud 属 `【需企业/网络环境】`，本地不依赖它也能跑。`【新建补强·配合 bmad-architecture】`
 
 > 每项三选一：**采纳**（写需求）/ **不采纳+理由** / **延后+触发条件**。禁止留空。
 
@@ -496,6 +501,7 @@ Agent 输出不符预期
 | D13 | MVP vs Enterprise 方案对比 | 见下表 | 新建 |
 | — | UX/设计规划阶段（视觉+体验契约） | `/ux-spec`、`A:eos-design`；产 `docs/DESIGN.md`+`docs/EXPERIENCE.md` | 复用BMAD（bmad-ux/Sally）+补强 |
 | D14 | 受监管行业合规清单 + 制度前置 + Agentic 数据出境门 | `docs/checklists/F-compliance.md`（+ 附录 `F-compliance-hipaa.md`/`F-compliance-pci-dss.md`/`F-compliance-gdpr-pipl.md`）；`/compliance` + `/requirements` Step 2.5；`eos-doctor` D5 | 新建 |
+| D15 | 部署拓扑决策清单 + 选型门（阶段 4/G4） | `docs/checklists/G-deployment.md`；`/deploy-topology`；接入 `eos-architecture`(G4) + `/release-gate`(G8) + R8 `release-ops` 规则 | 新建补强（配合 bmad-architecture） |
 | — | Agentic Engineering 扩展包（LLM/agent 产品） | `ai/10-ai-llm` 规则、`/eval-spec`(G-EVAL)、C-nfr/security/telemetry 扩展；产 `docs/eval-plan.md`；起步骨架 `docs/eos/examples/eval-starter/` | 新建补强（借鉴 bmad-eval-runner） |
 | — | BMAD reuse map（73 bmad-*） | `docs/eos/agent-map.md` | 复用BMAD |
 | — | 运营前置 skill | `.github/skills/eos-operational-readiness/SKILL.md` | 新建 |

@@ -1,6 +1,6 @@
 # EOS 用户手册（Engineering Operating System User Manual）
 
-> 版本：与 `docs/eos/VERSION` 同步（当前 `eos-1.7.1`）
+> 版本：与 `docs/eos/VERSION` 同步（当前 `eos-1.8.0`）
 > 适用：较新版本的 VS Code + GitHub Copilot Chat（自定义 agent / hooks 属近版能力，用「关于 VS Code」面板确认版本）+ 已安装 73 个 `bmad-*` skill（用户级）
 > 定位：本手册是**操作指南（怎么用）**；设计原理与取舍见同目录 `blueprint.md`（为什么这么设计）。
 > 约定：正文中文；文件名/路径/命令/配置键保留英文原文。
@@ -374,17 +374,19 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 |---|---|
 | **目标** | 技术方案、数据模型、API 契约、NFR 落点、关键决策留痕（ADR） |
 | **何时进入** | G3 通过、`docs/prd.md` 就绪 |
-| **怎么启动** | Chat 切到 **`（agent）eos-architecture`**（调用 `bmad-architecture`/Winston）；对每个不可逆决策跑 **`/adr`** |
-| **输入** | `docs/prd.md`、`docs/EXPERIENCE.md`+`docs/DESIGN.md`（若做了 UX 阶段）、`docs/checklists/C-nfr.md` |
-| **产出** | `docs/architecture.md`、`docs/data-model.md`、`api/openapi.yaml`、`docs/adr/NNN-*.md` |
-| **决策门 G4** | ☑ 扩展性/弹性/容灾/安全各有显式设计（不是"以后再说"）☑ 每个不可逆决策有 ADR |
-| **必查项** | API 契约**先于**实现写好了吗？ADR 有没有列备选方案和 trade-off？NFR 每项有落点吗？ |
+| **怎么启动** | Chat 切到 **`（agent）eos-architecture`**（调用 `bmad-architecture`/Winston）；对每个不可逆决策跑 **`/adr`**；跑 **`/deploy-topology`** 选部署拓扑 |
+| **输入** | `docs/prd.md`、`docs/EXPERIENCE.md`+`docs/DESIGN.md`（若做了 UX 阶段）、`docs/checklists/C-nfr.md`、`docs/checklists/G-deployment.md` |
+| **产出** | `docs/architecture.md`（含 Deployment 段）、`docs/data-model.md`、`api/openapi.yaml`、`docs/adr/NNN-*.md`（含 tech-stack + deployment-topology 两条 ADR）、填好的 `G-deployment.md` |
+| **决策门 G4** | ☑ 扩展性/弹性/容灾/安全各有显式设计（不是"以后再说"）☑ 每个不可逆决策有 ADR ☑ **技术栈已锁** ☑ **部署拓扑已选**（NFR 依据 + deployment-topology ADR） |
+| **必查项** | API 契约**先于**实现写好了吗？ADR 有没有列备选方案和 trade-off？NFR 每项有落点吗？**部署拓扑是不是选了"满足 NFR 的最简项"（而不是跟风上 K8s）**？ |
 | **防返工** | "API 先于实现"让前后端可并行、契约可被测试锚定；ADR 防团队失忆。 |
 | **样例** | `my-app/docs/adr/0001-session-strategy.md`（3 方案对比 + trade-off）、`my-app/api/openapi.yaml`（先于 src/auth.js 写） |
 
 **ADR 模板要素**（`/adr` 自动生成）：Status / Context / Decision / Consequences（侧重 1-N 扩展与可逆性）/ Alternatives considered。一文件一决策，从 `docs/architecture.md` 链接。
 
 > **在架构阶段锁定技术栈**（不可逆决策，阶段 0 故意只留占位）：选定语言/框架后 ① 从 `docs/eos/stack-presets.md` 更新 `00-workspace` 的 `Local commands` ② 启用对应 R3 栈规则 ③ 写 `docs/adr/00X-tech-stack.md`。**G4 会校验"栈已锁"**——这样 always-on 的 `00-workspace` 才与真实栈一致，消除阶段 0 的 ⛳ 占位与后续栈的矛盾。
+
+> **在架构阶段选定部署拓扑**（同属 NFR 驱动的架构决策）：跑 `/deploy-topology` 走查 `docs/checklists/G-deployment.md`——在**裸进程 / Docker / K8s / serverless / PaaS** 里**选满足 NFR 的最简项**（别默认上 K8s），落 `docs/adr/NNN-deployment-topology.md` + `architecture.md` 的 Deployment 段。EOS **不预设** Docker 或 K8s：拓扑由本阶段按 SLO/RTO/RPO/峰值 QPS 决定；真实 cluster/registry/cloud 属 `【需企业/网络环境】`，本地 dev/CI 不依赖它也能跑。所选拓扑的 manifest（`Dockerfile`/`compose.yml`/`k8s/*.yaml`/`serverless.yml`）自动吃 R8 `release-ops` 规则，G8 发布门再校验回滚/灰度/health 与拓扑一致。
 
 ---
 
@@ -503,7 +505,7 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 | 2 Requirements | `/requirements "<f>"` | `docs/requirements.md` | **G2★** | `/spec` |
 | 3 Spec | `/spec` | `docs/prd.md` | G3 | `/ux-spec`（后端可跳→ `eos-architecture`） |
 | 3.5 UX & Design | `/ux-spec`（或 `（agent）eos-design`） | `DESIGN.md`+`EXPERIENCE.md` | G-UX（条件） | `（agent）eos-architecture` |
-| 4 Architecture | `（agent）eos-architecture` + `/adr` | `architecture.md`+`openapi.yaml`+`adr/*` | G4 | `（agent）eos-plan`（先锁栈+ADR） |
+| 4 Architecture | `（agent）eos-architecture` + `/adr` + `/deploy-topology` | `architecture.md`+`openapi.yaml`+`adr/*`+`G-deployment.md` | G4 | `（agent）eos-plan`（先锁栈+ADR+拓扑） |
 | 5 Planning | `（agent）eos-plan` | `docs/stories/*` | G5 | `bmad-dev-story` |
 | 6 Development | `bmad-dev-story` → `bmad-code-review` | `src/*` + 审查结论 | G6 | `/e2e`（或 `bmad-tea`/`bmad-testarch-*`） |
 | 7 Testing | `/e2e`（或 `bmad-tea`/`bmad-testarch-*`） | tests + `trace-matrix.md` | G7 | `/release-gate` |
@@ -562,6 +564,7 @@ node .github/hooks/validate-config.mjs          # 期望 PASS
 ```
 （切到 agent）eos-architecture     → architecture.md + data-model + api/openapi.yaml
 /adr "技术栈选型 / 数据库选型"       → 不可逆决策留 ADR；**在此锁栈**=更新 00-workspace + 启用 R3
+/deploy-topology                   → 选部署拓扑（裸进程/Docker/K8s/serverless/PaaS，取满足 NFR 的最简项）+ deployment-topology ADR
 ```
 架构 agent 在 **G4** 会强制你的 SaaS 设计包含：
 - **事务边界**（哪些写操作必须原子）、**幂等键**（重试安全）
@@ -694,6 +697,7 @@ LLM tracing（token/成本/context/tool-span）。
 | `/spec-align` | 量化规范对齐度（AC 覆盖率/一次过率/漂移，G7 度量） | — | 对齐度报告（`spec-align.mjs`） |
 | `/e2e` | 编排浏览器/E2E 测试（Playwright 框架+生成+trace）；开发期可用 Playwright MCP 驱动浏览器自查（见 7.7） | — | Playwright 规格 + `docs/trace-matrix.md` |
 | `/adr` | 记录一条架构决策 | `<决策标题>` | `docs/adr/NNN-*.md` |
+| `/deploy-topology` | 选部署拓扑（裸进程/Docker/K8s/serverless/PaaS）对齐 NFR 并落 ADR | — | 填 `G-deployment.md` + `docs/adr/NNN-deployment-topology.md` + `architecture.md` Deployment 段 |
 | `/nfr` | 把 C-nfr 逐行填具体目标值 | — | 更新 `C-nfr.md` + PRD NFR 段 |
 | `/compliance` | 受监管行业合规前置（制度选择+边界控制，条件用；走 F-compliance） | `<制度名 或 领域描述>` | `docs/compliance-profile.md` |
 | `/telemetry-plan` | 设计埋点并对齐成功指标 | — | `docs/telemetry-plan.md` |
@@ -758,7 +762,7 @@ LLM tracing（token/成本/context/tool-span）。
 | `data-api/20-data-api.instructions.md` | `**/*.{sql,prisma}` | 数据建模、迁移、数据生命周期、多租户隔离、API 契约/弃用、时区/货币存储 |
 | `testing/30-testing.instructions.md` | `**/*.{test,spec}.*` | 测试金字塔、AC 可追溯、契约+DB 状态集成测试、覆盖率门、NFR/eval 双轨 |
 | `security/40-security.instructions.md` | `**` | 输入校验、deny-by-default、多租户、密钥、供应链、数据分级（薄护栏） |
-| `release-ops/50-release-ops.instructions.md` | `**/{Dockerfile,*.yml,*.yaml}` | 可复现构建、发布前置、health 端点 |
+| `release-ops/50-release-ops.instructions.md` | `**/{Dockerfile,*.yml,*.yaml}` | 部署拓扑（阶段 4/G4 定，见 `G-deployment.md`）、可复现构建、发布前置、health 端点 |
 
 > R1 全局信念在 `.github/copilot-instructions.md`（不在上表，因为它是 always-on 顶层文件）。
 

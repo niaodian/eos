@@ -16,6 +16,11 @@ Input: `docs/prd.md`. Honor the UX contracts `docs/EXPERIENCE.md` + `docs/DESIGN
 Use skill `bmad-architecture` (Winston) to produce architecture + data model + API contract.
 Then run `/adr` for each irreversible decision. Enforce NFR mapping against docs/checklists/C-nfr.md.
 
+Decide the **deployment topology** here too (it is NFR-driven and irreversible-ish): run
+`/deploy-topology` to walk `docs/checklists/G-deployment.md`, pick the **simplest topology that
+meets the NFRs** (bare process / Docker / K8s / serverless / PaaS — never default to K8s), and
+record `docs/adr/NNN-deployment-topology.md` + a Deployment section in `docs/architecture.md`.
+
 Lock the tech stack here — it is an irreversible decision that Phase 0 deliberately left as a
 placeholder. Once the architecture picks the language/framework: (1) update the `Local commands` in
 `.github/instructions/00-workspace.instructions.md` from `docs/eos/stack-presets.md`, (2) enable the
@@ -31,7 +36,9 @@ Paradigm isolation check (deterministic SaaS vs probabilistic Agentic):
 
 Gate G4: extensibility/resilience/DR/security each have an explicit design (not "later"),
 every irreversible decision has an ADR, the **tech stack is locked** (00-workspace updated + R3
-enabled + tech-stack ADR written), and — if both paradigms are present — the isolation
+enabled + tech-stack ADR written), the **deployment topology is chosen** (NFR-justified, with a
+`docs/adr/*-deployment-topology.md`), and — if both paradigms are present — the isolation
 points above are designed (async boundary, separated fault models, layered state).
 
-Output: docs/architecture.md, docs/data-model.md, api/openapi.yaml, docs/adr/* (incl. the tech-stack ADR).
+Output: docs/architecture.md (incl. a Deployment section), docs/data-model.md, api/openapi.yaml,
+docs/checklists/G-deployment.md (filled), docs/adr/* (incl. the tech-stack ADR + the deployment-topology ADR).
