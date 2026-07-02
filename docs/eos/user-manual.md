@@ -1,6 +1,6 @@
 # EOS 用户手册（Engineering Operating System User Manual）
 
-> 版本：与 `docs/eos/VERSION` 同步（当前 `eos-1.7.0`）
+> 版本：与 `docs/eos/VERSION` 同步（当前 `eos-1.7.1`）
 > 适用：较新版本的 VS Code + GitHub Copilot Chat（自定义 agent / hooks 属近版能力，用「关于 VS Code」面板确认版本）+ 已安装 73 个 `bmad-*` skill（用户级）
 > 定位：本手册是**操作指南（怎么用）**；设计原理与取舍见同目录 `blueprint.md`（为什么这么设计）。
 > 约定：正文中文；文件名/路径/命令/配置键保留英文原文。
@@ -190,7 +190,7 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 | **Agents（角色）** | `.github/agents/*.agent.md` | 切换：你选中某 agent 时持续生效 | Chat 的 agent 选择器切换 | 阶段编排者（持久 persona + 工具限制 + handoffs） |
 | **Skills（能力）** | `.github/skills/*/SKILL.md`（项目级）、`~/.agents/skills/bmad-*`（用户级） | 按相关性自动加载，或被 agent 点名调用 | Agent 自动用，或在 prompt 里写 `bmad-xxx` | 可移植能力（复用 BMAD + 新建补强） |
 | **Hooks（护栏）** | `.github/hooks/*.json` + 脚本 | 生命周期事件触发（PreToolUse 等） | 自动；无需手动 | 确定性护栏（拦危险操作、跑质量门） |
-| **MCP servers（工具扩展）** | `.vscode/mcp.json`（顶层 `"servers"`） | 启动时连接；工具出现在 **agent 模式**的 tools 选择器 | 提交进 git 团队共享；首启弹信任框 | 本地工具扩展（如 Playwright MCP 驱动浏览器自测） |
+| **MCP servers（工具扩展）** | `.vscode/mcp.json.example`（顶层 `"servers"`；opt-in 复制成 `.vscode/mcp.json`） | 客户端**会话启动即 eager 连接**、workspace 全局、**不可按阶段门控** | **默认 inert**（`.example`）；阶段 7 手动启用，活动文件留本地不提交 | 本地工具扩展（如 Playwright MCP 驱动浏览器自测，见 7.7） |
 
 ## 4.1 关键认知：没有"原生优先级"
 
@@ -423,9 +423,10 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 > 质量门要真正生效，项目 `package.json` 需有 `test`（及可选 `lint`/`typecheck`）脚本，
 > 否则 hook 会 `--if-present` 空跑。my-app 的最小 `package.json`：`{"scripts":{"test":"node --test"}}`。
 
-> **verify-as-you-build（可选）**：前端 story 实现后，可在 **agent 模式**用内置的 **Playwright MCP**
-> （`.vscode/mcp.json`，沙箱锁 localhost）驱动本地 dev server 自查刚写的交互——类似 Antigravity 的
-> Chrome 集成。这是**开发期便利**、非确定性；正式验证在阶段 7 用 `/e2e` 固化成 Playwright 规格。详见 7.7。
+> **verify-as-you-build（可选·opt-in）**：前端 story 实现后，可在 **agent 模式**用 **Playwright MCP**
+> 驱动本地 dev server 自查刚写的交互——类似 Antigravity 的 Chrome 集成。浏览器 MCP **默认不启用**（避免
+> 早期阶段被 eager 启动），需先 `cp .vscode/mcp.json.example .vscode/mcp.json`（沙箱锁 localhost）。这是
+> **开发期便利**、非确定性；正式验证在阶段 7 用 `/e2e` 固化成 Playwright 规格。详见 7.7。
 
 ---
 
@@ -816,19 +817,31 @@ act push --pull=false --action-offline-mode   # 首次拉过镜像后可完全�
 ## 7.7 浏览器自动化测试（Playwright MCP）【新建补强·映射 VS Code MCP 原生机制】
 
 想要"agent 亲自开浏览器点一点、截图自查"（类似 Antigravity 的 Chrome 集成）？VS Code + Copilot
-的原生做法是 **MCP server + agent 模式**。模板已内置一个**纯本地、沙箱化**的 Playwright MCP：
+的原生做法是 **MCP server + agent 模式**。模板把它做成**纯本地、沙箱化、默认关闭（opt-in）**的
+Playwright MCP：
 
-- **配置**：`.vscode/mcp.json`，顶层 key 是 **`"servers"`**（注意不是通用 README 里的 `"mcpServers"`——那是别的客户端格式）。官方建议纳入 git、团队共享。
+> **为什么默认关闭？**（这是 eos-1.7.1 修正的一个真实设计缺陷）MCP server 由客户端在**会话/对话启动时
+> 一次性 eager 启动**，且是 **workspace 全局**的——**无法按 SDLC 阶段门控**。若把活动的 `.vscode/mcp.json`
+> 随模板一起 ship，那么从**阶段 1 刚敲下一个 idea** 起，客户端（Copilot CLI / VS Code Chat 皆然）就会
+> 弹"Starting MCP servers playwright…"去拉起浏览器——既无必要又浪费。VS Code 的 `chat.mcp.autostart`
+> 是 Experimental 且仅 VS Code 生效，救不了 CLI。**唯一稳妥、跨客户端的做法：默认不给活动配置，等阶段 7 再
+> opt-in。**
+
+- **配置（inert）**：模板 ship 的是 **`.vscode/mcp.json.example`**——任何 MCP 客户端都**不会读 `.example`**，所以**什么都不会自启**。
+- **阶段 7 启用（opt-in）**：`cp .vscode/mcp.json.example .vscode/mcp.json` 然后重载窗口/会话。这个活动的 `mcp.json` 被 `.gitignore` 忽略、**只留在本地**，永不提交回模板。用完 `rm .vscode/mcp.json` 即可停用。
+- **配置格式**：顶层 key 是 **`"servers"`**（注意不是通用 README 里的 `"mcpServers"`——那是别的客户端格式）。
 - **引擎**：`@playwright/mcp`（Microsoft 官方），走 accessibility tree、确定性强、无遥测；与 BMAD 的 `bmad-testarch-framework` 选定的 Playwright 同源。
 - **护栏**：`sandboxEnabled: true` + 顶层 `sandbox` 把**文件写入锁到 workspace、网络锁到 localhost**（macOS/Linux 官方特性）——agent 驱动的浏览器只能打你自己的 dev server，出不了圈。
 - **首次使用**：一次性联网 `npx playwright install chromium`（并让 `@playwright/mcp` 首次下载）；VS Code 首启会弹**信任对话框**。之后在 **agent 模式**的 tools 选择器里就能看到 Playwright 工具。
 
-**用法**：跑 `/e2e`（见 7.1）编排 `bmad-testarch-framework`（初始化）→ `bmad-qa-generate-e2e-tests` / `bmad-testarch-automate`（生成/扩展）→ `bmad-testarch-trace`（AC↔E2E 矩阵）。开发期可让 agent 用 Playwright MCP 驱动 localhost 复现/探索，再把结论**固化成确定性 Playwright 规格**。
+**用法**：跑 `/e2e`（见 7.1）编排 `bmad-testarch-framework`（初始化）→ `bmad-qa-generate-e2e-tests` / `bmad-testarch-automate`（生成/扩展）→ `bmad-testarch-trace`（AC↔E2E 矩阵）。**开发期**若要 agent 用 Playwright MCP 驱动 localhost 复现/探索，先按上面 opt-in 启用，再把结论**固化成确定性 Playwright 规格**。
 
 **诚实边界**：
+- 浏览器 MCP **默认不启用**——**只在阶段 7 手动 opt-in**，避免早期阶段被 eager 启动打扰（见上"为什么默认关闭"）。
 - MCP 那层是**非确定性**的——只用于开发期自查，**绝不进 CI**、**绝不替代**确定性规格。CI 只跑 Playwright 脚本（`eos-ci.yml` / `bmad-testarch-ci`）。
 - `sandbox` 仅 macOS/Linux；网络白名单默认只放 `localhost`/`127.0.0.1`，若被测应用要拉外部资源（CDN 等）再按需加域名。
 - 想要**真实 Chrome** 的深度性能/网络排障？`【可选】`换用 Google 的 `chrome-devtools-mcp`——但它**默认开启用量遥测 + 调 CrUX API**，纯本地务必加 `--no-usage-statistics --no-performance-crux`。
+- 更进一步的"按需加载"方向：Playwright 官方也提供 **CLI + SKILLS** 形态（供 coding agent 按相关性懒加载，天然规避 eager 启动）——`【需在你的版本中核实】`成熟度，可作后续演进。
 - agent 模式 + MCP 的具体 UI 随版本演进，`【需在你的版本中核实】`。
 
 ---

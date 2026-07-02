@@ -9,7 +9,7 @@
 | Architecture | bmad-architecture / bmad-create-architecture (Winston) |
 | Planning | bmad-create-epics-and-stories, bmad-create-story, bmad-sprint-planning, bmad-testarch-atdd, bmad-check-implementation-readiness |
 | Development | bmad-dev-story, bmad-agent-dev (Amelia), bmad-quick-dev, bmad-code-review; EOS skill `eos-compliance-skeletons` (privacy scaffolds) |
-| Testing | bmad-tea (Murat), bmad-testarch-*, bmad-qa-generate-e2e-tests; EOS `/e2e` (Playwright framework+gen+trace; dev-time browser verify via sandboxed **Playwright MCP**, `.vscode/mcp.json`), `/spec-align` (AC coverage / first-pass rate) |
+| Testing | bmad-tea (Murat), bmad-testarch-*, bmad-qa-generate-e2e-tests; EOS `/e2e` (Playwright framework+gen+trace; dev-time browser verify via sandboxed **Playwright MCP** — opt-in at Phase 7 via `cp .vscode/mcp.json.example .vscode/mcp.json`, ships inert), `/spec-align` (AC coverage / first-pass rate) |
 | LLM Eval (if agentic) | EOS `/eval-spec` → docs/eval-plan.md; bmad-eval-runner (pattern ref only) |
 | Release/Ops | EOS prompts: /release-gate, /runbook |
 | Observability | EOS prompt: /telemetry-plan |
