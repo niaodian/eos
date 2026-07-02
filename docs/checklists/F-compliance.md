@@ -55,6 +55,7 @@ Tick every regime that applies, then record the result in `docs/compliance-profi
 - [ ] Named **control owner** per control (accountability, not just implementation)
 
 ## GDPR / CCPA / PIPL pack (privacy)
+> **详细控制→落点映射见配套附录 [`F-compliance-gdpr-pipl.md`](./F-compliance-gdpr-pipl.md)**（合法性/同意、DSAR 访问/删除/可携、跨境传输 SCCs vs PIPL 安全评估、ROPA/DPIA、72h 泄露通知，逐条对 EOS 落点；含 GDPR vs PIPL 差异表）。
 - [ ] **Lawful basis / consent** captured and revocable; consent state is queryable
 - [ ] **DSAR**: access / erasure / portability request handling path exists
 - [ ] **Cross-border transfer** mechanism (SCCs / adequacy / localization) named

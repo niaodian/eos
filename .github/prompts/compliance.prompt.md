@@ -15,7 +15,8 @@ tools: ['search', 'editFiles']
 Input: `docs/discovery.md` / `docs/requirements.md` if present, plus the `$ARGUMENTS` hint.
 Reference: walk `docs/checklists/F-compliance.md`. For HIPAA or PCI-DSS, use the detailed
 control→landing-point appendices `docs/checklists/F-compliance-hipaa.md` /
-`docs/checklists/F-compliance-pci-dss.md`. Reuse `bmad-testarch-nfr` for NFR landing and
+`docs/checklists/F-compliance-pci-dss.md`; for GDPR/CCPA/PIPL privacy, use
+`docs/checklists/F-compliance-gdpr-pipl.md`. Reuse `bmad-testarch-nfr` for NFR landing and
 skill `eos-operational-readiness` for the operational overlap.
 
 ## Step 1 — Regime selection (F-compliance Step 0)
