@@ -14,3 +14,6 @@ tools: ['search', 'runCommands']
 3. Read `.github/prompts/**` and `.github/agents/**`. Verify every referenced
    `bmad-*` skill and every relative Markdown link resolves.
 4. Output a table: [file] [issue type] [severity] [suggested fix]. Make no code changes.
+
+> **Next (Phase 0 → 1):** once this reports PASS, switch to the `eos-discovery` agent in the Chat
+> mode picker to start Discovery (Gate G1). This hop is manual — a prompt can't render a handoff button.

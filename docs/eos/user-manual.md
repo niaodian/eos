@@ -1,6 +1,6 @@
 # EOS 用户手册（Engineering Operating System User Manual）
 
-> 版本：与 `docs/eos/VERSION` 同步（当前 `eos-1.6.1`）
+> 版本：与 `docs/eos/VERSION` 同步（当前 `eos-1.6.2`）
 > 适用：较新版本的 VS Code + GitHub Copilot Chat（自定义 agent / hooks 属近版能力，用「关于 VS Code」面板确认版本）+ 已安装 73 个 `bmad-*` skill（用户级）
 > 定位：本手册是**操作指南（怎么用）**；设计原理与取舍见同目录 `blueprint.md`（为什么这么设计）。
 > 约定：正文中文；文件名/路径/命令/配置键保留英文原文。
@@ -162,7 +162,7 @@ node .github/hooks/validate-config.mjs      # 期望：PASS
 ## 3.3 填项目专属事实
 
 打开 `.github/instructions/00-workspace.instructions.md`，把它改成**你这个项目**的真实情况：
-- `Local commands`：换成你的栈的 install/lint/test/typecheck 命令——**成品行直接抄** `docs/eos/stack-presets.md`（Node/Python/Go/Java/Rust/.NET 全栈配方册，复制对应一块即可）
+- `Local commands`：**已定栈**就换成你的栈的 install/lint/test/typecheck 命令——**成品行直接抄** `docs/eos/stack-presets.md`（Node/Python/Go/Java/Rust/.NET 全栈配方册，复制对应一块即可）。**还没定栈**（多数 0-1 项目在架构前都没定）就**保留 Node 占位**——这是 ⛳ PROVISIONAL 值，**权威锁定在阶段 4（架构）** 连同 `docs/adr/00X-tech-stack.md`，避免 always-on 规则与将来真实栈打架
 - `Layout`：若目录结构不同，更新
 - 其它跨项目通用信念**不要**写这里——那属于 R1（`copilot-instructions.md`）
 
@@ -279,7 +279,7 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 | **怎么启动** | `npx degit --mode=git niaodian/eos-template my-app && cd my-app` |
 | **产出** | 完整 `.github/` + `docs/` 骨架 |
 | **门** | `node .github/hooks/validate-config.mjs` → **PASS** |
-| **必查** | PASS 0 errors；改 `00-workspace` 填本项目 install/lint/test 命令 |
+| **必查** | PASS 0 errors。**栈未定则先别改** `00-workspace`——保留 Node 占位即可；栈是不可逆决策，权威锁定在**阶段 4（ADR）**。已知栈可即抄 `docs/eos/stack-presets.md`（快路径）。 |
 | **打开方式** | 从 `my-app/` 内执行 `code .`——让**项目本身**成为工作区根。打开父目录会导致 agent/instructions/hooks 全部不生效（见 7.2）。 |
 | **样例** | `my-app/` 全树（44 文件，validate PASS） |
 
@@ -382,6 +382,8 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 | **样例** | `my-app/docs/adr/0001-session-strategy.md`（3 方案对比 + trade-off）、`my-app/api/openapi.yaml`（先于 src/auth.js 写） |
 
 **ADR 模板要素**（`/adr` 自动生成）：Status / Context / Decision / Consequences（侧重 1-N 扩展与可逆性）/ Alternatives considered。一文件一决策，从 `docs/architecture.md` 链接。
+
+> **在架构阶段锁定技术栈**（不可逆决策，阶段 0 故意只留占位）：选定语言/框架后 ① 从 `docs/eos/stack-presets.md` 更新 `00-workspace` 的 `Local commands` ② 启用对应 R3 栈规则 ③ 写 `docs/adr/00X-tech-stack.md`。**G4 会校验"栈已锁"**——这样 always-on 的 `00-workspace` 才与真实栈一致，消除阶段 0 的 ⛳ 占位与后续栈的矛盾。
 
 ---
 
@@ -489,19 +491,21 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 
 ## 6.x 阶段速查表（一页纸）
 
-| 阶段 | 启动方式 | 产物 | 门 |
-|---|---|---|---|
-| 1 Discovery | `（agent）eos-discovery` | `docs/discovery.md` | G1 |
-| 2 Requirements | `/requirements "<f>"` | `docs/requirements.md` | **G2★** |
-| 3 Spec | `/spec` | `docs/prd.md` | G3 |
-| 3.5 UX & Design | `/ux-spec`（或 `（agent）eos-design`） | `DESIGN.md`+`EXPERIENCE.md` | G-UX（条件） |
-| 4 Architecture | `（agent）eos-architecture` + `/adr` | `architecture.md`+`openapi.yaml`+`adr/*` | G4 |
-| 5 Planning | `（agent）eos-plan` | `docs/stories/*` | G5 |
-| 6 Development | `bmad-dev-story` → `bmad-code-review` | `src/*` + 审查结论 | G6 |
-| 7 Testing | `bmad-tea`/`bmad-testarch-*` | tests + `trace-matrix.md` | G7 |
-| 8 Release | `/release-gate`（+`/runbook`） | 门禁报告 + runbook | **G8★** |
-| 9 Observability | `/telemetry-plan` | `docs/telemetry-plan.md` | G9 |
-| 10 Iteration | `（agent）eos-review` | 变更提案 + 回写 PRD | G10 |
+| 阶段 | 启动方式 | 产物 | 门 | → 下一步 |
+|---|---|---|---|---|
+| 1 Discovery | `（agent）eos-discovery` | `docs/discovery.md` | G1 | `/requirements "<f>"` |
+| 2 Requirements | `/requirements "<f>"` | `docs/requirements.md` | **G2★** | `/spec` |
+| 3 Spec | `/spec` | `docs/prd.md` | G3 | `/ux-spec`（后端可跳→ `eos-architecture`） |
+| 3.5 UX & Design | `/ux-spec`（或 `（agent）eos-design`） | `DESIGN.md`+`EXPERIENCE.md` | G-UX（条件） | `（agent）eos-architecture` |
+| 4 Architecture | `（agent）eos-architecture` + `/adr` | `architecture.md`+`openapi.yaml`+`adr/*` | G4 | `（agent）eos-plan`（先锁栈+ADR） |
+| 5 Planning | `（agent）eos-plan` | `docs/stories/*` | G5 | `bmad-dev-story` |
+| 6 Development | `bmad-dev-story` → `bmad-code-review` | `src/*` + 审查结论 | G6 | `bmad-tea`/`bmad-testarch-*` |
+| 7 Testing | `bmad-tea`/`bmad-testarch-*` | tests + `trace-matrix.md` | G7 | `/release-gate` |
+| 8 Release | `/release-gate`（+`/runbook`） | 门禁报告 + runbook | **G8★** | `/telemetry-plan` |
+| 9 Observability | `/telemetry-plan` | `docs/telemetry-plan.md` | G9 | `（agent）eos-review` |
+| 10 Iteration | `（agent）eos-review` | 变更提案 + 回写 PRD | G10 | ⟲ `/requirements`（下一轮） |
+
+> **不跳阶段**：每个 EOS 命令/agent 跑完都会提示"→ 下一步"（prompt 末尾的 **Next** 面包屑 + agent 的 **handoff** 按钮）。阶段 6/7 是纯 BMAD skill，`eos-plan` 的 "Start Development" handoff 已把下游尾链（dev→review G6→test G7→release G8）一次性交代给 agent，跑完不断线。
 
 ---
 
@@ -535,8 +539,8 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 npx degit --mode=git niaodian/eos-template todo-api && cd todo-api
 node .github/hooks/validate-config.mjs          # 期望 PASS
 ```
-打开 `.github/instructions/00-workspace.instructions.md`，把 `Local commands` 换成你的栈。
-后端选 Node？从 `docs/eos/stack-presets.md` 抄 Node 那块。（Python/Go/Java/Rust/.NET 同理。）
+**已定栈**？打开 `.github/instructions/00-workspace.instructions.md` 把 `Local commands` 抄成你的栈块（`docs/eos/stack-presets.md`，快路径）。
+**还没定**？保留 Node 占位即可——栈的**权威锁定在第 4 步架构**（连同 ADR）。SaaS 项目通常第 0 步就知道栈，可直接抄。
 
 ### 第 1–3 步：想清楚要做什么（Chat 里逐条输入）
 ```
@@ -551,7 +555,7 @@ node .github/hooks/validate-config.mjs          # 期望 PASS
 ### 🔵 第 4 步：架构（SaaS 专属重点）
 ```
 （切到 agent）eos-architecture     → architecture.md + data-model + api/openapi.yaml
-/adr "数据库选型"                   → 每个不可逆决策留一份 ADR
+/adr "技术栈选型 / 数据库选型"       → 不可逆决策留 ADR；**在此锁栈**=更新 00-workspace + 启用 R3
 ```
 架构 agent 在 **G4** 会强制你的 SaaS 设计包含：
 - **事务边界**（哪些写操作必须原子）、**幂等键**（重试安全）

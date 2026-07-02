@@ -13,3 +13,5 @@ Create `ops/runbook-<service>.md` with:
 - Common incidents → diagnosis → mitigation
 - Rollback procedure (exact, executable steps)
 - Feature-flag toggles relevant to this service
+
+> **Next:** return to `/release-gate` (G8) — this runbook satisfies its rollback/canary line items.

@@ -29,3 +29,5 @@ Verify and report PASS/FAIL for each:
 - [ ] Local CI green: `act push -j verify` (validate-config + eos-doctor + tests + evals). Needs Docker.
 
 Any FAIL blocks release. Summarize as a gate report.
+
+> **Next (after G8):** run `/telemetry-plan` to land observability and close the ops loop (Gate G9).

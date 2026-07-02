@@ -15,3 +15,6 @@ tools: ['search', 'editFiles']
    to feed the eval/data flywheel (`docs/eval-plan.md`).
 
 Output: `docs/telemetry-plan.md`. Every success metric must have >=1 backing event.
+
+> **Next (after G9):** switch to the `eos-review` agent (Chat mode picker) to drive the next
+> iteration from telemetry — it closes the loop back to `/requirements` (Gate G10).

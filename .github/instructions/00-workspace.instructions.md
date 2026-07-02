@@ -9,9 +9,12 @@ applyTo: "**"
 ## Layout
 - `src/` app code · `docs/` specs & ADRs · `api/` OpenAPI · `ops/` runbooks · `.github/` EOS config.
 
-## Local commands (local CI via act; no cloud runner assumed)
+## Local commands  ⛳ PROVISIONAL — stack is locked at Phase 4 (Architecture) via ADR
+> The line below is the **Node reference default** (a placeholder — it does NOT commit the project
+> to a stack). The stack is an irreversible decision: lock it at **Phase 4** in an ADR
+> (`docs/adr/00X-tech-stack.md`), then replace this line from `docs/eos/stack-presets.md` and enable
+> the matching R3 rule. Already know the stack? Copy your block now (fast path); the ADR still records it.
 - Install: `npm ci` · Lint: `npm run lint` · Test: `npm test` · Typecheck: `npm run typecheck`.
-- Adjust to your stack — ready presets (Node/Python/Go/Java/Rust/.NET) in `docs/eos/stack-presets.md`.
 - Local CI: `act push` runs `.github/workflows/eos-ci.yml` in Docker (validate-config + eos-doctor + tests + evals).
 
 ## Git

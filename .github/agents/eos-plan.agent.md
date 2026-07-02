@@ -5,7 +5,10 @@ tools: ['search', 'editFiles']
 handoffs:
   - label: Start Development
     agent: agent
-    prompt: Implement the next ready story with bmad-dev-story, then run bmad-code-review and resolve blocking findings before the story is done (G6).
+    prompt: >-
+      Implement the next ready story with bmad-dev-story, then bmad-code-review and resolve blocking
+      findings before the story is done (G6). Then Testing (G7): bmad-tea / bmad-testarch-* to build
+      AC-traced tests + trace-matrix and verify NFR targets & LLM evals. Then run /release-gate (G8).
     send: false
 ---
 # EOS Planning Agent

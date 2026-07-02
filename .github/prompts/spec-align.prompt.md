@@ -33,3 +33,6 @@ EOS exists to make Agent output stable, controllable, and measurable. This quant
 - Feed the numbers into the **retrospective** (bmad-retrospective) as the epic's quality signal.
 
 Output: the metric printout (and optionally append the `RECORD` line to a trend log you keep in the repo).
+
+> **Next:** clean at G7 → proceed to `/release-gate` (G8); run this with `--strict` there as the
+> zero-drift release check.

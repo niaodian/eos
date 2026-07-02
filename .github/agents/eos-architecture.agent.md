@@ -16,6 +16,12 @@ Input: `docs/prd.md`. Honor the UX contracts `docs/EXPERIENCE.md` + `docs/DESIGN
 Use skill `bmad-architecture` (Winston) to produce architecture + data model + API contract.
 Then run `/adr` for each irreversible decision. Enforce NFR mapping against docs/checklists/C-nfr.md.
 
+Lock the tech stack here — it is an irreversible decision that Phase 0 deliberately left as a
+placeholder. Once the architecture picks the language/framework: (1) update the `Local commands` in
+`.github/instructions/00-workspace.instructions.md` from `docs/eos/stack-presets.md`, (2) enable the
+matching R3 stack rule, and (3) record it as `docs/adr/00X-tech-stack.md`. This resolves the ⛳
+PROVISIONAL marker so the always-on workspace rule matches the real stack.
+
 Paradigm isolation check (deterministic SaaS vs probabilistic Agentic):
 - If the system mixes a high-concurrency web path with LLM/agent calls, require an async
   decoupling point (queue/worker) so multi-second inference never blocks a request thread.
@@ -24,7 +30,8 @@ Paradigm isolation check (deterministic SaaS vs probabilistic Agentic):
 - Keep state layers distinct: SQL/strong-consistency vs vector/long-term vs context/short-term.
 
 Gate G4: extensibility/resilience/DR/security each have an explicit design (not "later"),
-every irreversible decision has an ADR, and — if both paradigms are present — the isolation
+every irreversible decision has an ADR, the **tech stack is locked** (00-workspace updated + R3
+enabled + tech-stack ADR written), and — if both paradigms are present — the isolation
 points above are designed (async boundary, separated fault models, layered state).
 
-Output: docs/architecture.md, docs/data-model.md, api/openapi.yaml, docs/adr/*.
+Output: docs/architecture.md, docs/data-model.md, api/openapi.yaml, docs/adr/* (incl. the tech-stack ADR).
