@@ -1,6 +1,6 @@
 # EOS 用户手册（Engineering Operating System User Manual）
 
-> 版本：与 `docs/eos/VERSION` 同步（当前 `eos-1.6.2`）
+> 版本：与 `docs/eos/VERSION` 同步（当前 `eos-1.7.0`）
 > 适用：较新版本的 VS Code + GitHub Copilot Chat（自定义 agent / hooks 属近版能力，用「关于 VS Code」面板确认版本）+ 已安装 73 个 `bmad-*` skill（用户级）
 > 定位：本手册是**操作指南（怎么用）**；设计原理与取舍见同目录 `blueprint.md`（为什么这么设计）。
 > 约定：正文中文；文件名/路径/命令/配置键保留英文原文。
@@ -190,6 +190,7 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 | **Agents（角色）** | `.github/agents/*.agent.md` | 切换：你选中某 agent 时持续生效 | Chat 的 agent 选择器切换 | 阶段编排者（持久 persona + 工具限制 + handoffs） |
 | **Skills（能力）** | `.github/skills/*/SKILL.md`（项目级）、`~/.agents/skills/bmad-*`（用户级） | 按相关性自动加载，或被 agent 点名调用 | Agent 自动用，或在 prompt 里写 `bmad-xxx` | 可移植能力（复用 BMAD + 新建补强） |
 | **Hooks（护栏）** | `.github/hooks/*.json` + 脚本 | 生命周期事件触发（PreToolUse 等） | 自动；无需手动 | 确定性护栏（拦危险操作、跑质量门） |
+| **MCP servers（工具扩展）** | `.vscode/mcp.json`（顶层 `"servers"`） | 启动时连接；工具出现在 **agent 模式**的 tools 选择器 | 提交进 git 团队共享；首启弹信任框 | 本地工具扩展（如 Playwright MCP 驱动浏览器自测） |
 
 ## 4.1 关键认知：没有"原生优先级"
 
@@ -422,6 +423,10 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 > 质量门要真正生效，项目 `package.json` 需有 `test`（及可选 `lint`/`typecheck`）脚本，
 > 否则 hook 会 `--if-present` 空跑。my-app 的最小 `package.json`：`{"scripts":{"test":"node --test"}}`。
 
+> **verify-as-you-build（可选）**：前端 story 实现后，可在 **agent 模式**用内置的 **Playwright MCP**
+> （`.vscode/mcp.json`，沙箱锁 localhost）驱动本地 dev server 自查刚写的交互——类似 Antigravity 的
+> Chrome 集成。这是**开发期便利**、非确定性；正式验证在阶段 7 用 `/e2e` 固化成 Playwright 规格。详见 7.7。
+
 ---
 
 ## 阶段 7 — Testing（验证 + 可追溯）
@@ -430,11 +435,11 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 |---|---|
 | **目标** | 按测试策略验证，建立 spec↔test 可追溯，并**验证 NFR 目标** |
 | **何时进入** | G6 通过 |
-| **怎么启动** | Chat 输入 **`bmad-tea`**（Murat）/ `bmad-testarch-test-design` / `bmad-testarch-automate` / `bmad-testarch-trace` / **`bmad-testarch-nfr`** / `bmad-qa-generate-e2e-tests`；**LLM 功能:按 `docs/eval-plan.md` 跑 eval 集 + 回归基线** |
+| **怎么启动** | Chat 输入 **`bmad-tea`**（Murat）/ `bmad-testarch-test-design` / `bmad-testarch-automate` / `bmad-testarch-trace` / **`bmad-testarch-nfr`** / `bmad-qa-generate-e2e-tests`；**面向用户流程用 `/e2e`**（编排 Playwright 框架+E2E 生成+trace，开发期可用 Playwright MCP 驱动浏览器自查，见 7.7）；**LLM 功能:按 `docs/eval-plan.md` 跑 eval 集 + 回归基线** |
 | **输入** | `docs/prd.md`（AC 清单）、**`docs/checklists/C-nfr.md`（NFR 目标值）**、**`docs/eval-plan.md`（LLM 功能）**、`src/` 代码 |
 | **产出** | 测试套件 + `docs/trace-matrix.md`（AC ↔ 测试映射）+ **NFR 验证结果** + **eval 结果（LLM 功能）** |
 | **生效规则 R6** | 金字塔结构；**每条 AC ≥1 测试**；`describe(<criterion id>)` 命名；无真实计时器/无顺序依赖；改动行覆盖率 ≥80%；**NFR 目标用 `bmad-testarch-nfr` 验证**；**LLM 输出用 eval 集+grader 验(非 exact-match),见 `ai/10-ai-llm` 规则** |
-| **决策门 G7** | ☑ 每条 AC ≥1 测试 ☑ 全绿 ☑ trace 矩阵完整 ☑ **NFR 目标已验证或显式标 deferred+trigger** ☑ **LLM 功能:eval 达基线阈值、无回归(G-EVAL)** ☑ **spec-alignment 量化（`/spec-align`：AC 覆盖率/一次过率/无漂移）** |
+| **决策门 G7** | ☑ 每条 AC ≥1 测试 ☑ 全绿 ☑ trace 矩阵完整 ☑ **面向用户流程 E2E 全绿（Playwright，`/e2e`）** ☑ **NFR 目标已验证或显式标 deferred+trigger** ☑ **LLM 功能:eval 达基线阈值、无回归(G-EVAL)** ☑ **spec-alignment 量化（`/spec-align`：AC 覆盖率/一次过率/无漂移）** |
 | **必查项** | 有没有"没被任何测试覆盖的 AC"？**C-nfr 里定的 P95/吞吐/SLO 有没有被验证**（而不是定了就忘）？延后的有没有显式标 trigger？**LLM 的 eval 分达阈值了吗?prompt/模型改动有没有跑回归?** |
 | **防返工** | trace 矩阵让"漏测的验收标准"无所遁形；**NFR 验证让"定了目标却没人验"无所遁形**；**eval 回归让"改 prompt 改崩了别处"无所遁形**。 |
 | **样例** | `my-app/test/auth.test.js`（10 个 AC-traced 测试全绿）、`my-app/docs/trace-matrix.md`（11/12 AC 有测试，1 个性能项显式 deferred） |
@@ -499,8 +504,8 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 | 3.5 UX & Design | `/ux-spec`（或 `（agent）eos-design`） | `DESIGN.md`+`EXPERIENCE.md` | G-UX（条件） | `（agent）eos-architecture` |
 | 4 Architecture | `（agent）eos-architecture` + `/adr` | `architecture.md`+`openapi.yaml`+`adr/*` | G4 | `（agent）eos-plan`（先锁栈+ADR） |
 | 5 Planning | `（agent）eos-plan` | `docs/stories/*` | G5 | `bmad-dev-story` |
-| 6 Development | `bmad-dev-story` → `bmad-code-review` | `src/*` + 审查结论 | G6 | `bmad-tea`/`bmad-testarch-*` |
-| 7 Testing | `bmad-tea`/`bmad-testarch-*` | tests + `trace-matrix.md` | G7 | `/release-gate` |
+| 6 Development | `bmad-dev-story` → `bmad-code-review` | `src/*` + 审查结论 | G6 | `/e2e`（或 `bmad-tea`/`bmad-testarch-*`） |
+| 7 Testing | `/e2e`（或 `bmad-tea`/`bmad-testarch-*`） | tests + `trace-matrix.md` | G7 | `/release-gate` |
 | 8 Release | `/release-gate`（+`/runbook`） | 门禁报告 + runbook | **G8★** | `/telemetry-plan` |
 | 9 Observability | `/telemetry-plan` | `docs/telemetry-plan.md` | G9 | `（agent）eos-review` |
 | 10 Iteration | `（agent）eos-review` | 变更提案 + 回写 PRD | G10 | ⟲ `/requirements`（下一轮） |
@@ -575,6 +580,7 @@ bmad-code-review                   → 代码审查，解掉阻断项（G6 完�
 ### 🔵 第 7 步：测试（SaaS 专属：契约 + DB 状态）
 ```
 bmad-tea / bmad-testarch-*         → 单元 + 集成测试
+/e2e                               → 面向用户流程 E2E（Playwright；开发期可用 MCP 自查）
 /spec-align                        → 量化：AC 覆盖率 / 一次过率 / 漂移
 ```
 SaaS 的 **G7** 要求：每条 AC ≥1 测试、**API 契约测试**（对 openapi.yaml）、**DB 状态集成测试**
@@ -685,6 +691,7 @@ LLM tracing（token/成本/context/tool-span）。
 | `/ux-spec` | 设计 UX/UI 视觉+体验契约（包裹 bmad-ux） | `<docs/prd.md 路径>` | `docs/DESIGN.md` + `docs/EXPERIENCE.md` |
 | `/eval-spec` | 设计 LLM/agentic 评估计划（条件门 G-EVAL） | `<docs/prd.md 路径>` | `docs/eval-plan.md` |
 | `/spec-align` | 量化规范对齐度（AC 覆盖率/一次过率/漂移，G7 度量） | — | 对齐度报告（`spec-align.mjs`） |
+| `/e2e` | 编排浏览器/E2E 测试（Playwright 框架+生成+trace）；开发期可用 Playwright MCP 驱动浏览器自查（见 7.7） | — | Playwright 规格 + `docs/trace-matrix.md` |
 | `/adr` | 记录一条架构决策 | `<决策标题>` | `docs/adr/NNN-*.md` |
 | `/nfr` | 把 C-nfr 逐行填具体目标值 | — | 更新 `C-nfr.md` + PRD NFR 段 |
 | `/compliance` | 受监管行业合规前置（制度选择+边界控制，条件用；走 F-compliance） | `<制度名 或 领域描述>` | `docs/compliance-profile.md` |
@@ -803,6 +810,26 @@ act push --pull=false --action-offline-mode   # 首次拉过镜像后可完全�
 | `F-compliance-hipaa.md` | HIPAA 控制→落点映射（配套附录） | Security Rule 技术/管理/物理保障 + 最小必要/去标识 + 泄露通知 + 6 年留存，逐条对 EOS 真实落点（🟢/🟡/⚪ 三档） | G2 + G8 |
 | `F-compliance-pci-dss.md` | PCI-DSS 控制→落点映射（配套附录） | v4.0 十二项 + Requirement 3 存储卡数据专表 + scope-reduction 战略（SAQ A） | G2 + G8 |
 | `F-compliance-gdpr-pipl.md` | GDPR/PIPL 隐私控制→落点映射（配套附录） | 合法性/同意、DSAR（访问/删除/可携）、跨境传输（SCCs vs PIPL 安全评估）、ROPA/DPIA、72h 通知；含 GDPR↔PIPL 差异表 | G2 + G8 |
+
+---
+
+## 7.7 浏览器自动化测试（Playwright MCP）【新建补强·映射 VS Code MCP 原生机制】
+
+想要"agent 亲自开浏览器点一点、截图自查"（类似 Antigravity 的 Chrome 集成）？VS Code + Copilot
+的原生做法是 **MCP server + agent 模式**。模板已内置一个**纯本地、沙箱化**的 Playwright MCP：
+
+- **配置**：`.vscode/mcp.json`，顶层 key 是 **`"servers"`**（注意不是通用 README 里的 `"mcpServers"`——那是别的客户端格式）。官方建议纳入 git、团队共享。
+- **引擎**：`@playwright/mcp`（Microsoft 官方），走 accessibility tree、确定性强、无遥测；与 BMAD 的 `bmad-testarch-framework` 选定的 Playwright 同源。
+- **护栏**：`sandboxEnabled: true` + 顶层 `sandbox` 把**文件写入锁到 workspace、网络锁到 localhost**（macOS/Linux 官方特性）——agent 驱动的浏览器只能打你自己的 dev server，出不了圈。
+- **首次使用**：一次性联网 `npx playwright install chromium`（并让 `@playwright/mcp` 首次下载）；VS Code 首启会弹**信任对话框**。之后在 **agent 模式**的 tools 选择器里就能看到 Playwright 工具。
+
+**用法**：跑 `/e2e`（见 7.1）编排 `bmad-testarch-framework`（初始化）→ `bmad-qa-generate-e2e-tests` / `bmad-testarch-automate`（生成/扩展）→ `bmad-testarch-trace`（AC↔E2E 矩阵）。开发期可让 agent 用 Playwright MCP 驱动 localhost 复现/探索，再把结论**固化成确定性 Playwright 规格**。
+
+**诚实边界**：
+- MCP 那层是**非确定性**的——只用于开发期自查，**绝不进 CI**、**绝不替代**确定性规格。CI 只跑 Playwright 脚本（`eos-ci.yml` / `bmad-testarch-ci`）。
+- `sandbox` 仅 macOS/Linux；网络白名单默认只放 `localhost`/`127.0.0.1`，若被测应用要拉外部资源（CDN 等）再按需加域名。
+- 想要**真实 Chrome** 的深度性能/网络排障？`【可选】`换用 Google 的 `chrome-devtools-mcp`——但它**默认开启用量遥测 + 调 CrUX API**，纯本地务必加 `--no-usage-statistics --no-performance-crux`。
+- agent 模式 + MCP 的具体 UI 随版本演进，`【需在你的版本中核实】`。
 
 ---
 

@@ -27,3 +27,10 @@ __pycache__/
 # generated docs (rebuild via docs/eos/tools/build-pdf.sh)
 docs/eos/*.pdf
 docs/eos/.user-manual.html
+
+# VS Code: keep local editor settings out, but COMMIT the shared MCP server config.
+# VS Code docs recommend committing .vscode/mcp.json for team sharing. A global `.vscode/`
+# ignore excludes the whole dir, so we must re-include the dir before re-including the file.
+!.vscode/
+.vscode/*
+!.vscode/mcp.json

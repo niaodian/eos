@@ -15,6 +15,10 @@ applyTo: "**/*.{test,spec}.*"
 - No flaky patterns: no real timers (use fakes), no order-dependent tests.
 - Coverage gate: changed lines >= 80% (enforced locally; see hooks/quality.json).
 - For test design/automation, invoke `bmad-testarch-test-design` / `bmad-testarch-automate`.
+- E2E/browser: Playwright is the engine (init via `bmad-testarch-framework`); author flows with
+  `/e2e`. Deterministic Playwright specs are the only thing CI runs. Dev-time only, the agent may
+  drive the local dev server through the sandboxed **Playwright MCP** (`.vscode/mcp.json`, localhost)
+  for exploration/triage — never as a substitute for a spec, never in CI.
 - Verify NFR targets from `docs/checklists/C-nfr.md` (latency/throughput, SLO/RTO/RPO, etc.)
   with `bmad-testarch-nfr`; each adopted NFR needs a check or an explicitly-deferred trigger.
 - Local CI (no cloud runner): `.github/workflows/eos-ci.yml` runs the aggregate gate
