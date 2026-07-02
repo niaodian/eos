@@ -34,6 +34,7 @@ Tick every regime that applies, then record the result in `docs/compliance-profi
 - [ ] **Incident / breach path**: who is notified, within what window, through which channel
 
 ## HIPAA pack (healthcare / PHI)
+> **详细控制→落点映射见配套附录 [`F-compliance-hipaa.md`](./F-compliance-hipaa.md)**（Security Rule 技术/管理/物理保障 + 最小必要 + 去标识 + 泄露通知 + 6 年留存，逐条对到 EOS 真实落点）。
 - [ ] PHI inventory + **minimum-necessary** access per role
 - [ ] **BAA with every subprocessor** (incl. cloud + any LLM/API) *before* PHI flows to it
 - [ ] Audit logs retained **≥ 6 years**; access to PHI is itself logged
@@ -41,6 +42,7 @@ Tick every regime that applies, then record the result in `docs/compliance-profi
 - [ ] **No PHI in third-party LLM prompts/logs without a BAA** (see Agentic data-boundary below)
 
 ## PCI-DSS pack (payment cards)
+> **详细 12 项要求→落点映射见配套附录 [`F-compliance-pci-dss.md`](./F-compliance-pci-dss.md)**（含 scope-reduction 战略 + Requirement 3 存储卡数据专表）。
 - [ ] **Never store PAN/CVV/track data**; use tokenization or a hosted-fields / payment-iframe provider
 - [ ] Scope minimization + network segmentation (keep card data out of general app/DB where possible)
 - [ ] **No card data in logs, telemetry, error reports, or analytics**

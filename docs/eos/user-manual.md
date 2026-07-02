@@ -1,6 +1,6 @@
 # EOS 用户手册（Engineering Operating System User Manual）
 
-> 版本：与 `docs/eos/VERSION` 同步（当前 `eos-1.4.5`）
+> 版本：与 `docs/eos/VERSION` 同步（当前 `eos-1.4.6`）
 > 适用：较新版本的 VS Code + GitHub Copilot Chat（自定义 agent / hooks 属近版能力，用「关于 VS Code」面板确认版本）+ 已安装 73 个 `bmad-*` skill（用户级）
 > 定位：本手册是**操作指南（怎么用）**；设计原理与取舍见同目录 `blueprint.md`（为什么这么设计）。
 > 约定：正文中文；文件名/路径/命令/配置键保留英文原文。
@@ -795,6 +795,8 @@ act push --pull=false --action-offline-mode   # 首次拉过镜像后可完全�
 | `D-ops.md` | 运营前置 | 埋点↔指标/权限矩阵/审计/回滚/灰度/配额/多租户/i18n/容量告警/Runbook | G2 |
 | `E-security.md` | 安全与机密 | 密钥不入代码/前端/`.env` 治理、供应链投毒防护、配置权限隔离、密钥轮换 | G2 + G8 |
 | `F-compliance.md` | 受监管行业合规（**仅受监管**） | 制度选择(HIPAA/PCI/SOC2/SOX/GDPR/CCPA/PIPL)→数据驻留/审计留存/最小必要/BAA·DPA/Agentic 数据出境 | G2 + G8 |
+| `F-compliance-hipaa.md` | HIPAA 控制→落点映射（配套附录） | Security Rule 技术/管理/物理保障 + 最小必要/去标识 + 泄露通知 + 6 年留存，逐条对 EOS 真实落点（🟢/🟡/⚪ 三档） | G2 + G8 |
+| `F-compliance-pci-dss.md` | PCI-DSS 控制→落点映射（配套附录） | v4.0 十二项 + Requirement 3 存储卡数据专表 + scope-reduction 战略（SAQ A） | G2 + G8 |
 
 ---
 
