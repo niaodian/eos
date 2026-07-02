@@ -3,9 +3,32 @@
 // (Pass an explicit file/glob — a bare directory path errors under Node 23's --test.)
 import { test } from 'node:test';
 import assert from 'node:assert';
-import { redact, scan, assertClean, luhnValid } from './redaction.mjs';
+import { redact, scan, assertClean, luhnValid, createRedactor, PROFILES } from './redaction.mjs';
 import { createConsentStore } from './consent.mjs';
 import { exportSubject, eraseSubject } from './dsar.mjs';
+
+test('redaction: regime profiles scope what gets masked', () => {
+  // PCI-DSS scope = cardholder data only; a plain email is out of scope and stays.
+  const pci = createRedactor(['PCI-DSS']); // alias resolves to PCI
+  const p = pci.redact({ cardNumber: '4111111111111111', email: 'jane@example.com' });
+  assert.strictEqual(p.cardNumber, '«REDACTED:cardnumber»');
+  assert.strictEqual(p.email, 'jane@example.com', 'PCI scope must not touch a non-card email');
+
+  // HIPAA scope = PHI (identifiers + health), but NOT a raw card number (that is PCI's regime).
+  const hipaa = createRedactor(['HIPAA']);
+  const h = hipaa.redact({ mrn: 'MR-9', email: 'jane@example.com', pan: '4111111111111111' });
+  assert.strictEqual(h.mrn, '«REDACTED:mrn»');
+  assert.strictEqual(h.email, '«REDACTED:email»');
+  assert.strictEqual(h.pan, '4111111111111111', 'HIPAA-only must not redact card data (select PCI for that)');
+
+  // base-only (no regime) = credentials/secrets only.
+  const base = createRedactor([]);
+  assert.strictEqual(base.redact({ token: 'abc123', email: 'a@b.co' }).token, '«REDACTED:token»');
+  assert.strictEqual(base.redact({ email: 'a@b.co' }).email, 'a@b.co');
+
+  assert.deepStrictEqual(pci.regimes, ['PCI']); // reports the active regime set
+  assert.ok(PROFILES.HIPAA && PROFILES.PCI && PROFILES.GDPR_PIPL, 'named regime presets are exported');
+});
 
 test('redaction: masks PAN / email / SSN / denied keys, preserves the rest', () => {
   const input = {

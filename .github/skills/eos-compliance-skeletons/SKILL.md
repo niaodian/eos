@@ -22,7 +22,7 @@ launch (the expensive time). `【新建补强】`
 
 | Need | Skeleton | Adapt |
 |---|---|---|
-| Strip PII/PHI/PAN before send/log | `redaction.mjs` → `redact()` / `assertClean()` | extend `DENY_KEYS`/`PATTERNS` per regime; call `assertClean()` on the line before any provider call |
+| Strip PII/PHI/PAN before send/log | `redaction.mjs` → `createRedactor([regime])` + `assertClean()` | pick regime preset(s) from `PROFILES` (base+HIPAA/PCI/GDPR_PIPL) or extend a profile; call `assertClean()` before any provider call |
 | Consent (versioned, revocable, per-purpose) | `consent.mjs` → `createConsentStore()` | back with `(subject_id, purpose, granted, basis, version, at)`; keep purposes separate (PIPL) |
 | DSAR export / erasure | `dsar.mjs` → `exportSubject()` / `eraseSubject()` | register one `source` adapter per table/service |
 | Audit trail (who/when/what, no PII) | `audit.mjs` → `audit()` | point `record()` at a WORM / append-only table |

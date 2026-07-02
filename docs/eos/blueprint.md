@@ -168,7 +168,7 @@ mkdir -p ~/.git-templates/eos && cp -R <golden>/.github ~/.git-templates/eos/
 git config --global init.templateDir ~/.git-templates/eos
 ```
 
-版本化：`docs/eos/VERSION`（当前 `eos-1.4.8`）。升级用 `degit` 拉新版到 /tmp 后 `diff -ru` 合并，
+版本化：`docs/eos/VERSION`（当前 `eos-1.4.9`）。升级用 `degit` 拉新版到 /tmp 后 `diff -ru` 合并，
 再跑 `validate-config.mjs` + `bmad-code-review`。
 
 ---

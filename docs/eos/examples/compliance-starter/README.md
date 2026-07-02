@@ -12,7 +12,7 @@ compliance checklists mark 🟡 *project must build*. They exist so you don't co
 ## Files → which 🟡 item → EOS landing point
 | File | Covers (🟡 item) | Regime | Landing point it satisfies |
 |---|---|---|---|
-| `redaction.mjs` | field-level redaction / PII-free logging / **AI data-boundary** | all | `ai/10-ai-llm` "Redact before sending to the provider"; `eos-doctor` **D5**; F-compliance *Agentic data-boundary* |
+| `redaction.mjs` | regime-scoped redaction / PII-free logging / **AI data-boundary** | HIPAA·PCI·GDPR/PIPL presets | `ai/10-ai-llm` "Redact before sending to the provider"; `eos-doctor` **D5**; F-compliance *Agentic data-boundary* |
 | `consent.mjs` | consent store (versioned, revocable, **per-purpose**) | GDPR/PIPL | F-compliance-gdpr-pipl "Lawful basis & consent"; PIPL separate-consent |
 | `dsar.mjs` | DSAR export / erase over pluggable sources | GDPR/PIPL | `data-api` "support subject deletion / export"; "every deletion audited" |
 | `audit.mjs` | append-only who/when/what trail (shared) | all | `data-api` "every deletion of user data is audited … without logging the data itself" |
@@ -29,8 +29,9 @@ node --test docs/eos/examples/compliance-starter/compliance.test.mjs
 Python equivalent: `pytest tests/compliance -q` with the same three modules.
 
 ## Adapt it to your project (4 steps)
-1. **redaction** — extend `DENY_KEYS` / `PATTERNS` for your regime (HIPAA `mrn/phi`, PCI `pan/cvv`,
-   GDPR/PIPL `email/nationalId`). Call `assertClean(payload)` on the line **before** any provider /
+1. **redaction** — pick your regime(s) with `createRedactor(['HIPAA'])` / `['PCI-DSS']` /
+   `['GDPR','PIPL']` (presets in `PROFILES`; `base` credentials always on), or extend a profile's
+   `keys`/`patterns`. Call `assertClean(payload)` on the line **before** any provider /
    cross-border / analytics call — that is the D5 boundary in code.
 2. **consent** — replace the in-memory `Map` with a table `(subject_id, purpose, granted, basis,
    version, at)`, latest row per (subject, purpose). Keep purposes **separate** (PIPL).
