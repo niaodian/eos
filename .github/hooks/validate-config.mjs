@@ -88,7 +88,10 @@ for (const [label, needle] of [['*.ts', 'ts'], ['*.tsx', 'tsx'], ['*.py', 'py'],
   if (!allGlobs.includes(needle)) warns.push(`S4 no rule appears to cover ${label}`);
 }
 
-// S9 hooks JSON validity + event-name validity
+// S9 hooks JSON validity + event-name validity.
+// These 8 names are the official VS Code Copilot hook events, confirmed against
+// docs/agents/reference/hooks-reference.md (they also happen to match Claude Code's set).
+// Hooks are a VS Code *Preview* feature — names/schema may change; re-verify on your version. [audit G1]
 const validEvents = [
   'SessionStart', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse',
   'PreCompact', 'SubagentStart', 'SubagentStop', 'Stop',

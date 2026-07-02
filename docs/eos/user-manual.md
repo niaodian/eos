@@ -1,6 +1,6 @@
 # EOS 用户手册（Engineering Operating System User Manual）
 
-> 版本：与 `docs/eos/VERSION` 同步（当前 `eos-1.8.0`）
+> 版本：与 `docs/eos/VERSION` 同步（当前 `eos-1.9.0`）
 > 适用：较新版本的 VS Code + GitHub Copilot Chat（自定义 agent / hooks 属近版能力，用「关于 VS Code」面板确认版本）+ 已安装 73 个 `bmad-*` skill（用户级）
 > 定位：本手册是**操作指南（怎么用）**；设计原理与取舍见同目录 `blueprint.md`（为什么这么设计）。
 > 约定：正文中文；文件名/路径/命令/配置键保留英文原文。
@@ -40,6 +40,7 @@
 - [附录 A 术语表](#附录-a-术语表)
 - [附录 B 命令速查卡](#附录-b-命令速查卡)
 - [附录 C 端到端样例（my-app）](#附录-c-端到端样例（my-app）)
+- [附录 D 实例化后硬化（让门禁具备权威）](#附录-d-实例化后硬化（让门禁具备权威）)
 
 ---
 
@@ -126,8 +127,19 @@ bmad-code-review                   → 审查无阻断项           (Gate G6)
 
 ## 2.4 Hooks 成熟度说明
 
-- Hooks 是 VS Code 的 **Preview** 功能；`.github/hooks/*.json` **默认即加载**，无需额外开关。
-- `chat.useCustomAgentHooks` 只管 `.agent.md` 里内嵌的 hooks，与工作区 `.github/hooks/` 无关。
+- Hooks 是 VS Code 的 **Preview** 功能：官方明确"配置格式与行为在未来版本可能变化"，请在你的版本核实
+  （官方参考：`docs/agent-customization/hooks.md`、`docs/agents/reference/hooks-reference.md`）。
+- 工作区 `.github/hooks/*.json` **默认即加载**（官方设置 `chat.hookFilesLocations` 默认包含
+  `.github/hooks`），无需额外 Preview 开关。`chat.useCustomAgentHooks` 只管 `.agent.md` 里内嵌的
+  agent hooks，与工作区 `.github/hooks/` 无关。
+- EOS 的 8 个合法事件（`SessionStart / UserPromptSubmit / PreToolUse / PostToolUse / PreCompact /
+  SubagentStart / SubagentStop / Stop`）已核对官方 `hooks-reference.md` 一致；`deny-dangerous.js`
+  的 `permissionDecision: allow/deny/ask` 也符合官方 PreToolUse schema。
+- **确认 hooks 在你的会话真的生效**（"存在 ≠ 生效"）：在 Copilot Chat（Agent 模式）让它运行
+  `echo 'api_key="sk-EXAMPLEprobe1234567"'`。hooks 已加载 → 被 deny（命中密钥字面量规则）；未加载 →
+  只会无害地打印这行字符串。若没被拦截，多半是把父目录当成了工作区根（见 §9.3）。
+- **诚实边界**：`deny-dangerous.js` 是**本地减速带**（逐机器、Preview、解析失败放行、CI 不调用），
+  是纵深防御而非权威。真正的权威门是 CI 三道硬检查 + 分支保护 + 人工评审（见附录 D）。
 
 ---
 
@@ -1095,6 +1107,59 @@ node .github/hooks/validate-config.mjs        # PASS
 npm test                                       # 10/10 green
 echo '{"tool_input":{"command":"rm -rf /tmp/x"}}' | node .github/hooks/deny-dangerous.js  # deny
 ```
+
+---
+
+# 附录 D 实例化后硬化（让门禁具备权威）
+
+> 为什么需要这一步：EOS 的硬强制是**"契约性"**的 —— 3 道 CI 硬门（validate-config / eos-doctor /
+> secret-scan）与 hooks 本身**存在，但要变成"合并阻断权威"，取决于你在 GitHub 服务端补齐分支保护**。
+> 模板无法替你的组织做这些服务端决定（`【需组织/GitHub 设置】`），但下面是一次性的确切步骤。
+> 这直接回应第三方审计的 keystone 项（T1）："先让门具备权威，其余软门/自改风险才有意义去堵。"
+
+## D.1 让 3 道 CI 硬门成为"必需检查" `【需组织/GitHub 设置】`
+
+GitHub 仓库 → **Settings → Branches → Add branch ruleset**（或 Add rule），针对默认分支：
+
+1. 勾选 **Require a pull request before merging**（禁止直接 push 到默认分支）。
+2. 勾选 **Require status checks to pass before merging** → 搜索并选中 **`verify`**（`eos-ci.yml` 的 job）。
+   —— 这一步把 validate-config / eos-doctor / secret-scan 从"绿灯建议"变成"红灯阻断"。
+3. 勾选 **Require review from Code Owners**（配合 D.2 的 CODEOWNERS）。
+4. （推荐）勾选 **Do not allow bypassing the above settings**，避免管理员随手绕过。
+
+> 本地无法验证服务端是否已开：请在 Settings 里自查。个人命名空间仓库默认**没有**这些保护。
+
+## D.2 启用 CODEOWNERS 治理保护
+
+模板已随仓提供 `.github/CODEOWNERS`（覆盖 `instructions/ agents/ hooks/ workflows/ prompts/`
+与 `docs/eos/`、安全/合规清单）。**实例化后**把其中的 `@niaodian` 全部替换为你的团队 handle
+（推荐团队而非个人，如 `@your-org/platform-team`）。配合 D.1 的 "Require review from Code Owners"，
+即可阻止 agent 或任何写权限者**免评审改动治理文件**（回应审计 E1/H5：agent `editFiles` 自改规则）。
+
+## D.3 固定本地审批基线
+
+```sh
+cp .vscode/settings.json.example .vscode/settings.json    # 活跃文件保持本地（git-ignored）
+```
+
+关键项：`chat.tools.global.autoApprove` 保持 `false`（`true` 等于 /yolo，关闭关键安全保护）；
+`chat.tools.terminal.autoApprove` 内置危险命令 denylist（与 `deny-dangerous.js` 纵深防御）。
+设置键均已核对官方 `docs/agents/reference/ai-settings.md`；自动审批演进较快，请在你的版本复核。
+
+## D.4 已知取舍与残余风险（诚实清单）
+
+以下是 EOS **有意的设计取舍**（local-first / opt-in / reuse-first 的固有成本）。不是 bug，但请
+显式确认团队接受其残余风险，并知悉缓解手段：
+
+| 取舍 | 残余风险 | 缓解 |
+|---|---|---|
+| `.vscode/*` 默认 gitignore，`mcp.json` opt-in 后本地留存（审计 F2/C2） | 沙箱/审批基线可被本地私改而无人发现 | 随仓 `settings.json.example`/`mcp.json.example` 安全基线 + 评审；团队约定 |
+| `bmad-*` 技能装在**用户级**、未 pin 版本（审计 H4/T6） | 不同机器技能版本/存否不一 → agentic 行为不完全可复现 | 在 `docs/` 记录团队统一的 bmad 版本；关键技能可 vendor/子模块化 |
+| Hooks 是 Preview、逐机器、解析失败放行、CI 不调用（审计 G2） | 破坏性操作实时拦截非权威，可绕过 | 权威在 D.1 的 CI 硬门 + 人工评审；hooks 仅作减速带 |
+| agent 具 `editFiles`（审计 H5） | 原则上可改自身治理文件 | D.2 CODEOWNERS + D.1 必审（开启后即阻断） |
+
+**须组织决策（模板不代做，`【需组织标准】`）**：CI runner 标准（现 `ubuntu-latest`）、批准的密钥库、
+命名空间/仓库归属、模型 pin/注册策略、制品完整性（SBOM/签名/SLSA）。这些不是违规，是组织标准问题。
 
 ---
 

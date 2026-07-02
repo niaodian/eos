@@ -43,6 +43,9 @@ jobs:
         shell: bash
         run: |
           if [ -f package.json ]; then
+            # E2: a package.json project MUST define a runnable test script — a green-but-empty gate
+            # is worse than no gate. Static check (no network), so it never flakes offline. [audit E2]
+            node -e "const s=(require('./package.json').scripts)||{}; if(!s.test){console.error('EOS FAIL: package.json present but no \"test\" script. Add a real test script (or a documented no-op) so the quality gate cannot vacuously pass.'); process.exit(1)}"
             # Offline-tolerant install: prefer cache, fall back, never hard-fail the gate on network.
             npm ci --prefer-offline --no-audit --no-fund 2>/dev/null \
               || npm install --prefer-offline --no-audit --no-fund 2>/dev/null \

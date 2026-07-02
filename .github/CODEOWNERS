@@ -1,0 +1,39 @@
+# CODEOWNERS — EOS agentic-governance protection (SCAFFOLD)
+#
+# WHY THIS EXISTS [audit E1/H5]
+#   Without CODEOWNERS + branch protection, anyone with write access — or an agent granted
+#   `editFiles` — can change the files that steer every AI action (instructions, agents, hooks,
+#   CI) WITHOUT review. A poisoned instruction could merge unreviewed. This file routes those
+#   paths to required reviewers so self-/silent modification of governance is blocked.
+#
+# HONEST SCOPE — a template CANNOT enforce server-side settings.
+#   This file only has EFFECT if the downstream repo ALSO enables, on GitHub (Settings > Branches):
+#     • Branch protection on the default branch
+#     • "Require a pull request before merging" + "Require review from Code Owners"
+#     • (recommended) "Require status checks to pass" → select the `verify` job so the 3 CI hard
+#       gates (validate-config / eos-doctor / secret-scan) become authoritative, not just advisory.
+#   Until you enable those, CODEOWNERS is advisory only. Steps: see docs/eos/user-manual.md
+#   → "Post-instantiation hardening (make the gates authoritative)".
+#
+# ACTION ON INSTANTIATION
+#   Replace @niaodian everywhere below with your team handle (e.g. @your-org/platform-team).
+#   A team handle is preferred over a person so review isn't blocked when one person is away.
+
+# Default owner for everything (more specific rules below win).
+*                                   @niaodian
+
+# --- Agentic governance: the files that steer every AI action. Protect hardest. ---
+/.github/                           @niaodian
+/.github/copilot-instructions.md    @niaodian
+/.github/instructions/              @niaodian
+/.github/agents/                    @niaodian
+/.github/prompts/                   @niaodian
+/.github/hooks/                     @niaodian
+/.github/workflows/                 @niaodian
+/.github/CODEOWNERS                 @niaodian
+/AGENTS.md                          @niaodian
+
+# --- EOS spine + security/compliance docs: changes alter the methodology itself. ---
+/docs/eos/                          @niaodian
+/docs/checklists/E-security.md      @niaodian
+/docs/checklists/F-compliance.md    @niaodian

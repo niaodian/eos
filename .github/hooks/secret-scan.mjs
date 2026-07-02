@@ -20,12 +20,17 @@ const PATTERNS = [
   ['Google API key', /AIza[0-9A-Za-z_\-]{35}/],
   ['Slack token', /xox[baprs]-[A-Za-z0-9-]{10,}/],
   ['private key block', /-----BEGIN\s+(RSA|EC|OPENSSH|DSA|PRIVATE)\s+(PRIVATE\s+)?KEY-----/],
-  ['hardcoded credential', /(password|passwd|secret|api[_-]?key|access[_-]?token|client[_-]?secret)\s*[:=]\s*["'][^"'${}\n]{6,}["']/i],
+  ['hardcoded credential', /(?:password|passwd|secret|api[_-]?key|access[_-]?token|client[_-]?secret)\s*[:=]\s*["']([^"'${}\n]{6,})["']/i],
 ];
-// Allow obvious placeholders / env references (reduce false positives).
-const IGNORE_LINE = /(process\.env|os\.environ|import\.meta\.env|System\.getenv|\$\{|<[A-Z_]+>|example|placeholder|changeme|xxx+|your[_-])/i;
+// Lines that merely READ an env var are code, not a literal secret — skip the whole line.
+const ENV_REF = /(process\.env|os\.environ|import\.meta\.env|System\.getenv|getenv\(|ENV\[)/i;
+// A matched VALUE that is itself an obvious placeholder — skip only that match (not the whole line,
+// so a real secret sharing a line with a `# example` comment is still caught). [audit D4]
+const PLACEHOLDER = /(\$\{|<[A-Z_]+>|example|placeholder|changeme|change[_-]?me|x{3,}|your[_-]|dummy|sample|redacted|\*{3,}|REPLACE|TODO)/i;
 
-const TEXT_EXT = new Set(['.js', '.mjs', '.cjs', '.ts', '.tsx', '.jsx', '.py', '.go', '.java', '.rs', '.cs', '.rb', '.php', '.sh', '.env', '.json', '.yaml', '.yml', '.toml', '.ini', '.md', '.txt', '.sql', '.properties']);
+const TEXT_EXT = new Set(['.js', '.mjs', '.cjs', '.ts', '.tsx', '.jsx', '.py', '.go', '.java', '.rs', '.cs', '.rb', '.php', '.sh', '.bash', '.zsh', '.ps1', '.psm1', '.env', '.json', '.yaml', '.yml', '.toml', '.ini', '.conf', '.cfg', '.tf', '.tfvars', '.hcl', '.xml', '.gradle', '.md', '.txt', '.sql', '.properties']);
+// Secret-bearing files with no (or an unusual) extension — matched by exact basename. [audit D3]
+const TEXT_NAMES = new Set(['Dockerfile', 'Containerfile', '.npmrc', '.netrc', '.pgpass', '.env']);
 const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'build', '.next', 'coverage', 'vendor']);
 
 function listFiles() {
@@ -55,21 +60,21 @@ for (const envName of ['.env', '.env.local', '.env.production', '.env.developmen
 for (const rel of listFiles()) {
   const ext = extname(rel).toLowerCase();
   const base = rel.split('/').pop();
-  if (!TEXT_EXT.has(ext) && base !== '.env') continue;
+  if (!TEXT_EXT.has(ext) && !TEXT_NAMES.has(base)) continue;
   if (rel.includes('/eval-starter/') || base === 'secret-scan.mjs' || base === 'deny-dangerous.js') continue; // self / examples with placeholder patterns
   const full = join(root, rel);
   let txt;
   try { if (statSync(full).size > 512 * 1024) continue; txt = readFileSync(full, 'utf8'); } catch { continue; }
   txt.split('\n').forEach((line, i) => {
-    if (IGNORE_LINE.test(line)) return;
+    if (ENV_REF.test(line)) return; // a line that reads an env var isn't a literal secret
     for (const [kind, re] of PATTERNS) {
       const m = line.match(re);
-      if (m) {
-        const hit = m[0];
-        const red = hit.length > 8 ? hit.slice(0, 4) + '***' + hit.slice(-2) : '***';
-        findings.push({ file: rel, line: i + 1, kind, sample: red });
-        break;
-      }
+      if (!m) continue;
+      const hit = m[1] || m[0];           // capture group = the value (credential pattern); else whole match
+      if (PLACEHOLDER.test(hit)) continue; // the matched value itself is an obvious placeholder
+      const red = hit.length > 8 ? hit.slice(0, 4) + '***' + hit.slice(-2) : '***';
+      findings.push({ file: rel, line: i + 1, kind, sample: red });
+      break;
     }
   });
 }

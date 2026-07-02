@@ -92,23 +92,28 @@ R1（Global）模板不变：仅放全项目公约数，引用 `docs/eos/agent-m
 
 # Part 7（修正版）— 落地步骤关键修正
 
-## 7.7 Hooks 护栏（修正版 · 已实测）
+## 7.7 Hooks 护栏（修正版 · 符合官方 schema）
 
-`【已实测 · 近版 VS Code】`
+`【符合官方 schema · Preview：官方声明配置格式/行为可能变化，需在你的版本核实】`
 - **`.github/hooks/*.json` 默认加载**（官方 `chat.hookFilesLocations` 默认含 `.github/hooks`）。
   **工作区 hooks 无需任何 Preview 开关**。（`chat.useCustomAgentHooks` 只管写在 `.agent.md`
-  frontmatter 里的 agent 内嵌 hooks，与工作区 hooks 无关。）
-- **PreToolUse 拦截已实测生效**：危险命令被 deny。
+  frontmatter 里的 agent 内嵌 hooks，与工作区 hooks 无关。）官方参考：
+  `docs/agent-customization/hooks.md`、`docs/agents/reference/hooks-reference.md`。
+- **事件名与 schema 已核对官方**：8 个合法事件与 `hooks-reference.md` 一致；`permissionDecision:
+  allow/deny/ask` 符合官方 PreToolUse schema。（这些事件名恰好与 Claude Code 重合，但同为 VS Code 官方集。）
+- **PreToolUse deny 在近版 VS Code 实测生效**；但因属 Preview，请用 user-manual §2.4 的"hook 加载自检"
+  确认你的当前会话确实加载了 hooks（"存在 ≠ 生效"）。`deny-dangerous.js` 是**本地减速带**（逐机器、
+  解析失败放行、CI 不调用），非权威 —— 权威在 CI 三道硬门 + 分支保护（见 user-manual 附录 D）。
 
 PreToolUse 与 PostToolUse 的输出 schema **不同**，这是初稿的关键 bug：
 
 **PreToolUse（拦截工具调用）** → 用 `hookSpecificOutput.permissionDecision`：
 ```javascript
-// .github/hooks/deny-dangerous.js  — 已实测正确版
+// .github/hooks/deny-dangerous.js（节选/示意；仓库内为完整强化版 denylist + 诚实定位注释）
 let s = ''; process.stdin.on('data', d => (s += d)); process.stdin.on('end', () => {
   let payload = {}; try { payload = JSON.parse(s || '{}'); } catch {}
   const text = JSON.stringify(payload);
-  const danger = [/rm\s+-rf\s+[\/~]/, /DROP\s+TABLE/i, /git\s+push\s+--force/, /:\s*>\s*\//];
+  const danger = [/\brm\s+-[a-zA-Z]*[rf]/, /DROP\s+TABLE/i, /git\s+push\b[^\n]*\s(--force|-f)\b/, /:\s*>\s*\//];
   if (danger.some(r => r.test(text))) {
     process.stdout.write(JSON.stringify({
       hookSpecificOutput: {
@@ -168,7 +173,7 @@ mkdir -p ~/.git-templates/eos && cp -R <golden>/.github ~/.git-templates/eos/
 git config --global init.templateDir ~/.git-templates/eos
 ```
 
-版本化：`docs/eos/VERSION`（当前 `eos-1.8.0`）。升级用 `degit` 拉新版到 /tmp 后 `diff -ru` 合并，
+版本化：`docs/eos/VERSION`（当前 `eos-1.9.0`）。升级用 `degit` 拉新版到 /tmp 后 `diff -ru` 合并，
 再跑 `validate-config.mjs` + `bmad-code-review`。
 
 ---
@@ -502,6 +507,7 @@ Agent 输出不符预期
 | — | UX/设计规划阶段（视觉+体验契约） | `/ux-spec`、`A:eos-design`；产 `docs/DESIGN.md`+`docs/EXPERIENCE.md` | 复用BMAD（bmad-ux/Sally）+补强 |
 | D14 | 受监管行业合规清单 + 制度前置 + Agentic 数据出境门 | `docs/checklists/F-compliance.md`（+ 附录 `F-compliance-hipaa.md`/`F-compliance-pci-dss.md`/`F-compliance-gdpr-pipl.md`）；`/compliance` + `/requirements` Step 2.5；`eos-doctor` D5 | 新建 |
 | D15 | 部署拓扑决策清单 + 选型门（阶段 4/G4） | `docs/checklists/G-deployment.md`；`/deploy-topology`；接入 `eos-architecture`(G4) + `/release-gate`(G8) + R8 `release-ops` 规则 | 新建补强（配合 bmad-architecture） |
+| D16 | 第三方审计硬化（enforcement authority / portability / detection coverage） | keystone 脚手架 `.github/CODEOWNERS` + `.vscode/settings.json.example` + user-manual 附录 D；`eos-doctor` D5 warn→error（受监管+LLM+无边界）、D1/D2 依赖信号消目录名逃逸；`secret-scan` 扩展名/无扩展名覆盖 + 同行假阴性收紧；`deny-dangerous` denylist 补漏 + 诚实定位；CI 有 package.json 则要求 test 脚本；`/release-gate` 接 `spec-align --strict`；G1 事件名核对官方 `hooks-reference.md`（审计假阳性）+ Preview 口径统一 | 新建补强（审计驱动） |
 | — | Agentic Engineering 扩展包（LLM/agent 产品） | `ai/10-ai-llm` 规则、`/eval-spec`(G-EVAL)、C-nfr/security/telemetry 扩展；产 `docs/eval-plan.md`；起步骨架 `docs/eos/examples/eval-starter/` | 新建补强（借鉴 bmad-eval-runner） |
 | — | BMAD reuse map（73 bmad-*） | `docs/eos/agent-map.md` | 复用BMAD |
 | — | 运营前置 skill | `.github/skills/eos-operational-readiness/SKILL.md` | 新建 |

@@ -8,6 +8,10 @@ tools: ['search', 'runCommands']
 
 Verify and report PASS/FAIL for each:
 - [ ] Quality gate green (lint + typecheck + tests). Run locally.
+- [ ] Spec alignment (no drift): `node .github/hooks/spec-align.mjs --strict` PASS — every PRD
+      acceptance criterion has a passing trace-matrix row. This is where the "never implement beyond
+      the approved spec" red line is ENFORCED (every-push CI runs it advisory; release runs it strict).
+      N/A only if the project tracks specs outside docs/prd.md + docs/trace-matrix.md (state so).
 - [ ] No leaked secrets: `node .github/hooks/secret-scan.mjs` PASS (no hardcoded creds/keys/`.env`).
 - [ ] Supply chain: lockfile committed, versions pinned, deps vetted (no typosquat / remote-script-to-shell).
 - [ ] Dependency audit clean (`npm audit` / `pip-audit`). Needs a lockfile: if missing, run

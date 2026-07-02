@@ -1,7 +1,7 @@
 # EOS Template — Engineering Operating System
 
 A portable, **local-first** engineering operating system for VS Code + GitHub Copilot,
-orchestrating the installed **BMAD** skills (73 `bmad-*`) across the full SDLC. Version: **eos-1.8.0**.
+orchestrating the installed **BMAD** skills (73 `bmad-*`) across the full SDLC. Version: **eos-1.9.0**.
 
 **Supports two paradigms in one framework:**
 - **Traditional SaaS** (deterministic): transactions, resilience (circuit-breaker/backoff), REST/OpenAPI, RBAC/multi-tenancy, OTel observability.
@@ -61,6 +61,7 @@ Per-stack setup presets (Node/Python/Go/Java/Rust/.NET + AI/LLM): [docs/eos/stac
 - No org/network dependencies: fully local & Git-portable.
 - Local CI runs via `act` (GitHub Actions locally, needs Docker) — `.github/workflows/eos-ci.yml`.
   No Docker? Run the same gate directly: `node .github/hooks/validate-config.mjs && node .github/hooks/eos-doctor.mjs`.
-- Hooks are a VS Code **Preview** feature; `.github/hooks/*.json` load by default.
+- Hooks are a VS Code **Preview** feature (official: config format/behavior may change) — `.github/hooks/*.json`
+  load by default via `chat.hookFilesLocations`. See `docs/eos/user-manual.md` §2.4 + 附录 D.
 - There is **no native rule priority** — control is via `applyTo` scope + conventions + hooks.
 
