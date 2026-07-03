@@ -1,12 +1,12 @@
-# C. NFR Checklist (fill: 目标值 / 不适用+理由)
-- [ ] 性能(后端): P95 延迟 ____ / 吞吐 ____
-- [ ] 前端性能预算/CWV(如有前端): LCP ____ (≤2.5s) / INP ____ (≤200ms) / CLS ____ (≤0.1) / JS 包体积 ____
-- [ ] 容量&扩展: 峰值 ____ / 增长 ____ / 横向扩展策略 ____
-- [ ] 可用性&容灾: SLO ____ / RTO ____ / RPO ____
-- [ ] 安全&合规: 认证 ____ / 加密 ____ / 数据分级 ____ / 合规制度(none|HIPAA|PCI-DSS|SOC2|SOX|GDPR|CCPA|PIPL) ____ / 见 `F-compliance.md` ____
-- [ ] 可观测性: 日志 ____ / 指标 ____ / 追踪 ____
-- [ ] 可维护性: 模块边界 ____ / ADR ____
-- [ ] 可访问性 a11y: 目标等级 ____ (WCAG 2.1 AA) / 对比度 ____ / 键盘可达 ____
-- [ ] 国际化(如适用): 时区(UTC 存储) ____ / 货币(最小单位/Decimal+ISO) ____ / 文案外部化 ____ / RTL ____
-- [ ] 多租户(如适用): 隔离级别(行/库/实例) ____ / 跨租户 deny 默认 ____
-- [ ] LLM/agentic（如适用）: 每请求成本/token 预算 ____ / 单次调用 P95 延迟 ____ / 质量阈值(eval 分) ____
+# C. NFR Checklist (fill: target value / not applicable + reason)
+- [ ] Performance (backend): P95 latency ____ / throughput ____
+- [ ] Frontend performance budget/CWV (if there is a frontend): LCP ____ (≤2.5s) / INP ____ (≤200ms) / CLS ____ (≤0.1) / JS bundle size ____
+- [ ] Capacity & scalability: peak ____ / growth ____ / horizontal scaling strategy ____
+- [ ] Availability & disaster recovery: SLO ____ / RTO ____ / RPO ____
+- [ ] Security & compliance: authentication ____ / encryption ____ / data classification ____ / compliance regime (none|HIPAA|PCI-DSS|SOC2|SOX|GDPR|CCPA|PIPL) ____ / see `F-compliance.md` ____
+- [ ] Observability: logs ____ / metrics ____ / tracing ____
+- [ ] Maintainability: module boundaries ____ / ADR ____
+- [ ] Accessibility a11y: target level ____ (WCAG 2.1 AA) / contrast ____ / keyboard accessible ____
+- [ ] Internationalization (if applicable): time zone (UTC storage) ____ / currency (minor units/Decimal+ISO) ____ / copy externalization ____ / RTL ____
+- [ ] Multi-tenancy (if applicable): isolation level (row/database/instance) ____ / cross-tenant deny by default ____
+- [ ] LLM/agentic (if applicable): per-request cost/token budget ____ / single-call P95 latency ____ / quality threshold (eval score) ____

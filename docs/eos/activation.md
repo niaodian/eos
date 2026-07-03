@@ -1,94 +1,116 @@
-# EOS 实例化后硬化 · 激活清单（Activation Ledger）
+# EOS Post-instantiation Hardening · Activation Ledger
 
-> **这是什么**：从模板实例化一个真实仓库后，有几件"一次性"的事**只有你的组织/GitHub 账户能做**，
-> 模板替不了（`【需组织/GitHub 设置】`）。做完它们，EOS 的 3 道 CI 硬门才从**"契约性存在"**变成
-> **"合并阻断的技术权威"**——这正是第三方审计里"拿不回的 9 分"中**你能拿回的部分**。
+> **What this is**: after you instantiate a real repo from the template, a few "one-time" things
+> **only your org/GitHub account can do** — the template can't do them for you (`【Needs org/GitHub setup】`).
+> Once they're done, EOS's 3 CI hard gates change from **"contractually present"** to
+> **"merge-blocking technical authority"** — which is exactly **the part you CAN win back** of the
+> "9 points you can't get back" from the third-party audit.
 >
-> **怎么用**：
-> - 想要引导式逐步执行 → 在 Copilot Chat 里跑 **`/eos-init`**（它会尽量替你改、改不了的打印确切步骤）。
-> - 想要完整原理与步骤 → 见 `docs/eos/user-manual.md` **附录 D**。
-> - 本文件是**可勾选的进度台账**：`eos-doctor` 每次运行都会读它并 advisory 提示还剩几项；
->   `/release-gate`（G8）发布前会再核一次——**这就是"系统性遗忘"的防线**。
+> **How to use it**:
+> - Want a guided, step-by-step run → run **`/eos-init`** in Copilot Chat (it changes what it can for you,
+>   and prints the exact steps for what it can't).
+> - Want the full rationale and steps → see **Appendix D** of `docs/eos/user-manual.md`.
+> - This file is a **checkable progress ledger**: every run of `eos-doctor` reads it and advisory-reminds you
+>   how many items remain; **`/release-gate` (G8)** re-checks it before you ship — **this is the defense against
+>   "systematic forgetting".**
 >
-> **勾选语法**（`eos-doctor` 按此解析，请勿改变行首格式）：
-> - `- [ ]` 未做（pending，会被持续提示）
-> - `- [x]` 已完成
-> - `- [~]` 有意豁免——**必须在同一行补上原因**，例如：`- [~] 分支保护 · 原因：个人试验仓，一次性 spike`
+> **Checkbox syntax** (`eos-doctor` parses this — do not change the line-start format):
+> - `- [ ]` not done (pending; will be reminded continuously)
+> - `- [x]` done
+> - `- [~]` intentionally waived — **you must add the reason on the same line**, e.g.:
+>   `- [~] Branch protection · Reason: personal spike repo, one-off`
 >
-> **模板自身**：以下项在**纯净模板里故意保持未勾选**（诚实自陈：模板确实还没硬化，也无法自开服务端保护）。
-> 你从模板实例化后，请按你的真实决定逐项勾掉或豁免。
+> **The template itself**: the items below are **deliberately left unchecked in the clean template** (honest
+> self-report: the template genuinely isn't hardened yet, and cannot open server-side protection for itself).
+> After you instantiate from it, check off or waive each item according to your real decisions.
 
 ---
 
-## 一、拿回"强制权威"轴（约 +4 分）——每个真实仓库都应做
+## 1. Win back the "enforcement authority" axis (~+4 points) — every real repo should do this
 
-- [ ] Branch protection: default branch 要求 PR + 必需检查 `verify` + Code Owner 评审
-  - **为什么**：没有它，CI 只是"绿灯建议"，任何写权限者（或获 `editFiles` 的 agent）可不评审直接合并——
-    审计判定"契约性而非技术权威"的根因，也是失分最大的一项。
-  - **步骤**：GitHub 仓库 → Settings → Branches → Add branch ruleset，对默认分支勾选 *Require a pull request
-    before merging* + *Require status checks to pass* → 选中 `verify`（`eos-ci.yml` 的 job）+ *Require review
-    from Code Owners*。（详见附录 D.1）
-  - **验证**：Settings → Branches 自查；或（可选，需 `gh` 登录）`gh api repos/:owner/:repo/branches/main/protection`
-    返回 200 而非 404。**本地/离线无法验证服务端状态——这是提醒，不是门禁。**
+- [ ] Branch protection: default branch requires a PR + the required check `verify` + Code Owner review
+  - **Why**: without it, CI is only a "green-light suggestion" — anyone with write access (or an agent granted
+    `editFiles`) can merge without review. This is the root cause the audit judged "contractual rather than
+    technical authority", and the single biggest point loss.
+  - **Steps**: GitHub repo → Settings → Branches → Add branch ruleset; for the default branch enable *Require a
+    pull request before merging* + *Require status checks to pass* → select `verify` (the `eos-ci.yml` job) +
+    *Require review from Code Owners*. (See Appendix D.1)
+  - **Verify**: self-check in Settings → Branches; or (optional, needs `gh` login)
+    `gh api repos/:owner/:repo/branches/main/protection` returns 200 rather than 404. **Local/offline cannot
+    verify server-side state — this is a reminder, not a gate.**
 
-- [ ] CODEOWNERS: 把 `.github/CODEOWNERS` 里的 `@niaodian` 全部换成你的团队 handle
-  - **为什么**：配合上面的 "Require review from Code Owners"，阻止任何人（含 agent）**免评审改动治理文件**
-    （instructions / agents / hooks / workflows / prompts 与 `docs/eos/`）。（审计 E1/H5）
-  - **步骤**：编辑 `.github/CODEOWNERS`，`@niaodian` → 例如 `@your-org/platform-team`（推荐团队而非个人，
-    避免单人休假阻塞评审）。（详见附录 D.2）
-  - **验证**：`grep -n '@niaodian' .github/CODEOWNERS` 应无输出。
+- [ ] CODEOWNERS: replace every `@niaodian` in `.github/CODEOWNERS` with your team handle
+  - **Why**: combined with "Require review from Code Owners" above, this stops anyone (including an agent) from
+    **changing governance files without review** (instructions / agents / hooks / workflows / prompts and
+    `docs/eos/`). (Audit E1/H5)
+  - **Steps**: edit `.github/CODEOWNERS`, `@niaodian` → e.g. `@your-org/platform-team` (prefer a team over an
+    individual, to avoid a single person's leave blocking review). (See Appendix D.2)
+  - **Verify**: `grep -n '@niaodian' .github/CODEOWNERS` should print nothing.
 
-- [ ] 审批基线: `cp .vscode/settings.json.example .vscode/settings.json`
-  - **为什么**：把安全的自动审批基线固定到本机——`chat.tools.global.autoApprove:false`（不开 /yolo）+
-    终端危险命令 denylist（与 `deny-dangerous.js` 纵深防御）。
-  - **步骤**：执行上面的 `cp`（活跃文件是 git-ignored，不会回流模板）。（详见附录 D.3）
-  - **验证**：`.vscode/settings.json` 存在且 `chat.tools.global.autoApprove` 为 `false`。
+- [ ] Approval baseline: `cp .vscode/settings.json.example .vscode/settings.json`
+  - **Why**: pins the safe auto-approval baseline to this machine — `chat.tools.global.autoApprove:false`
+    (no /yolo) + a terminal dangerous-command denylist (defense-in-depth with `deny-dangerous.js`).
+  - **Steps**: run the `cp` above (the active file is git-ignored, so it won't flow back to the template).
+    (See Appendix D.3)
+  - **Verify**: `.vscode/settings.json` exists and `chat.tools.global.autoApprove` is `false`.
 
-- [ ] 项目事实: 填 `.github/instructions/00-workspace.instructions.md`（技术栈 / 目录结构 / 约定）
-  - **为什么**：这是全局 always-on 上下文的锚点；填得准，Agent 的每一步输出都更稳、更少返工。
-  - **步骤**：把占位内容替换为你项目的真实栈与布局。（见 §3.3）
-  - **验证**：文件内不再含 `TODO` / `<替换` 一类占位符。
+- [ ] Project facts: fill in `.github/instructions/00-workspace.instructions.md` (tech stack / directory layout / conventions)
+  - **Why**: this is the anchor for global always-on context; fill it accurately and every step of the Agent's
+    output is steadier, with less rework.
+  - **Steps**: replace the placeholder content with your project's real stack and layout. (See §3.3)
+  - **Verify**: the file no longer contains placeholders like `TODO` / `<replace`.
 
-## 二、打开"组织合规"轴（约 +2 分）——仅**受监管**项目需要
+## 2. Open the "org-compliance" axis (~+2 points) — only **regulated** projects need this
 
-- [ ] （若受监管）合规边界: 跑 `/compliance` 产出 `docs/compliance-profile.md`，并确认组织标准
-  - **为什么**：profile-neutral 模板无法替你认证 HIPAA/PCI-DSS 等；一旦声明受监管 regime 且存在 LLM/agent，
-    `eos-doctor` 的 **D5（BLOCKER，deny-by-default）** 会要求先记录数据边界（BAA/DPA · 自托管 · 脱敏 · 排除受监管数据）。
-  - **须组织决策**（模板不代做，`【需组织标准】`）：批准的密钥库、CI runner 标准、模型 pin/注册策略、
-    制品完整性（SBOM / 签名 / SLSA）。（详见附录 D.4）
-  - **验证**：`docs/compliance-profile.md` 存在且首行 `**Regulatory regime:**` 已如实填写；`eos-doctor` 无 D5 ERROR。
-  - **不受监管**？→ 用豁免语法记为：`- [~] 合规档案 · 原因：本项目不处理受监管数据（无 PHI/PAN）`。
+- [ ] (If regulated) Compliance boundary: run `/compliance` to produce `docs/compliance-profile.md`, and confirm org standards
+  - **Why**: a profile-neutral template can't certify HIPAA/PCI-DSS etc. for you; once you declare a regulated
+    regime AND an LLM/agent is present, `eos-doctor`'s **D5 (BLOCKER, deny-by-default)** requires you to first
+    record the data boundary (BAA/DPA · self-host · redaction · excluding regulated data).
+  - **Requires org decisions** (the template won't make them, `【Needs org standard】`): approved secret store,
+    CI runner standard, model pin/registry policy, artifact integrity (SBOM / signing / SLSA). (See Appendix D.4)
+  - **Verify**: `docs/compliance-profile.md` exists and its first line `**Regulatory regime:**` is filled in
+    truthfully; `eos-doctor` shows no D5 ERROR.
+  - **Not regulated**? → record it with the waiver syntax:
+    `- [~] Compliance profile · Reason: this project handles no regulated data (no PHI/PAN)`.
 
 ---
 
-## 三、拿不回的分数（结构性上限 · 记录在此以示诚实）
+## 3. Points you can't get back (structural ceiling · recorded here for honesty)
 
-这些**不是**你能靠动作拿回的，它们是模板在 profile-neutral / local-first 前提下的固有上限，审计已如实披露：
+These are **not** recoverable by any action you take; they are the template's inherent ceiling under a
+profile-neutral / local-first premise, and the audit disclosed them faithfully:
 
-- **hooks 是 Preview · 逐机器 · 解析失败放行 · CI 不调用**——本地护栏是"减速带"非权威；权威已正确重定位到
-  CI 硬门 + 人工评审（见附录 D.4）。
-- **denylist 是有限枚举黑名单**——真正的地板是 `autoApprove:false`（deny-by-default），denylist 仅纵深防御。
-- **`bmad-*` 用户级未 pin**——跨机可复现性缺口，reuse-first 的固有成本（见附录 D.4）。
+- **Hooks are Preview · per-machine · fail-open on parse error · not invoked by CI** — local guardrails are a
+  "speed bump", not authority; authority is correctly relocated to the CI hard gates + human review
+  (see Appendix D.4).
+- **The denylist is a finite enumerated blacklist** — the real floor is `autoApprove:false` (deny-by-default);
+  the denylist is only defense-in-depth.
+- **`bmad-*` user-level, not pinned** — a cross-machine reproducibility gap, the inherent cost of reuse-first
+  (see Appendix D.4).
 
-### 小白版：上面这些到底可不可怕？（一句话人话）
+### Beginner version: are these things actually scary? (one-liner, in plain words)
 
-先记住结论：**这些不是 bug，是"纯本地 + 零依赖 + 官方还在预览的功能"这个前提的固有代价，而且每一条背后都有更硬的安全网兜着。**
+First, the conclusion: **these aren't bugs — they're the inherent cost of the "pure-local + zero-dependency +
+still-in-preview official features" premise, and each one has a harder safety net behind it.**
 
-| 你看到的说法 | 人话翻译 | 为什么不可怕 |
+| What you see | Plain-words translation | Why it isn't scary |
 |---|---|---|
-| hooks 是 Preview · 解析失败放行 | 门口那条"自动减速带"是测试版；遇到读不懂的输入会**抬杆放行**而不是把你锁死 | 它只是减速带、不是闸机——真正拦危险的是下面"安全网"的第 1/3/4 条 |
-| denylist 有限枚举、不完备 | 保安手里那张"危险命令名单"天然写不全（`shred`、`git clean -fdx` 等没列全） | 真正的地板是**默认任何命令都要你点一次同意**（`autoApprove:false`）；名单只是额外的自动帮手 |
-| quality 每次全量 | 每改一次文件就自动跑一次检查、偏慢（已从"含全套测试"瘦身为**只跑快检 `lint`+`typecheck`**） | 它**只提示、永不打断你**（恒 exit 0）；完整测试交给云端 CI 权威跑，正确性不受影响 |
-| `bmad-*` 未 pin | 你机器上装的 bmad 技能没锁版本，换台电脑可能版本不同 | 影响"跨机完全一致"，不影响单机正确运行；团队可在 `docs/` 里统一版本号 |
+| Hooks are Preview · fail-open on parse error | That "automatic speed bump" at the door is beta; on input it can't parse it **lifts the barrier and lets you through** rather than locking you out | It's only a speed bump, not a turnstile — what actually stops danger is items 1/3/4 of the "safety net" below |
+| Denylist is finite / incomplete | The guard's "dangerous-command list" is inherently incomplete (`shred`, `git clean -fdx`, etc. aren't all listed) | The real floor is that **by default every command needs one click of your approval** (`autoApprove:false`); the list is just an extra automatic helper |
+| quality runs in full every time | Every file edit auto-runs a check, a bit slow (already slimmed from "full test suite" to **just the fast checks `lint`+`typecheck`**) | It **only advises, never interrupts you** (always exit 0); the full test suite is run by the cloud CI authority, so correctness is unaffected |
+| `bmad-*` not pinned | The bmad skills installed on your machine aren't version-locked; another computer may have different versions | Affects "cross-machine identical", not single-machine correct operation; a team can standardize the version in `docs/` |
 
-**真正拦住危险的"安全网"（这才是你该记住的）：**
+**The real "safety net" that stops danger (this is what you should remember):**
 
-1. **默认人工审批**（`chat.tools.global.autoApprove:false`）——危险操作执行前会先弹出来问你一次。
-2. **CI 三道硬门**（`validate-config` / `eos-doctor` / `secret-scan`）——提交到 GitHub 后在云端强制跑，本地绕不过。
-3. **分支保护**（第一节 `/eos-init` 帮你开的那个）——让 CI 门从"绿灯建议"变成"不过就不许合并"。
-4. **人工代码评审**（CODEOWNERS）——治理文件的改动必须有人签字。
+1. **Default human approval** (`chat.tools.global.autoApprove:false`) — dangerous operations pop up and ask you once before executing.
+2. **CI's 3 hard gates** (`validate-config` / `eos-doctor` / `secret-scan`) — run enforced in the cloud after you push to GitHub; can't be bypassed locally.
+3. **Branch protection** (the one `/eos-init` helps you open in section 1) — turns the CI gates from "green-light suggestion" into "no merge unless it passes".
+4. **Human code review** (CODEOWNERS) — changes to governance files must be signed off by a person.
 
-> 记住这一句就够：**本地这几条是"减速带"，云端那四道才是"闸机"。** EOS 没有假装减速带是闸机——把"做不到的"如实写出来，正是它的设计诚实（也是审计给"诚实/披露层"打满分的原因）。
+> Remember just this: **the local items here are "speed bumps"; the four cloud ones are the "turnstiles".** EOS
+> doesn't pretend the speed bump is a turnstile — writing down "what it can't do" honestly is exactly its design
+> integrity (and why the audit gave full marks on the honesty/disclosure layer).
 
-> 一句话：**第一、二节做完，你就拿回了模板允许你拿回的全部分数**；第三节的上限取决于 local-first 架构本身，
-> 不因为哪个开发者"忘了做"而失分——它从设计上就被如实标注为"做不到"。
+> In one line: **finish sections 1 and 2 and you've won back every point the template lets you win back**; the
+> ceiling in section 3 depends on the local-first architecture itself, and isn't lost because some developer
+> "forgot to do it" — it's honestly labeled "can't do" by design.

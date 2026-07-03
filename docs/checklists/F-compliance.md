@@ -1,11 +1,11 @@
-# F. Regulatory Compliance Checklist (decision per item: 采纳 / 不适用+理由 / 延后+触发条件)
+# F. Regulatory Compliance Checklist (decision per item: adopt / not applicable + reason / defer + trigger condition)
 
 > Walk at **G2 (requirements)** and re-verify at **G8 (release)**. This gate forces *engineering*
 > decisions early so regulated constraints shape the architecture instead of triggering a rewrite later.
 >
 > **⚠ Not legal advice.** EOS is an engineering scaffold, not a compliance certification. It cannot
 > replace a compliance officer / legal counsel / auditor. Treat every ADOPT below as an engineering
-> commitment that still needs human sign-off. `【新建补强】`
+> commitment that still needs human sign-off. `【New-build】`
 
 ## Step 0 — Regime selection (do this first, at Discovery/Requirements)
 Tick every regime that applies, then record the result in `docs/compliance-profile.md`
@@ -19,7 +19,7 @@ Tick every regime that applies, then record the result in `docs/compliance-profi
 - [ ] **SOX** — financial reporting controls (public-company finance)
 - [ ] **GDPR** — EU personal data
 - [ ] **CCPA/CPRA** — California personal data
-- [ ] **PIPL / 个人信息保护法** — China personal information
+- [ ] **PIPL / Personal Information Protection Law** — China personal information
 - [ ] **other** (name it: ____; find the equivalent controls)
 
 ## Cross-cutting controls (any regulated regime)
@@ -34,7 +34,7 @@ Tick every regime that applies, then record the result in `docs/compliance-profi
 - [ ] **Incident / breach path**: who is notified, within what window, through which channel
 
 ## HIPAA pack (healthcare / PHI)
-> **详细控制→落点映射见配套附录 [`F-compliance-hipaa.md`](./F-compliance-hipaa.md)**（Security Rule 技术/管理/物理保障 + 最小必要 + 去标识 + 泄露通知 + 6 年留存，逐条对到 EOS 真实落点）。
+> **For detailed control → landing-point mapping, see companion appendix [`F-compliance-hipaa.md`](./F-compliance-hipaa.md)** (Security Rule technical/administrative/physical safeguards + minimum necessary + de-identification + breach notification + 6-year retention, mapped item-by-item to real EOS landing points).
 - [ ] PHI inventory + **minimum-necessary** access per role
 - [ ] **BAA with every subprocessor** (incl. cloud + any LLM/API) *before* PHI flows to it
 - [ ] Audit logs retained **≥ 6 years**; access to PHI is itself logged
@@ -42,11 +42,11 @@ Tick every regime that applies, then record the result in `docs/compliance-profi
 - [ ] **No PHI in third-party LLM prompts/logs without a BAA** (see Agentic data-boundary below)
 
 ## PCI-DSS pack (payment cards)
-> **详细 12 项要求→落点映射见配套附录 [`F-compliance-pci-dss.md`](./F-compliance-pci-dss.md)**（含 scope-reduction 战略 + Requirement 3 存储卡数据专表）。
+> **For detailed 12 requirements → landing-point mapping, see companion appendix [`F-compliance-pci-dss.md`](./F-compliance-pci-dss.md)** (includes scope-reduction strategy + dedicated Requirement 3 stored card data table).
 - [ ] **Never store PAN/CVV/track data**; use tokenization or a hosted-fields / payment-iframe provider
 - [ ] Scope minimization + network segmentation (keep card data out of general app/DB where possible)
 - [ ] **No card data in logs, telemetry, error reports, or analytics**
-- [ ] ASV scan / SAQ path identified as a *process* (external; not a local dependency) `【可选扩展·需外部机构】`
+- [ ] ASV scan / SAQ path identified as a *process* (external; not a local dependency) `【Optional · needs external body】`
 
 ## SOC 2 / SOX pack (finance / enterprise trust)
 - [ ] **Immutable audit trail** + change-management evidence (who changed what, approved by whom)
@@ -55,7 +55,7 @@ Tick every regime that applies, then record the result in `docs/compliance-profi
 - [ ] Named **control owner** per control (accountability, not just implementation)
 
 ## GDPR / CCPA / PIPL pack (privacy)
-> **详细控制→落点映射见配套附录 [`F-compliance-gdpr-pipl.md`](./F-compliance-gdpr-pipl.md)**（合法性/同意、DSAR 访问/删除/可携、跨境传输 SCCs vs PIPL 安全评估、ROPA/DPIA、72h 泄露通知，逐条对 EOS 落点；含 GDPR vs PIPL 差异表）。
+> **For detailed control → landing-point mapping, see companion appendix [`F-compliance-gdpr-pipl.md`](./F-compliance-gdpr-pipl.md)** (lawful basis/consent, DSAR access/erasure/portability, cross-border transfer SCCs vs PIPL security assessment, ROPA/DPIA, 72h breach notification, item-by-item to EOS landing points; includes GDPR vs PIPL differences table).
 - [ ] **Lawful basis / consent** captured and revocable; consent state is queryable
 - [ ] **DSAR**: access / erasure / portability request handling path exists
 - [ ] **Cross-border transfer** mechanism (SCCs / adequacy / localization) named

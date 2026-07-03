@@ -1,14 +1,14 @@
 # D. Operational Pre-Flight Checklist
-> decision per item: 采纳 / 不采纳+理由 / 延后+触发条件
-- [ ] 关键事件埋点 ↔ 成功指标闭合
-- [ ] 权限矩阵 (角色 × 资源 × 操作)
-- [ ] 审计范围
-- [ ] 回滚预案可执行
-- [ ] 灰度维度 + 回退阈值
-- [ ] 配额/限流阈值
-- [ ] 多租户隔离级别 (如适用)
-- [ ] i18n/多区域 (如适用)
-- [ ] 容量模型 + 告警阈值
-- [ ] 数据生命周期 (保留期/归档/删除；PII 的 GDPR 导出与删除)
-- [ ] 高可用/容灾 (冗余、故障转移、备份+恢复演练；按 SLO 需要)
-- [ ] Runbook 责任人/升级路径
+> decision per item: adopt / do not adopt + reason / defer + trigger condition
+- [ ] Key-event telemetry ↔ success metrics closed loop
+- [ ] Permission matrix (role × resource × operation)
+- [ ] Audit scope
+- [ ] Rollback plan is executable
+- [ ] Canary/gradual-rollout dimension + rollback threshold
+- [ ] Quota/rate-limit thresholds
+- [ ] Multi-tenant isolation level (if applicable)
+- [ ] i18n/multi-region (if applicable)
+- [ ] Capacity model + alert thresholds
+- [ ] Data lifecycle (retention period/archive/delete; GDPR export and deletion for PII)
+- [ ] High availability/disaster recovery (redundancy, failover, backup + restore drill; as required by SLO)
+- [ ] Runbook owner/escalation path

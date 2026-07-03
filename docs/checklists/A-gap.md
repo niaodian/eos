@@ -1,7 +1,7 @@
 # A. Requirement Gap Checklist
-- [ ] 问题陈述单句可证伪
-- [ ] 每条需求有可度量验收标准
-- [ ] 边界/异常/空态/并发已定义
-- [ ] 依赖与前置条件已列明
-- [ ] 明确 scope-out（不做什么）
-- [ ] 已排查与现有方案/能力重叠（避免重复造）
+- [ ] Problem statement is falsifiable in a single sentence
+- [ ] Every requirement has measurable acceptance criteria
+- [ ] Boundaries / exceptions / empty states / concurrency are defined
+- [ ] Dependencies and prerequisites are listed
+- [ ] scope-out is explicit (what will not be done)
+- [ ] Checked for overlap with existing solutions/capabilities (avoid rebuilding what already exists)

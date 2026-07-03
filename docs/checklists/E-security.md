@@ -1,4 +1,4 @@
-# E. Security & Secrets Checklist (decision per item: 采纳 / 不适用+理由 / 延后+触发条件)
+# E. Security & Secrets Checklist (decision per item: adopt / not applicable + reason / defer + trigger condition)
 
 > Walk at G2 (requirements) and re-verify at G8 (release). Supply-chain + secret hygiene.
 
@@ -17,7 +17,7 @@
 - [ ] Install scripts distrusted for unvetted packages (`--ignore-scripts` when auditing)
 - [ ] Dependency audit clean (`npm audit` / `pip-audit`); typosquat/new-maintainer check for critical deps
 - [ ] No `curl … | bash` / remote-script-to-shell in setup or CI
-- [ ] `【optional·maturity】` SBOM generated + artifacts/commits signed + provenance (regulated/enterprise delivery)
+- [ ] `【Optional · maturity】` SBOM generated + artifacts/commits signed + provenance (regulated/enterprise delivery)
 
 ## AuthZ & data
 - [ ] Deny-by-default authz on every state-changing operation
