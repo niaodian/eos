@@ -52,6 +52,6 @@ mark an item `[x]` unless it is actually done or verified.
    reasons), and what remains `[ ]` pending (and why the human still needs to do it). Remind them
    `/release-gate` (G8) re-checks this before shipping.
 
-> **Next:** with authority hardened, begin the lifecycle — `/discovery` (or `/requirements` if the problem
-> is already framed). The activation ledger stays in the repo; revisit it via `/eos-init` any time an item
-> changes.
+> **Next:** with authority hardened, begin the lifecycle — switch to the **eos-discovery** agent (or run
+> `/requirements` directly if the problem is already framed). The activation ledger stays in the repo;
+> revisit it via `/eos-init` any time an item changes.
