@@ -1070,6 +1070,8 @@ npm test                                            # 跑测试（质量门同�
 npm audit                                           # 发布前依赖审计
 
 # ── Copilot Chat（Agent 模式）──
+/eos-help                    # 迷路了？打印记忆卡 + 你在哪个阶段 + 下一步（只读，不改文件）
+/eos-init                    # 阶段0：一次性硬化（分支保护 + CODEOWNERS + 审批基线 → activation.md）
 （agent）eos-discovery        # 阶段1：问题定义        → G1
 /requirements "<feature>"    # 阶段2：需求+运营前置    → G2★
 /spec                        # 阶段3：PRD 真相源       → G3

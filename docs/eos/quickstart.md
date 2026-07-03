@@ -1,5 +1,8 @@
 # EOS Quickstart
 
+> **Lost at any point?** Run `/eos-help` in Copilot Chat — it detects which phase this repo is in,
+> prints the memory card, and tells you the exact next step (and any pending one-time hardening).
+
 ## Prerequisites (local-first — nothing enterprise required)
 | Tool | Needed for | If absent |
 |---|---|---|

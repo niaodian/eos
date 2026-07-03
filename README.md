@@ -15,7 +15,7 @@ The two are **explicitly isolated** so a project can be either — or both — w
   copilot-instructions.md       # R1 always-on global rules (minimal)
   instructions/                 # scoped rules (applyTo globs): 6 backend stacks + frontend + data-api
                                 #   + ai/llm + testing + security + release-ops
-  prompts/                      # slash-command workflows (/eos-init /requirements /spec /ux-spec /eval-spec
+  prompts/                      # slash-command workflows (/eos-help /eos-init /requirements /spec /ux-spec /eval-spec
                                 #   /spec-align /adr /nfr /telemetry-plan /release-gate /runbook /validate-config)
   agents/                       # 5 orchestrator agents (discovery/design/architecture/plan/review)
   skills/                       # project-level capabilities (operational-readiness)
