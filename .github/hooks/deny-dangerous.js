@@ -15,7 +15,7 @@ process.stdin.on('end', () => {
     /\brm\s+(-[a-z]*[rf]|--(?:recursive|force))/i, // rm -rf/-fr/-r/-f/-R (any order) + long flags
     /\bfind\b[^\n]*-delete/i,  // mass delete via find
     /DROP\s+TABLE/i,           // destructive SQL
-    /\bgit\s+push\b[^\n]*\s(-f|--force)(?![\w-])/, // force push (blocks --force/-f; ALLOWS the safer --force-with-lease)
+    /\bgit\s+push\b[^\n]*\s(-f|--force)(?![\w-])/i, // force push: blocks --force/-f, ALLOWS the safer --force-with-lease. /i unifies case with the rm rule + settings.json.example mirror. [round-3 nit]
     /\bgit\s+reset\s+--hard\b/, // discard local work
     /:\s*>\s*\//,              // truncate a root file
     /\bdd\s+if=/i,             // raw disk overwrite

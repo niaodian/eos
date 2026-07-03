@@ -1,7 +1,7 @@
 # EOS Template — Engineering Operating System
 
 A portable, **local-first** engineering operating system for VS Code + GitHub Copilot,
-orchestrating the installed **BMAD** skills (73 `bmad-*`) across the full SDLC. Version: **eos-1.9.1**.
+orchestrating the installed **BMAD** skills (73 `bmad-*`) across the full SDLC. Version: **eos-1.9.2**.
 
 **Supports two paradigms in one framework:**
 - **Traditional SaaS** (deterministic): transactions, resilience (circuit-breaker/backoff), REST/OpenAPI, RBAC/multi-tenancy, OTel observability.

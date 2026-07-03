@@ -39,6 +39,11 @@ jobs:
       - name: EOS spec-alignment (advisory — AC coverage / first-pass rate)
         run: node .github/hooks/spec-align.mjs
 
+      - name: EOS guardrail regression tests (deny-dangerous invariants)
+        # Enforces the fragile PreToolUse contract: --force-with-lease ALLOWED, rm long-flags/-R DENIED,
+        # benign not over-blocked. Zero-dep node:test, offline. [round-3 audit residual #9]
+        run: node --test .github/hooks/deny-dangerous.test.mjs
+
       - name: Quality gate + evals (only if the project has a package.json)
         shell: bash
         run: |
