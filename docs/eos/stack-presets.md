@@ -1,125 +1,126 @@
-# EOS Stack Presets（技术栈配方册）
+# EOS Stack Presets
 
-> 这是一份**参考文档，不带 frontmatter / `applyTo`，不会被 Copilot 自动加载** ——
-> 所以放再多栈也**不增加任何 always-on 上下文成本**。
+> A **reference doc with no frontmatter / `applyTo` — Copilot never auto-loads it**, so it adds
+> **zero always-on context cost** no matter how many stacks it lists.
 >
-> 配置新项目时：**只复制你用的那一个栈的块**（monorepo 可两个）到对应文件，别整本搬进 `00-workspace`。
+> When configuring a new project: **copy only the one block for the stack you use** (two for a monorepo)
+> into the right file — don't paste the whole thing into `00-workspace`.
 
-## 怎么用（3 步）
+## How to use (3 steps)
 
-1. 打开 `.github/instructions/00-workspace.instructions.md`，把 `## Local commands` 那一行换成下面你这个栈的成品行。
-2. 启用对应的 **R3 栈规则文件**（六大后端栈 Node/Python/Go/Java/Rust/.NET + 前端 React 均随模板发布，留着即可）。其余不用的栈规则文件是**惰性的**——只有当仓库里真有对应后缀文件时才生效，留着无害，想删也行。
-3.（可选）若用非 Node 栈又想让自动质量门禁生效，按下表替换 `.github/hooks/quality.json` 里 `PostToolUse` 的命令（现有那条是 Node 专用：探测 `npm`+`package.json`，非 Node 自动 no-op）。
+1. Open `.github/instructions/00-workspace.instructions.md` and replace the `## Local commands` line with the finished line for your stack below.
+2. Enable the matching **R3 stack-rule file** (all six backends — Node/Python/Go/Java/Rust/.NET — plus the React frontend ship with the template; just keep them). The unused stack-rule files are **lazy**: they only take effect when the repo actually contains files with the matching extension, so keeping them is harmless (delete them if you prefer).
+3. (Optional) If you use a non-Node stack and want the automatic quality gate to fire, replace the `PostToolUse` command in `.github/hooks/quality.json` per the table below (the shipped one is Node-only: it probes for `npm` + `package.json` and no-ops automatically on non-Node repos).
 
-> **互斥提醒**：每个 R3 文件的 `applyTo` glob 必须互不重叠（`**/*.ts` / `**/*.py` / `**/*.go` / `**/*.java` / `**/*.rs` / `**/*.cs` / `**/*.{tsx,jsx}`）。改完跑 `node .github/hooks/validate-config.mjs` 验 S3。
+> **Mutual-exclusion reminder**: every R3 file's `applyTo` glob must be non-overlapping (`**/*.ts` / `**/*.py` / `**/*.go` / `**/*.java` / `**/*.rs` / `**/*.cs` / `**/*.{tsx,jsx}`). After editing, run `node .github/hooks/validate-config.mjs` to check S3.
 
 ---
 
-## 速查表
+## Quick reference
 
-| 栈 | R3 文件（`applyTo`） | 随模板发布 |
+| Stack | R3 file (`applyTo`) | Ships with template |
 |---|---|---|
-| Node.js / TypeScript（默认） | `backend/10-backend-node`（`**/*.ts`） | ✅ |
-| Python（FastAPI/Django） | `backend/10-backend-python`（`**/*.py`） | ✅ |
-| Go | `backend/10-backend-go`（`**/*.go`） | ✅ |
-| Java / Spring Boot | `backend/10-backend-java`（`**/*.java`） | ✅ |
-| 前端 React | `frontend/10-frontend`（`**/*.{tsx,jsx}`） | ✅ |
-| Rust | `backend/10-backend-rust`（`**/*.rs`） | ✅ |
-| .NET / C# | `backend/10-backend-dotnet`（`**/*.cs`） | ✅ |
-| AI / LLM & Agentic | `ai/10-ai-llm`（`**/{ai,llm,rag}/**`，附加层） | ✅ |
+| Node.js / TypeScript (default) | `backend/10-backend-node` (`**/*.ts`) | ✅ |
+| Python (FastAPI/Django) | `backend/10-backend-python` (`**/*.py`) | ✅ |
+| Go | `backend/10-backend-go` (`**/*.go`) | ✅ |
+| Java / Spring Boot | `backend/10-backend-java` (`**/*.java`) | ✅ |
+| Frontend React | `frontend/10-frontend` (`**/*.{tsx,jsx}`) | ✅ |
+| Rust | `backend/10-backend-rust` (`**/*.rs`) | ✅ |
+| .NET / C# | `backend/10-backend-dotnet` (`**/*.cs`) | ✅ |
+| AI / LLM & Agentic | `ai/10-ai-llm` (`**/{ai,llm,rag}/**`, additive layer) | ✅ |
 
 ---
 
-## 每个栈的成品块
+## Finished block per stack
 
-### Node.js / TypeScript（默认）
+### Node.js / TypeScript (default)
 
-- **`00-workspace` Local commands**：
+- **`00-workspace` Local commands**:
   ```
   - Install: `npm ci` · Lint: `npm run lint` · Test: `npm test` · Typecheck: `npm run typecheck`.
   ```
-- **R3**：`backend/10-backend-node.instructions.md`（已发布，`**/*.ts`）。pnpm/yarn 同理换前缀。
-- **Layout**：`src/` · `test/`
-- **quality.json 内层命令**（默认即此）：`npm run -s lint --if-present && npm run -s typecheck --if-present && npm test --silent --if-present`
+- **R3**: `backend/10-backend-node.instructions.md` (shipped, `**/*.ts`). Same for pnpm/yarn — just swap the prefix.
+- **Layout**: `src/` · `test/`
+- **quality.json inner command** (this is the default): `npm run -s lint --if-present && npm run -s typecheck --if-present && npm test --silent --if-present`
 
-### Python（FastAPI/Django）
+### Python (FastAPI/Django)
 
-- **Local commands**：
+- **Local commands**:
   ```
   - Install: `pip install -r requirements.txt` · Lint: `ruff check .` · Test: `pytest` · Typecheck: `mypy .`.
   ```
-- **R3**：`backend/10-backend-python.instructions.md`（已发布，`**/*.py`）。变体：`uv sync` / `poetry install`。
-- **Layout**：`app/`（routers/services/repositories）· `tests/`
-- **quality.json 内层命令**：`ruff check . && mypy . && pytest -q`
+- **R3**: `backend/10-backend-python.instructions.md` (shipped, `**/*.py`). Variants: `uv sync` / `poetry install`.
+- **Layout**: `app/` (routers/services/repositories) · `tests/`
+- **quality.json inner command**: `ruff check . && mypy . && pytest -q`
 
 ### Go
 
-- **Local commands**：
+- **Local commands**:
   ```
   - Install: `go mod download` · Lint: `golangci-lint run` · Test: `go test ./...` · Typecheck: `go vet ./...`.
   ```
-- **R3**：`backend/10-backend-go.instructions.md`（已发布，`**/*.go`）
-- **Layout**：`cmd/` · `internal/` · `pkg/`
-- **quality.json 内层命令**：`golangci-lint run && go vet ./... && go test ./...`
+- **R3**: `backend/10-backend-go.instructions.md` (shipped, `**/*.go`)
+- **Layout**: `cmd/` · `internal/` · `pkg/`
+- **quality.json inner command**: `golangci-lint run && go vet ./... && go test ./...`
 
 ### Java / Spring Boot
 
-- **Local commands**（Maven）：
+- **Local commands** (Maven):
   ```
   - Install: `mvn -q dependency:go-offline` · Lint: `mvn -q spotless:check` · Test: `mvn -q test` · Build: `mvn -q compile`.
   ```
-  Gradle：`./gradlew dependencies` / `spotlessCheck` / `test` / `compileJava`
-- **R3**：`backend/10-backend-java.instructions.md`（已发布，`**/*.java`）
-- **Layout**：`src/main/java` · `src/test/java`
-- **quality.json 内层命令**：`mvn -q spotless:check && mvn -q test`
+  Gradle: `./gradlew dependencies` / `spotlessCheck` / `test` / `compileJava`
+- **R3**: `backend/10-backend-java.instructions.md` (shipped, `**/*.java`)
+- **Layout**: `src/main/java` · `src/test/java`
+- **quality.json inner command**: `mvn -q spotless:check && mvn -q test`
 
 ### Rust
 
-- **Local commands**：
+- **Local commands**:
   ```
   - Install: `cargo fetch` · Lint: `cargo clippy -- -D warnings` · Test: `cargo test` · Typecheck: `cargo check`.
   ```
-- **R3**：`backend/10-backend-rust.instructions.md`（已发布，`**/*.rs`）
-- **Layout**：`src/` · `tests/`
-- **quality.json 内层命令**：`cargo clippy -- -D warnings && cargo test`
+- **R3**: `backend/10-backend-rust.instructions.md` (shipped, `**/*.rs`)
+- **Layout**: `src/` · `tests/`
+- **quality.json inner command**: `cargo clippy -- -D warnings && cargo test`
 
 ### .NET / C#
 
-- **Local commands**：
+- **Local commands**:
   ```
   - Install: `dotnet restore` · Lint: `dotnet format --verify-no-changes` · Test: `dotnet test` · Build: `dotnet build`.
   ```
-- **R3**：`backend/10-backend-dotnet.instructions.md`（已发布，`**/*.cs`）
-- **Layout**：`src/` · `tests/`
-- **quality.json 内层命令**：`dotnet format --verify-no-changes && dotnet test`
+- **R3**: `backend/10-backend-dotnet.instructions.md` (shipped, `**/*.cs`)
+- **Layout**: `src/` · `tests/`
+- **quality.json inner command**: `dotnet format --verify-no-changes && dotnet test`
 
-### AI / LLM & Agentic（附加层，与后端栈叠加）
+### AI / LLM & Agentic (additive layer, stacks on top of a backend)
 
-> 这是**附加层**，不替代后端栈：LLM 产品通常是"Python 后端 + AI 层"。把 AI 代码放 `ai/`/`llm/`/`rag/` 目录,该目录文件同时吃后端栈规则 + 这条 AI 规则。
+> This is an **additive layer**, not a replacement for the backend stack: an LLM product is usually "Python backend + AI layer". Put AI code under `ai/`/`llm/`/`rag/`; files there pick up both the backend stack rule and this AI rule.
 
-- **Local commands**（在后端栈基础上加评估）：
+- **Local commands** (backend stack plus eval):
   ```
   - Install: `pip install -r requirements.txt` · Lint: `ruff check .` · Test: `pytest` · Eval: `pytest evals/ -q`.
   ```
-- **R3**：`ai/10-ai-llm.instructions.md`（已发布，`**/{ai,llm,rag}/**`）——prompt 即制品、tool/agent 架构、非确定性评估、可复现、LLM 安全、tracing/成本
-- **Layout**：`ai/`（agents/tools/chains）· `ai/prompts/`（版本化 prompt）· `evals/`（评估集+grader）
-- **常见依赖治理**（按需，pin 版本）：编排 LangChain / LlamaIndex；向量库 Chroma(本地)/ Pinecone·Qdrant·Weaviate(托管)；provider SDK OpenAI/Anthropic。**同步阻塞的 LLM 调用不得在 Web 请求线程内**——走异步队列(Celery/BullMQ)，见 `ai/10-ai-llm` 的 Execution model。
-- **配套门**：`/eval-spec` 产 `docs/eval-plan.md`（条件门 **G-EVAL**，非 LLM 功能 SKIP+理由）；C-nfr 加成本/token/延迟/质量阈值
-- **起步骨架**：拷 `docs/eos/examples/eval-starter/`（零依赖可跑的 dataset+graders+runner+stub），换掉 stub 即用
-- **quality.json 内层命令**：`ruff check . && pytest -q && pytest evals/ -q`
-  （Node 项目改用 `node --test evals/*.test.mjs`——须给显式 glob,裸 `evals/` 目录在 Node 23 会报错）
-- **CI**：`.github/workflows/eos-ci.yml`（`act push` 本地跑）会执行 evals + `eos-doctor`（G-EVAL 机器强制）,回归即失败
+- **R3**: `ai/10-ai-llm.instructions.md` (shipped, `**/{ai,llm,rag}/**`) — prompt-as-artifact, tool/agent architecture, non-deterministic evaluation, reproducibility, LLM safety, tracing/cost
+- **Layout**: `ai/` (agents/tools/chains) · `ai/prompts/` (versioned prompts) · `evals/` (eval sets + graders)
+- **Common dependency governance** (as needed, pin versions): orchestration LangChain / LlamaIndex; vector stores Chroma (local) / Pinecone·Qdrant·Weaviate (hosted); provider SDKs OpenAI/Anthropic. **A synchronous, blocking LLM call must never run inside a web request thread** — use an async queue (Celery/BullMQ); see the Execution model in `ai/10-ai-llm`.
+- **Companion gate**: `/eval-spec` produces `docs/eval-plan.md` (conditional gate **G-EVAL**; non-LLM features SKIP with a reason); C-nfr adds cost/token/latency/quality thresholds
+- **Starter skeleton**: copy `docs/eos/examples/eval-starter/` (a zero-dependency runnable dataset + graders + runner + stub) and swap the stub
+- **quality.json inner command**: `ruff check . && pytest -q && pytest evals/ -q`
+  (Node projects use `node --test evals/*.test.mjs` instead — pass an explicit glob; a bare `evals/` directory errors on Node 23)
+- **CI**: `.github/workflows/eos-ci.yml` (run locally with `act push`) executes evals + `eos-doctor` (G-EVAL machine-enforced), failing on regression
 
 ---
 
-## 前端并存（monorepo）
+## Frontend alongside a backend (monorepo)
 
-前端 React 规则 `frontend/10-frontend.instructions.md`（`**/*.{tsx,jsx}`）与任一后端规则天然互斥，可同仓共存。monorepo 里 `00-workspace` 的 `Local commands` 可写两行（前端 `npm` + 后端 `pytest`/`go test`），各自标注目录前缀。若前后端都是纯 `.ts`，把后端 glob 收窄到目录（如 `apps/api/**/*.ts`）以保持互斥——见 `backend/10-backend-node.instructions.md` 顶部 Scope note。
+The React frontend rule `frontend/10-frontend.instructions.md` (`**/*.{tsx,jsx}`) is naturally mutually exclusive with any backend rule, so they can coexist in one repo. In a monorepo, `00-workspace`'s `Local commands` can hold two lines (frontend `npm` + backend `pytest`/`go test`), each annotated with its directory prefix. If both frontend and backend are pure `.ts`, narrow the backend glob to a directory (e.g. `apps/api/**/*.ts`) to keep them exclusive — see the Scope note at the top of `backend/10-backend-node.instructions.md`.
 
-## 改完必跑
+## Run after editing
 
 ```sh
-node .github/hooks/validate-config.mjs   # 期望 PASS：S3 glob 互斥、S4 类型覆盖、S7 必需路径
+node .github/hooks/validate-config.mjs   # expect PASS: S3 glob exclusivity, S4 type coverage, S7 required paths
 ```
 
-> 新增/删除栈不动 EOS 骨架（agents / prompts / hooks / 治理流程都不变）——只换 `applyTo` 和正文。详见 user-manual 第 11 章。
+> Adding or removing a stack doesn't touch the EOS skeleton (agents / prompts / hooks / governance flow are all unchanged) — you only swap `applyTo` and the body text. See user-manual Chapter 11 for details.

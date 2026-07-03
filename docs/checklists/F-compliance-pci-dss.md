@@ -1,52 +1,59 @@
 # F-PCI. PCI-DSS control → EOS landing-point map
 
-> **配套附录**（companion to `F-compliance.md`）。金融/支付场景选中 PCI-DSS 后，逐条把 12 项要求映射到
-> EOS 里的**真实落点**（规则文件 / 门 / hook），或标为"项目自建"或"流程·外部机构"。首列 `☐` 打勾；
-> 未决的 🟢/🟡 项在 **G2 = BLOCKER**。
+> **Companion appendix** (companion to `F-compliance.md`). Once PCI-DSS is selected for a finance/payments
+> scenario, map each of the 12 requirements to a **real landing point** in EOS (rule file / gate / hook),
+> or mark it "project-built" or "process · external body". During walkthrough, tick `☐` in the first
+> column; unresolved 🟢/🟡 items are **G2 = BLOCKER**.
 >
-> **⚠ Not legal advice / not a QSA assessment.** EOS 帮你把控制**落到工程**，不替代 QSA 审计、SAQ、
-> ASV 扫描。要求按 **PCI-DSS v4.0** 的 12 项组织，具体子项以官方最新标准为准。`【新建补强】`
+> **⚠ Not legal advice / not a QSA assessment.** EOS helps you land controls **in engineering**; it does
+> not replace a QSA audit, SAQ, or ASV scan. Requirements are organized by the 12 items of
+> **PCI-DSS v4.0**; the authoritative sub-items are the latest official standard. `【New-build】`
 >
-> **Legend：** 🟢 EOS rule/gate exists ｜ 🟡 project must build ｜ ⚪ process / external（非代码）
+> **Legend (three landing-point tiers, honest grading):**
+> - 🟢 **EOS rule/gate exists** — a rule or gate you can use directly (real path provided)
+> - 🟡 **project must build** — engineering can implement it, but EOS has no dedicated rule (direction provided)
+> - ⚪ **process / external** — done by process or an external body, **non-code** (EOS can only remind)
 
-## ⭐ Scope reduction first（最省事、最安全的合规路径）
-> **不接触卡数据 = 不背大部分 PCI 负担。** 首选把 PAN 输入交给 **PCI-validated 支付服务商**的
-> hosted fields / iframe / redirect，让 PAN **不流经**你的前端/后端/DB → 落到最小的 **SAQ A**。
-> 自建卡数据存储（SAQ D）成本极高，除非有强理由，一律避免。
+## ⭐ Scope reduction first (the cheapest, safest compliance path)
+> **Not touching card data = not carrying most of the PCI burden.** Prefer handing PAN entry to a
+> **PCI-validated payment provider**'s hosted fields / iframe / redirect, so PAN **never flows through**
+> your frontend/backend/DB → landing on the smallest **SAQ A**.
+> Building your own card-data store (SAQ D) is extremely expensive — avoid it unless you have a strong reason.
 
 | ✔ | Strategy | Landing point |
 |---|---|---|
-| ☐ | Use hosted fields / iframe / redirect（PAN 不进你的系统） | 🟡 project payment integration + 🟢 `frontend` "no secrets/sensitive in client bundle" |
-| ☐ | Tokenization（用 token 代替 PAN 做后续业务） | 🟡 project + 🟢 `data-api` "never store raw sensitive; surrogate keys" |
+| ☐ | Use hosted fields / iframe / redirect (PAN never enters your system) | 🟡 project payment integration + 🟢 `frontend` "no secrets/sensitive in client bundle" |
+| ☐ | Tokenization (use a token instead of the PAN for downstream business) | 🟡 project + 🟢 `data-api` "never store raw sensitive; surrogate keys" |
 | ☐ | Record chosen SAQ type + CDE boundary | 🟢 `docs/compliance-profile.md` (via `/compliance`) |
 
 ## The 12 requirements (v4.0)
 | ✔ | Req | Requirement | Landing point |
 |---|---|---|---|
-| ☐ | 1 | Network security controls（防火墙/网络分段，隔离 CDE） | ⚪ infra/network + 🟡 project segmentation |
-| ☐ | 2 | Secure configurations（禁用厂商默认值/弱配置） | 🟢 `release-ops` "reproducible & pinned builds" · `security` config isolation per env |
-| ☐ | **3** | **Protect stored account data** — 见下方专表（PCI 工程核心） | 🟢🟡 见 §Requirement 3 |
-| ☐ | 4 | Strong cryptography in transit（开放网络传输用 TLS） | 🟢 `security` "encrypt … in transit" |
+| ☐ | 1 | Network security controls (firewall/segmentation, isolate the CDE) | ⚪ infra/network + 🟡 project segmentation |
+| ☐ | 2 | Secure configurations (disable vendor defaults/weak config) | 🟢 `release-ops` "reproducible & pinned builds" · `security` config isolation per env |
+| ☐ | **3** | **Protect stored account data** — see the dedicated table below (the PCI engineering core) | 🟢🟡 see §Requirement 3 |
+| ☐ | 4 | Strong cryptography in transit (TLS over open networks) | 🟢 `security` "encrypt … in transit" |
 | ☐ | 5 | Protect against malware | ⚪ infra/endpoint — non-code |
-| ☐ | 6 | Secure systems & software（安全 SDLC、补丁、漏洞管理、变更控制） | 🟢 `E-security` supply-chain（lockfile/pin/`npm ci`/audit）· `eos-ci.yml` `npm audit`/`pip-audit` · `testing` rule · code-review G6 |
-| ☐ | 7 | Restrict access by business need-to-know | 🟢 `security` deny-by-default authz · `data-api` tenant-scoping/RLS · `D-ops` 权限矩阵 |
-| ☐ | 8 | Identify & authenticate（唯一 ID + **MFA**） | 🟡 project authN (MFA) + 🟢 `security` least-privilege creds, key rotation |
+| ☐ | 6 | Secure systems & software (secure SDLC, patching, vulnerability management, change control) | 🟢 `E-security` supply-chain (lockfile/pin/`npm ci`/audit) · `eos-ci.yml` `npm audit`/`pip-audit` · `testing` rule · code-review G6 |
+| ☐ | 7 | Restrict access by business need-to-know | 🟢 `security` deny-by-default authz · `data-api` tenant-scoping/RLS · `D-ops` permission matrix |
+| ☐ | 8 | Identify & authenticate (unique ID + **MFA**) | 🟡 project authN (MFA) + 🟢 `security` least-privilege creds, key rotation |
 | ☐ | 9 | Restrict physical access | ⚪ cloud provider / facility — non-code |
-| ☐ | 10 | Log & monitor all access（审计日志，**保留 ≥12 个月**，≥3 个月即时可查） | 🟢 `backend/*` structured logs + request id, "No PII/card data" · 🟡 project log-retention (≥12m) · `/telemetry-plan` |
-| ☐ | 11 | Test security regularly（**季度 ASV 外部扫描**、渗透测试、变更检测） | ⚪ external ASV/pentest `【可选扩展·需外部机构】` + 🟢 `secret-scan.mjs`/`gitleaks` as a partial local aid |
-| ☐ | 12 | Organizational security policy（风险评估、意识培训、事件响应） | ⚪ process + 🟢 incident/rollback in `/runbook` |
+| ☐ | 10 | Log & monitor all access (audit logs, **retain ≥12 months**, ≥3 months instantly queryable) | 🟢 `backend/*` structured logs + request id, "No PII/card data" · 🟡 project log-retention (≥12m) · `/telemetry-plan` |
+| ☐ | 11 | Test security regularly (**quarterly ASV external scan**, penetration testing, change detection) | ⚪ external ASV/pentest `【Optional · needs external body】` + 🟢 `secret-scan.mjs`/`gitleaks` as a partial local aid |
+| ☐ | 12 | Organizational security policy (risk assessment, awareness training, incident response) | ⚪ process + 🟢 incident/rollback in `/runbook` |
 
-## Requirement 3 — Protect stored account data（**最容易踩雷，单列**）
+## Requirement 3 — Protect stored account data (**easiest to trip on, broken out**)
 | ✔ | Control | Requirement | Landing point |
 |---|---|---|---|
-| ☐ | **SAD never stored after auth** | 授权后**禁止存储** CVV/CVC2/CVV2/CID、完整磁道、PIN——**即使加密也不行** | 🟢 `E-security` "no secret in code/logs/fixtures" · `secret-scan.mjs` · 🟡 project: 断言不落库/不落日志 |
-| ☐ | **PAN rendered unreadable** | 存储的 PAN 必须不可读：truncation / tokenization / hashing / strong crypto | 🟢 `security` encrypt-at-rest · `data-api` "no raw sensitive; surrogate keys" · 🟡 project tokenization |
-| ☐ | **Mask PAN on display** | 展示时最多首6末4，其余遮蔽 | 🟡 project display masking + 🟢 `frontend` explicit states / no sensitive in bundle |
-| ☐ | **No card data in logs/telemetry/errors** | 卡数据不得进日志、埋点、错误上报、分析 | 🟢 `backend/*` "No PII in logs" · `ai/llm` "redact before provider" · `secret-scan.mjs` |
-| ☐ | Key management | 加密密钥的存储/轮换/最小权限，密钥与数据分离 | 🟢 `security` "secrets via env/secret store; rotate keys" · 🟡 infra KMS |
+| ☐ | **SAD never stored after auth** | after authorization, **never store** CVV/CVC2/CVV2/CID, full track, or PIN — **not even encrypted** | 🟢 `E-security` "no secret in code/logs/fixtures" · `secret-scan.mjs` · 🟡 project: assert not persisted / not logged |
+| ☐ | **PAN rendered unreadable** | stored PAN must be unreadable: truncation / tokenization / hashing / strong crypto | 🟢 `security` encrypt-at-rest · `data-api` "no raw sensitive; surrogate keys" · 🟡 project tokenization |
+| ☐ | **Mask PAN on display** | on display show at most first-6/last-4, mask the rest | 🟡 project display masking + 🟢 `frontend` explicit states / no sensitive in bundle |
+| ☐ | **No card data in logs/telemetry/errors** | card data must not enter logs, telemetry, error reports, or analytics | 🟢 `backend/*` "No PII in logs" · `ai/llm` "redact before provider" · `secret-scan.mjs` |
+| ☐ | Key management | storage/rotation/least-privilege for encryption keys; keep keys separate from data | 🟢 `security` "secrets via env/secret store; rotate keys" · 🟡 infra KMS |
 
 ---
-**Agentic 特别提醒**：卡数据/PAN 送第三方 LLM 通常**违反 PCI**——走 `F-compliance.md` 的
-*Agentic data-boundary*（自托管 · 脱敏/令牌化网关 · 排除卡数据；BAA/DPA 不改变 PCI 的 SAD 禁存红线）。
-`eos-doctor` **D5** 会在"声明 PCI-DSS + 有 LLM 代码 + 无边界决策"时 WARN。任何未决 🟢/🟡 项在
-**G2 = BLOCKER**，G8 由 `/release-gate` 复验。
+**Agentic note**: sending card data/PAN to a third-party LLM usually **violates PCI** — follow the
+*Agentic data-boundary* in `F-compliance.md` (self-hosted · redaction/tokenization gateway · exclude card
+data; a BAA/DPA does not change PCI's hard "never store SAD" line). `eos-doctor` **D5** WARNs when
+"PCI-DSS declared + LLM code present + no boundary decision". Any unresolved 🟢/🟡 item is a
+**G2 = BLOCKER**, re-verified at G8 by `/release-gate`.
