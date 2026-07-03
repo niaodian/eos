@@ -1,0 +1,71 @@
+name: Bug report
+description: Something in the EOS template (hooks, validators, prompts, agents, rules, or docs) behaves incorrectly.
+title: "bug: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve EOS. This is a **local-first** template — please include enough
+        detail to reproduce offline. Do **not** paste secrets, tokens, or PII.
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Pre-flight
+      options:
+        - label: I searched existing issues and this is not a duplicate.
+          required: true
+        - label: "I ran `node .github/hooks/validate-config.mjs` and included any relevant output."
+          required: false
+        - label: This is not a security vulnerability (those go through SECURITY.md, privately).
+          required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected area
+      options:
+        - "hooks / validators (.github/hooks/*)"
+        - "prompts (slash commands, .github/prompts/*)"
+        - "agents (orchestrators, .github/agents/*)"
+        - "instructions / rules (.github/instructions/*)"
+        - "docs (docs/eos/*, README)"
+        - "CI workflow (.github/workflows/*)"
+        - "other / not sure"
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you expect, and what actually happened?
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Exact commands or Copilot Chat actions. Include the command output if a hook/validator failed.
+      render: shell
+    validations:
+      required: true
+  - type: input
+    id: eos-version
+    attributes:
+      label: EOS version
+      description: "See docs/eos/VERSION or the version line in README.md (e.g. eos-1.10.0)."
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options: ["macOS", "Linux", "Windows (native)", "Windows (WSL)"]
+    validations:
+      required: true
+  - type: input
+    id: node-version
+    attributes:
+      label: Node.js version
+      description: "Output of `node --version` (Node 18+ is the only hard dependency)."
+    validations:
+      required: true
