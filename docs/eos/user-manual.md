@@ -1,6 +1,6 @@
 # EOS 用户手册（Engineering Operating System User Manual）
 
-> 版本：与 `docs/eos/VERSION` 同步（当前 `eos-1.9.2`）
+> 版本：与 `docs/eos/VERSION` 同步（当前 `eos-1.10.0`）
 > 适用：较新版本的 VS Code + GitHub Copilot Chat（自定义 agent / hooks 属近版能力，用「关于 VS Code」面板确认版本）+ 已安装 73 个 `bmad-*` skill（用户级）
 > 定位：本手册是**操作指南（怎么用）**；设计原理与取舍见同目录 `blueprint.md`（为什么这么设计）。
 > 约定：正文中文；文件名/路径/命令/配置键保留英文原文。
@@ -187,6 +187,8 @@ node .github/hooks/validate-config.mjs
 # 关键：从项目目录内执行 `code .`，让 my-new-app 成为工作区根（含 .github/）。
 # 不要打开它的父目录，否则自定义 agent / instructions / hooks 都不会被发现。
 code .
+# 一次性硬化（让 CI 门具备"合并阻断"权威）：在 Copilot Chat 里跑 /eos-init，
+# 按引导逐项勾掉 docs/eos/activation.md（分支保护 + CODEOWNERS + 审批基线；详见附录 D）。
 ```
 
 ---
@@ -294,6 +296,7 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 | **门** | `node .github/hooks/validate-config.mjs` → **PASS** |
 | **必查** | PASS 0 errors。**栈未定则先别改** `00-workspace`——保留 Node 占位即可；栈是不可逆决策，权威锁定在**阶段 4（ADR）**。已知栈可即抄 `docs/eos/stack-presets.md`（快路径）。 |
 | **打开方式** | 从 `my-app/` 内执行 `code .`——让**项目本身**成为工作区根。打开父目录会导致 agent/instructions/hooks 全部不生效（见 7.2）。 |
+| **★ 硬化（一次性）** | 跑 `/eos-init`：引导你开分支保护（runbook）+ 替换 CODEOWNERS handle + 固定审批基线，进度记入 `docs/eos/activation.md`。**这一步决定 CI 门是否真能阻断合并**（详见附录 D）；`eos-doctor` 每次会提示还剩几项，`/release-gate` 发布前再核一次——避免"系统性遗忘"。个人试验仓可逐项豁免（`[~] … 原因：…`）。 |
 | **样例** | `my-app/` 全树（44 文件，validate PASS） |
 
 ---
@@ -526,6 +529,8 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 | 10 Iteration | `（agent）eos-review` | 变更提案 + 回写 PRD | G10 | ⟲ `/requirements`（下一轮） |
 
 > **不跳阶段**：每个 EOS 命令/agent 跑完都会提示"→ 下一步"（prompt 末尾的 **Next** 面包屑 + agent 的 **handoff** 按钮）。阶段 6/7 是纯 BMAD skill，`eos-plan` 的 "Start Development" handoff 已把下游尾链（dev→review G6→test G7→release G8）一次性交代给 agent，跑完不断线。
+
+> **一次性硬化（阶段 0，别忘）**：`/eos-init` 把 CI 门从"契约性存在"变"合并阻断权威"（分支保护 + CODEOWNERS + 审批基线），进度记在 `docs/eos/activation.md`；`eos-doctor` **每次运行**都会 advisory 提示剩余项，`/release-gate`（G8）发布前再核一次——这就是防"系统性遗忘"的三重提示。
 
 ---
 
@@ -1049,6 +1054,9 @@ EOS 的栈规则是**可插拔**的。新增一个栈 = 加一个 `*.instruction
 | NFR | 非功能需求（性能/容量/容灾/安全/可观测…） |
 | trace 矩阵 | AC ↔ 测试的映射表，确保无漏测 |
 | Hook | `.github/hooks/` 下的生命周期事件脚本（Preview） |
+| 契约性 vs 技术权威 | CI 门"存在"是契约性；只有下游开启**服务端分支保护**要求 `verify` 通过，才变成"合并阻断"的技术权威 |
+| activation（实例化后硬化） | 从模板实例化后的一次性动作（分支保护 + CODEOWNERS + 审批基线 [+ 受监管则合规档案]）；台账 `docs/eos/activation.md`，引导 `/eos-init`，详解附录 D |
+| keystone | 让门禁具备权威的"拱心石"：CODEOWNERS + settings 基线随仓提供，服务端分支保护由下游启用 |
 
 ---
 
@@ -1116,6 +1124,10 @@ echo '{"tool_input":{"command":"rm -rf /tmp/x"}}' | node .github/hooks/deny-dang
 > secret-scan）与 hooks 本身**存在，但要变成"合并阻断权威"，取决于你在 GitHub 服务端补齐分支保护**。
 > 模板无法替你的组织做这些服务端决定（`【需组织/GitHub 设置】`），但下面是一次性的确切步骤。
 > 这直接回应第三方审计的 keystone 项（T1）："先让门具备权威，其余软门/自改风险才有意义去堵。"
+
+> **进度追踪**：本附录是"完整步骤（怎么做）"；随仓的 `docs/eos/activation.md` 是"可勾选台账（做到哪了）"，
+> 被 `eos-doctor` 每次 advisory 提示、被 `/release-gate`（G8）发布前再核。引导式执行用 **`/eos-init`**——
+> 它会替你做本地能做的（换 handle、拷基线），并把服务端分支保护的确切步骤打印给你（模板无法代开）。
 
 ## D.1 让 3 道 CI 硬门成为"必需检查" `【需组织/GitHub 设置】`
 

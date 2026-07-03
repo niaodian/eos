@@ -32,6 +32,7 @@ const required = [
   '.github/agents',
   '.github/hooks',
   'docs/eos/agent-map.md',
+  'docs/eos/activation.md',
 ];
 for (const p of required) {
   if (!existsSync(join(root, p))) errors.push(`S7 missing required path: ${p}`);
@@ -150,6 +151,8 @@ console.log('');
 // at the OPENED workspace root. Opening a PARENT folder makes all of them silently inactive.
 console.log('  NOTE  In VS Code, open THIS folder as the workspace root (File > Open Folder > select it).');
 console.log('        If you open a parent folder, custom agents/instructions/hooks are NOT discovered.');
+console.log('  NOTE  One-time: run /eos-init to make the CI gates merge-blocking (branch protection +');
+console.log('        CODEOWNERS + approval baseline). Progress is tracked in docs/eos/activation.md.');
 console.log('');
 if (errors.length) {
   console.log(`FAIL: ${errors.length} error(s), ${warns.length} warning(s)`);

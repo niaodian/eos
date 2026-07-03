@@ -1,7 +1,7 @@
 # EOS Template — Engineering Operating System
 
 A portable, **local-first** engineering operating system for VS Code + GitHub Copilot,
-orchestrating the installed **BMAD** skills (73 `bmad-*`) across the full SDLC. Version: **eos-1.9.2**.
+orchestrating the installed **BMAD** skills (73 `bmad-*`) across the full SDLC. Version: **eos-1.10.0**.
 
 **Supports two paradigms in one framework:**
 - **Traditional SaaS** (deterministic): transactions, resilience (circuit-breaker/backoff), REST/OpenAPI, RBAC/multi-tenancy, OTel observability.
@@ -15,7 +15,7 @@ The two are **explicitly isolated** so a project can be either — or both — w
   copilot-instructions.md       # R1 always-on global rules (minimal)
   instructions/                 # scoped rules (applyTo globs): 6 backend stacks + frontend + data-api
                                 #   + ai/llm + testing + security + release-ops
-  prompts/                      # slash-command workflows (/requirements /spec /ux-spec /eval-spec
+  prompts/                      # slash-command workflows (/eos-init /requirements /spec /ux-spec /eval-spec
                                 #   /spec-align /adr /nfr /telemetry-plan /release-gate /runbook /validate-config)
   agents/                       # 5 orchestrator agents (discovery/design/architecture/plan/review)
   skills/                       # project-level capabilities (operational-readiness)
@@ -45,6 +45,12 @@ See [docs/eos/quickstart.md](docs/eos/quickstart.md) (Prerequisites + Day-1). Fi
 ```
 node .github/hooks/validate-config.mjs    # expect PASS
 ```
+
+> **One-time hardening (makes the CI gates actually merge-blocking, not just advisory):** after you
+> instantiate a real repo, run `/eos-init` in Copilot Chat. It walks you through branch protection +
+> replacing the CODEOWNERS handle + the approval baseline, and tracks progress in
+> [docs/eos/activation.md](docs/eos/activation.md). `eos-doctor` reminds you of anything still pending
+> on every run, and `/release-gate` re-checks it before you ship — so it can't be systematically forgotten.
 
 > **Open the project folder itself as the workspace root** (`code .` from inside it). VS Code discovers
 > `.github/{agents,instructions,hooks,prompts}` only at the opened root — open a **parent** folder and the

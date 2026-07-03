@@ -124,8 +124,35 @@ if (regimeText.trim() && REGULATED.test(regimeText) && llmPresent) {
   }
 }
 
+// --- A0 Activation surface (ADVISORY — never fails CI) ---
+// EOS's CI gates are AUTHORITATIVE only once the downstream repo enables SERVER-SIDE branch protection,
+// and the org-compliance axis only opens once an approved profile is installed. Neither can be verified
+// locally (no network / no org backend), so this is an honest REMINDER, not a gate. It reads the tracked
+// ledger docs/eos/activation.md and reports how many one-time hardening items are still pending. This is
+// the "impossible to systematically forget" surface: it prints every run and in CI, yet never blocks.
+const activationOut = [];
+const ledgerPath = join(root, 'docs/eos/activation.md');
+if (!existsSync(ledgerPath)) {
+  activationOut.push('  ACTIVATION  docs/eos/activation.md not found — run /eos-init to set up enforcement authority (branch protection · CODEOWNERS · approval baseline).');
+} else {
+  const pending = [];
+  for (const ln of readFileSync(ledgerPath, 'utf8').split('\n')) {
+    const m = ln.match(/^\s*-\s*\[( |x|X|~)\]\s+(.*\S)/);
+    if (m && m[1] === ' ') pending.push(m[2].trim());
+  }
+  if (pending.length) {
+    activationOut.push(`  ACTIVATION  enforcement authority = CONTRACTUAL: ${pending.length} one-time hardening item(s) pending (advisory — local checks can't verify server-side branch protection):`);
+    for (const p of pending) activationOut.push('              \u25B8 ' + p);
+    activationOut.push('              \u2192 run /eos-init, or see docs/eos/activation.md \u00B7 \u9644\u5F55 D. Mark [x] done or [~] waived-with-reason to clear.');
+  } else {
+    activationOut.push('  ACTIVATION  enforcement authority attested \u2713 (docs/eos/activation.md \u2014 0 pending).');
+  }
+}
+
 // --- Report (same shape as validate-config.mjs) ---
 console.log('EOS SDLC gate doctor\n');
+for (const line of activationOut) console.log(line);
+if (activationOut.length) console.log('');
 for (const w of warns) console.log('  WARN  ' + w);
 for (const e of errors) console.log('  ERROR ' + e);
 console.log('');

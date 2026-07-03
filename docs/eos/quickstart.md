@@ -21,11 +21,14 @@
 ## Day-1 (from clone to first spec)
 1. Open this folder in VS Code.
 2. Validate config: `node .github/hooks/validate-config.mjs` (expect PASS).
-3. In Copilot Chat (Agent mode):
+3. **One-time harden** (turns the CI gates from advisory into merge-blocking): run `/eos-init` in Copilot
+   Chat — it walks you through branch protection + CODEOWNERS + approval baseline, tracked in
+   `docs/eos/activation.md`. Personal/throwaway repo? Waive items with a reason; `eos-doctor` keeps score.
+4. In Copilot Chat (Agent mode):
    - Switch to the **eos-discovery** agent → produces `docs/discovery.md`.
    - Run `/requirements "<feature>"` → `docs/requirements.md` + operational decision table (Gate G2).
    - Run `/spec` → `docs/prd.md` (reuses bmad-create-prd, validated by bmad-validate-prd).
-4. Commit.
+5. Commit.
 
 > First time: set project facts in `.github/instructions/00-workspace.instructions.md` —
 > copy your stack's preset from `docs/eos/stack-presets.md` (Node/Python/Go/Java/Rust/.NET).
@@ -40,6 +43,7 @@ Then follow handoffs: → /spec → /ux-spec (user-facing) → (agent) eos-archi
 ```
 New feature:   /requirements "<feature>" → /spec → /ux-spec → (agent) eos-architecture
                                           → (handoff) eos-plan → bmad-dev-story → bmad-code-review
+One-time harden: /eos-init   (branch protection + CODEOWNERS + approval baseline → docs/eos/activation.md)
 Before release: /release-gate
 Self-check:     node .github/hooks/validate-config.mjs
 Local CI:       act push -j verify   (validate-config + eos-doctor + tests + evals; needs Docker)
