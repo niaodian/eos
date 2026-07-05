@@ -21,6 +21,25 @@
 - `npm audit` (a G8 item) needs a lockfile — run `npm i --package-lock-only` first; offline it may
   defer (re-run when online), never a hard local blocker.
 
+### Windows
+EOS runs **natively on Windows** (PowerShell or Command Prompt) — WSL/Git-Bash is *not* needed for the
+core flow (hooks, validators, tests are all Node, and paths are normalized cross-platform):
+- **Install Node.js**: from [nodejs.org](https://nodejs.org), or a package manager
+  (`winget install OpenJS.NodeJS.LTS` / `choco install nodejs-lts`).
+- **Command chaining**: the `&&` and `\` line-continuation shown above are POSIX. **PowerShell 7+** and
+  **Command Prompt** support `&&`; **Windows PowerShell 5.1** does not — just run each command on its
+  own line:
+  ```
+  node .github/hooks/validate-config.mjs
+  node .github/hooks/eos-doctor.mjs
+  ```
+- **Line endings**: the repo ships a `.gitattributes` that forces **LF**, so hooks/scripts stay valid
+  after a Windows checkout. Leave `core.autocrlf` unset (don't re-mangle them to CRLF).
+- **`act`** (local CI) needs **Docker Desktop** (WSL2 backend); otherwise use the direct `node ...`
+  commands above — they are the same gate.
+- **`build-pdf.sh`** (optional manual→PDF) is a Bash script — run it from **Git-Bash or WSL**, or just
+  read `docs/eos/user-manual.md` directly.
+
 ## Day-1 (from clone to first spec)
 1. Open this folder in VS Code.
 2. Validate config: `node .github/hooks/validate-config.mjs` (expect PASS).

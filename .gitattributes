@@ -1,0 +1,28 @@
+# EOS is a local-first, cross-platform template. Force LF everywhere so hooks, shell
+# scripts, and configs behave identically on macOS, Linux, and native Windows — a CRLF
+# checkout breaks `*.sh` shebang parsing and can skew line-based hook/regex logic.
+# The repo is authored all-LF; this keeps it that way regardless of a contributor's
+# `core.autocrlf` setting. Binary types below are never line-ending-normalized.
+
+# Text: normalize to LF in the repo AND on checkout (every OS).
+* text=auto eol=lf
+
+# Operational scripts that MUST stay LF (belt-and-suspenders over the rule above).
+*.sh    text eol=lf
+*.mjs   text eol=lf
+*.js    text eol=lf
+
+# Binary assets — leave bytes untouched (future-proofing; none tracked yet).
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.webp  binary
+*.ico   binary
+*.pdf   binary
+*.woff  binary
+*.woff2 binary
+*.ttf   binary
+*.otf   binary
+*.zip   binary
+*.gz    binary

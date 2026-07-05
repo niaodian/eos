@@ -1,0 +1,18 @@
+# EOS cross-platform editor defaults (complements .gitattributes). https://editorconfig.org
+# Focused on the cross-platform essentials (LF, UTF-8, final newline); indent width is
+# left to each language's formatter to avoid fighting gofmt / language conventions.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.md]
+# Markdown uses two trailing spaces for hard line breaks — keep them.
+trim_trailing_whitespace = false
+
+[*.go]
+# Go is tab-indented (gofmt); don't let a global space rule mangle it.
+indent_style = tab
