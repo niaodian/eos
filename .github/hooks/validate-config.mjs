@@ -89,6 +89,23 @@ for (const [label, needle] of [['*.ts', 'ts'], ['*.tsx', 'tsx'], ['*.py', 'py'],
   if (!allGlobs.includes(needle)) warns.push(`S4 no rule appears to cover ${label}`);
 }
 
+// S5 always-on budget — copilot-instructions.md (R1) enters EVERY session, and applyTo:"**" rule files
+// share that per-session cost ("always-on is the scarcest resource"). Enforces blueprint P3/P8, which
+// documented this budget but left it unchecked. R1 line cap is a hard gate; the word cap is advisory.
+const bodyWords = (s) => (s.replace(/^---\n[\s\S]*?\n---\n?/, '').match(/\S+/g) || []).length;
+const R1 = '.github/copilot-instructions.md';
+if (existsSync(join(root, R1))) {
+  const t = readFileSync(join(root, R1), 'utf8');
+  const lines = t.replace(/\n+$/, '').split('\n').length;
+  if (lines > 40) errors.push(`S5 ${R1}: ${lines} lines (>40) — R1 enters every session; keep it minimal, split thin slices by applyTo`);
+  if (bodyWords(t) > 300) warns.push(`S5 ${R1}: ${bodyWords(t)} words (>300 budget) — split thin slices by applyTo`);
+}
+for (const { rel, glob } of Object.values(globsByArea).flat()) {
+  if (glob !== '**') continue; // only always-on files share the every-session cost
+  const w = bodyWords(readFileSync(join(root, rel), 'utf8'));
+  if (w > 300) warns.push(`S5 ${rel}: ${w} words (>300 budget) — trim or move a slice to a scoped applyTo rule`);
+}
+
 // S9 hooks JSON validity + event-name validity.
 // These 8 names are the official VS Code Copilot hook events, confirmed against
 // docs/agents/reference/hooks-reference.md (they also happen to match Claude Code's set).

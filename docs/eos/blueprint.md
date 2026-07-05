@@ -418,16 +418,16 @@ Script: `.github/hooks/validate-config.mjs`, zero-dependency, `node .github/hook
 
 | Check item | Description | Hooks linkage |
 |---|---|---|
-| S1 | Main rule file must exist | — |
-| S2 | Every `.instructions.md` has legal `applyTo` | `config-check.json` PostToolUse automatically runs after each write to a rule file |
+| S1 | Every `.instructions.md` has valid YAML frontmatter | — |
+| S2 | Every `.instructions.md` has legal `applyTo` (else manual-attach only) | `config-check.json` PostToolUse runs `validate-config` after each write to a rule file |
 | S3 | Non-`"**"` files have no duplicate globs (`"**"` may legally coexist) | — |
-| S4 | All skill names referenced by `#tool:` exist on disk | — |
-| S5 | `*.prompt.md` has `description` | — |
-| S6 | `*.agent.md` has `description` and `tools[]` | — |
-| S7 | hook JSON has an `event` field | — |
-| S8 | `deny-dangerous.js` uses the correct PreToolUse schema | — |
-| S9 | `AGENTS.md` exists and is non-empty | — |
-| S10 | Total word count of rule files ≤ budget (global ≤400 words, stack rules ≤300 words) | — |
+| S4 | Common source types (`.ts`/`.tsx`/`.py`/`.sql`) have rule coverage | — |
+| S5 | Always-on budget: `copilot-instructions.md` ≤40 lines (error); each `applyTo:"**"` rule file ≤300 words (warn) | — |
+| S6 | File name matches `NN-area[-stack].instructions.md` | — |
+| S7 | Required paths exist (`copilot-instructions.md`, `instructions/`, `prompts/`, `agents/`, `hooks/`, `docs/eos/agent-map.md`, `docs/eos/activation.md`) | — |
+| S9 | hook JSON is valid and event names are valid | — |
+| S10 | Every `.agent.md` has valid `name` (error) + `description` (warn) | — |
+| S11 | Every `.prompt.md` has `description` | — |
 
 **Goal**: 0 errors, 0 warnings (currently passed; see work_done).
 
@@ -471,12 +471,12 @@ Agent output does not match expectation
 |---|---|---|---|
 | P1 | Only functional Spec is written, no NFR | SLO explodes after launch; there is already heavy coupling when tests are added | C-nfr checklist is mandatory for G2; architecture phase must have NFR where it lands |
 | P2 | Operational requirements (telemetry/authz/canary) are not front-loaded | Post-launch patch rework costs × 3 | D-ops checklist + `eos-operational-readiness` skill + G2 | 
-| P3 | All rules are stuffed into `copilot-instructions.md` | always-on length explodes and pollutes every session | copilot-instructions.md ≤40 lines, S10 word-count gate |
+| P3 | All rules are stuffed into `copilot-instructions.md` | always-on length explodes and pollutes every session | copilot-instructions.md ≤40 lines, S5 always-on-budget gate |
 | P4 | Reinventing the wheel (creating similar prompts when `bmad-*` already exists) | double maintenance, output drift | every artifact must mark source; agent-map.md reference table |
 | P5 | Assuming multiple rules have native priority | silent errors after version changes | officially verified: order is not guaranteed; control with applyTo + Hooks |
 | P6 | Using comma-separated multiple globs in a single `applyTo` | not verified in official docs, behavior unknown | S2 check; recommendation: use brace expansion `{a,b}` instead |
 | P7 | `deny-dangerous.js` uses the PostToolUse schema `decision:"block"` | PreToolUse ineffective, dangerous operation passes | S8 check; correct field: `hookSpecificOutput.permissionDecision:"deny"` |
-| P8 | Rule bloat, a single file exceeds 300 words | Token exceeds budget and rules are truncated | S10 word-count check; split files by "single responsibility" |
+| P8 | Rule bloat, a single file exceeds 300 words | Token exceeds budget and rules are truncated | S5 word-count check (always-on files); split files by "single responsibility" |
 | P9 | Irreversible architecture decisions are made without ADR | team memory is lost; no decision context during evolution | G4 must have ADR; `/adr` prompt |
 | P10 | Letting Agent generate code directly and skip Spec | code drifts from requirements; tests have no traceable target | G3 is the prerequisite gate for G5; no `docs/prd.md`, no Planning |
 | P11 | Releasing without rollback/canary | cannot withdraw when issues occur; all users are affected | G8 five-item gate; `/release-gate` prompt enforces it |

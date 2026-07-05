@@ -16,8 +16,6 @@ applyTo: "**"
 - Supply chain: commit lockfiles; pin versions (no floating `latest`); prefer `npm ci` over `npm install`;
   distrust install scripts from unknown packages (`npm ci --ignore-scripts` when vetting); watch for
   typosquatted/newly-published deps. Never pipe a remote script into a shell (`curl … | bash`).
-- `【optional · maturity】` Artifact integrity for regulated/enterprise delivery: SBOM (e.g. CycloneDX/Syft),
-  signed artifacts/commits (Sigstore/cosign), SLSA provenance. Not required for local-first; add when shipping to a controlled supply chain.
 - Scan for leaked secrets: `node .github/hooks/secret-scan.mjs` (also run by CI + eos-doctor).
   Optional deeper scan: install `gitleaks` and secret-scan.mjs auto-uses it (allowlist in `.gitleaks.toml`);
   absence degrades gracefully to the built-in patterns.

@@ -10,6 +10,9 @@ applyTo: "**/{Dockerfile,*.yml,*.yaml}"
   serverless) must honor the chosen topology's rollback/canary/health contract. Pick the simplest
   topology that meets the NFRs; never default to Kubernetes.
 - Builds must be reproducible & pinned (lockfiles committed).
+- `【Optional · maturity】` Artifact integrity for regulated/enterprise delivery: SBOM (e.g. CycloneDX/Syft),
+  signed artifacts/commits (Sigstore/cosign), SLSA provenance. Not required for local-first; add when
+  shipping to a controlled supply chain.
 - No release without: passing quality gate, rollback plan, canary strategy.
 - Every service exposes health/readiness endpoints.
 - Document operational steps in `ops/runbook-<service>.md`.

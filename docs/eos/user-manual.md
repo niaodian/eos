@@ -203,7 +203,7 @@ So EOS **never depends on "Rule A overriding Rule B"**. The only reliable contro
 
 ## 4.2 always-on is the scarcest resource
 
-`copilot-instructions.md` (R1) enters **every** session, so it must be minimal (≈40 lines): only "cross-project, always-true" engineering beliefs (source of truth, reuse first, security red lines, operational awareness).
+`copilot-instructions.md` (R1) enters **every** session, so it must be minimal (≤40 lines, enforced by `validate-config` S5): only "cross-project, always-true" engineering beliefs (source of truth, reuse first, security red lines, operational awareness).
 **If narrow scope (`applyTo`) can be used, never use always-on.**
 
 ---
@@ -833,6 +833,7 @@ node .github/hooks/validate-config.mjs
 | S2 | warn | Every `.instructions.md` has `applyTo` (otherwise it can only be mounted manually) |
 | S3 | error | Non-`**` files have no duplicate glob (`**` legally coexists and is exempt) |
 | S4 | warn | Common source types (such as .ts/.tsx/.py/.sql) have rule coverage |
+| S5 | error/warn | Always-on budget: `copilot-instructions.md` ≤40 lines (error); each `applyTo:"**"` rule file ≤300 words (warn) |
 | S6 | warn | File name matches `NN-area[-stack].instructions.md` convention |
 | S7 | error | Required paths/files exist (copilot-instructions.md, instructions/, prompts/, agents/, hooks/, docs/eos/agent-map.md) |
 | S9 | error | hook JSON is legal and event names are valid |
@@ -974,7 +975,7 @@ EOS stack rules are **pluggable**. Adding a stack = add one `*.instructions.md` 
 |---|---|---|---|
 | P1 | Write only functional Spec, no NFR | SLO explodes after launch | C-nfr is required for G2 |
 | P2 | Operational requirements not moved upfront | Post-launch rework ×3 | D-ops + `eos-operational-readiness` + G2 |
-| P3 | Stuff all rules into copilot-instructions.md | always-on blows up and pollutes all sessions | R1≤40 lines; split thin slices by applyTo |
+| P3 | Stuff all rules into copilot-instructions.md | always-on blows up and pollutes all sessions | R1≤40 lines (S5 gate); split thin slices by applyTo |
 | P4 | Rebuild wheels (existing bmad-* but create new) | Dual maintenance and drift | Mark source for deliverables; agent-map.md |
 | P5 | Assume native priority exists | Silent errors after version changes | Rely on applyTo + Hooks, not order |
 | P6 | Comma-string multi-glob `"a,b"` | Behavior unverified | Use braces `{a,b}` + subfolders; S2/S3 |
