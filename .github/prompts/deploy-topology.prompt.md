@@ -17,7 +17,7 @@ Consequences / Alternatives considered) and land a **Deployment** section in
 `docs/architecture.md`.
 
 Honest local-first boundary: this decides the target topology + its rollback/canary/health
-contract only. Provisioning the real cluster/registry/cloud is `【需企业/网络环境】`; keep local
+contract only. Provisioning the real cluster/registry/cloud is `【Needs enterprise env】`; keep local
 dev + CI runnable without it.
 
 Output: filled `docs/checklists/G-deployment.md`, `docs/adr/NNN-deployment-topology.md`, and a

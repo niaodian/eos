@@ -110,7 +110,7 @@ usually **retrofitted late** (the most expensive time). `redaction.mjs` in parti
 boundary, you are forced into a model/architecture swap. See `docs/checklists/F-compliance.md`
 (*Agentic data-boundary*), `docs/checklists/F-compliance-gdpr-pipl.md`, and the `/compliance` prompt.
 
-> `【新建补强】` — no BMAD skill ships compliance code skeletons; this fills that gap and composes
+> `【New-build】` — no BMAD skill ships compliance code skeletons; this fills that gap and composes
 > with `eos-operational-readiness` (decides *what*) by giving the *starting scaffold*, in all four
 > default reference-stack ports (Node/ESM · Python/stdlib · Go · Java/JDK) so it drops straight
 > into whichever stack the project runs on.

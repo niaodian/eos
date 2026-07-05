@@ -70,6 +70,6 @@ Per-stack setup presets (Node/Python/Go/Java/Rust/.NET + AI/LLM): [docs/eos/stac
 - Local CI runs via `act` (GitHub Actions locally, needs Docker) — `.github/workflows/eos-ci.yml`.
   No Docker? Run the same gate directly: `node .github/hooks/validate-config.mjs && node .github/hooks/eos-doctor.mjs`.
 - Hooks are a VS Code **Preview** feature (official: config format/behavior may change) — `.github/hooks/*.json`
-  load by default via `chat.hookFilesLocations`. See `docs/eos/user-manual.md` §2.4 + 附录 D.
+  load by default via `chat.hookFilesLocations`. See `docs/eos/user-manual.md` §2.4 + Appendix D.
 - There is **no native rule priority** — control is via `applyTo` scope + conventions + hooks.
 

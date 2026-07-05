@@ -107,7 +107,7 @@ if (existsSync(scanner)) {
 // template's own docs. Fires the Agentic landmine: PHI/PAN to a third-party model needs a boundary decision.
 const readIf = (p) => { try { return readFileSync(join(root, p), 'utf8'); } catch { return ''; } };
 const regimeText = readIf('docs/compliance-profile.md') + '\n' + readIf('docs/requirements.md');
-const REGULATED = /\b(HIPAA|PCI[\s-]?DSS|SOC\s?2|SOX|GDPR|CCPA|CPRA|PIPL)\b|个人信息保护/i;
+const REGULATED = /\b(HIPAA|PCI[\s-]?DSS|SOC\s?2|SOX|GDPR|CCPA|CPRA|PIPL)\b/i;
 if (regimeText.trim() && REGULATED.test(regimeText) && llmPresent) {
   let boundaryText = regimeText;
   const adrDir = join(root, 'docs/adr');
@@ -115,7 +115,7 @@ if (regimeText.trim() && REGULATED.test(regimeText) && llmPresent) {
     for (const f of readdirSync(adrDir)) if (f.endsWith('.md')) boundaryText += '\n' + readIf(`docs/adr/${f}`);
   }
   boundaryText += '\n' + readIf('docs/architecture.md');
-  const BOUNDARY = /\bBAA\b|\bDPA\b|self[\s-]?host|on[\s-]?prem|redact|tokeniz|de[\s-]?identif|exclude regulated|no PHI|no PAN|脱敏|不出境|本地模型|自托管/i;
+  const BOUNDARY = /\bBAA\b|\bDPA\b|self[\s-]?host|on[\s-]?prem|redact|tokeniz|de[\s-]?identif|exclude regulated|no PHI|no PAN/i;
   if (!BOUNDARY.test(boundaryText)) {
     // BLOCKER (deny-by-default) per security rule: a regulated regime + LLM/agent is the Agentic
     // compliance landmine. Only fires when regime IS declared AND LLM IS present AND no boundary is
@@ -143,7 +143,7 @@ if (!existsSync(ledgerPath)) {
   if (pending.length) {
     activationOut.push(`  ACTIVATION  enforcement authority = CONTRACTUAL: ${pending.length} one-time hardening item(s) pending (advisory — local checks can't verify server-side branch protection):`);
     for (const p of pending) activationOut.push('              \u25B8 ' + p);
-    activationOut.push('              \u2192 run /eos-init, or see docs/eos/activation.md \u00B7 \u9644\u5F55 D. Mark [x] done or [~] waived-with-reason to clear.');
+    activationOut.push('              \u2192 run /eos-init, or see docs/eos/activation.md \u00B7 Appendix D. Mark [x] done or [~] waived-with-reason to clear.');
   } else {
     activationOut.push('  ACTIVATION  enforcement authority attested \u2713 (docs/eos/activation.md \u2014 0 pending).');
   }

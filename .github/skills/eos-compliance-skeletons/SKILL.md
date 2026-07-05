@@ -7,7 +7,7 @@ description: Use when implementing privacy/compliance controls in code — conse
 
 **Goal:** Turn the high-frequency 🟡 *project must build* rows of the compliance checklists into a
 **starting scaffold**, so consent / DSAR / redaction are shaped early instead of retrofitted after
-launch (the expensive time). `【新建补强】`
+launch (the expensive time). `【New-build】`
 
 ## When to use
 - Building **consent** capture, a **DSAR** endpoint (access / erasure / portability), or **redaction**

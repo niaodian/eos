@@ -49,7 +49,7 @@ this but cannot verify server-side branch protection for you.
 ## 4. Where to read more (one line each)
 
 - Fast start: `docs/eos/quickstart.md` · One-page cheat-sheet: user-manual §6.x · Beginner tracks: §6.5
-- Terms you don't recognize: user-manual 附录 A (glossary) · Why it's built this way: `docs/eos/blueprint.md`
+- Terms you don't recognize: user-manual Appendix A (glossary) · Why it's built this way: `docs/eos/blueprint.md`
 
 > Keep the whole reply scannable (a novice should grok it in ~20 seconds). Do not run any commands or edit
 > files — this is orientation only.

@@ -12,7 +12,7 @@ You are hardening a **freshly instantiated** EOS repository so its 3 CI hard gat
 be done by the human in GitHub's UI — for those, print the exact steps, do not pretend to enforce them.**
 
 Work through `docs/eos/activation.md` top to bottom. For each item: do what is locally doable, then update
-the ledger line (`- [ ]` → `- [x]` done, or `- [~] … · 原因：<reason>` if the developer waives it). Never
+the ledger line (`- [ ]` → `- [x]` done, or `- [~] … · Reason: <reason>` if the developer waives it). Never
 mark an item `[x]` unless it is actually done or verified.
 
 ## Steps
@@ -30,10 +30,10 @@ mark an item `[x]` unless it is actually done or verified.
 
 4. **Project facts.** Open `.github/instructions/00-workspace.instructions.md`. Help the user replace the
    placeholders with the real stack / directory layout / conventions. Check the ledger line once no
-   `TODO` / `<替换…>` placeholders remain.
+   `TODO` / `<replace...>` placeholders remain.
 
 5. **Branch protection (SERVER-SIDE — you cannot do this for them).** Print the exact click-path from
-   `docs/eos/user-manual.md` 附录 D.1: GitHub repo → Settings → Branches → Add branch ruleset on the
+   `docs/eos/user-manual.md` Appendix D.1: GitHub repo → Settings → Branches → Add branch ruleset on the
    default branch → *Require a pull request before merging* + *Require status checks to pass* → select the
    `verify` job + *Require review from Code Owners*. Then offer an **opt-in** verification: only if the user
    confirms `gh` is installed and authenticated, run
@@ -43,9 +43,9 @@ mark an item `[x]` unless it is actually done or verified.
 
 6. **Compliance (only if regulated).** Ask whether this project handles regulated data (PHI / PAN / etc.).
    - If **yes**: run `/compliance` to produce `docs/compliance-profile.md`, confirm the data-boundary
-     decision is recorded, and flag the `【需组织标准】` items (approved secret store, runner, model
+     decision is recorded, and flag the `【Needs org standard】` items (approved secret store, runner, model
      registry, artifact integrity). Check the ledger line only once `eos-doctor` shows no D5 ERROR.
-   - If **no**: waive it — set the ledger line to `- [~] 合规档案 · 原因：本项目不处理受监管数据（无 PHI/PAN）`.
+   - If **no**: waive it — set the ledger line to `- [~] Compliance profile · Reason: this project handles no regulated data (no PHI/PAN)`.
 
 7. **Confirm & report.** Run `node .github/hooks/eos-doctor.mjs` and show the user the `ACTIVATION` line
    (it reflects the ledger you just updated). Summarize: what is now `[x]`, what is `[~]` waived (with

@@ -16,8 +16,8 @@ node "$HERE/check-anchors.mjs" "$SRC"
 
 echo "2/3 pandoc -> HTML…"
 pandoc "$SRC" -f gfm -t html5 --standalone --embed-resources \
-  --toc --toc-depth=2 -V toc-title="目录" \
-  --metadata title="EOS 用户手册" \
+  --toc --toc-depth=2 -V toc-title="Contents" \
+  --metadata title="EOS User Manual" \
   --syntax-highlighting=tango \
   -c "$CSS" -o "$HTML"
 

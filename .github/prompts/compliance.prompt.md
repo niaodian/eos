@@ -10,7 +10,7 @@ tools: ['search', 'editFiles']
 > **Not legal advice.** EOS is an engineering scaffold, not a compliance certification; it cannot
 > replace a compliance officer / legal counsel / auditor. Every ADOPT below is an engineering
 > commitment that still needs human sign-off. Run this **early** (Discovery/Requirements) so
-> regulated constraints shape the architecture instead of forcing a rewrite later. `【新建补强】`
+> regulated constraints shape the architecture instead of forcing a rewrite later. `【New-build】`
 
 Input: `docs/discovery.md` / `docs/requirements.md` if present, plus the `$ARGUMENTS` hint.
 Reference: walk `docs/checklists/F-compliance.md`. For HIPAA or PCI-DSS, use the detailed
