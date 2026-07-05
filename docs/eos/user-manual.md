@@ -98,11 +98,16 @@ bmad-code-review                   → review has no blockers  (Gate G6)
 
 | Component | Requirement | Self-check command |
 |---|---|---|
-| macOS | Any recent version (zsh) | `sw_vers` |
+| OS | macOS, Windows 10/11, or Linux — EOS is cross-platform; native Windows needs no WSL for the core flow | macOS `sw_vers` · Windows `winver` · Linux `uname -sr` |
 | VS Code | Recent version (custom agent / hooks require a recent version) | Check the real version in the About panel (`code --version` may be a shim and is not reliable) |
 | GitHub Copilot | Logged in (enterprise license is only a license, not a configuration dependency) | Chat panel is usable |
 | Node.js | 18+ (used by validators and hooks) | `node -v` |
-| BMAD skills | 73 `bmad-*` (user-level) | `ls ~/.agents/skills &#124; grep -c '^bmad-'` |
+| BMAD skills | 73 `bmad-*` (user-level) | macOS/Linux `ls ~/.agents/skills &#124; grep -c '^bmad-'` · Windows `(Get-ChildItem ~/.agents/skills -Filter 'bmad-*').Count` |
+
+> **On Windows or Linux?** The core flow is identical — all hooks/validators are Node and paths are
+> normalized cross-platform, so **native Windows needs no WSL/Git-Bash**. For the Windows specifics
+> (PowerShell 5.1 `&&` caveat, LF via `.gitattributes`, `act` needs Docker Desktop, `build-pdf.sh` via
+> Git-Bash), see the quickstart's [**Windows** setup notes](quickstart.md#windows).
 
 ## 2.2 Where BMAD skills live
 
