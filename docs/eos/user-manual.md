@@ -1,279 +1,263 @@
-# EOS 用户手册（Engineering Operating System User Manual）
+# EOS User Manual (Engineering Operating System)
 
-> 版本：与 `docs/eos/VERSION` 同步（当前 `eos-1.10.0`）
-> 适用：较新版本的 VS Code + GitHub Copilot Chat（自定义 agent / hooks 属近版能力，用「关于 VS Code」面板确认版本）+ 已安装 73 个 `bmad-*` skill（用户级）
-> 定位：本手册是**操作指南（怎么用）**；设计原理与取舍见同目录 `blueprint.md`（为什么这么设计）。
-> 约定：正文中文；文件名/路径/命令/配置键保留英文原文。
+> Version: synced with `docs/eos/VERSION` (current `eos-1.10.0`)
+> Applies to: recent VS Code + GitHub Copilot Chat (custom agent / hooks are recent-version capabilities; confirm the version in the "About VS Code" panel) + 73 installed `bmad-*` skills (user-level)
+> Positioning: this manual is an **operating guide (how to use it)**; for design rationale and trade-offs, see `blueprint.md` in the same directory (why it is designed this way).
+> Conventions: prose in English; file names / paths / commands / config keys kept verbatim.
 
 ---
 
-## 如何阅读本手册
+## How to read this manual
 
-| 你是谁 / 你想做什么 | 直接跳到 |
+| Who you are / what you want to do | Jump directly to |
 |---|---|
-| 第一次接触，想 10 分钟跑起来 | [第 1 章 快速上手](#第-1-章-快速上手（10-分钟）) |
-| 要在一台新 Mac 上装环境 | [第 2 章 一次性环境准备](#第-2-章-一次性环境准备) |
-| 要开一个新项目 | [第 3 章 新项目 Day-1](#第-3-章-新项目-day-1-bootstrap) |
-| 想搞懂"规则/prompt/agent/skill/hook 到底啥区别" | [第 4 章 核心概念](#第-4-章-核心概念（五种机制）) |
-| **要从 idea 一路做到上线后迭代** | [第 6 章 全生命周期实操](#第-6-章-全生命周期实操（idea-→-迭代）) ← 手册核心 |
-| 想查某个斜杠命令 / agent / 规则 | [第 7 章 完整参考](#第-7-章-完整参考（速查）) |
-| 配置坏了 / Agent 不按预期工作 | [第 9 章 故障定位](#第-9-章-故障定位与排错) |
-| 想把这套搬到别的项目/团队 | [第 10 章 跨项目复用与分发](#第-10-章-跨项目复用与分发) |
+| First-time user who wants to get running in 10 minutes | [Chapter 1 Quick start](#chapter-1-quick-start-10-minutes) |
+| Need to set up the environment on a new Mac | [Chapter 2 One-time environment setup](#chapter-2-one-time-environment-setup) |
+| Need to start a new project | [Chapter 3 New project Day-1](#chapter-3-new-project-day-1-bootstrap) |
+| Want to understand "what exactly are rules/prompts/agents/skills/hooks" | [Chapter 4 Core concepts](#chapter-4-core-concepts-five-mechanisms) |
+| **Need to go from idea all the way to post-launch iteration** | [Chapter 6 Full-lifecycle practice](#chapter-6-full-lifecycle-practice-idea-→-iteration) ← manual core |
+| Want to look up a slash command / agent / rule | [Chapter 7 Complete reference](#chapter-7-complete-reference-quick-reference) |
+| Configuration is broken / Agent is not working as expected | [Chapter 9 Failure localization](#chapter-9-failure-localization-and-troubleshooting) |
+| Want to move this system to another project/team | [Chapter 10 Cross-project reuse and distribution](#chapter-10-cross-project-reuse-and-distribution) |
 
 ---
 
-## 目录
+## Table of contents
 
-- [第 1 章 快速上手（10 分钟）](#第-1-章-快速上手（10-分钟）)
-- [第 2 章 一次性环境准备](#第-2-章-一次性环境准备)
-- [第 3 章 新项目 Day-1 Bootstrap](#第-3-章-新项目-day-1-bootstrap)
-- [第 4 章 核心概念（五种机制）](#第-4-章-核心概念（五种机制）)
-- [第 5 章 心智模型：分层规则 + 决策门](#第-5-章-心智模型：分层规则--决策门)
-- [第 6 章 全生命周期实操（idea → 迭代）](#第-6-章-全生命周期实操（idea-→-迭代）)
-- [第 6.5 章 两条上手路径（SaaS vs Agentic · 小白友好）](#第-65-章-两条上手路径（saas-vs-agentic-·-小白友好）)
-- [第 7 章 完整参考（速查）](#第-7-章-完整参考（速查）)
-- [第 8 章 配置质检与验收](#第-8-章-配置质检与验收)
-- [第 9 章 故障定位与排错](#第-9-章-故障定位与排错)
-- [第 10 章 跨项目复用与分发](#第-10-章-跨项目复用与分发)
-- [第 11 章 新增技术栈](#第-11-章-新增技术栈)
-- [第 12 章 反模式速查](#第-12-章-反模式速查)
-- [附录 A 术语表](#附录-a-术语表)
-- [附录 B 命令速查卡](#附录-b-命令速查卡)
-- [附录 C 端到端样例（my-app）](#附录-c-端到端样例（my-app）)
-- [附录 D 实例化后硬化（让门禁具备权威）](#附录-d-实例化后硬化（让门禁具备权威）)
+- [Chapter 1 Quick start (10 minutes)](#chapter-1-quick-start-10-minutes)
+- [Chapter 2 One-time environment setup](#chapter-2-one-time-environment-setup)
+- [Chapter 3 New project Day-1 Bootstrap](#chapter-3-new-project-day-1-bootstrap)
+- [Chapter 4 Core concepts (five mechanisms)](#chapter-4-core-concepts-five-mechanisms)
+- [Chapter 5 Mental model: layered rules + decision gates](#chapter-5-mental-model-layered-rules--decision-gates)
+- [Chapter 6 Full-lifecycle practice (idea → iteration)](#chapter-6-full-lifecycle-practice-idea-→-iteration)
+- [Chapter 6.5 Two onboarding paths (SaaS vs Agentic · beginner-friendly)](#chapter-65-two-onboarding-paths-saas-vs-agentic-·-beginner-friendly)
+- [Chapter 7 Complete reference (quick-reference)](#chapter-7-complete-reference-quick-reference)
+- [Chapter 8 Configuration QA and acceptance](#chapter-8-configuration-qa-and-acceptance)
+- [Chapter 9 Failure localization and troubleshooting](#chapter-9-failure-localization-and-troubleshooting)
+- [Chapter 10 Cross-project reuse and distribution](#chapter-10-cross-project-reuse-and-distribution)
+- [Chapter 11 Adding a technology stack](#chapter-11-adding-a-technology-stack)
+- [Chapter 12 Anti-patterns quick reference](#chapter-12-anti-patterns-quick-reference)
+- [Appendix A Glossary](#appendix-a-glossary)
+- [Appendix B Command cheat sheet](#appendix-b-command-cheat-sheet)
+- [Appendix C End-to-end example (my-app)](#appendix-c-end-to-end-example-my-app)
+- [Appendix D Post-instantiation hardening (make gates authoritative)](#appendix-d-post-instantiation-hardening-make-gates-authoritative)
 
 ---
 
-# 第 1 章 快速上手（10 分钟）
+# Chapter 1 Quick start (10 minutes)
 
-## 1.1 EOS 是什么（一句话）
+## 1.1 What EOS is (one sentence)
 
-EOS = 一套**纯本地、Git 化、可跨项目移植**的工程操作系统。它把"和 AI 结对开发"从
-自由对话，变成**带决策门（gate）的标准 SDLC 流水线**：每个阶段有明确输入/输出/通过标准，
-并优先复用你已装的 73 个 `bmad-*` skill，而不是重复造轮子。
+EOS = a **purely local, Git-backed, cross-project portable** Engineering Operating System. It turns "pairing with AI for development" from free-form conversation into a **standard SDLC pipeline with decision gates**: every phase has clear inputs/outputs/pass criteria, and it prioritizes reusing your installed 73 `bmad-*` skills instead of rebuilding wheels.
 
-它解决四个老大难：
-1. 需求阶段不完整 → 上线后大规模返工
-2. 运营需求（埋点/权限/回滚…）没在需求期前置 → 上线后补补丁
-3. 缺治理门禁 → 代码与需求漂移、危险操作无人拦
-4. 多语言栈规则混乱 → Agent 输出不稳定
+It solves four persistent hard problems:
+1. Incomplete requirements phase → large-scale post-launch rework
+2. Operational requirements (telemetry/authz/rollback...) not moved upfront into requirements → post-launch patchwork
+3. Missing governance gates → code drifts from requirements, dangerous operations go unchecked
+4. Chaotic rules across language stacks → unstable Agent output
 
-## 1.2 三条你每天都会用的命令
+## 1.2 Three commands you will use every day
 
-在 VS Code 的 **Copilot Chat（Agent 模式）** 里输入：
+In **Copilot Chat (Agent mode)** in VS Code, enter:
 
 ```
-/requirements "<一句话功能描述>"     # 进入正式开发流的最短入口
-/release-gate                        # 上线前过门禁
+/requirements "<one-sentence feature description>"     # shortest entry into the formal development flow
+/release-gate                                           # pass the gate before launch
 ```
 
-在**终端**里：
+In the **terminal**:
 
 ```
-node .github/hooks/validate-config.mjs   # 配置自检，期望输出 PASS
+node .github/hooks/validate-config.mjs   # config self-check, expect PASS
 ```
 
-## 1.3 Happy Path（从 idea 到代码的最短链路）
+## 1.3 Happy Path (shortest chain from idea to code)
 
 ```
-（切换 agent）eos-discovery        → docs/discovery.md      (Gate G1)
+(switch agent) eos-discovery        → docs/discovery.md      (Gate G1)
 /requirements "<feature>"          → docs/requirements.md   (Gate G2)
 /spec                              → docs/prd.md            (Gate G3)
-/ux-spec（面向用户，纯后端跳过）   → docs/DESIGN.md + docs/EXPERIENCE.md (Gate G-UX)
-（切换 agent）eos-architecture     → docs/architecture.md + api/openapi.yaml + ADR (Gate G4)
-（handoff）eos-plan                → docs/stories/*.md      (Gate G5)
-（handoff）bmad-dev-story          → src/ 代码             (Gate G6)
-bmad-code-review                   → 审查无阻断项           (Gate G6)
+/ux-spec (user-facing; skip pure backend) → docs/DESIGN.md + docs/EXPERIENCE.md (Gate G-UX)
+(switch agent) eos-architecture     → docs/architecture.md + api/openapi.yaml + ADR (Gate G4)
+(handoff) eos-plan                  → docs/stories/*.md      (Gate G5)
+(handoff) bmad-dev-story            → src/ code              (Gate G6)
+bmad-code-review                   → review has no blockers  (Gate G6)
 ```
 
-> 每个 `→` 都是一道门。**没过门不要进下一阶段**——这正是 EOS 防返工的核心。
+> Every `→` is a gate. **Do not enter the next phase until the gate passes**--this is the core of how EOS prevents rework.
 >
-> **⚠️ 用 agent 前的头号前提**：在 VS Code 里必须把**项目文件夹本身**（含 `.github/` 的那一层）
-> 作为工作区根打开——`File > Open Folder…` 选中它，或终端 `cd my-app && code .`。若你打开的是它的
-> **父目录**，`eos-*` 自定义 agent 及 `.github/instructions|hooks` 会**全部静默失效**（详见 7.2 排障）。
+> **⚠️ Top prerequisite before using agents**: in VS Code you must open the **project folder itself** (the level that contains `.github/`) as the workspace root--select it via `File > Open Folder...`, or run `cd my-app && code .` in the terminal. If you open its **parent directory**, `eos-*` custom agents and `.github/instructions|hooks` will **all silently fail** (see 7.2 troubleshooting).
 
 ---
 
-# 第 2 章 一次性环境准备
+# Chapter 2 One-time environment setup
 
-> 这些步骤每台机器只做一次。已经做过的可跳过（本机已就绪）。
+> Do these steps only once per machine. Skip anything already done (this machine is ready).
 
-## 2.1 前置清单
+## 2.1 Prerequisite checklist
 
-| 组件 | 要求 | 自检命令 |
+| Component | Requirement | Self-check command |
 |---|---|---|
-| macOS | 任意近期版本（zsh） | `sw_vers` |
-| VS Code | 较新版本（自定义 agent / hooks 需近版） | 关于面板查看真实版本（`code --version` 可能是 shim，不准） |
-| GitHub Copilot | 已登录（企业 license 仅作 license，不作配置依赖） | Chat 面板可用 |
-| Node.js | 18+（验证器与 hooks 用） | `node -v` |
-| BMAD skills | 73 个 `bmad-*`（用户级） | `ls ~/.agents/skills | grep -c '^bmad-'` |
+| macOS | Any recent version (zsh) | `sw_vers` |
+| VS Code | Recent version (custom agent / hooks require a recent version) | Check the real version in the About panel (`code --version` may be a shim and is not reliable) |
+| GitHub Copilot | Logged in (enterprise license is only a license, not a configuration dependency) | Chat panel is usable |
+| Node.js | 18+ (used by validators and hooks) | `node -v` |
+| BMAD skills | 73 `bmad-*` (user-level) | `ls ~/.agents/skills &#124; grep -c '^bmad-'` |
 
-## 2.2 BMAD skills 在哪
+## 2.2 Where BMAD skills live
 
 ```
-~/.agents/skills/     # 73 个 bmad-*（+ 其它 gds-/wds-，共 121）
-~/.claude/skills/     # 镜像，同上
+~/.agents/skills/     # 73 bmad-* (+ other gds-/wds-, 121 total)
+~/.claude/skills/     # mirror, same as above
 ```
-这些是**用户级**、跨所有项目共享的。EOS 通过 prompt/agent 里的 `bmad-*` 名称来调用它们，
-**不需要把它们复制进项目**。
+These are **user-level** and shared across all projects. EOS invokes them by their `bmad-*` names in prompts/agents, and **does not require copying them into the project**.
 
-## 2.3 用户级 agents 目录（可选）
+## 2.3 User-level agents directory (optional)
 
-若你想把某些 `eos-*.agent.md` 提升为"所有项目通用"，放到：
+If you want to promote some `eos-*.agent.md` files to "available in all projects", put them in:
 ```
 ~/.copilot/agents/
 ```
-（注意：是 `~/.copilot/agents`，不是 VS Code User 目录；这是实测确认的路径。）
+(Note: it is `~/.copilot/agents`, not the VS Code User directory; this path was confirmed by testing.)
 
-## 2.4 Hooks 成熟度说明
+## 2.4 Hooks maturity notes
 
-- Hooks 是 VS Code 的 **Preview** 功能：官方明确"配置格式与行为在未来版本可能变化"，请在你的版本核实
-  （官方参考：`docs/agent-customization/hooks.md`、`docs/agents/reference/hooks-reference.md`）。
-- 工作区 `.github/hooks/*.json` **默认即加载**（官方设置 `chat.hookFilesLocations` 默认包含
-  `.github/hooks`），无需额外 Preview 开关。`chat.useCustomAgentHooks` 只管 `.agent.md` 里内嵌的
-  agent hooks，与工作区 `.github/hooks/` 无关。
-- EOS 的 8 个合法事件（`SessionStart / UserPromptSubmit / PreToolUse / PostToolUse / PreCompact /
-  SubagentStart / SubagentStop / Stop`）已核对官方 `hooks-reference.md` 一致；`deny-dangerous.js`
-  的 `permissionDecision: allow/deny/ask` 也符合官方 PreToolUse schema。
-- **确认 hooks 在你的会话真的生效**（"存在 ≠ 生效"）：在 Copilot Chat（Agent 模式）让它运行
-  `echo 'api_key="sk-EXAMPLEprobe1234567"'`。hooks 已加载 → 被 deny（命中密钥字面量规则）；未加载 →
-  只会无害地打印这行字符串。若没被拦截，多半是把父目录当成了工作区根（见 §9.3）。
-- **诚实边界**：`deny-dangerous.js` 是**本地减速带**（逐机器、Preview、解析失败放行、CI 不调用），
-  是纵深防御而非权威。真正的权威门是 CI 三道硬检查 + 分支保护 + 人工评审（见附录 D）。
+- Hooks are a VS Code **Preview** feature: the official docs state clearly that "configuration format and behavior may change in future versions", so verify in your version (official references: `docs/agent-customization/hooks.md`, `docs/agents/reference/hooks-reference.md`).
+- Workspace `.github/hooks/*.json` files **load by default** (the official `chat.hookFilesLocations` setting includes `.github/hooks` by default), with no extra Preview switch required. `chat.useCustomAgentHooks` only governs agent hooks embedded in `.agent.md`, and is unrelated to workspace `.github/hooks/`.
+- EOS's 8 legal events (`SessionStart / UserPromptSubmit / PreToolUse / PostToolUse / PreCompact / SubagentStart / SubagentStop / Stop`) have been checked against the official `hooks-reference.md`; `deny-dangerous.js`'s `permissionDecision: allow/deny/ask` also matches the official PreToolUse schema.
+- **Confirm hooks are really effective in your session** ("exists ≠ effective"): in Copilot Chat (Agent mode), ask it to run `echo 'api_key="sk-EXAMPLEprobe1234567"'`. Hooks loaded → denied (hits the secret-literal rule); not loaded → it harmlessly prints the string. If it is not intercepted, you most likely opened the parent directory as the workspace root (see §9.3).
+- **Honest boundary**: `deny-dangerous.js` is a **local speed bump** (per-machine, Preview, parse-failure allows, CI does not call it), a defense-in-depth layer rather than authority. The real authoritative gates are the three CI hard checks + branch protection + human review (see Appendix D).
 
 ---
 
-# 第 3 章 新项目 Day-1 Bootstrap
+# Chapter 3 New project Day-1 Bootstrap
 
-## 3.1 三种创建方式（任选其一）
+## 3.1 Three creation methods (choose one)
 
-**方式 A — degit（推荐，最快）**
+**Method A — degit (recommended, fastest)**
 ```sh
-# 私有模板必须加 --mode=git
+# Private templates must add --mode=git
 npx degit --mode=git niaodian/eos-template my-new-app
 cd my-new-app
 git init && git add -A && git commit -m "chore: scaffold from eos-template"
 ```
 
-**方式 B — gh + GitHub template**
+**Method B — gh + GitHub template**
 ```sh
 gh repo create my-new-app --template niaodian/eos-template --private --clone
 cd my-new-app
 ```
 
-**方式 C — VS Code 直接 New Repository from Template**（GitHub 网页 → Use this template）。
+**Method C — VS Code directly New Repository from Template** (GitHub web page → Use this template).
 
-## 3.2 落地后第一件事：自检
+## 3.2 First thing after landing: self-check
 
 ```sh
-node .github/hooks/validate-config.mjs      # 期望：PASS
+node .github/hooks/validate-config.mjs      # expected: PASS
 ```
 
-看到 `PASS` 表示规则层、prompt、agent、hook 都健康，可以开干。
+Seeing `PASS` means the rule layers, prompts, agents, and hooks are healthy, and you can start work.
 
-## 3.3 填项目专属事实
+## 3.3 Fill project-specific facts
 
-打开 `.github/instructions/00-workspace.instructions.md`，把它改成**你这个项目**的真实情况：
-- `Local commands`：**已定栈**就换成你的栈的 install/lint/test/typecheck 命令——**成品行直接抄** `docs/eos/stack-presets.md`（Node/Python/Go/Java/Rust/.NET 全栈配方册，复制对应一块即可）。**还没定栈**（多数 0-1 项目在架构前都没定）就**保留 Node 占位**——这是 ⛳ PROVISIONAL 值，**权威锁定在阶段 4（架构）** 连同 `docs/adr/00X-tech-stack.md`，避免 always-on 规则与将来真实栈打架
-- `Layout`：若目录结构不同，更新
-- 其它跨项目通用信念**不要**写这里——那属于 R1（`copilot-instructions.md`）
+Open `.github/instructions/00-workspace.instructions.md` and change it to the real facts of **your project**:
+- `Local commands`: if the stack is **already decided**, replace this with the install/lint/test/typecheck commands for your stack--**copy the finished line directly** from `docs/eos/stack-presets.md` (a recipe book for Node/Python/Go/Java/Rust/.NET full stacks; copy the matching block). If the stack is **not decided yet** (most 0-1 projects are not before architecture), **keep the Node placeholder**--this is a ⛳ PROVISIONAL value, and the authoritative lock happens in **Phase 4 (Architecture)** together with `docs/adr/00X-tech-stack.md`, avoiding conflict between always-on rules and the future real stack.
+- `Layout`: update it if the directory structure differs.
+- Do **not** write other cross-project general beliefs here--those belong to R1 (`copilot-instructions.md`).
 
-## 3.4 Day-1 完整序列（复制即用）
+## 3.4 Full Day-1 sequence (copy-ready)
 
 ```sh
 npx degit --mode=git niaodian/eos-template my-new-app && cd my-new-app
 git init && git add -A && git commit -q -m "chore: scaffold from eos-template"
 node .github/hooks/validate-config.mjs
-# 关键：从项目目录内执行 `code .`，让 my-new-app 成为工作区根（含 .github/）。
-# 不要打开它的父目录，否则自定义 agent / instructions / hooks 都不会被发现。
+# Key: run `code .` from inside the project directory so my-new-app becomes the workspace root (including .github/).
+# Do not open its parent directory, or custom agents / instructions / hooks will not be discovered.
 code .
-# 一次性硬化（让 CI 门具备"合并阻断"权威）：在 Copilot Chat 里跑 /eos-init，
-# 按引导逐项勾掉 docs/eos/activation.md（分支保护 + CODEOWNERS + 审批基线；详见附录 D）。
+# One-time hardening (make CI gates authoritative as merge blockers): run /eos-init in Copilot Chat,
+# then follow the guide to check off docs/eos/activation.md item by item (branch protection + CODEOWNERS + approval baseline; see Appendix D).
 ```
 
 ---
 
-# 第 4 章 核心概念（五种机制）
+# Chapter 4 Core concepts (five mechanisms)
 
-EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加载"是用好 EOS 的关键。**
+EOS uses 5 native VS Code + Copilot mechanisms to carry rules. **Understanding "when it is loaded" is the key to using EOS well.**
 
-| 机制 | 文件位置 | 何时进入上下文 | 你怎么触发 | EOS 中的角色 |
+| Mechanism | File location | When it enters context | How you trigger it | Role in EOS |
 |---|---|---|---|---|
-| **Instructions（指令）** | `.github/copilot-instructions.md`、`.github/instructions/**/*.instructions.md` | 自动：always-on 或按 `applyTo` glob 匹配文件类型 | 不用手动触发；编辑匹配文件即生效 | 规则层（编码规范、安全红线、栈约定） |
-| **Prompts（斜杠命令）** | `.github/prompts/*.prompt.md` | 按需：你输入 `/name` 时 | Chat 里输入 `/requirements` 等 | 工作流（单个可复用任务） |
-| **Agents（角色）** | `.github/agents/*.agent.md` | 切换：你选中某 agent 时持续生效 | Chat 的 agent 选择器切换 | 阶段编排者（持久 persona + 工具限制 + handoffs） |
-| **Skills（能力）** | `.github/skills/*/SKILL.md`（项目级）、`~/.agents/skills/bmad-*`（用户级） | 按相关性自动加载，或被 agent 点名调用 | Agent 自动用，或在 prompt 里写 `bmad-xxx` | 可移植能力（复用 BMAD + 新建补强） |
-| **Hooks（护栏）** | `.github/hooks/*.json` + 脚本 | 生命周期事件触发（PreToolUse 等） | 自动；无需手动 | 确定性护栏（拦危险操作、跑质量门） |
-| **MCP servers（工具扩展）** | `.vscode/mcp.json.example`（顶层 `"servers"`；opt-in 复制成 `.vscode/mcp.json`） | 客户端**会话启动即 eager 连接**、workspace 全局、**不可按阶段门控** | **默认 inert**（`.example`）；阶段 7 手动启用，活动文件留本地不提交 | 本地工具扩展（如 Playwright MCP 驱动浏览器自测，见 7.7） |
+| **Instructions** | `.github/copilot-instructions.md`, `.github/instructions/**/*.instructions.md` | Automatic: always-on or matched to file type by `applyTo` glob | No manual trigger; takes effect when editing matching files | Rule layers (coding conventions, security red lines, stack conventions) |
+| **Prompts** | `.github/prompts/*.prompt.md` | On demand: when you enter `/name` | Enter `/requirements`, etc. in Chat | Workflows (single reusable task) |
+| **Agents** | `.github/agents/*.agent.md` | On switch: continuously effective when you select an agent | Switch in Chat's agent selector | Phase orchestrators (persistent persona + tool limits + handoffs) |
+| **Skills** | `.github/skills/*/SKILL.md` (project-level), `~/.agents/skills/bmad-*` (user-level) | Auto-loaded by relevance, or explicitly called by an agent | Agent uses them automatically, or write `bmad-xxx` in a prompt | Portable capabilities (reuse BMAD + new-build augmentation) |
+| **Hooks** | `.github/hooks/*.json` + scripts | Triggered by lifecycle events (PreToolUse, etc.) | Automatic; no manual action required | Deterministic guardrails (block dangerous operations, run quality gates) |
+| **MCP servers** | `.vscode/mcp.json.example` (top-level `"servers"`; opt-in copy to `.vscode/mcp.json`) | Client **eager-connects at session start**, workspace-global, **cannot be gated by phase** | **Inert by default** (`.example`); enable manually in Phase 7, keep active file local and uncommitted | Local tool extension (e.g., Playwright MCP drives browser self-checks; see 7.7) |
 
-## 4.1 关键认知：没有"原生优先级"
+## 4.1 Key recognition: there is no "native priority"
 
-官方明确：存在多份 instructions 时**会被合并加入上下文，顺序不保证**。
-所以 EOS **从不依赖"规则 A 覆盖规则 B"**。控制冲突的唯一可靠手段是：
-1. **`applyTo` 作用域**：用互斥 glob 让每条规则只在该类文件生效；
-2. **单一职责**：一个文件只管一个主题；
-3. **Hooks**：需要"确定性"的约束（如拦 `rm -rf /`）交给 hook，不靠 Agent 自觉。
+Officially: when multiple instructions exist, **they are merged into context, and order is not guaranteed**.
+So EOS **never depends on "Rule A overriding Rule B"**. The only reliable controls for conflicts are:
+1. **`applyTo` scope**: use mutually exclusive globs so each rule applies only to its file class;
+2. **Single responsibility**: one file governs one topic;
+3. **Hooks**: constraints that need "determinism" (such as blocking `rm -rf /`) go to hooks, not Agent self-discipline.
 
-## 4.2 always-on 是最稀缺资源
+## 4.2 always-on is the scarcest resource
 
-`copilot-instructions.md`（R1）会进入**每一次**会话，所以它必须极简（≈40 行）：只放
-"跨项目、永远成立"的工程信念（真相源、复用优先、安全红线、运营意识）。
-**能用窄作用域（applyTo）就绝不用 always-on。**
+`copilot-instructions.md` (R1) enters **every** session, so it must be minimal (≈40 lines): only "cross-project, always-true" engineering beliefs (source of truth, reuse first, security red lines, operational awareness).
+**If narrow scope (`applyTo`) can be used, never use always-on.**
 
 ---
 
-# 第 5 章 心智模型：分层规则 + 决策门
+# Chapter 5 Mental model: layered rules + decision gates
 
-## 5.1 规则十层（R1–R10）
+## 5.1 Ten rule layers (R1–R10)
 
-| 编号 | 名称 | 落地文件 | 作用域 |
+| ID | Name | Landing file | Scope |
 |---|---|---|---|
-| R1 | Global 全局信念 | `.github/copilot-instructions.md` | always-on（`**`） |
-| R2 | Workspace 仓库事实 | `instructions/00-workspace.instructions.md` | `**`（本仓库） |
+| R1 | Global beliefs | `.github/copilot-instructions.md` | always-on (`**`) |
+| R2 | Workspace repository facts | `instructions/00-workspace.instructions.md` | `**` (this repository) |
 | R3 | Frontend | `instructions/frontend/10-frontend.instructions.md` | `**/*.{tsx,jsx}` |
-| R4 | Backend | `instructions/backend/10-backend-node.instructions.md`（+python） | `**/*.ts`（/ `**/*.py`） |
+| R4 | Backend | `instructions/backend/10-backend-node.instructions.md` (+python) | `**/*.ts` (/ `**/*.py`) |
 | R5 | Data & API | `instructions/data-api/20-data-api.instructions.md` | `**/*.{sql,prisma}` |
 | R6 | Testing | `instructions/testing/30-testing.instructions.md` | `**/*.{test,spec}.*` |
-| R7 | Security | `instructions/security/40-security.instructions.md` | `**`（薄护栏） |
+| R7 | Security | `instructions/security/40-security.instructions.md` | `**` (thin guardrail) |
 | R8 | Release & Ops | `instructions/release-ops/50-release-ops.instructions.md` | `**/{Dockerfile,*.yml,*.yaml}` |
-| R9 | Agent 编排 | `.github/agents/eos-*.agent.md` | 切换时 |
-| R10 | Workflow | `.github/prompts/*.prompt.md` | 调用时 |
+| R9 | Agent orchestration | `.github/agents/eos-*.agent.md` | When switched in |
+| R10 | Workflow | `.github/prompts/*.prompt.md` | When invoked |
 
-> 注意 R1 与 R2、R7 都用 `**`：这是**合法共存**（薄、互补、单一职责），不是冲突。
-> 验证器 S3 检查会**豁免 `**`**，正因如此。
+> Note that R1, R2, and R7 all use `**`: this is **legal coexistence** (thin, complementary, single-responsibility), not a conflict.
+> Validator S3 checks **exempt `**`** exactly for this reason.
 
-## 5.2 决策门十关（G1–G10）
+## 5.2 Ten decision gates (G1–G10)
 
-| 门 | 阶段 | 通过标准（不过则不进下一阶段） |
+| Gate | Phase | Pass criteria (do not enter the next phase if not passed) |
 |---|---|---|
-| G1 | Discovery | 问题是一句可证伪陈述 + 成功指标可度量 |
-| **G2** | Requirements | **五张清单无未决 BLOCKER（必过硬门）** |
-| G3 | Spec | 每条需求有 ≥1 可度量验收标准 |
-| G-UX | UX & Design（条件） | 面向用户：每条需求有屏幕/流程/四态/a11y/视觉token；纯后端 SKIP+理由 |
-| G-EVAL | Eval（条件·LLM/agentic） | 每条 LLM 支撑的 AC 有 eval 用例+grader+阈值；含注入/成本用例；纯确定性功能 SKIP+理由 |
-| G4 | Architecture | 不可逆决策有 ADR；NFR/扩展/容灾各有显式设计 |
-| G5 | Planning | 每个 story 上下文自包含、可独立实现、含 AC |
-| G6 | Development | lint/typecheck/单测全绿（hook 质量门）+ 代码审查无阻断项 |
-| G7 | Testing | 每条 AC ≥1 测试且全绿；trace 矩阵完整 |
-| **G8** | Release | **质量+审计+回滚+灰度+NFR 五项门禁全过（必过硬门）** |
-| G9 | Observability | 关键路径埋点在产、指标可见 |
-| G10 | Iteration | 每个变更回写 Spec 真相源 |
+| G1 | Discovery | Problem is a falsifiable one-sentence statement + success metrics are measurable |
+| **G2** | Requirements | **Five checklists have no unresolved BLOCKER (mandatory hard gate)** |
+| G3 | Spec | Every requirement has ≥1 measurable acceptance criterion |
+| G-UX | UX & Design (conditional) | User-facing: every requirement has screen/flow/four states/a11y/visual tokens; pure backend SKIP+reason |
+| G-EVAL | Eval (conditional · LLM/agentic) | Every LLM-backed AC has eval case+grader+threshold; includes injection/cost cases; pure deterministic feature SKIP+reason |
+| G4 | Architecture | Irreversible decisions have ADRs; NFR/scale/DR each have explicit design |
+| G5 | Planning | Every story is self-contained, independently implementable, and includes AC |
+| G6 | Development | lint/typecheck/unit tests all green (hook quality gate) + code review has no blockers |
+| G7 | Testing | Every AC has ≥1 test and all are green; trace matrix is complete |
+| **G8** | Release | **Quality + audit + rollback + canary + NFR gates all pass (mandatory hard gate)** |
+| G9 | Observability | Key-path telemetry is in production and metrics are visible |
+| G10 | Iteration | Every change is written back to the Spec source of truth |
 
-**G2 和 G8 是两道硬门**：前者堵"上线后返工"，后者堵"带病上线"。
+**G2 and G8 are the two hard gates**: the former blocks "post-launch rework"; the latter blocks "launching while sick".
 
-> **哪些门可机器强制**：配置合规（`validate-config.mjs`，S1–S11）、G-EVAL（`eos-doctor.mjs`：有 `ai/llm/rag` 代码却无 `docs/eval-plan.md` → 报错）、G6 质量与 G7 测试/评估（`npm test`/evals）——这些都由本地 CI `.github/workflows/eos-ci.yml`（`act push`，需 Docker）在合并/发布前批量跑。其余偏内容/判断的门（G1/G3/G4/G5/G-UX/G10）靠 prompt+清单+人审。
+> **Which gates can be machine-enforced**: configuration compliance (`validate-config.mjs`, S1–S11), G-EVAL (`eos-doctor.mjs`: code under `ai/llm/rag` but no `docs/eval-plan.md` → error), G6 quality and G7 tests/evals (`npm test`/evals)--all of these are batch-run by local CI `.github/workflows/eos-ci.yml` (`act push`, requires Docker) before merge/release. The remaining gates that lean toward content/judgment (G1/G3/G4/G5/G-UX/G10) rely on prompts + checklists + human review.
 
 ---
 
-# 第 6 章 全生命周期实操（idea → 迭代）
+# Chapter 6 Full-lifecycle practice (idea → iteration)
 
-> 这是手册核心。10 个阶段，每个都给：**目标 / 何时进入 / 怎么启动（精确命令）/ 输入 / 产出 /
-> 决策门 / 必查项 / 防返工要点 / 样例**。
-> 样例统一引用 `my-app`（功能：用户登录）的真实产物，路径见每节"样例"。
-> 约定：`（agent）xxx` = 在 Chat 切换到该 agent；`/xxx` = 在 Chat 输入斜杠命令；
-> `` `cmd` `` = 在终端执行。
+> This is the core of the manual. 10 phases; each gives: **goal / when to enter / how to start (exact command) / inputs / outputs / decision gate / must-check items / anti-rework points / example**.
+> Examples consistently reference the real artifacts of `my-app` (feature: user login); paths appear in each section's "example".
+> Convention: `(agent) xxx` = switch to that agent in Chat; `/xxx` = enter a slash command in Chat; `` `cmd` `` = run it in the terminal.
 
-## 全景图
+## Panorama
 
 ```
  idea
@@ -281,530 +265,505 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
   ▼
 [1] Discovery ─G1→ [2] Requirements ─G2→ [3] Spec ─G3→ [3.5] UX&Design ─G-UX→
 [4] Architecture ─G4→ [5] Planning ─G5→ [6] Development ─G6→ [7] Testing ─G7→
-[8] Release ─G8→ [9] Observability ─G9→ [10] Iteration ─G10→（回流驱动下一轮 [2]）⟲
+[8] Release ─G8→ [9] Observability ─G9→ [10] Iteration ─G10→ (feeds back to drive next round [2]) ⟲
 ```
 
 ---
 
-## 阶段 0 — 项目初始化（一次性）
+## Phase 0 — Project initialization (one-time)
 
-| 项 | 内容 |
+| Item | Content |
 |---|---|
-| **目标** | 从模板得到一个配置健康的空项目 |
-| **怎么启动** | `npx degit --mode=git niaodian/eos-template my-app && cd my-app` |
-| **产出** | 完整 `.github/` + `docs/` 骨架 |
-| **门** | `node .github/hooks/validate-config.mjs` → **PASS** |
-| **必查** | PASS 0 errors。**栈未定则先别改** `00-workspace`——保留 Node 占位即可；栈是不可逆决策，权威锁定在**阶段 4（ADR）**。已知栈可即抄 `docs/eos/stack-presets.md`（快路径）。 |
-| **打开方式** | 从 `my-app/` 内执行 `code .`——让**项目本身**成为工作区根。打开父目录会导致 agent/instructions/hooks 全部不生效（见 7.2）。 |
-| **★ 硬化（一次性）** | 跑 `/eos-init`：引导你开分支保护（runbook）+ 替换 CODEOWNERS handle + 固定审批基线，进度记入 `docs/eos/activation.md`。**这一步决定 CI 门是否真能阻断合并**（详见附录 D）；`eos-doctor` 每次会提示还剩几项，`/release-gate` 发布前再核一次——避免"系统性遗忘"。个人试验仓可逐项豁免（`[~] … 原因：…`）。 |
-| **样例** | `my-app/` 全树（44 文件，validate PASS） |
+| **Goal** | Get an empty project with healthy configuration from the template |
+| **How to start** | `npx degit --mode=git niaodian/eos-template my-app && cd my-app` |
+| **Output** | Complete `.github/` + `docs/` skeleton |
+| **Gate** | `node .github/hooks/validate-config.mjs` → **PASS** |
+| **Must check** | PASS 0 errors. **If the stack is undecided, do not change** `00-workspace` yet--keep the Node placeholder; the stack is an irreversible decision, and the authority is locked in **Phase 4 (ADR)**. If the stack is known, copy `docs/eos/stack-presets.md` directly (fast path). |
+| **How to open** | Run `code .` from inside `my-app/`--make **the project itself** the workspace root. Opening the parent directory makes agent/instructions/hooks all ineffective (see 7.2). |
+| **★ Hardening (one-time)** | Run `/eos-init`: it guides you through enabling branch protection (runbook) + replacing CODEOWNERS handles + pinning the approval baseline, and records progress in `docs/eos/activation.md`. **This step determines whether CI gates can truly block merges** (see Appendix D); `eos-doctor` gives an advisory reminder of remaining items every time, and `/release-gate` checks again before release--to avoid "systemic forgetting". Personal experiment repositories may exempt items one by one (`[~] ... reason: ...`). |
+| **Example** | Full `my-app/` tree (44 files, validate PASS) |
 
 ---
 
-## 阶段 1 — Discovery（问题定义）
+## Phase 1 — Discovery (problem definition)
 
-| 项 | 内容 |
+| Item | Content |
 |---|---|
-| **目标** | 把"模糊的 idea"收敛成**一句可证伪的问题 + 可度量成功指标 + 已知约束** |
-| **何时进入** | 你有一个想法但还说不清"成功长什么样" |
-| **怎么启动** | Chat 切到 **`（agent）eos-discovery`**；它会调用 `bmad-brainstorming` + `bmad-agent-analyst`（Mary），可选用 `bmad-forge-idea` 压力测试 |
-| **输入** | 原始想法（口述即可） |
-| **产出** | `docs/discovery.md`：问题陈述、证伪条件、成功指标表、scope-in/out |
-| **决策门 G1** | ☑ 问题是一句可证伪陈述 ☑ 成功指标可度量 |
-| **必查项** | 写得出"失败长什么样"吗？指标有数值和数据来源吗？范围外（不做什么）写了吗？ |
-| **防返工** | 这是最廉价的纠错点。问题没锁定就往下做，后面每一步都在放大偏差。 |
-| **样例** | `my-app/docs/discovery.md`（登录成功率≥98%、p95≤300ms 等 4 个可度量指标） |
+| **Goal** | Converge a "vague idea" into **one falsifiable problem sentence + measurable success metrics + known constraints** |
+| **When to enter** | You have an idea but cannot yet say "what success looks like" |
+| **How to start** | Switch Chat to **`(agent) eos-discovery`**; it will call `bmad-brainstorming` + `bmad-agent-analyst` (Mary), optionally using `bmad-forge-idea` for pressure testing |
+| **Input** | Raw idea (spoken description is fine) |
+| **Output** | `docs/discovery.md`: problem statement, falsification conditions, success metrics table, scope-in/out |
+| **Decision gate G1** | ☑ Problem is a falsifiable one-sentence statement ☑ Success metrics are measurable |
+| **Must-check items** | Can you write "what failure looks like"? Do metrics have numeric values and data sources? Did you write out-of-scope (what not to do)? |
+| **Anti-rework** | This is the cheapest correction point. If the problem is not locked and you move on, every later step amplifies the deviation. |
+| **Example** | `my-app/docs/discovery.md` (4 measurable metrics such as login success rate ≥98%, p95≤300ms) |
 
-**完成判据**：能向同事用一句话讲清"我们在解决什么问题、怎么知道解决了"。
+**Completion criterion**: you can explain in one sentence to a colleague "what problem we are solving, and how we know it is solved".
 
 ---
 
-## 阶段 2 — Requirements（需求分析 + 运营前置）★ 硬门
+## Phase 2 — Requirements (analysis + operational pre-flight) ★ hard gate
 
-| 项 | 内容 |
+| Item | Content |
 |---|---|
-| **目标** | 展开功能需求 + NFR + **把运营需求前置**（埋点/权限/回滚…），堵死"上线后返工" |
-| **何时进入** | G1 通过、`docs/discovery.md` 就绪 |
-| **怎么启动** | Chat 输入 **`/requirements "<feature>"`**（包裹 `bmad-create-prd` + skill `eos-operational-readiness`） |
-| **输入** | `docs/discovery.md` |
-| **产出** | `docs/requirements.md`，**顶部带"Operational Pre-Flight Decision Table"** |
-| **决策门 G2（硬门）** | 五张清单 A/B/C/D/E 全部走查（**受监管行业再加第六张 F-compliance**），**任何未决项 = BLOCKER，不清零不得进 Spec** |
-| **必查项** | 运营前置 11 项（telemetry/authz/audit/rollback/monitoring/canary/quota/i18n/multi-tenancy/capacity-SLO/DR）每项三选一：**ADOPT / SKIP+理由 / DEFER+触发条件**，禁止留空 |
-| **防返工** | 用"反向提问法"逼出隐性需求：谁**无权**做？做错怎么**回滚**？怎么**知道**线上有没有用？×100 用户会怎样？ |
-| **样例** | `my-app/docs/requirements.md`（11 项决策表 + authz 矩阵 + A/B/C/D 走查结论无 BLOCKER） |
+| **Goal** | Expand functional requirements + NFR + **move operational requirements upfront** (telemetry/authz/rollback...), preventing "post-launch rework" |
+| **When to enter** | G1 passed and `docs/discovery.md` is ready |
+| **How to start** | Enter **`/requirements "<feature>"`** in Chat (wraps `bmad-create-prd` + skill `eos-operational-readiness`) |
+| **Input** | `docs/discovery.md` |
+| **Output** | `docs/requirements.md`, **with "Operational Pre-Flight Decision Table" at the top** |
+| **Decision gate G2 (hard gate)** | Walk through all five checklists A/B/C/D/E (**regulated industries add the sixth F-compliance**); **any unresolved item = BLOCKER; cannot enter Spec until cleared** |
+| **Must-check items** | For the 11 operational pre-flight items (telemetry/authz/audit/rollback/monitoring/canary/quota/i18n/multi-tenancy/capacity-SLO/DR), every item must choose one of three: **ADOPT / SKIP+reason / DEFER+trigger**; blanks are forbidden |
+| **Anti-rework** | Use the "reverse questioning method" to force out hidden requirements: who is **not authorized** to do this? How do we **roll back** if it goes wrong? How do we **know** whether it is used in production? What happens at ×100 users? |
+| **Example** | `my-app/docs/requirements.md` (11-item decision table + authz matrix + A/B/C/D walkthrough conclusions with no BLOCKER) |
 
-**五张清单**（完整内容在 `docs/checklists/`；**受监管行业再加第六张 F**）：
-- **A-gap**：需求缺口（可证伪、验收可度量、边界/异常/并发、依赖、scope-out、重叠排查）
-- **B-rework**：上线后高概率补做（埋点/authz/审计/回滚/告警/灰度/限流/i18n/空错态/迁移可逆）
-- **C-nfr**：非功能需求（性能/容量/可用性容灾/安全合规/可观测/可维护/a11y，逐项填目标值）
-- **D-ops**：运营前置（埋点↔指标闭合/权限矩阵/审计范围/回滚预案/灰度阈值/配额/多租户/i18n/容量告警/Runbook 责任人）
-- **E-security**：安全与机密（密钥不入代码/前端、`.env` 治理、供应链投毒防护、配置权限隔离、密钥轮换）
-- **F-compliance**（**仅受监管行业**）：具名制度选择（HIPAA/PCI-DSS/SOC2/SOX/GDPR/CCPA/PIPL）→ 级联控制（数据驻留、审计留存期、最小必要、供应商 **BAA/DPA**、**Agentic 数据出境**决策）
+**Five checklists** (full content in `docs/checklists/`; **regulated industries add the sixth F**):
+- **A-gap**: requirement gaps (falsifiable, measurable acceptance, boundaries/exceptions/concurrency, dependencies, scope-out, overlap check)
+- **B-rework**: likely post-launch add-ons (telemetry/authz/audit/rollback/alerting/canary/rate-limit/i18n/empty-error states/reversible migration)
+- **C-nfr**: non-functional requirements (performance/capacity/availability DR/security compliance/observability/maintainability/a11y, fill target values one by one)
+- **D-ops**: operational pre-flight (telemetry↔metrics closure/authz matrix/audit scope/rollback plan/canary thresholds/quota/multi-tenancy/i18n/capacity alerts/runbook owner)
+- **E-security**: security and secrets (no secrets in code/frontend, `.env` governance, supply-chain poisoning defense, config permission isolation, key rotation)
+- **F-compliance** (**regulated industries only**): named regime selection (HIPAA/PCI-DSS/SOC2/SOX/GDPR/CCPA/PIPL) → cascading controls (data residency, audit retention, minimum necessary, vendor **BAA/DPA**, **Agentic data egress** decision)
 
-> **受监管行业（医疗/金融等）请在需求阶段就定制度**：`/requirements` 的 **Step 2.5 制度前置**逼你先答"是否适用 HIPAA/PCI-DSS/SOC2/SOX/GDPR/CCPA/PIPL"，选中即走 `F-compliance.md`（专用命令 **`/compliance`**：制度选择→数据驻留/审计留存/最小必要/供应商 BAA/DPA/Agentic 数据出境），把这些**在架构定型前**落地——避免上线后推倒重来。**尤其**：LLM/agent 产品若涉 PHI/PAN/受监管个人数据，必须当场定"数据出境"方案（签 BAA/DPA · 自托管模型 · 脱敏网关 · 排除受监管数据），晚决 = 换模型换架构。结果记入 `docs/compliance-profile.md`。
-> **非法律意见**：EOS 只强制早期工程决策，**不替代**合规官/法务/审计师签核。`【新建补强】`
+> **Regulated industries (healthcare/finance, etc.) should decide the regime in the requirements phase**: `/requirements` **Step 2.5 regime pre-flight** forces you to answer first whether HIPAA/PCI-DSS/SOC2/SOX/GDPR/CCPA/PIPL applies; selecting one runs `F-compliance.md` (dedicated command **`/compliance`**: regime selection → data residency/audit retention/minimum necessary/vendor BAA/DPA/Agentic data egress) and lands these decisions **before architecture is fixed**--avoiding a teardown after launch. **Especially**: if an LLM/agent product involves PHI/PAN/regulated personal data, it must decide the "data egress" plan immediately (signed BAA/DPA · self-hosted model · redaction gateway · exclude regulated data); deciding late = model swap and architecture swap. Record the result in `docs/compliance-profile.md`.
+> **Not legal advice**: EOS only enforces early engineering decisions and **does not replace** compliance officer/legal/auditor sign-off. `【New-build】`
 
-> 配套命令：`/nfr` 专门把 C-nfr 逐行填上具体目标值。
+> Supporting command: `/nfr` fills C-nfr with concrete target values line by line.
 
 ---
 
-## 阶段 3 — Spec（PRD = 唯一真相源）
+## Phase 3 — Spec (PRD = single source of truth)
 
-| 项 | 内容 |
+| Item | Content |
 |---|---|
-| **目标** | 把需求固化成 PRD，成为下游唯一认可的真相源 |
-| **何时进入** | G2 通过、`docs/requirements.md` 无 BLOCKER |
-| **怎么启动** | Chat 输入 **`/spec`**（用 `bmad-create-prd` 起草，用 `bmad-validate-prd` 校验） |
-| **输入** | `docs/requirements.md` |
-| **产出** | `docs/prd.md`：每条 FR 带验收标准 + NFR 段（来自 C-nfr，不留空） |
-| **决策门 G3** | ☑ 每条需求有 ≥1 可度量验收标准 |
-| **必查项** | 验收标准能写成测试吗？NFR 段有没有照搬 C-nfr 的目标值？scope-out 写了吗？ |
-| **防返工** | PRD 即契约。从此下游只认 `docs/prd.md`；任何"我以为"都要回来改 PRD。 |
-| **样例** | `my-app/docs/prd.md`（FR1–FR5，每条配 AC1.1…AC5.3） |
+| **Goal** | Solidify requirements into a PRD that becomes the only downstream recognized source of truth |
+| **When to enter** | G2 passed and `docs/requirements.md` has no BLOCKER |
+| **How to start** | Enter **`/spec`** in Chat (draft with `bmad-create-prd`, validate with `bmad-validate-prd`) |
+| **Input** | `docs/requirements.md` |
+| **Output** | `docs/prd.md`: every FR has acceptance criteria + NFR section (from C-nfr, no blanks) |
+| **Decision gate G3** | ☑ Every requirement has ≥1 measurable acceptance criterion |
+| **Must-check items** | Can the acceptance criteria be written as tests? Did the NFR section copy the target values from C-nfr? Is scope-out written? |
+| **Anti-rework** | The PRD is the contract. From here on, downstream only recognizes `docs/prd.md`; any "I assumed" must come back to update the PRD. |
+| **Example** | `my-app/docs/prd.md` (FR1–FR5, each with AC1.1...AC5.3) |
 
 ---
 
-## 阶段 3.5 — UX & Design（视觉 + 体验契约）★ 条件门
+## Phase 3.5 — UX & Design (visual + experience contract) ★ conditional gate
 
-| 项 | 内容 |
+| Item | Content |
 |---|---|
-| **目标** | 动手架构/实现前定下"长什么样 + 怎么交互"，产出两份对等契约 |
-| **何时进入** | G3 通过、`docs/prd.md` 就绪。**面向用户的产品必做**；纯后端/API/CLI 项目可 SKIP |
-| **怎么启动** | Chat 输入 **`/ux-spec`**（包裹 `bmad-ux`）或切到 **`（agent）eos-design`**；问题仍模糊用 `bmad-cis-design-thinking`(Maya)，要强主张用 `bmad-agent-ux-designer`(Sally) |
-| **输入** | `docs/prd.md` |
-| **产出** | `docs/DESIGN.md`（视觉身份：token/字体/色彩/间距）+ `docs/EXPERIENCE.md`（信息架构/用户流/屏幕状态/交互/a11y/旅程） |
-| **决策门 G-UX** | ☑ 每条面向用户需求有屏幕/流程 ☑ loading/empty/error/success 四态齐全 ☑ a11y 基线（键盘/焦点/标签/对比度）☑ 用 DESIGN.md 命名 token、不硬编码；纯后端 → 在 `EXPERIENCE.md` 写 `SKIP — 无用户界面（理由）` |
-| **必查项** | 每个屏幕的空/错/载入态都定义了吗？关键操作可纯键盘完成吗？颜色/间距是引用 token 还是写死？ |
-| **防返工** | UX 契约**先于**架构与实现：架构据此定 API/数据、story 据此引用屏幕、前端规则与埋点据此落地。两份契约对任何后来的 mock/import 有最终解释权。 |
-| **可跳过** | 纯后端/CLI：一行 `SKIP + 理由` 即过门，不阻塞。 |
+| **Goal** | Decide "what it looks like + how it interacts" before architecture/implementation, producing two peer contracts |
+| **When to enter** | G3 passed and `docs/prd.md` is ready. **Required for user-facing products**; pure backend/API/CLI projects may SKIP |
+| **How to start** | Enter **`/ux-spec`** in Chat (wraps `bmad-ux`) or switch to **`(agent) eos-design`**; if the problem is still vague use `bmad-cis-design-thinking` (Maya), and for strong opinionated design use `bmad-agent-ux-designer` (Sally) |
+| **Input** | `docs/prd.md` |
+| **Output** | `docs/DESIGN.md` (visual identity: tokens/fonts/colors/spacing) + `docs/EXPERIENCE.md` (information architecture/user flows/screen states/interactions/a11y/journey) |
+| **Decision gate G-UX** | ☑ Every user-facing requirement has screen/flow ☑ loading/empty/error/success four states are complete ☑ a11y baseline (keyboard/focus/labels/contrast) ☑ use named tokens from DESIGN.md, no hard-coding; pure backend → write `SKIP — no user interface (reason)` in `EXPERIENCE.md` |
+| **Must-check items** | Are empty/error/loading states defined for every screen? Can key actions be completed with keyboard only? Are colors/spacing referencing tokens or hard-coded? |
+| **Anti-rework** | The UX contract comes **before** architecture and implementation: architecture uses it to decide APIs/data, stories reference screens from it, and frontend rules and telemetry land from it. The two contracts are authoritative for any later mock/import. |
+| **Skippable** | Pure backend/CLI: one line `SKIP + reason` passes the gate and does not block. |
 
-> 复用说明【BMAD + 补强】：能力来自 `bmad-ux` / `bmad-agent-ux-designer`(Sally) / `bmad-cis-design-thinking`(Maya)，
-> EOS 只新增编排（`/ux-spec` prompt + `eos-design` agent + G-UX 门），**不重建设计能力**。
+> Reuse note 【BMAD + augmentation】: capabilities come from `bmad-ux` / `bmad-agent-ux-designer` (Sally) / `bmad-cis-design-thinking` (Maya).
+> EOS only adds orchestration (`/ux-spec` prompt + `eos-design` agent + G-UX gate) and **does not rebuild design capability**.
 
 ---
 
-## 阶段 4 — Architecture（方案 + 数据模型 + API 契约 + ADR）
+## Phase 4 — Architecture (solution + data model + API contract + ADR)
 
-| 项 | 内容 |
+| Item | Content |
 |---|---|
-| **目标** | 技术方案、数据模型、API 契约、NFR 落点、关键决策留痕（ADR） |
-| **何时进入** | G3 通过、`docs/prd.md` 就绪 |
-| **怎么启动** | Chat 切到 **`（agent）eos-architecture`**（调用 `bmad-architecture`/Winston）；对每个不可逆决策跑 **`/adr`**；跑 **`/deploy-topology`** 选部署拓扑 |
-| **输入** | `docs/prd.md`、`docs/EXPERIENCE.md`+`docs/DESIGN.md`（若做了 UX 阶段）、`docs/checklists/C-nfr.md`、`docs/checklists/G-deployment.md` |
-| **产出** | `docs/architecture.md`（含 Deployment 段）、`docs/data-model.md`、`api/openapi.yaml`、`docs/adr/NNN-*.md`（含 tech-stack + deployment-topology 两条 ADR）、填好的 `G-deployment.md` |
-| **决策门 G4** | ☑ 扩展性/弹性/容灾/安全各有显式设计（不是"以后再说"）☑ 每个不可逆决策有 ADR ☑ **技术栈已锁** ☑ **部署拓扑已选**（NFR 依据 + deployment-topology ADR） |
-| **必查项** | API 契约**先于**实现写好了吗？ADR 有没有列备选方案和 trade-off？NFR 每项有落点吗？**部署拓扑是不是选了"满足 NFR 的最简项"（而不是跟风上 K8s）**？ |
-| **防返工** | "API 先于实现"让前后端可并行、契约可被测试锚定；ADR 防团队失忆。 |
-| **样例** | `my-app/docs/adr/0001-session-strategy.md`（3 方案对比 + trade-off）、`my-app/api/openapi.yaml`（先于 src/auth.js 写） |
+| **Goal** | Technical solution, data model, API contract, NFR landing points, and trace for key decisions (ADR) |
+| **When to enter** | G3 passed and `docs/prd.md` is ready |
+| **How to start** | Switch Chat to **`(agent) eos-architecture`** (calls `bmad-architecture`/Winston); run **`/adr`** for every irreversible decision; run **`/deploy-topology`** to choose deployment topology |
+| **Input** | `docs/prd.md`, `docs/EXPERIENCE.md`+`docs/DESIGN.md` (if UX phase was done), `docs/checklists/C-nfr.md`, `docs/checklists/G-deployment.md` |
+| **Output** | `docs/architecture.md` (including Deployment section), `docs/data-model.md`, `api/openapi.yaml`, `docs/adr/NNN-*.md` (including tech-stack + deployment-topology ADRs), filled `G-deployment.md` |
+| **Decision gate G4** | ☑ Scalability/resilience/DR/security each have explicit design (not "later") ☑ Every irreversible decision has an ADR ☑ **Tech stack is locked** ☑ **Deployment topology is selected** (NFR basis + deployment-topology ADR) |
+| **Must-check items** | Was the API contract written **before** implementation? Does each ADR list alternatives and trade-offs? Does every NFR have a landing point? **Did the deployment topology choose "the simplest option that satisfies NFR" (rather than following the K8s trend)**? |
+| **Anti-rework** | "API before implementation" lets frontend and backend proceed in parallel and anchors the contract in tests; ADRs prevent team amnesia. |
+| **Example** | `my-app/docs/adr/0001-session-strategy.md` (3-solution comparison + trade-off), `my-app/api/openapi.yaml` (written before `src/auth.js`) |
 
-**ADR 模板要素**（`/adr` 自动生成）：Status / Context / Decision / Consequences（侧重 1-N 扩展与可逆性）/ Alternatives considered。一文件一决策，从 `docs/architecture.md` 链接。
+**ADR template elements** (auto-generated by `/adr`): Status / Context / Decision / Consequences (focus on 1-N scale and reversibility) / Alternatives considered. One file per decision, linked from `docs/architecture.md`.
 
-> **在架构阶段锁定技术栈**（不可逆决策，阶段 0 故意只留占位）：选定语言/框架后 ① 从 `docs/eos/stack-presets.md` 更新 `00-workspace` 的 `Local commands` ② 启用对应 R3 栈规则 ③ 写 `docs/adr/00X-tech-stack.md`。**G4 会校验"栈已锁"**——这样 always-on 的 `00-workspace` 才与真实栈一致，消除阶段 0 的 ⛳ 占位与后续栈的矛盾。
+> **Lock the tech stack in the architecture phase** (irreversible decision; Phase 0 intentionally only leaves a placeholder): after choosing language/framework, ① update `00-workspace` `Local commands` from `docs/eos/stack-presets.md` ② enable the corresponding R3 stack rule ③ write `docs/adr/00X-tech-stack.md`. **G4 validates "stack locked"**--so always-on `00-workspace` matches the real stack and eliminates the conflict between the Phase 0 ⛳ placeholder and the later stack.
 
-> **在架构阶段选定部署拓扑**（同属 NFR 驱动的架构决策）：跑 `/deploy-topology` 走查 `docs/checklists/G-deployment.md`——在**裸进程 / Docker / K8s / serverless / PaaS** 里**选满足 NFR 的最简项**（别默认上 K8s），落 `docs/adr/NNN-deployment-topology.md` + `architecture.md` 的 Deployment 段。EOS **不预设** Docker 或 K8s：拓扑由本阶段按 SLO/RTO/RPO/峰值 QPS 决定；真实 cluster/registry/cloud 属 `【需企业/网络环境】`，本地 dev/CI 不依赖它也能跑。所选拓扑的 manifest（`Dockerfile`/`compose.yml`/`k8s/*.yaml`/`serverless.yml`）自动吃 R8 `release-ops` 规则，G8 发布门再校验回滚/灰度/health 与拓扑一致。
+> **Select the deployment topology in the architecture phase** (also an NFR-driven architecture decision): run `/deploy-topology` to walk through `docs/checklists/G-deployment.md`--among **bare process / Docker / K8s / serverless / PaaS**, **choose the simplest option that satisfies NFR** (do not default to K8s), and land `docs/adr/NNN-deployment-topology.md` + the Deployment section of `architecture.md`. EOS **does not pre-assume** Docker or K8s: topology is decided in this phase by SLO/RTO/RPO/peak QPS; real cluster/registry/cloud belongs to `【Needs enterprise env】`, and local dev/CI can still run without it. The selected topology's manifests (`Dockerfile`/`compose.yml`/`k8s/*.yaml`/`serverless.yml`) automatically receive R8 `release-ops` rules, and the G8 release gate then validates rollback/canary/health consistency with the topology.
 
 ---
 
-## 阶段 5 — Planning（拆 Epics→Stories）
+## Phase 5 — Planning (break into Epics→Stories)
 
-| 项 | 内容 |
+| Item | Content |
 |---|---|
-| **目标** | 把架构拆成可独立实现、上下文自包含的 story |
-| **何时进入** | G4 通过 |
-| **怎么启动** | Chat 切到 **`（agent）eos-plan`**（`bmad-create-epics-and-stories` → `bmad-create-story` → `bmad-sprint-planning`），对每条 AC 用 **`bmad-testarch-atdd`** 先设计验收测试；**若含 LLM/agentic 组件,再跑 `/eval-spec` 设计评估集(G-EVAL)**;最后用 `bmad-check-implementation-readiness` 验就绪 |
-| **输入** | `docs/prd.md`、`docs/architecture.md`、`docs/EXPERIENCE.md`（若做了 UX 阶段） |
-| **产出** | `docs/epics/*`、`docs/stories/*.md`（每个含**验收测试大纲**）**、`docs/eval-plan.md`（LLM 功能）** |
-| **决策门 G5** | ☑ 每个 story 上下文自包含 ☑ 可独立实现 ☑ 含 AC **且每条 AC 有验收测试设计（ATDD）** ☑ 把 telemetry/authz/rollback 落成具体任务 **☑ LLM 功能有 eval-plan（G-EVAL）或显式 SKIP** |
-| **必查项** | 开发者拿到这个 story，**不回头翻别处**就能开工吗？DoD 写了吗？**每条 AC 的验收测试意图定义了吗**？**LLM 功能的 eval 集/grader/阈值定了吗**？ |
-| **防返工** | "就绪门"防开发中途缺上下文；**测试左移**让验收标准在写码前就可测，防"事后补测凑覆盖率"；**eval 左移**让非确定的 LLM 输出在写码前就有可度量基线。 |
-| **样例** | `my-app/docs/stories/story-001-auth.md`（AC + 自包含 context + DoD = Ready） |
+| **Goal** | Break architecture into independently implementable, self-contained stories |
+| **When to enter** | G4 passed |
+| **How to start** | Switch Chat to **`(agent) eos-plan`** (`bmad-create-epics-and-stories` → `bmad-create-story` → `bmad-sprint-planning`); design acceptance tests first for every AC with **`bmad-testarch-atdd`**; **if it contains LLM/agentic components, also run `/eval-spec` to design the evaluation set (G-EVAL)**; finally validate readiness with `bmad-check-implementation-readiness` |
+| **Input** | `docs/prd.md`, `docs/architecture.md`, `docs/EXPERIENCE.md` (if UX phase was done) |
+| **Output** | `docs/epics/*`, `docs/stories/*.md` (each includes **acceptance test outline**), **`docs/eval-plan.md` (LLM features)** |
+| **Decision gate G5** | ☑ Every story is self-contained ☑ independently implementable ☑ includes AC **and every AC has acceptance test design (ATDD)** ☑ telemetry/authz/rollback are landed as concrete tasks **☑ LLM features have eval-plan (G-EVAL) or explicit SKIP** |
+| **Must-check items** | Can a developer start work from this story **without going back to read elsewhere**? Is DoD written? **Is the acceptance test intent defined for every AC**? **Are the eval set/grader/threshold for LLM features defined**? |
+| **Anti-rework** | The "readiness gate" prevents missing context in the middle of development; **shifting testing left** makes acceptance criteria testable before coding and prevents "adding tests later just to fill coverage"; **shifting eval left** gives nondeterministic LLM output a measurable baseline before coding. |
+| **Example** | `my-app/docs/stories/story-001-auth.md` (AC + self-contained context + DoD = Ready) |
 
 ---
 
-## 阶段 6 — Development（按 story 实现）
+## Phase 6 — Development (implement per story)
 
-| 项 | 内容 |
+| Item | Content |
 |---|---|
-| **目标** | 实现 story，受栈规则 + 护栏约束，**完成前过代码审查** |
-| **何时进入** | G5 通过、story = Ready |
-| **怎么启动** | Chat 输入 **`bmad-dev-story`** 实现（快速场景用 `bmad-quick-dev`）；实现后跑 **`bmad-code-review`**（三路对抗审查：Blind Hunter / Edge Case Hunter / Acceptance Auditor），解掉阻断项再进 G7 |
-| **输入** | `docs/stories/story-XXX.md` |
-| **产出** | `src/` 代码 + 对应测试 + **代码审查结论（阻断项已解）** |
-| **自动生效的规则** | 编辑 `.tsx/.jsx`→R3 前端规则；`.ts`→R4 后端；`.sql/.prisma`→R5；`.test.*`→R6；**全部** `**`→R1+R2+R7（按 applyTo 自动注入，你无需手动加载） |
-| **护栏（自动）** | **PreToolUse** `deny-dangerous.js` 拦截 `rm -rf /`、`DROP TABLE`、`git push --force` 等；**PostToolUse** `quality.json` 跑 lint+typecheck+test |
-| **决策门 G6** | ☑ lint/typecheck/单测全绿（质量门 hook 放行）☑ **代码审查无阻断项（`bmad-code-review`）** |
-| **必查项** | 危险操作真的被拦了吗？质量门是不是因为缺 `package.json` test 脚本而空跑？**代码审查跑了吗？阻断项都解了还是被无声跳过**？ |
-| **防返工** | Hooks 把约束从"靠 Agent 自觉"变成"确定性拦截"；**代码审查补上自动化查不出的设计/逻辑/边界/安全盲区**——两者互补，缺一不可。 |
-| **样例** | `my-app/src/auth.js`（零依赖 `node:crypto`）；质量门模拟 exit 0、10/10 测试通过 |
+| **Goal** | Implement the story under stack rules + guardrails, and **pass code review before completion** |
+| **When to enter** | G5 passed, story = Ready |
+| **How to start** | Enter **`bmad-dev-story`** in Chat to implement (use `bmad-quick-dev` for fast cases); after implementation run **`bmad-code-review`** (three-way adversarial review: Blind Hunter / Edge Case Hunter / Acceptance Auditor), resolve blockers before entering G7 |
+| **Input** | `docs/stories/story-XXX.md` |
+| **Output** | `src/` code + corresponding tests + **code review conclusion (blockers resolved)** |
+| **Automatically effective rules** | Editing `.tsx/.jsx`→R3 frontend rules; `.ts`→R4 backend; `.sql/.prisma`→R5; `.test.*`→R6; **all** `**`→R1+R2+R7 (automatically injected by applyTo; you do not need manual loading) |
+| **Guardrails (automatic)** | **PreToolUse** `deny-dangerous.js` blocks `rm -rf /`, `DROP TABLE`, `git push --force`, etc.; **PostToolUse** `quality.json` runs lint+typecheck+test |
+| **Decision gate G6** | ☑ lint/typecheck/unit tests all green (quality gate hook allows) ☑ **code review has no blockers (`bmad-code-review`)** |
+| **Must-check items** | Are dangerous operations actually blocked? Is the quality gate empty-running because `package.json` lacks a test script? **Did code review run? Were blockers resolved or silently skipped**? |
+| **Anti-rework** | Hooks turn constraints from "Agent self-discipline" into "deterministic interception"; **code review fills design/logic/edge/security blind spots that automation cannot find**--they complement each other and neither can be omitted. |
+| **Example** | `my-app/src/auth.js` (zero-dependency `node:crypto`); quality-gate simulation exit 0, 10/10 tests passed |
 
-> 质量门要真正生效，项目 `package.json` 需有 `test`（及可选 `lint`/`typecheck`）脚本，
-> 否则 hook 会 `--if-present` 空跑。my-app 的最小 `package.json`：`{"scripts":{"test":"node --test"}}`。
+> For the quality gate to be truly effective, project `package.json` must have a `test` script (and optional `lint`/`typecheck` scripts), otherwise the hook will empty-run via `--if-present`. Minimal `package.json` in my-app: `{"scripts":{"test":"node --test"}}`.
 
-> **verify-as-you-build（可选·opt-in）**：前端 story 实现后，可在 **agent 模式**用 **Playwright MCP**
-> 驱动本地 dev server 自查刚写的交互——类似 Antigravity 的 Chrome 集成。浏览器 MCP **默认不启用**（避免
-> 早期阶段被 eager 启动），需先 `cp .vscode/mcp.json.example .vscode/mcp.json`（沙箱锁 localhost）。这是
-> **开发期便利**、非确定性；正式验证在阶段 7 用 `/e2e` 固化成 Playwright 规格。详见 7.7。
+> **verify-as-you-build (optional · opt-in)**: after implementing a frontend story, in **agent mode** you can use **Playwright MCP** to drive the local dev server and self-check the interaction you just wrote--similar to Antigravity's Chrome integration. Browser MCP is **not enabled by default** (to avoid eager startup in early phases); first run `cp .vscode/mcp.json.example .vscode/mcp.json` (sandbox locked to localhost). This is a **development convenience**, not deterministic; formal verification in Phase 7 uses `/e2e` to solidify Playwright specs. See 7.7.
 
 ---
 
-## 阶段 7 — Testing（验证 + 可追溯）
+## Phase 7 — Testing (verification + traceability)
 
-| 项 | 内容 |
+| Item | Content |
 |---|---|
-| **目标** | 按测试策略验证，建立 spec↔test 可追溯，并**验证 NFR 目标** |
-| **何时进入** | G6 通过 |
-| **怎么启动** | Chat 输入 **`bmad-tea`**（Murat）/ `bmad-testarch-test-design` / `bmad-testarch-automate` / `bmad-testarch-trace` / **`bmad-testarch-nfr`** / `bmad-qa-generate-e2e-tests`；**面向用户流程用 `/e2e`**（编排 Playwright 框架+E2E 生成+trace，开发期可用 Playwright MCP 驱动浏览器自查，见 7.7）；**LLM 功能:按 `docs/eval-plan.md` 跑 eval 集 + 回归基线** |
-| **输入** | `docs/prd.md`（AC 清单）、**`docs/checklists/C-nfr.md`（NFR 目标值）**、**`docs/eval-plan.md`（LLM 功能）**、`src/` 代码 |
-| **产出** | 测试套件 + `docs/trace-matrix.md`（AC ↔ 测试映射）+ **NFR 验证结果** + **eval 结果（LLM 功能）** |
-| **生效规则 R6** | 金字塔结构；**每条 AC ≥1 测试**；`describe(<criterion id>)` 命名；无真实计时器/无顺序依赖；改动行覆盖率 ≥80%；**NFR 目标用 `bmad-testarch-nfr` 验证**；**LLM 输出用 eval 集+grader 验(非 exact-match),见 `ai/10-ai-llm` 规则** |
-| **决策门 G7** | ☑ 每条 AC ≥1 测试 ☑ 全绿 ☑ trace 矩阵完整 ☑ **面向用户流程 E2E 全绿（Playwright，`/e2e`）** ☑ **NFR 目标已验证或显式标 deferred+trigger** ☑ **LLM 功能:eval 达基线阈值、无回归(G-EVAL)** ☑ **spec-alignment 量化（`/spec-align`：AC 覆盖率/一次过率/无漂移）** |
-| **必查项** | 有没有"没被任何测试覆盖的 AC"？**C-nfr 里定的 P95/吞吐/SLO 有没有被验证**（而不是定了就忘）？延后的有没有显式标 trigger？**LLM 的 eval 分达阈值了吗?prompt/模型改动有没有跑回归?** |
-| **防返工** | trace 矩阵让"漏测的验收标准"无所遁形；**NFR 验证让"定了目标却没人验"无所遁形**；**eval 回归让"改 prompt 改崩了别处"无所遁形**。 |
-| **样例** | `my-app/test/auth.test.js`（10 个 AC-traced 测试全绿）、`my-app/docs/trace-matrix.md`（11/12 AC 有测试，1 个性能项显式 deferred） |
+| **Goal** | Verify according to the test strategy, establish spec↔test traceability, and **verify NFR targets** |
+| **When to enter** | G6 passed |
+| **How to start** | Enter **`bmad-tea`** (Murat) / `bmad-testarch-test-design` / `bmad-testarch-automate` / `bmad-testarch-trace` / **`bmad-testarch-nfr`** / `bmad-qa-generate-e2e-tests`; **use `/e2e` for user-facing flows** (orchestrates Playwright framework + E2E generation + trace; during development Playwright MCP can drive browser self-checks, see 7.7); **LLM features: run the eval set + regression baseline according to `docs/eval-plan.md`** |
+| **Input** | `docs/prd.md` (AC list), **`docs/checklists/C-nfr.md` (NFR targets)**, **`docs/eval-plan.md` (LLM features)**, `src/` code |
+| **Output** | Test suite + `docs/trace-matrix.md` (AC ↔ test mapping) + **NFR verification results** + **eval results (LLM features)** |
+| **Effective rule R6** | Test pyramid; **every AC has ≥1 test**; `describe(<criterion id>)` naming; no real timers/no order dependency; changed-line coverage ≥80%; **verify NFR targets with `bmad-testarch-nfr`**; **verify LLM output with eval set+grader (not exact-match), see `ai/10-ai-llm` rule** |
+| **Decision gate G7** | ☑ Every AC has ≥1 test ☑ all green ☑ trace matrix complete ☑ **user-facing flow E2E all green (Playwright, `/e2e`)** ☑ **NFR targets verified or explicitly marked deferred+trigger** ☑ **LLM features: eval reaches baseline threshold, no regression (G-EVAL)** ☑ **spec-alignment quantified (`/spec-align`: AC coverage/first-pass rate/no drift)** |
+| **Must-check items** | Are there ACs not covered by any test? **Were the P95/throughput/SLO targets defined in C-nfr verified** (instead of set and forgotten)? Are deferred items explicitly marked with triggers? **Did the LLM eval score reach the threshold? Were regressions run after prompt/model changes?** |
+| **Anti-rework** | The trace matrix exposes "untested acceptance criteria"; **NFR verification exposes "targets set but never verified"**; **eval regression exposes "prompt changes broke something else"**. |
+| **Example** | `my-app/test/auth.test.js` (10 AC-traced tests all green), `my-app/docs/trace-matrix.md` (11/12 ACs have tests, 1 performance item explicitly deferred) |
 
 ---
 
-## 阶段 8 — Release（发布门禁）★ 硬门
+## Phase 8 — Release (release gate) ★ hard gate
 
-| 项 | 内容 |
+| Item | Content |
 |---|---|
-| **目标** | 过质量/安全/回滚/灰度/NFR 门后才发布 |
-| **何时进入** | G7 通过 |
-| **怎么启动** | Chat 输入 **`/release-gate`**；缺 runbook 就先 **`/runbook <service>`** |
-| **输入** | 测试结果、NFR 验证结果、`ops/runbook-*.md` |
-| **产出** | 发布门禁报告（逐项 PASS/FAIL）、`ops/runbook-<service>.md` |
-| **决策门 G8（硬门）** | 逐项核验：① 质量门绿（lint+typecheck+test）② 依赖审计干净（`npm audit`/`pip-audit`）③ **NFR 目标已验证（G7 的 `bmad-testarch-nfr`，延后项带 trigger）** ④ 回滚预案可执行 ⑤ 灰度策略有文档 ⑥ health/readiness 端点 ⑦ `validate-config.mjs` PASS。**任一 FAIL 阻断发布** |
-| **必查项** | 回滚步骤是"可执行的精确步骤"还是空话？灰度延后的有没有写 trigger？审计 0 漏洞吗？**NFR 目标验了没**？ |
-| **防返工** | 无回滚/无灰度/NFR 未验不得上线——堵"带病上线"。 |
-| **样例** | `my-app/docs/release-gate.md`（适用项全过、`npm audit` 0 vulns）、`my-app/docs/trace-matrix.md`（性能 NFR 项显式 deferred+trigger）、`my-app/ops/runbook-auth.md`（`FEATURE_LOGIN=off` 回滚） |
+| **Goal** | Release only after passing quality/security/rollback/canary/NFR gates |
+| **When to enter** | G7 passed |
+| **How to start** | Enter **`/release-gate`** in Chat; if runbook is missing, run **`/runbook <service>`** first |
+| **Input** | Test results, NFR verification results, `ops/runbook-*.md` |
+| **Output** | Release-gate report (PASS/FAIL item by item), `ops/runbook-<service>.md` |
+| **Decision gate G8 (hard gate)** | Verify item by item: ① quality gate green (lint+typecheck+test) ② dependency audit clean (`npm audit`/`pip-audit`) ③ **NFR targets verified (G7's `bmad-testarch-nfr`; deferred items have triggers)** ④ rollback plan executable ⑤ canary strategy documented ⑥ health/readiness endpoints ⑦ `validate-config.mjs` PASS. **Any FAIL blocks release** |
+| **Must-check items** | Are rollback steps "exact executable steps" or empty words? Do deferred canary items have triggers? Does audit show 0 vulnerabilities? **Were NFR targets verified**? |
+| **Anti-rework** | No rollback/no canary/unverified NFR means no launch--blocks "launching while sick". |
+| **Example** | `my-app/docs/release-gate.md` (all applicable items pass, `npm audit` 0 vulns), `my-app/docs/trace-matrix.md` (performance NFR item explicitly deferred+trigger), `my-app/ops/runbook-auth.md` (`FEATURE_LOGIN=off` rollback) |
 
 ---
 
-## 阶段 9 — Observability（埋点落地 + 运营闭环）
+## Phase 9 — Observability (telemetry landing + ops loop)
 
-| 项 | 内容 |
+| Item | Content |
 |---|---|
-| **目标** | 埋点上线、指标可见、形成运营闭环 |
-| **何时进入** | G8 通过 / 发布后 |
-| **怎么启动** | Chat 输入 **`/telemetry-plan`** |
-| **输入** | `docs/discovery.md`（成功指标）、代码中的事件 |
-| **产出** | `docs/telemetry-plan.md`：事件清单（名/触发/属性）、事件↔指标映射、告警阈值、审计覆盖 |
-| **决策门 G9** | ☑ 关键路径埋点在产 ☑ **每个成功指标 ≥1 backing event** |
-| **必查项** | 阶段 1 定的每个成功指标，都有对应埋点事件吗？敏感操作有审计吗？告警阈值定了吗？ |
-| **防返工** | 埋点在**需求阶段**就设计（D-ops），这里只做落实校验——避免上线后才发现"没法量化效果"。 |
-| **样例** | `my-app/src/auth.js` 发出 5 个 `auth.*` 事件（attempted/succeeded/failed/session.created/destroyed） |
+| **Goal** | Telemetry is live, metrics are visible, and an operational loop exists |
+| **When to enter** | G8 passed / after release |
+| **How to start** | Enter **`/telemetry-plan`** in Chat |
+| **Input** | `docs/discovery.md` (success metrics), events in code |
+| **Output** | `docs/telemetry-plan.md`: event list (name/trigger/properties), event↔metric mapping, alert thresholds, audit coverage |
+| **Decision gate G9** | ☑ Key-path telemetry is in production ☑ **every success metric has ≥1 backing event** |
+| **Must-check items** | Does every success metric defined in Phase 1 have a corresponding telemetry event? Are sensitive operations audited? Are alert thresholds defined? |
+| **Anti-rework** | Telemetry is designed in the **requirements phase** (D-ops); here we only verify implementation--avoiding the post-launch discovery that "we cannot quantify impact". |
+| **Example** | `my-app/src/auth.js` emits 5 `auth.*` events (attempted/succeeded/failed/session.created/destroyed) |
 
 ---
 
-## 阶段 10 — Iteration（迭代 / 扩展 / 演进）
+## Phase 10 — Iteration (iterate / extend / evolve)
 
-| 项 | 内容 |
+| Item | Content |
 |---|---|
-| **目标** | 指标回流驱动下一轮需求；管理变更与架构演进 |
-| **何时进入** | 上线运营后、有数据/反馈 |
-| **怎么启动** | Chat 切到 **`（agent）eos-review`**（`bmad-correct-course` 变更管理、`bmad-retrospective` 复盘、`bmad-document-project` 棕地文档、`bmad-sprint-status`） |
-| **输入** | `docs/telemetry-plan.md` 的指标、用户反馈 |
-| **产出** | 变更提案、下轮 backlog、retro 笔记、更新的 ADR |
-| **决策门 G10** | ☑ 每个变更经影响分析 ☑ **回写 Spec 真相源**（改 `docs/prd.md` 等） |
-| **必查项** | 变更只改了代码、忘了回写 PRD 吗？（那就是 spec/code 漂移，反模式 P10） |
-| **防返工** | `eos-review` 的 handoff 直接把你带回 `/requirements`，闭环成下一轮 [2]。 |
-| **样例** | `my-app/docs/prd.md §6 Iteration Log`：由埋点观察触发 CR-001，回写进 PRD |
+| **Goal** | Metrics feed back into the next round of requirements; manage change and architecture evolution |
+| **When to enter** | After launch operations, with data/feedback |
+| **How to start** | Switch Chat to **`(agent) eos-review`** (`bmad-correct-course` change management, `bmad-retrospective` retrospective, `bmad-document-project` brownfield docs, `bmad-sprint-status`) |
+| **Input** | Metrics from `docs/telemetry-plan.md`, user feedback |
+| **Output** | Change proposal, next-round backlog, retro notes, updated ADRs |
+| **Decision gate G10** | ☑ Every change has impact analysis ☑ **write back to the Spec source of truth** (update `docs/prd.md`, etc.) |
+| **Must-check items** | Did the change modify code only and forget to update the PRD? (that is spec/code drift, anti-pattern P10) |
+| **Anti-rework** | `eos-review`'s handoff takes you directly back to `/requirements`, closing the loop into the next round [2]. |
+| **Example** | `my-app/docs/prd.md §6 Iteration Log`: telemetry observation triggers CR-001, written back into PRD |
 
 ---
 
-## 6.x 阶段速查表（一页纸）
+## 6.x Phase quick-reference (one page)
 
-| 阶段 | 启动方式 | 产物 | 门 | → 下一步 |
+| Phase | How to start | Artifact | Gate | → Next step |
 |---|---|---|---|---|
-| 1 Discovery | `（agent）eos-discovery` | `docs/discovery.md` | G1 | `/requirements "<f>"` |
+| 1 Discovery | `(agent) eos-discovery` | `docs/discovery.md` | G1 | `/requirements "<f>"` |
 | 2 Requirements | `/requirements "<f>"` | `docs/requirements.md` | **G2★** | `/spec` |
-| 3 Spec | `/spec` | `docs/prd.md` | G3 | `/ux-spec`（后端可跳→ `eos-architecture`） |
-| 3.5 UX & Design | `/ux-spec`（或 `（agent）eos-design`） | `DESIGN.md`+`EXPERIENCE.md` | G-UX（条件） | `（agent）eos-architecture` |
-| 4 Architecture | `（agent）eos-architecture` + `/adr` + `/deploy-topology` | `architecture.md`+`openapi.yaml`+`adr/*`+`G-deployment.md` | G4 | `（agent）eos-plan`（先锁栈+ADR+拓扑） |
-| 5 Planning | `（agent）eos-plan` | `docs/stories/*` | G5 | `bmad-dev-story` |
-| 6 Development | `bmad-dev-story` → `bmad-code-review` | `src/*` + 审查结论 | G6 | `/e2e`（或 `bmad-tea`/`bmad-testarch-*`） |
-| 7 Testing | `/e2e`（或 `bmad-tea`/`bmad-testarch-*`） | tests + `trace-matrix.md` | G7 | `/release-gate` |
-| 8 Release | `/release-gate`（+`/runbook`） | 门禁报告 + runbook | **G8★** | `/telemetry-plan` |
-| 9 Observability | `/telemetry-plan` | `docs/telemetry-plan.md` | G9 | `（agent）eos-review` |
-| 10 Iteration | `（agent）eos-review` | 变更提案 + 回写 PRD | G10 | ⟲ `/requirements`（下一轮） |
+| 3 Spec | `/spec` | `docs/prd.md` | G3 | `/ux-spec` (backend may skip → `eos-architecture`) |
+| 3.5 UX & Design | `/ux-spec` (or `(agent) eos-design`) | `DESIGN.md`+`EXPERIENCE.md` | G-UX (conditional) | `(agent) eos-architecture` |
+| 4 Architecture | `(agent) eos-architecture` + `/adr` + `/deploy-topology` | `architecture.md`+`openapi.yaml`+`adr/*`+`G-deployment.md` | G4 | `(agent) eos-plan` (lock stack+ADR+topology first) |
+| 5 Planning | `(agent) eos-plan` | `docs/stories/*` | G5 | `bmad-dev-story` |
+| 6 Development | `bmad-dev-story` → `bmad-code-review` | `src/*` + review conclusion | G6 | `/e2e` (or `bmad-tea`/`bmad-testarch-*`) |
+| 7 Testing | `/e2e` (or `bmad-tea`/`bmad-testarch-*`) | tests + `trace-matrix.md` | G7 | `/release-gate` |
+| 8 Release | `/release-gate` (+`/runbook`) | gate report + runbook | **G8★** | `/telemetry-plan` |
+| 9 Observability | `/telemetry-plan` | `docs/telemetry-plan.md` | G9 | `(agent) eos-review` |
+| 10 Iteration | `(agent) eos-review` | change proposal + PRD write-back | G10 | ⟲ `/requirements` (next round) |
 
-> **不跳阶段**：每个 EOS 命令/agent 跑完都会提示"→ 下一步"（prompt 末尾的 **Next** 面包屑 + agent 的 **handoff** 按钮）。阶段 6/7 是纯 BMAD skill，`eos-plan` 的 "Start Development" handoff 已把下游尾链（dev→review G6→test G7→release G8）一次性交代给 agent，跑完不断线。
+> **Do not skip phases**: every EOS command/agent prints "→ Next step" when it finishes (the **Next** breadcrumb at the end of prompts + the agent **handoff** button). Phases 6/7 are pure BMAD skills; `eos-plan`'s "Start Development" handoff already gives the agent the entire downstream tail chain (dev→review G6→test G7→release G8), so the flow does not break after it runs.
 
-> **一次性硬化（阶段 0，别忘）**：`/eos-init` 把 CI 门从"契约性存在"变"合并阻断权威"（分支保护 + CODEOWNERS + 审批基线），进度记在 `docs/eos/activation.md`；`eos-doctor` **每次运行**都会 advisory 提示剩余项，`/release-gate`（G8）发布前再核一次——这就是防"系统性遗忘"的三重提示。
+> **One-time hardening (Phase 0, do not forget)**: `/eos-init` turns CI gates from "contractually present" into "merge-blocking authority" (branch protection + CODEOWNERS + approval baseline), recorded in `docs/eos/activation.md`; `eos-doctor` gives an advisory reminder of remaining items **every run**, and `/release-gate` (G8) checks again before release--this is the triple reminder that prevents "systemic forgetting".
 
 ---
 
-# 第 6.5 章 两条上手路径（SaaS vs Agentic · 小白友好）
+# Chapter 6.5 Two onboarding paths (SaaS vs Agentic · beginner-friendly)
 
-> 前面第 6 章讲了完整的 10 阶段。这一章把它落成**两条可照抄的具体路径**：一条做**传统 SaaS 软件**
-> （确定性），一条做 **Agentic/LLM 产品**（概率性）。两条路径**主干相同**（都走 G1→G10），只在
-> 少数阶段有专属动作。**你不需要背这些——照着抄命令即可。**
+> Chapter 6 gave the complete 10-phase lifecycle. This chapter turns it into **two concrete copyable paths**: one for **traditional SaaS software** (deterministic), and one for **Agentic/LLM products** (probabilistic). The two paths share the **same trunk** (both go G1→G10) and only have specialized actions in a few phases. **You do not need to memorize these--just copy the commands.**
 
-## 6.5.0 先搞清：我这个项目是哪一类？
+## 6.5.0 First clarify: which kind of project is this?
 
-| 问自己 | 传统 SaaS | Agentic/LLM |
+| Ask yourself | Traditional SaaS | Agentic/LLM |
 |---|---|---|
-| 核心逻辑是确定的吗？（同样输入→同样输出） | ✅ 是 | ❌ 否（LLM 有随机性） |
-| 有没有"调用大模型/RAG/agent"？ | 否 | ✅ 有 |
-| 例子 | 电商后台、CRM、订单系统、管理面板 | 智能客服、RAG 问答、AI 助手、多 agent 工作流 |
-| 关键难点 | 事务一致性、并发、权限 | 幻觉、评估、成本、prompt 注入 |
+| Is the core logic deterministic? (same input → same output) | ✅ Yes | ❌ No (LLMs are stochastic) |
+| Does it "call a large model/RAG/agent"? | No | ✅ Yes |
+| Examples | E-commerce admin, CRM, order system, management dashboard | Intelligent customer service, RAG Q&A, AI assistant, multi-agent workflow |
+| Key difficulty | Transaction consistency, concurrency, permissions | Hallucination, evaluation, cost, prompt injection |
 
-> **混合项目**（如"SaaS 后台 + 一个 AI 客服模块"）：主体走 SaaS 路径，AI 模块那部分**额外**走
-> Agentic 路径的专属步骤（下面标 🟣 的）。EOS 的规则是**按目录自动生效**的——AI 代码放 `ai/`/`llm/`/`rag/`
-> 目录，就会自动叠加 Agentic 规则，其余代码走后端栈规则。两套机制**不会打架**（见第 6.5.3）。
+> **Hybrid projects** (such as "SaaS backend + an AI customer-service module"): the main body follows the SaaS path; the AI module additionally follows the Agentic-specific steps (marked 🟣 below). EOS rules take effect **automatically by directory**--AI code placed under `ai/`/`llm/`/`rag/` automatically overlays Agentic rules, while the rest of the code follows backend stack rules. The two mechanisms **do not fight** (see Chapter 6.5.3).
 
 ---
 
-## 6.5.1 路径 A — 传统 SaaS 软件（确定性）
+## 6.5.1 Path A — Traditional SaaS software (deterministic)
 
-**示例目标**：做一个"待办事项 API"（增删改查 + 用户隔离）。全程复制命令即可。
+**Example goal**: build a "to-do API" (CRUD + user isolation). Just copy commands end to end.
 
-### 第 0 步：建项目 + 选栈（5 分钟）
+### Step 0: Create project + choose stack (5 minutes)
 ```sh
 npx degit --mode=git niaodian/eos-template todo-api && cd todo-api
-node .github/hooks/validate-config.mjs          # 期望 PASS
+node .github/hooks/validate-config.mjs          # expect PASS
 ```
-**已定栈**？打开 `.github/instructions/00-workspace.instructions.md` 把 `Local commands` 抄成你的栈块（`docs/eos/stack-presets.md`，快路径）。
-**还没定**？保留 Node 占位即可——栈的**权威锁定在第 4 步架构**（连同 ADR）。SaaS 项目通常第 0 步就知道栈，可直接抄。
+**Stack already decided?** Open `.github/instructions/00-workspace.instructions.md` and copy `Local commands` from your stack block (`docs/eos/stack-presets.md`, fast path).
+**Not decided yet?** Keep the Node placeholder--the **authoritative stack lock happens in Step 4 Architecture** (together with ADR). SaaS projects usually know the stack at Step 0, so they can copy directly.
 
-### 第 1–3 步：想清楚要做什么（Chat 里逐条输入）
+### Step 1–3: Clarify what to build (enter one by one in Chat)
 ```
-（切到 agent）eos-discovery        → 产出 docs/discovery.md（问题+成功指标）
-/requirements "待办事项的增删改查，支持多用户隔离"   → docs/requirements.md（G2 硬门：五张清单）
-/compliance "医疗/金融等受监管才需"                → docs/compliance-profile.md（受监管加第六张 F；否则跳过）
-/spec                              → docs/prd.md（每条需求带验收标准 AC）
+(switch to agent) eos-discovery        → produces docs/discovery.md (problem+success metrics)
+/requirements "To-do CRUD with multi-user isolation"   → docs/requirements.md (G2 hard gate: five checklists)
+/compliance "needed only for regulated sectors like healthcare/finance" → docs/compliance-profile.md (regulated adds sixth F; otherwise skip)
+/spec                              → docs/prd.md (every requirement has AC)
 ```
-> **G2 硬门必过**：五张清单 A/B/C/D/E 无未决项。SaaS 项目尤其注意 **C-nfr 的性能/容灾**、
-> **D-ops 的权限矩阵/数据生命周期**、**E-security 的多租户隔离**。
+> **G2 hard gate must pass**: five checklists A/B/C/D/E have no unresolved items. SaaS projects should especially watch **performance/DR in C-nfr**, **authz matrix/data lifecycle in D-ops**, and **multi-tenant isolation in E-security**.
 
-### 🔵 第 4 步：架构（SaaS 专属重点）
+### 🔵 Step 4: Architecture (SaaS-specific focus)
 ```
-（切到 agent）eos-architecture     → architecture.md + data-model + api/openapi.yaml
-/adr "技术栈选型 / 数据库选型"       → 不可逆决策留 ADR；**在此锁栈**=更新 00-workspace + 启用 R3
-/deploy-topology                   → 选部署拓扑（裸进程/Docker/K8s/serverless/PaaS，取满足 NFR 的最简项）+ deployment-topology ADR
+(switch to agent) eos-architecture     → architecture.md + data-model + api/openapi.yaml
+/adr "tech stack choice / database choice"       → record ADR for irreversible decisions; **lock stack here** = update 00-workspace + enable R3
+/deploy-topology                   → choose deployment topology (bare process/Docker/K8s/serverless/PaaS, simplest option satisfying NFR) + deployment-topology ADR
 ```
-架构 agent 在 **G4** 会强制你的 SaaS 设计包含：
-- **事务边界**（哪些写操作必须原子）、**幂等键**（重试安全）
-- **确定性容错**：外部调用要有超时 + 指数退避 + 断路器（**不是** AI 那种反思重试）
-- **API 契约先行**：`openapi.yaml` 先于实现；破坏性变更走新版本 + 弃用政策
-- **多租户隔离**（若多租户）：每个查询按租户作用域，默认拒绝跨租户
+At **G4**, the architecture agent forces your SaaS design to include:
+- **Transaction boundaries** (which writes must be atomic), **idempotency keys** (retry safety)
+- **Deterministic fault tolerance**: external calls need timeout + exponential backoff + circuit breaker (**not** AI-style reflection retry)
+- **API contract first**: `openapi.yaml` precedes implementation; breaking changes require a new version + deprecation policy
+- **Multi-tenant isolation** (if multi-tenant): every query is scoped by tenant, and cross-tenant access is denied by default
 
-### 第 5–6 步：拆 story + 写代码
+### Step 5–6: Break stories + write code
 ```
-（切到 agent）eos-plan             → docs/stories/*（每个 story 含验收测试设计 ATDD）
-bmad-dev-story                     → src/ 代码（自动受后端栈规则约束）
-bmad-code-review                   → 代码审查，解掉阻断项（G6 完成定义）
+(switch to agent) eos-plan             → docs/stories/* (each story includes acceptance test design ATDD)
+bmad-dev-story                     → src/ code (automatically constrained by backend stack rules)
+bmad-code-review                   → code review, resolve blockers (G6 Definition of Done)
 ```
-写代码时**自动生效**的 SaaS 规则（你无需手动加载，编辑对应文件就触发）：分层（Routes→Services→Repos）、
-输入校验、事务/幂等、UTC 时间 + 货币用整数分/Decimal、OTel 可观测。
+When writing code, SaaS rules take effect **automatically** (you do not need to load them manually; editing the matching file triggers them): layering (Routes→Services→Repos), input validation, transactions/idempotency, UTC time + money in minor units/Decimal, OTel observability.
 
-### 🔵 第 7 步：测试（SaaS 专属：契约 + DB 状态）
+### 🔵 Step 7: Testing (SaaS-specific: contract + DB state)
 ```
-bmad-tea / bmad-testarch-*         → 单元 + 集成测试
-/e2e                               → 面向用户流程 E2E（Playwright；开发期可用 MCP 自查）
-/spec-align                        → 量化：AC 覆盖率 / 一次过率 / 漂移
+bmad-tea / bmad-testarch-*         → unit + integration tests
+/e2e                               → user-facing flow E2E (Playwright; MCP self-checks available during development)
+/spec-align                        → quantify: AC coverage / first-pass rate / drift
 ```
-SaaS 的 **G7** 要求：每条 AC ≥1 测试、**API 契约测试**（对 openapi.yaml）、**DB 状态集成测试**
-（事务 commit/rollback、约束、幂等）、NFR 目标已验证。
+SaaS **G7** requires: every AC has ≥1 test, **API contract tests** (against openapi.yaml), **DB state integration tests** (transaction commit/rollback, constraints, idempotency), and NFR targets verified.
 
-### 第 8–10 步：发布 + 观测 + 迭代
+### Step 8–10: Release + observability + iteration
 ```
-/runbook todo-api                  → ops/runbook-todo-api.md（含回滚步骤）
-/release-gate                      → G8 五项门禁（质量+审计+NFR+回滚+灰度）
-/telemetry-plan                    → 埋点（SaaS 侧：QPS/延迟/5xx 黄金信号）
-（切到 agent）eos-review            → 迭代回写 PRD
+/runbook todo-api                  → ops/runbook-todo-api.md (including rollback steps)
+/release-gate                      → G8 five gates (quality+audit+NFR+rollback+canary)
+/telemetry-plan                    → telemetry (SaaS side: QPS/latency/5xx golden signals)
+(switch to agent) eos-review       → iteration writes back to PRD
 ```
 
 ---
 
-## 6.5.2 路径 B — Agentic / LLM 产品（概率性）
+## 6.5.2 Path B — Agentic / LLM product (probabilistic)
 
-**示例目标**：做一个"智能客服 agent"（改订单地址，带工具调用）。与路径 A **主干相同**，
-标 🟣 的是 **Agentic 专属**步骤。
+**Example goal**: build an "intelligent customer-service agent" (change order shipping address, with tool calls). The trunk is **the same** as Path A; steps marked 🟣 are **Agentic-specific**.
 
-### 第 0 步：建项目 + 建 AI 目录
+### Step 0: Create project + create AI directories
 ```sh
 npx degit --mode=git niaodian/eos-template cs-agent && cd cs-agent
-mkdir -p ai/prompts evals                       # AI 代码放这里，自动叠加 Agentic 规则
-node .github/hooks/validate-config.mjs          # 期望 PASS
+mkdir -p ai/prompts evals                       # AI code goes here; Agentic rules overlay automatically
+node .github/hooks/validate-config.mjs          # expect PASS
 ```
-栈选 Python（LLM 产品最常见）：从 stack-presets 抄 **Python + AI/LLM 附加层**那两块。
+Choose Python as the stack (most common for LLM products): copy the two blocks **Python + AI/LLM additional layer** from stack-presets.
 
-### 第 1–3 步：同路径 A（discovery → requirements → spec）
+### Step 1–3: Same as Path A (discovery → requirements → spec)
 ```
-（切到 agent）eos-discovery
-/requirements "客服 agent：用户下单后改寄送地址，需鉴权、防越权、防注入"
-/compliance "涉 PHI/PAN/受监管个人数据才需"   → 受监管则当场定 Agentic 数据出境方案
+(switch to agent) eos-discovery
+/requirements "customer-service agent: change shipping address after order, requires authn, anti-BOLA, anti-injection"
+/compliance "needed only if PHI/PAN/regulated personal data is involved"   → if regulated, decide Agentic data egress plan immediately
 /spec
 ```
-> Agentic 项目在 **G2** 尤其要在 requirements 里把 **eval 成功指标**（准确率/一次过率）、
-> **成本/token 预算**、**注入防御**写清楚——这些是概率性产品的命脉。
+> In **G2**, Agentic projects must especially write **eval success metrics** (accuracy/first-pass rate), **cost/token budget**, and **injection defenses** into requirements--these are the lifeblood of probabilistic products.
 
-### 🟣 第 4 步：架构（Agentic 专属重点）
+### 🟣 Step 4: Architecture (Agentic-specific focus)
 ```
-（切到 agent）eos-architecture     → architecture.md（agent 编排图 + 工具 allow-list）
-/adr "编排策略：单趟状态机 vs ReAct 循环"
+(switch to agent) eos-architecture     → architecture.md (agent orchestration diagram + tool allow-list)
+/adr "orchestration strategy: single-pass state machine vs ReAct loop"
 ```
-架构 agent 在 **G4** 会强制 Agentic 设计包含：
-- **工具 allow-list**（typed schema，agent 只能调白名单内的工具）
-- **有界编排**（状态机/图，禁止无界 self-invocation）
-- **记忆分层**：短期（上下文窗口）/ 长期（向量库，最终一致）/ 强一致（仍归 SQL，**别拿向量库当真相源**）
-- **异步解耦**：>1s 的 LLM 调用**不得**卡在 Web 请求线程里，走异步队列（Celery/BullMQ）
-- **认知容错**（**不是** SaaS 那种退避）：工具/LLM 失败 → 捕获错误 → 注入 prompt → 有界反思重试 ≤N 次 → 降级
+At **G4**, the architecture agent forces Agentic design to include:
+- **Tool allow-list** (typed schema; agent can only call allow-listed tools)
+- **Bounded orchestration** (state machine/graph; unbounded self-invocation forbidden)
+- **Memory layering**: short-term (context window) / long-term (vector store, eventually consistent) / strongly consistent (still SQL; **do not use the vector store as source of truth**)
+- **Asynchronous decoupling**: LLM calls >1s **must not** block a Web request thread; use async queues (Celery/BullMQ)
+- **Cognitive fault tolerance** (**not** SaaS-style backoff): tool/LLM failure → capture error → inject into prompt → bounded reflection retry ≤N times → degrade
 
-### 🟣 第 5 步：拆 story + **设计评估集（G-EVAL）**
+### 🟣 Step 5: Break stories + **design evaluation set (G-EVAL)**
 ```
-（切到 agent）eos-plan
-/eval-spec                         → docs/eval-plan.md（G-EVAL 条件门）
+(switch to agent) eos-plan
+/eval-spec                         → docs/eval-plan.md (G-EVAL conditional gate)
 ```
-`/eval-spec` 让你**在写代码前**先定评估集——这是概率性系统的"ATDD"。评估集必须含：
-黄金用例、**prompt 注入对抗用例**、RAG 召回率(recall@k)、工具调用准确率、成本/延迟预算。
-> **不想从零写评估器？** 拷 `docs/eos/examples/eval-starter/`（零依赖可跑）改改即用。
+`/eval-spec` makes you define the evaluation set **before writing code**--this is the "ATDD" of probabilistic systems. The evaluation set must include: golden cases, **prompt-injection adversarial cases**, RAG recall (recall@k), tool-call accuracy, cost/latency budget.
+> **Do not want to write an evaluator from scratch?** Copy `docs/eos/examples/eval-starter/` (zero-dependency runnable starter) and adapt it.
 
-### 🟣 第 6–7 步：写 AI 代码 + 跑评估
+### 🟣 Step 6–7: Write AI code + run evals
 ```
-bmad-dev-story                     → ai/ 下的 agent/tools/chains + ai/prompts/ 版本化 prompt
+bmad-dev-story                     → agent/tools/chains under ai/ + versioned prompts under ai/prompts/
 bmad-code-review
-node --test evals/*.test.mjs       → 跑评估基线（G-EVAL 机器强制：达标才能过）
+node --test evals/*.test.mjs       → run eval baseline (G-EVAL machine-enforced: must meet threshold)
 ```
-写 AI 代码时**自动生效**的 Agentic 规则：prompt 存成文件（不内联字符串）、工具 typed schema、
-temperature=0 可复现、把模型输出当**不可信**（防注入、输出审核、不放密钥/PII 进 prompt）、
-LLM tracing（token/成本/context/tool-span）。
+When writing AI code, Agentic rules take effect **automatically**: prompts saved as files (not inline strings), tool typed schema, temperature=0 for reproducibility, treat model output as **untrusted** (anti-injection, output review, do not put secrets/PII into prompts), LLM tracing (token/cost/context/tool-span).
 
-> **关键**：LLM 输出**不能用 exact-match 单测**（它是概率性的）——必须用**评估集 + grader + 回归基线**。
-> 改了 prompt/模型跌破基线 = 不许发布。这是 SaaS 与 Agentic 最根本的测试差异。
+> **Key**: LLM output **cannot be tested with exact-match unit tests** (it is probabilistic)--you must use **evaluation set + grader + regression baseline**.
+> If changing prompt/model falls below baseline = no release. This is the most fundamental testing difference between SaaS and Agentic.
 
-### 第 8–10 步：发布 + LLM 观测 + 评估飞轮
+### Step 8–10: Release + LLM observability + evaluation flywheel
 ```
-/release-gate                      → G8（含 secret-scan + 评估基线）
-/telemetry-plan                    → LLM 侧：token 消耗/context 占用/tool 链路 tracing
-（切到 agent）eos-review            → 用户反馈 → 新评估用例 → 重定基线（评估飞轮）
+/release-gate                      → G8 (including secret-scan + eval baseline)
+/telemetry-plan                    → LLM side: token spend/context usage/tool-chain tracing
+(switch to agent) eos-review       → user feedback → new eval cases → rebaseline (evaluation flywheel)
 ```
 
 ---
 
-## 6.5.3 两条路径的关键差异（一表看懂 · 避免范式污染）
+## 6.5.3 Key differences between the two paths (one table · avoid paradigm pollution)
 
-| 维度 | 🔵 SaaS（确定性） | 🟣 Agentic（概率性） |
+| Dimension | 🔵 SaaS (deterministic) | 🟣 Agentic (probabilistic) |
 |---|---|---|
-| **状态** | SQL 事务 + 幂等，强一致 | 短期上下文 / 长期向量库 / 强一致仍归 SQL |
-| **容错** | 超时 + 指数退避 + 断路器 | 捕获错误 → 注入 prompt → 有界反思 → 降级 |
-| **测试** | 单元 + **契约测试 + DB 状态集成测试**（exact-assert） | **评估集 + grader + 回归基线**（禁 exact-match） |
-| **专属门** | G4 事务/韧性 | **G-EVAL**（评估）+ G4 异步解耦 |
-| **可观测** | OTel + QPS/延迟/5xx | token/成本/context/tool-span |
-| **执行模型** | 请求-响应即可 | >1s 调用走异步队列，别卡请求线程 |
-| **命脉风险** | 事务不一致、并发、越权 | 幻觉、评估缺失、成本失控、prompt 注入 |
+| **State** | SQL transactions + idempotency, strongly consistent | Short-term context / long-term vector store / strongly consistent still SQL |
+| **Fault tolerance** | Timeout + exponential backoff + circuit breaker | Capture error → inject prompt → bounded reflection → degrade |
+| **Testing** | Unit + **contract tests + DB state integration tests** (exact-assert) | **Evaluation set + grader + regression baseline** (exact-match forbidden) |
+| **Dedicated gates** | G4 transactions/resilience | **G-EVAL** (evaluation) + G4 async decoupling |
+| **Observability** | OTel + QPS/latency/5xx | token/cost/context/tool-span |
+| **Execution model** | Request-response is enough | Calls >1s go through async queue; do not block request thread |
+| **Lifeblood risks** | Transaction inconsistency, concurrency, unauthorized access | Hallucination, missing evaluation, runaway cost, prompt injection |
 
-> ⚠️ **严禁互换**：别拿 SaaS 的指数退避去反复刷模型改逻辑错（烧 token 且不收敛）；也别拿 AI 的
-> 反思去处理一个纯网络超时（那该用断路器）。EOS 的规则已把两套机制显式隔离，混合项目在 G4
-> 由 `eos-architecture` 检查隔离点——但**你照抄上面的路径就不会错**。
+> ⚠️ **Strictly forbidden to swap**: do not use SaaS exponential backoff to repeatedly call a model for a logic error (burns tokens and does not converge); do not use AI reflection to handle a pure network timeout (that needs a circuit breaker). EOS rules explicitly isolate the two mechanisms, and hybrid projects are checked for isolation points by `eos-architecture` at G4--but **if you copy the paths above, you will not go wrong**.
 
 ---
 
-# 第 7 章 完整参考（速查）
+# Chapter 7 Complete reference (quick-reference)
 
-## 7.1 斜杠命令（`.github/prompts/`）
+## 7.1 Slash commands (`.github/prompts/`)
 
-| 命令 | 作用 | 参数 | 产出 |
+| Command | Purpose | Parameter | Output |
 |---|---|---|---|
-| `/requirements` | 需求分析 + 运营前置（包裹 bmad-create-prd） | `<feature 或 docs/discovery.md 路径>` | `docs/requirements.md` |
-| `/spec` | 产出 PRD 真相源（bmad-create-prd + bmad-validate-prd） | `<docs/requirements.md 路径>` | `docs/prd.md` |
-| `/ux-spec` | 设计 UX/UI 视觉+体验契约（包裹 bmad-ux） | `<docs/prd.md 路径>` | `docs/DESIGN.md` + `docs/EXPERIENCE.md` |
-| `/eval-spec` | 设计 LLM/agentic 评估计划（条件门 G-EVAL） | `<docs/prd.md 路径>` | `docs/eval-plan.md` |
-| `/spec-align` | 量化规范对齐度（AC 覆盖率/一次过率/漂移，G7 度量） | — | 对齐度报告（`spec-align.mjs`） |
-| `/e2e` | 编排浏览器/E2E 测试（Playwright 框架+生成+trace）；开发期可用 Playwright MCP 驱动浏览器自查（见 7.7） | — | Playwright 规格 + `docs/trace-matrix.md` |
-| `/adr` | 记录一条架构决策 | `<决策标题>` | `docs/adr/NNN-*.md` |
-| `/deploy-topology` | 选部署拓扑（裸进程/Docker/K8s/serverless/PaaS）对齐 NFR 并落 ADR | — | 填 `G-deployment.md` + `docs/adr/NNN-deployment-topology.md` + `architecture.md` Deployment 段 |
-| `/nfr` | 把 C-nfr 逐行填具体目标值 | — | 更新 `C-nfr.md` + PRD NFR 段 |
-| `/compliance` | 受监管行业合规前置（制度选择+边界控制，条件用；走 F-compliance） | `<制度名 或 领域描述>` | `docs/compliance-profile.md` |
-| `/telemetry-plan` | 设计埋点并对齐成功指标 | — | `docs/telemetry-plan.md` |
-| `/release-gate` | 跑发布门禁（G8） | — | 门禁报告 |
-| `/runbook` | 生成运维 runbook（含回滚步骤） | `<service 名>` | `ops/runbook-<service>.md` |
-| `/validate-config` | EOS 配置静态+语义体检 | — | 问题表（不改代码） |
+| `/requirements` | Requirements analysis + operational pre-flight (wraps bmad-create-prd) | `<feature or docs/discovery.md path>` | `docs/requirements.md` |
+| `/spec` | Produce PRD source of truth (bmad-create-prd + bmad-validate-prd) | `<docs/requirements.md path>` | `docs/prd.md` |
+| `/ux-spec` | Design UX/UI visual+experience contract (wraps bmad-ux) | `<docs/prd.md path>` | `docs/DESIGN.md` + `docs/EXPERIENCE.md` |
+| `/eval-spec` | Design LLM/agentic evaluation plan (conditional gate G-EVAL) | `<docs/prd.md path>` | `docs/eval-plan.md` |
+| `/spec-align` | Quantify spec alignment (AC coverage/first-pass rate/drift, G7 metric) | — | Alignment report (`spec-align.mjs`) |
+| `/e2e` | Orchestrate browser/E2E tests (Playwright framework+generation+trace); during development Playwright MCP can drive browser self-checks (see 7.7) | — | Playwright specs + `docs/trace-matrix.md` |
+| `/adr` | Record one architecture decision | `<decision title>` | `docs/adr/NNN-*.md` |
+| `/deploy-topology` | Choose deployment topology (bare process/Docker/K8s/serverless/PaaS), align NFR, and land ADR | — | Fill `G-deployment.md` + `docs/adr/NNN-deployment-topology.md` + Deployment section in `architecture.md` |
+| `/nfr` | Fill C-nfr with concrete target values line by line | — | Updates `C-nfr.md` + PRD NFR section |
+| `/compliance` | Regulated-industry compliance pre-flight (regime selection + boundary controls, conditional; uses F-compliance) | `<regime name or domain description>` | `docs/compliance-profile.md` |
+| `/telemetry-plan` | Design telemetry and align it with success metrics | — | `docs/telemetry-plan.md` |
+| `/release-gate` | Run release gate (G8) | — | Gate report |
+| `/runbook` | Generate operations runbook (including rollback steps) | `<service name>` | `ops/runbook-<service>.md` |
+| `/validate-config` | EOS configuration static+semantic health check | — | Issue table (does not change code) |
 
-## 7.2 编排 Agents（`.github/agents/`）
+## 7.2 Orchestrator Agents (`.github/agents/`)
 
-| Agent | 阶段 | 复用的 BMAD | handoff 去向 |
+| Agent | Phase | Reused BMAD | handoff to |
 |---|---|---|---|
-| `eos-discovery` | 1 问题定义 | bmad-brainstorming, bmad-agent-analyst, bmad-forge-idea | → `/requirements` |
-| `eos-design` | 3.5 UX/设计 | bmad-ux, bmad-agent-ux-designer(Sally), bmad-cis-design-thinking(Maya) | → `eos-architecture` |
-| `eos-architecture` | 4 架构 | bmad-architecture（Winston） | → `eos-plan` |
-| `eos-plan` | 5 计划 | bmad-create-epics-and-stories, bmad-create-story, bmad-sprint-planning, bmad-testarch-atdd | → `bmad-dev-story` → `bmad-code-review` |
-| `eos-review` | 10 迭代 | bmad-correct-course, bmad-retrospective, bmad-document-project | → `/requirements`（下一轮） |
+| `eos-discovery` | 1 problem definition | bmad-brainstorming, bmad-agent-analyst, bmad-forge-idea | → `/requirements` |
+| `eos-design` | 3.5 UX/design | bmad-ux, bmad-agent-ux-designer(Sally), bmad-cis-design-thinking(Maya) | → `eos-architecture` |
+| `eos-architecture` | 4 architecture | bmad-architecture (Winston) | → `eos-plan` |
+| `eos-plan` | 5 planning | bmad-create-epics-and-stories, bmad-create-story, bmad-sprint-planning, bmad-testarch-atdd | → `bmad-dev-story` → `bmad-code-review` |
+| `eos-review` | 10 iteration | bmad-correct-course, bmad-retrospective, bmad-document-project | → `/requirements` (next round) |
 
-> **如何切换 agent**：Copilot Chat 输入框的 mode/agent 选择器 → 选中目标 agent（如 `eos-discovery`）。
-> 切换后该 persona 持续生效（含其 `tools` 限制与 `handoffs`），直到你再次切换。
+> **How to switch agent**: in Copilot Chat's mode/agent selector → select the target agent (such as `eos-discovery`).
+> After switching, that persona remains active (including its `tools` limits and `handoffs`) until you switch again.
 >
-> **⚠️ 只看到 "Agent / Ask / Plan" + 「Configure Custom Agents…」，找不到 eos-* 自定义 agent？**
-> **头号原因（90% 是这个）：你在 VS Code 里打开的不是项目根，而是它的父目录。** VS Code 只在**已打开的
-> 工作区根**下扫描 `.github/agents/`（单层、非递归）。如果你打开的是一个「包含很多项目」的父文件夹
-> （例如 `~/Developer/Projects/`，而项目在其子目录 `my-app/`），那么 `.github/` 不在根上 →
-> **自定义 agent、`.github/instructions/`、`.github/hooks/` 会全部静默失效**（状态栏可能仍显示某个子仓库的
-> git 分支名，很有迷惑性）。
+> **⚠️ Only see "Agent / Ask / Plan" + "Configure Custom Agents...", and cannot find eos-* custom agents?**
+> **Top cause (90%): you opened the parent directory in VS Code, not the project root.** VS Code scans `.github/agents/` only under the **opened workspace root** (single level, non-recursive). If you opened a parent folder that "contains many projects" (for example `~/Developer/Projects/`, while the project is in its child `my-app/`), then `.github/` is not at the root → **custom agents, `.github/instructions/`, and `.github/hooks/` all silently fail** (the status bar may still show a child repository's git branch name, which is misleading).
 >
-> **30 秒自检（最重要）**：
-> 1. VS Code 左侧 Explorer **顶层第一屏**能直接看到 `.github/`、`README.md` 吗？能 → 根正确；
->    看到的是一堆项目文件夹（`my-app/`、`other-app/` …）→ 你打开错了父目录。
-> 2. 打开集成终端跑 `ls .github/agents`：若列出 5 个 `eos-*.agent.md` 但选择器仍空，几乎可断定是根打开错了。
-> 3. **修复**：`File > Open Folder…` 选中**项目文件夹本身**（含 `.github/` 的那一层），或终端 `cd my-app && code .`。
+> **30-second self-check (most important)**:
+> 1. In the left VS Code Explorer, can you directly see `.github/` and `README.md` on the **first top-level screen**? Yes → root is correct;
+>    seeing a bunch of project folders (`my-app/`, `other-app/`, ...) → you opened the wrong parent directory.
+> 2. Run `ls .github/agents` in the integrated terminal: if it lists 5 `eos-*.agent.md` files but the selector is still empty, root opening is almost certainly wrong.
+> 3. **Fix**: `File > Open Folder...` and select the **project folder itself** (the level that contains `.github/`), or run `cd my-app && code .` in the terminal.
 >
-> 排除"根"因素后，再按下面顺序排查（**不需要**把 `.github/agents/` 复制到用户级目录——
-> `.github/agents/*.agent.md` 就是官方默认识别位置）：
+> After excluding the "root" factor, troubleshoot in this order (**do not need** to copy `.github/agents/` into the user-level directory--`.github/agents/*.agent.md` is the official default recognized location):
 >
-> | 排查 | 做法 |
+> | Check | How |
 > |---|---|
-> | ① 确认在**工作区根**打开 | 见上方 30 秒自检——这是最常见原因，务必先排除。 |
-> | ② agent 文件有合法 `name` 吗 | 每个 `.agent.md` 的 frontmatter 必须有 `name:`，且只含小写字母/数字/连字符（`^[a-z0-9-]+$`）。跑 `node .github/hooks/validate-config.mjs`，S10 会报缺失/非法/重名。 |
-> | ③ 重载窗口 | 新建/degit 项目后：命令面板 `Developer: Reload Window`，让 VS Code 重新扫描 agent 文件。 |
-> | ④ 版本 | 自定义 agent 需较新的 VS Code + Copilot Chat。用「关于 VS Code」看真实版本（`code --version` 是 shim，不准）。`【需在你的版本中核实】` UI 入口位置随版本略有差异。 |
-> | ⑤ 设置未被覆盖 | 检查 user/workspace `settings.json` 没有把 `chat.agentFilesLocations` 改成不含 `.github/agents`（默认即含，一般无需设置）。 |
+> | ① Confirm opened at **workspace root** | See the 30-second self-check above--this is the most common cause, so exclude it first. |
+> | ② Does the agent file have a legal `name`? | Every `.agent.md` frontmatter must have `name:`, containing only lowercase letters/digits/hyphens (`^[a-z0-9-]+$`). Run `node .github/hooks/validate-config.mjs`; S10 reports missing/illegal/duplicate names. |
+> | ③ Reload window | After creating/degit-ing a project: command palette `Developer: Reload Window`, so VS Code rescans agent files. |
+> | ④ Version | Custom agents require recent VS Code + Copilot Chat. Use "About VS Code" for the real version (`code --version` is a shim and unreliable). `【Verify in your version】` UI entry locations vary slightly by version. |
+> | ⑤ Settings not overridden | Check user/workspace `settings.json` did not change `chat.agentFilesLocations` to omit `.github/agents` (the default includes it, usually no setting needed). |
 >
-> 仍不出现时的**替代路径**：直接用斜杠命令走流程——`/requirements`、`/compliance`、`/spec`、`/ux-spec`、`/eval-spec`、
-> `/release-gate` 等 prompt 文件不依赖 agent 选择器，输入 `/` 即可看到。agent 只是"编排 persona"，
-> 其能力都能用对应 prompt/skill 手动触发（见 7.1 与 `docs/eos/agent-map.md`）。
+> **Alternative path** if they still do not appear: run the flow directly with slash commands--prompt files such as `/requirements`, `/compliance`, `/spec`, `/ux-spec`, `/eval-spec`, `/release-gate` do not depend on the agent selector; type `/` to see them. Agents are only "orchestration personas", and their capabilities can all be manually triggered with corresponding prompts/skills (see 7.1 and `docs/eos/agent-map.md`).
 
-## 7.3 规则文件（`.github/instructions/`）
+## 7.3 Rule files (`.github/instructions/`)
 
-| 文件 | `applyTo` | 管什么 |
+| File | `applyTo` | Governs |
 |---|---|---|
-| `00-workspace.instructions.md` | `**` | 本仓库事实：目录布局、本地命令、Git 约定 |
-| `frontend/10-frontend.instructions.md` | `**/*.{tsx,jsx}` | React/Next.js 组件规范、响应式/多端、a11y(WCAG AA)、i18n、性能预算/CWV |
-| `backend/10-backend-node.instructions.md` | `**/*.ts` | Node/TS 分层、确定性韧性(断路器/退避)、事务/幂等、UTC/货币、OTel |
-| `backend/10-backend-python.instructions.md` | `**/*.py` | FastAPI 路由→服务→仓储、Pydantic、韧性、事务、OTel |
-| `backend/10-backend-go.instructions.md` | `**/*.go` | Go 分层、并发、韧性、OTel |
-| `backend/10-backend-java.instructions.md` | `**/*.java` | Spring Boot 分层、事务、Resilience4j、Micrometer/OTel |
-| `backend/10-backend-rust.instructions.md` | `**/*.rs` | Rust 分层、并发安全、韧性、tracing/OTel |
-| `backend/10-backend-dotnet.instructions.md` | `**/*.cs` | .NET 分层、async/持久化、Polly、OTel |
-| `ai/10-ai-llm.instructions.md` | `**/{ai,llm,rag}/**` | **Agentic 附加层**：prompt 即制品、tool/agent 架构、认知反思容错、记忆分层、异步解耦、评估、LLM 安全、tracing |
-| `data-api/20-data-api.instructions.md` | `**/*.{sql,prisma}` | 数据建模、迁移、数据生命周期、多租户隔离、API 契约/弃用、时区/货币存储 |
-| `testing/30-testing.instructions.md` | `**/*.{test,spec}.*` | 测试金字塔、AC 可追溯、契约+DB 状态集成测试、覆盖率门、NFR/eval 双轨 |
-| `security/40-security.instructions.md` | `**` | 输入校验、deny-by-default、多租户、密钥、供应链、数据分级（薄护栏） |
-| `release-ops/50-release-ops.instructions.md` | `**/{Dockerfile,*.yml,*.yaml}` | 部署拓扑（阶段 4/G4 定，见 `G-deployment.md`）、可复现构建、发布前置、health 端点 |
+| `00-workspace.instructions.md` | `**` | Repository facts: directory layout, local commands, Git conventions |
+| `frontend/10-frontend.instructions.md` | `**/*.{tsx,jsx}` | React/Next.js component conventions, responsive/multi-device, a11y (WCAG AA), i18n, performance budget/CWV |
+| `backend/10-backend-node.instructions.md` | `**/*.ts` | Node/TS layering, deterministic resilience (circuit breaker/backoff), transactions/idempotency, UTC/money, OTel |
+| `backend/10-backend-python.instructions.md` | `**/*.py` | FastAPI routes→services→repositories, Pydantic, resilience, transactions, OTel |
+| `backend/10-backend-go.instructions.md` | `**/*.go` | Go layering, concurrency, resilience, OTel |
+| `backend/10-backend-java.instructions.md` | `**/*.java` | Spring Boot layering, transactions, Resilience4j, Micrometer/OTel |
+| `backend/10-backend-rust.instructions.md` | `**/*.rs` | Rust layering, concurrency safety, resilience, tracing/OTel |
+| `backend/10-backend-dotnet.instructions.md` | `**/*.cs` | .NET layering, async/persistence, Polly, OTel |
+| `ai/10-ai-llm.instructions.md` | `**/{ai,llm,rag}/**` | **Agentic additional layer**: prompt-as-artifact, tool/agent architecture, cognitive reflection fault tolerance, memory layering, async decoupling, evaluation, LLM safety, tracing |
+| `data-api/20-data-api.instructions.md` | `**/*.{sql,prisma}` | Data modeling, migrations, data lifecycle, multi-tenant isolation, API contracts/deprecation, time zone/money storage |
+| `testing/30-testing.instructions.md` | `**/*.{test,spec}.*` | Test pyramid, AC traceability, contract+DB state integration tests, coverage gate, NFR/eval dual track |
+| `security/40-security.instructions.md` | `**` | Input validation, deny-by-default, multi-tenancy, secrets, supply chain, data classification (thin guardrail) |
+| `release-ops/50-release-ops.instructions.md` | `**/{Dockerfile,*.yml,*.yaml}` | Deployment topology (decided in Phase 4/G4, see `G-deployment.md`), reproducible builds, release preconditions, health endpoints |
 
-> R1 全局信念在 `.github/copilot-instructions.md`（不在上表，因为它是 always-on 顶层文件）。
+> R1 global beliefs are in `.github/copilot-instructions.md` (not in the table because it is the always-on top-level file).
 
-## 7.4 项目级 Skill（`.github/skills/`）
+## 7.4 Project-level Skill (`.github/skills/`)
 
-| Skill | 何时用 | 作用 |
+| Skill | When to use | Purpose |
 |---|---|---|
-| `eos-operational-readiness` | 阶段 2/4 | 强制对 10 项运营/NFR 做 ADOPT/SKIP/DEFER 决策，无空白 |
-| `eos-compliance-skeletons` | 开发阶段（建 🟡 隐私控制时） | 指向可跑起步骨架（redaction/consent/DSAR/audit，四默认参考栈全实现：Node/ESM · Python/stdlib · Go · Java/JDK），把"该建什么"变成"起步脚手架"；`redactorFromProfile()` 自动读 `/compliance` 的 **Regulatory regime:** 行选档 |
+| `eos-operational-readiness` | Phase 2/4 | Force ADOPT/SKIP/DEFER decisions for 10 operational/NFR items, with no blanks |
+| `eos-compliance-skeletons` | Development phase (when building 🟡 privacy controls) | Points to runnable starter skeletons (redaction/consent/DSAR/audit; implemented for four default reference stacks: Node/ESM · Python/stdlib · Go · Java/JDK), turning "what should be built" into "starter scaffold"; `redactorFromProfile()` auto-reads the **Regulatory regime:** line from `/compliance` to select a profile |
 
-> 73 个用户级 `bmad-*` skill 见 `docs/eos/agent-map.md` 的阶段映射表。
+> See the phase mapping table in `docs/eos/agent-map.md` for the 73 user-level `bmad-*` skills.
 
-## 7.5 Hooks（`.github/hooks/`）
+## 7.5 Hooks (`.github/hooks/`)
 
-| 文件 | 事件 | 作用 |
+| File | Event | Purpose |
 |---|---|---|
-| `guardrails.json` + `deny-dangerous.js` | PreToolUse | 拦截危险操作 + **供应链投毒（`curl\|bash`/`--unsafe-perm`）+ 硬编码密钥字面量**（输出 `permissionDecision:"deny"`） |
-| `quality.json` | PostToolUse | 写文件后跑 lint+typecheck+test 质量门 |
-| `config-check.json` | PostToolUse | 每次编辑后自动跑 `validate-config.mjs`（配置 S1–S11）**＋ `eos-doctor.mjs`（SDLC 门诊 / G-EVAL 连线 / 密钥扫描）** |
-| `validate-config.mjs` | 手动/被 hook 调用 | 零依赖静态验证器（S1–S11：规则/agent/prompt frontmatter、glob、必需路径、hook 事件） |
-| `eos-doctor.mjs` | **PostToolUse（逐编辑，经 `config-check.json`）** / 手动 / 被 CI 调用 | 零依赖 SDLC 门诊：G-EVAL、G-UX、**D4 密钥扫描（调 `secret-scan.mjs`）** |
-| `secret-scan.mjs` | 手动 / 被 eos-doctor + CI 调用 | 密钥扫描：内置零依赖正则（硬编码密钥/私钥、误提交 `.env`）**＋ 若装了 `gitleaks` 自动叠加深度扫描**（`.gitleaks.toml` 白名单）；命中 exit 1、输出脱敏 |
-| `spec-align.mjs` | 手动（`/spec-align`）/ 被 CI 调用 | 规范对齐量化：解析 `prd.md`+`trace-matrix.md` → AC 覆盖率 / 一次过率 / 漂移；`--strict` 命中即 exit 1 |
+| `guardrails.json` + `deny-dangerous.js` | PreToolUse | Blocks dangerous operations + **supply-chain poisoning (`curl&#124;bash`/`--unsafe-perm`) + hardcoded secret literals** (outputs `permissionDecision:"deny"`) |
+| `quality.json` | PostToolUse | Runs lint+typecheck+test quality gate after file writes |
+| `config-check.json` | PostToolUse | Automatically runs `validate-config.mjs` after every edit (configuration S1–S11) **+ `eos-doctor.mjs` (SDLC clinic / G-EVAL wiring / secret scan)** |
+| `validate-config.mjs` | Manual/called by hook | Zero-dependency static validator (S1–S11: rule/agent/prompt frontmatter, glob, required paths, hook events) |
+| `eos-doctor.mjs` | **PostToolUse (per edit, via `config-check.json`)** / manual / called by CI | Zero-dependency SDLC clinic: G-EVAL, G-UX, **D4 secret scan (calls `secret-scan.mjs`)** |
+| `secret-scan.mjs` | Manual / called by eos-doctor + CI | Secret scanning: built-in zero-dependency regexes (hardcoded secrets/private keys, accidentally committed `.env`) **+ if `gitleaks` is installed, automatically adds deep scan** (`.gitleaks.toml` allowlist); hits exit 1 and output is redacted |
+| `spec-align.mjs` | Manual (`/spec-align`) / called by CI | Quantified spec alignment: parses `prd.md`+`trace-matrix.md` → AC coverage / first-pass rate / drift; `--strict` exits 1 on hits |
 
-**手动测试护栏**（终端）：
+**Manual guardrail test** (terminal):
 ```sh
 echo '{"tool_input":{"command":"rm -rf /tmp/x"}}' | node .github/hooks/deny-dangerous.js
 # → {"hookSpecificOutput":{...,"permissionDecision":"deny",...}}
@@ -812,192 +771,184 @@ echo '{"tool_input":{"command":"ls"}}' | node .github/hooks/deny-dangerous.js
 # → {}
 ```
 
-**本地 CI（第三道强制层，需 Docker）**：EOS 除"实时 Hook + 配置静态校验"外，还提供 `act` 跑的全仓批量门。
+**Local CI (third enforcement layer, requires Docker)**: besides "real-time Hook + configuration static validation", EOS provides repository-wide batch gates run by `act`.
 ```sh
-act push -j verify            # 跑 .github/workflows/eos-ci.yml：validate-config + eos-doctor + tests + evals
-act push --pull=false --action-offline-mode   # 首次拉过镜像后可完全离线
+act push -j verify            # runs .github/workflows/eos-ci.yml: validate-config + eos-doctor + tests + evals
+act push --pull=false --action-offline-mode   # fully offline after images have been pulled once
 ```
-> 三道强制层各司其职：**Hook（逐编辑实时）**=`config-check.json` 每次编辑跑 `validate-config.mjs`+`eos-doctor.mjs`（配置合规 + G-EVAL 连线）、`quality.json` 跑质量门、`guardrails.json` 拦危险操作 · **静态校验（手动/按需）**=同两个脚本可随时手跑 · **act CI（合并/发布前全仓批量）**=`eos-ci.yml` 跑 validate-config+eos-doctor+tests+evals。同一门（如 G-EVAL）在逐编辑与 CI 两处都强制，早发现也防漏网。
+> The three enforcement layers divide responsibilities: **Hook (real-time per edit)**=`config-check.json` runs `validate-config.mjs`+`eos-doctor.mjs` after every edit (configuration compliance + G-EVAL wiring), `quality.json` runs quality gates, `guardrails.json` blocks dangerous operations · **static validation (manual/on demand)**=the same two scripts can be run anytime · **act CI (whole-repo batch before merge/release)**=`eos-ci.yml` runs validate-config+eos-doctor+tests+evals. The same gate (such as G-EVAL) is enforced both per-edit and in CI, so issues are found early and cannot slip through.
 
-## 7.6 六张需求清单（`docs/checklists/`；第六张仅受监管行业）
+## 7.6 Six requirement checklists (`docs/checklists/`; sixth only for regulated industries)
 
-| 文件 | 名称 | 用途 | 在哪个门用 |
+| File | Name | Use | Used at which gate |
 |---|---|---|---|
-| `A-gap.md` | 需求缺口 | 可证伪/可度量/边界/依赖/scope-out/重叠 | G2 |
-| `B-rework.md` | 上线后高概率补做 | 埋点/authz/审计/回滚/告警/灰度/限流/i18n/空错态/迁移可逆 | G2 |
-| `C-nfr.md` | 非功能需求 | 性能/容量/容灾/安全/可观测/可维护/a11y 逐项填目标 | G2 + G4 |
-| `D-ops.md` | 运营前置 | 埋点↔指标/权限矩阵/审计/回滚/灰度/配额/多租户/i18n/容量告警/Runbook | G2 |
-| `E-security.md` | 安全与机密 | 密钥不入代码/前端/`.env` 治理、供应链投毒防护、配置权限隔离、密钥轮换 | G2 + G8 |
-| `F-compliance.md` | 受监管行业合规（**仅受监管**） | 制度选择(HIPAA/PCI/SOC2/SOX/GDPR/CCPA/PIPL)→数据驻留/审计留存/最小必要/BAA·DPA/Agentic 数据出境 | G2 + G8 |
-| `F-compliance-hipaa.md` | HIPAA 控制→落点映射（配套附录） | Security Rule 技术/管理/物理保障 + 最小必要/去标识 + 泄露通知 + 6 年留存，逐条对 EOS 真实落点（🟢/🟡/⚪ 三档） | G2 + G8 |
-| `F-compliance-pci-dss.md` | PCI-DSS 控制→落点映射（配套附录） | v4.0 十二项 + Requirement 3 存储卡数据专表 + scope-reduction 战略（SAQ A） | G2 + G8 |
-| `F-compliance-gdpr-pipl.md` | GDPR/PIPL 隐私控制→落点映射（配套附录） | 合法性/同意、DSAR（访问/删除/可携）、跨境传输（SCCs vs PIPL 安全评估）、ROPA/DPIA、72h 通知；含 GDPR↔PIPL 差异表 | G2 + G8 |
+| `A-gap.md` | Requirement gaps | Falsifiable/measurable/boundaries/dependencies/scope-out/overlap | G2 |
+| `B-rework.md` | Likely post-launch add-ons | telemetry/authz/audit/rollback/alerting/canary/rate-limit/i18n/empty-error-loading states/reversible migration | G2 |
+| `C-nfr.md` | Non-functional requirements | Performance/capacity/DR/security/observability/maintainability/a11y targets filled item by item | G2 + G4 |
+| `D-ops.md` | Operational pre-flight | telemetry↔metrics/authz matrix/audit/rollback/canary/quota/multi-tenancy/i18n/capacity alerts/runbook | G2 |
+| `E-security.md` | Security and secrets | no secrets in code/frontend/`.env` governance, supply-chain poisoning defense, config permission isolation, key rotation | G2 + G8 |
+| `F-compliance.md` | Regulated-industry compliance (**regulated only**) | regime selection (HIPAA/PCI/SOC2/SOX/GDPR/CCPA/PIPL)→data residency/audit retention/minimum necessary/BAA·DPA/Agentic data egress | G2 + G8 |
+| `F-compliance-hipaa.md` | HIPAA controls→landing-point mapping (companion appendix) | Security Rule technical/administrative/physical safeguards + minimum necessary/de-identification + breach notification + 6-year retention, mapped line by line to real EOS landing points (🟢/🟡/⚪ tiers) | G2 + G8 |
+| `F-compliance-pci-dss.md` | PCI-DSS controls→landing-point mapping (companion appendix) | v4.0 twelve requirements + Requirement 3 card-data storage special table + scope-reduction strategy (SAQ A) | G2 + G8 |
+| `F-compliance-gdpr-pipl.md` | GDPR/PIPL privacy controls→landing-point mapping (companion appendix) | lawfulness/consent, DSAR (access/deletion/portability), cross-border transfer (SCCs vs PIPL security assessment), ROPA/DPIA, 72h notification; includes GDPR↔PIPL difference table | G2 + G8 |
 
 ---
 
-## 7.7 浏览器自动化测试（Playwright MCP）【新建补强·映射 VS Code MCP 原生机制】
+## 7.7 Browser automation testing (Playwright MCP)【New-build · maps to VS Code MCP native mechanism】
 
-想要"agent 亲自开浏览器点一点、截图自查"（类似 Antigravity 的 Chrome 集成）？VS Code + Copilot
-的原生做法是 **MCP server + agent 模式**。模板把它做成**纯本地、沙箱化、默认关闭（opt-in）**的
-Playwright MCP：
+Want the "agent to personally open the browser, click around, and screenshot self-check" (similar to Antigravity's Chrome integration)? The native VS Code + Copilot approach is **MCP server + agent mode**. The template packages it as a **purely local, sandboxed, default-off (opt-in)** Playwright MCP:
 
-> **为什么默认关闭？**（这是 eos-1.7.1 修正的一个真实设计缺陷）MCP server 由客户端在**会话/对话启动时
-> 一次性 eager 启动**，且是 **workspace 全局**的——**无法按 SDLC 阶段门控**。若把活动的 `.vscode/mcp.json`
-> 随模板一起 ship，那么从**阶段 1 刚敲下一个 idea** 起，客户端（Copilot CLI / VS Code Chat 皆然）就会
-> 弹"Starting MCP servers playwright…"去拉起浏览器——既无必要又浪费。VS Code 的 `chat.mcp.autostart`
-> 是 Experimental 且仅 VS Code 生效，救不了 CLI。**唯一稳妥、跨客户端的做法：默认不给活动配置，等阶段 7 再
-> opt-in。**
+> **Why default off?** (This is a real design defect fixed in eos-1.7.1.) MCP servers are **eager-started once by the client at session/conversation start** and are **workspace-global**--they **cannot be gated by SDLC phase**. If an active `.vscode/mcp.json` ships with the template, then from the moment **Phase 1 just types an idea**, clients (Copilot CLI / VS Code Chat alike) will pop "Starting MCP servers playwright..." to bring up a browser--unnecessary and wasteful. VS Code's `chat.mcp.autostart` is Experimental and only affects VS Code, so it cannot save CLI. **The only robust cross-client approach: do not provide active config by default; opt in at Phase 7.**
 
-- **配置（inert）**：模板 ship 的是 **`.vscode/mcp.json.example`**——任何 MCP 客户端都**不会读 `.example`**，所以**什么都不会自启**。
-- **阶段 7 启用（opt-in）**：`cp .vscode/mcp.json.example .vscode/mcp.json` 然后重载窗口/会话。这个活动的 `mcp.json` 被 `.gitignore` 忽略、**只留在本地**，永不提交回模板。用完 `rm .vscode/mcp.json` 即可停用。
-- **配置格式**：顶层 key 是 **`"servers"`**（注意不是通用 README 里的 `"mcpServers"`——那是别的客户端格式）。
-- **引擎**：`@playwright/mcp`（Microsoft 官方），走 accessibility tree、确定性强、无遥测；与 BMAD 的 `bmad-testarch-framework` 选定的 Playwright 同源。
-- **护栏**：`sandboxEnabled: true` + 顶层 `sandbox` 把**文件写入锁到 workspace、网络锁到 localhost**（macOS/Linux 官方特性）——agent 驱动的浏览器只能打你自己的 dev server，出不了圈。
-- **首次使用**：一次性联网 `npx playwright install chromium`（并让 `@playwright/mcp` 首次下载）；VS Code 首启会弹**信任对话框**。之后在 **agent 模式**的 tools 选择器里就能看到 Playwright 工具。
+- **Configuration (inert)**: the template ships **`.vscode/mcp.json.example`**--no MCP client reads `.example`, so **nothing auto-starts**.
+- **Enable in Phase 7 (opt-in)**: `cp .vscode/mcp.json.example .vscode/mcp.json`, then reload window/session. The active `mcp.json` is ignored by `.gitignore`, **kept local only**, and never committed back to the template. Remove it with `rm .vscode/mcp.json` when done.
+- **Configuration format**: top-level key is **`"servers"`** (note: not the generic README's `"mcpServers"`--that is another client format).
+- **Engine**: `@playwright/mcp` (official Microsoft), uses accessibility tree, is highly deterministic, no telemetry; same source as the Playwright chosen by BMAD's `bmad-testarch-framework`.
+- **Guardrails**: `sandboxEnabled: true` + top-level `sandbox` locks **file writes to workspace and network to localhost** (official macOS/Linux feature)--the agent-driven browser can only hit your own dev server and cannot leave the fence.
+- **First use**: one-time networked `npx playwright install chromium` (and let `@playwright/mcp` download on first use); VS Code first launch shows a **trust dialog**. Afterwards, Playwright tools appear in the **agent mode** tools selector.
 
-**用法**：跑 `/e2e`（见 7.1）编排 `bmad-testarch-framework`（初始化）→ `bmad-qa-generate-e2e-tests` / `bmad-testarch-automate`（生成/扩展）→ `bmad-testarch-trace`（AC↔E2E 矩阵）。**开发期**若要 agent 用 Playwright MCP 驱动 localhost 复现/探索，先按上面 opt-in 启用，再把结论**固化成确定性 Playwright 规格**。
+**Usage**: run `/e2e` (see 7.1) to orchestrate `bmad-testarch-framework` (initialize) → `bmad-qa-generate-e2e-tests` / `bmad-testarch-automate` (generate/extend) → `bmad-testarch-trace` (AC↔E2E matrix). **During development**, if you want the agent to use Playwright MCP to reproduce/explore localhost, first enable opt-in as above, then **solidify findings into deterministic Playwright specs**.
 
-**诚实边界**：
-- 浏览器 MCP **默认不启用**——**只在阶段 7 手动 opt-in**，避免早期阶段被 eager 启动打扰（见上"为什么默认关闭"）。
-- MCP 那层是**非确定性**的——只用于开发期自查，**绝不进 CI**、**绝不替代**确定性规格。CI 只跑 Playwright 脚本（`eos-ci.yml` / `bmad-testarch-ci`）。
-- `sandbox` 仅 macOS/Linux；网络白名单默认只放 `localhost`/`127.0.0.1`，若被测应用要拉外部资源（CDN 等）再按需加域名。
-- 想要**真实 Chrome** 的深度性能/网络排障？`【可选】`换用 Google 的 `chrome-devtools-mcp`——但它**默认开启用量遥测 + 调 CrUX API**，纯本地务必加 `--no-usage-statistics --no-performance-crux`。
-- 更进一步的"按需加载"方向：Playwright 官方也提供 **CLI + SKILLS** 形态（供 coding agent 按相关性懒加载，天然规避 eager 启动）——`【需在你的版本中核实】`成熟度，可作后续演进。
-- agent 模式 + MCP 的具体 UI 随版本演进，`【需在你的版本中核实】`。
+**Honest boundaries**:
+- Browser MCP is **not enabled by default**--**only manually opt in during Phase 7**, avoiding eager startup interference in early phases (see "Why default off" above).
+- The MCP layer is **nondeterministic**--use it only for development self-checks, **never in CI**, and **never as a substitute** for deterministic specs. CI only runs Playwright scripts (`eos-ci.yml` / `bmad-testarch-ci`).
+- `sandbox` is macOS/Linux only; the network allowlist defaults to `localhost`/`127.0.0.1`; if the app under test needs external resources (CDN, etc.), add domains as needed.
+- Want deeper performance/network troubleshooting with **real Chrome**? `【Optional】` switch to Google's `chrome-devtools-mcp`--but it **enables usage telemetry + calls the CrUX API by default**, so for pure local use you must add `--no-usage-statistics --no-performance-crux`.
+- Further "on-demand loading" direction: Playwright officially also provides **CLI + SKILLS** forms (for coding agents to lazy-load by relevance, naturally avoiding eager startup)--`【Verify in your version】` maturity; this can be future evolution.
+- The concrete UI for agent mode + MCP evolves by version, `【Verify in your version】`.
 
 ---
 
-# 第 8 章 配置质检与验收
+# Chapter 8 Configuration QA and acceptance
 
-## 8.1 静态验证（每次改配置后必跑）
+## 8.1 Static validation (must run after every configuration change)
 
 ```sh
 node .github/hooks/validate-config.mjs
 ```
 
-| 检查 | 级别 | 含义 |
+| Check | Level | Meaning |
 |---|---|---|
-| S1 | error | 每个 `.instructions.md` 有合法 YAML frontmatter |
-| S2 | warn | 每个 `.instructions.md` 有 `applyTo`（否则只能手动挂载） |
-| S3 | error | 非 `**` 文件无重复 glob（`**` 合法共存，被豁免） |
-| S4 | warn | 常见源码类型（如 .ts/.tsx/.py/.sql）都有规则覆盖 |
-| S6 | warn | 文件名符合 `NN-area[-stack].instructions.md` 规范 |
-| S7 | error | 必需路径/文件存在（copilot-instructions.md、instructions/、prompts/、agents/、hooks/、docs/eos/agent-map.md） |
-| S9 | error | hook JSON 合法且 event 名有效 |
-| S10 | error/warn | 每个 `.agent.md` 有 `name`（error，缺则 Chat 不按名列出）+ `description`（warn） |
-| S11 | warn | 每个 `.prompt.md` 有 `description` |
+| S1 | error | Every `.instructions.md` has legal YAML frontmatter |
+| S2 | warn | Every `.instructions.md` has `applyTo` (otherwise it can only be mounted manually) |
+| S3 | error | Non-`**` files have no duplicate glob (`**` legally coexists and is exempt) |
+| S4 | warn | Common source types (such as .ts/.tsx/.py/.sql) have rule coverage |
+| S6 | warn | File name matches `NN-area[-stack].instructions.md` convention |
+| S7 | error | Required paths/files exist (copilot-instructions.md, instructions/, prompts/, agents/, hooks/, docs/eos/agent-map.md) |
+| S9 | error | hook JSON is legal and event names are valid |
+| S10 | error/warn | Every `.agent.md` has `name` (error; if missing, Chat will not list it by name) + `description` (warn) |
+| S11 | warn | Every `.prompt.md` has `description` |
 
-> 期望输出：`PASS`。任何 **error** 必须先修复再继续；**warn** 视情况处理。
-> （以上为当前 `validate-config.mjs` 实际实现的检查项。）
+> Expected output: `PASS`. Any **error** must be fixed before continuing; **warn** is handled case by case.
+> (The above are the checks actually implemented in current `validate-config.mjs`.)
 
-## 8.2 语义验证（定期 / 大改后）
+## 8.2 Semantic validation (periodic / after major changes)
 
-Chat 输入 **`/validate-config`**：让 Agent 读 `.github/` 全量，检测规则矛盾、重复、
-作用域过宽、失效链接，输出 `[文件][问题类型][严重度][建议]` 表，**不改代码**。
+Enter **`/validate-config`** in Chat: have Agent read all of `.github/`, detect rule contradictions, duplicates, overly broad scopes, and broken links, then output a `[file][issue type][severity][suggestion]` table, **without changing code**.
 
-## 8.3 行为验收 Rubric（冒烟）
+## 8.3 Behavioral acceptance Rubric (smoke)
 
-用一个最小 dry-run 功能（如"用户登录"）端到端跑 10 阶段，逐项打勾：
+Run one minimal dry-run feature (such as "user login") end to end through 10 phases, checking off each item:
 
-| 阶段 | 期望产出 | 通过标准 |
+| Phase | Expected output | Pass criteria |
 |---|---|---|
-| Discovery | 单句问题+指标 | ☐ 可证伪 ☐ 有度量 |
-| Requirements | PRD draft + 四清单 | ☐ 无未决 BLOCKER |
-| Spec | `docs/prd.md` | ☐ 每条需求有 AC |
-| Architecture | ADR + API 契约 | ☐ ADR 有 trade-off ☐ API 先于实现 |
-| Planning | story 列表 | ☐ 每 story 含 AC+context |
-| Development | 代码 + 过 hook | ☐ 合规代码不被拦 ☐ 危险指令被拦 |
-| Testing | 测试 + trace | ☐ 每 AC ≥1 测试 ☐ 全绿 |
-| Release | 门禁报告 | ☐ 五项门禁全过 |
-| Observability | 埋点在产 | ☐ 关键路径可见 |
-| Iteration | 回写 Spec | ☐ `docs/prd.md` 已更新 |
+| Discovery | One-sentence problem+metrics | ☐ falsifiable ☐ has metrics |
+| Requirements | PRD draft + four checklists | ☐ no unresolved BLOCKER |
+| Spec | `docs/prd.md` | ☐ every requirement has AC |
+| Architecture | ADR + API contract | ☐ ADR has trade-off ☐ API before implementation |
+| Planning | story list | ☐ every story has AC+context |
+| Development | code + passes hook | ☐ compliant code not blocked ☐ dangerous command blocked |
+| Testing | tests + trace | ☐ every AC has ≥1 test ☐ all green |
+| Release | gate report | ☐ all five gates pass |
+| Observability | telemetry in production | ☐ key paths visible |
+| Iteration | write back to Spec | ☐ `docs/prd.md` updated |
 
-> 完整真实样例见**附录 C**（`my-app` 12/12 通过，报告在 `my-app/docs/eos/walkthrough.md`）。
+> See **Appendix C** for the complete real example (`my-app` 12/12 passed, report in `my-app/docs/eos/walkthrough.md`).
 
 ---
 
-# 第 9 章 故障定位与排错
+# Chapter 9 Failure localization and troubleshooting
 
-## 9.1 失败定位决策树
+## 9.1 Failure localization decision tree
 
 ```
-Agent 输出不符预期
-├─ 某类文件时规则不生效   → 检查该规则的 applyTo glob（validate-config S2/S3）
-│                            常见：用了逗号串 "a,b" 而非花括号 "{a,b}"
-├─ 规则被覆盖/互相矛盾     → 跑 /validate-config 语义检查；查多个 "**" 文件是否措辞冲突
-├─ 斜杠命令不被识别       → prompt 缺 description frontmatter；文件名须 *.prompt.md
-├─ 切了 agent 但没生效     → 确认在 Chat agent 选择器真正选中；查 *.agent.md 的 tools 是否过窄
-├─ 危险操作没被拦         → deny-dangerous.js 的 schema；grep hookSpecificOutput.permissionDecision
-├─ 质量门空跑/没拦        → package.json 缺 test/lint/typecheck 脚本（hook 用 --if-present）
-├─ bmad-* 调不到          → 确认 ~/.agents/skills/ 下该 skill 存在；名称拼写
-└─ 全局规则不生效         → 确认路径正好是 .github/copilot-instructions.md（S1）
+Agent output does not match expectation
+├─ Rules ineffective for a certain file class → check that rule's applyTo glob (validate-config S2/S3)
+│                                             common: used comma string "a,b" instead of braces "{a,b}"
+├─ Rules overridden/mutually contradictory    → run /validate-config semantic check; inspect whether multiple "**" files conflict in wording
+├─ Slash command not recognized               → prompt missing description frontmatter; file name must be *.prompt.md
+├─ Switched agent but ineffective             → confirm the agent is actually selected in Chat agent selector; check whether *.agent.md tools are too narrow
+├─ Dangerous operation not blocked            → deny-dangerous.js schema; grep hookSpecificOutput.permissionDecision
+├─ Quality gate empty-runs/does not block     → package.json lacks test/lint/typecheck scripts (hook uses --if-present)
+├─ bmad-* cannot be invoked                   → confirm the skill exists under ~/.agents/skills/; check name spelling
+└─ Global rules ineffective                   → confirm path is exactly .github/copilot-instructions.md (S1)
 ```
 
-## 9.2 "到底是规则、prompt、agent 还是 hook 的问题？"
+## 9.2 "Is this a rule, prompt, agent, or hook problem?"
 
-| 症状 | 大概率根因 | 验证方法 |
+| Symptom | Most likely root cause | How to verify |
 |---|---|---|
-| 只在某类文件错 | **规则**（applyTo） | 改个别的文件类型看是否复现 |
-| 任何文件都错、措辞打架 | **规则**（多 always-on 冲突） | `/validate-config` |
-| 输入 `/x` 没反应 | **prompt**（命名/frontmatter） | 看 `.github/prompts/x.prompt.md` 是否存在且有 description |
-| 流程跳步、persona 不对 | **agent**（没切/handoff） | 看 Chat 当前 agent；看 handoffs 配置 |
-| 危险命令通过 / 质量门没跑 | **hook**（schema/脚本/脚本缺脚本） | 用 7.5 的手动测试命令喂 JSON |
+| Wrong only for a certain file class | **rule** (applyTo) | Try another file type to see whether it reproduces |
+| Wrong in every file, wording conflicts | **rule** (multiple always-on conflicts) | `/validate-config` |
+| Entering `/x` has no effect | **prompt** (name/frontmatter) | Check whether `.github/prompts/x.prompt.md` exists and has description |
+| Flow skips steps or persona is wrong | **agent** (not switched/handoff) | Check current Chat agent; inspect handoffs config |
+| Dangerous command passes / quality gate does not run | **hook** (schema/script/script lacks scripts) | Feed JSON using the manual test commands in 7.5 |
 
-## 9.3 常见坑（实测）
+## 9.3 Common pitfalls (tested)
 
-- **VS Code 打开的是父目录而非项目根** → `eos-*` agent、`.github/instructions`、`.github/hooks` 全部静默失效（最常见坑）。从项目目录内 `code .`，Explorer 顶层应能直接看到 `.github/`（见 7.2 的 30 秒自检）。
-- `code --version` 返回 `3.0.12` 是 shim，**不是真实版本**；真实版本看 VS Code 关于面板。
-- 私有模板 `npx degit user/repo` 会失败 → 必须 `npx degit --mode=git user/repo`。
-- PreToolUse 用错 schema（`decision:"block"` 是 PostToolUse 的）→ 拦不住。正确是 `hookSpecificOutput.permissionDecision:"deny"`。
-- 多个 `applyTo:"**"` 文件**不是**冲突（薄、互补、单一职责），验证器 S3 已豁免。
+- **VS Code opened the parent directory, not the project root** → `eos-*` agents, `.github/instructions`, and `.github/hooks` all silently fail (most common pitfall). Run `code .` from inside the project directory; Explorer top level should directly show `.github/` (see 7.2's 30-second self-check).
+- `code --version` returning `3.0.12` is a shim, **not the real version**; check the VS Code About panel for the real version.
+- Private template `npx degit user/repo` fails → must use `npx degit --mode=git user/repo`.
+- PreToolUse used the wrong schema (`decision:"block"` belongs to PostToolUse) → cannot block. Correct is `hookSpecificOutput.permissionDecision:"deny"`.
+- Multiple `applyTo:"**"` files are **not** conflicts (thin, complementary, single-responsibility); validator S3 exempts them.
 
 ---
 
-# 第 10 章 跨项目复用与分发
+# Chapter 10 Cross-project reuse and distribution
 
-## 10.1 什么放哪里（关键分层）
+## 10.1 What goes where (key layering)
 
-| 层级 | 位置 | 放什么 | 特性 |
+| Layer | Location | What to put there | Characteristic |
 |---|---|---|---|
-| **用户级（跨所有项目共享）** | `~/.agents/skills/`、`~/.claude/skills/` | 73 个 `bmad-*` 通用能力 | 已装，不随项目走 |
-| 用户级 agents（可选） | `~/.copilot/agents/` | 你想全局通用的 `eos-*.agent.md` | 所有项目可见 |
-| **工作区级（随项目走）** | 项目 `.github/` + `docs/` | EOS 规则/prompt/agent/skill/hook + 文档 | 跟着 repo 走，团队共享 |
+| **User-level (shared across all projects)** | `~/.agents/skills/`, `~/.claude/skills/` | 73 generic `bmad-*` capabilities | Installed, does not travel with project |
+| User-level agents (optional) | `~/.copilot/agents/` | `eos-*.agent.md` files you want globally | Visible to all projects |
+| **Workspace-level (travels with project)** | project `.github/` + `docs/` | EOS rules/prompts/agents/skills/hooks + docs | Travels with repo, shared by team |
 
-> 原则：**通用能力放用户级，项目专属放 `.github/`**。把项目专属塞进用户级 = 跨项目污染（反模式 P13）。
+> Principle: **generic capabilities go user-level; project-specific items go under `.github/`**. Putting project-specific items at user level = cross-project pollution (anti-pattern P13).
 
-## 10.2 一键初始化新项目
+## 10.2 One-command new project initialization
 
 ```sh
-# 方式 A：degit（私有库加 --mode=git）
+# Method A: degit (private repos add --mode=git)
 npx degit --mode=git niaodian/eos-template my-app
 
-# 方式 B：gh + template
+# Method B: gh + template
 gh repo create my-app --template niaodian/eos-template --private --clone
 ```
 
-## 10.3 分发给团队（纯本地、无企业依赖）
+## 10.3 Distribution to a team (purely local, no enterprise dependency)
 
-1. 把 `eos-template` 设为 GitHub **template repo**（已设 `isTemplate:true`）。
-2. 团队成员各自 `--mode=git` degit 或 `gh ... --template` 初始化。
-3. 共享的 `bmad-*` 各自在本机用户级安装（一次）。
-4. **不要**在配置里写任何企业内网/接口/SSO 依赖——保持离线可运行。
+1. Set `eos-template` as a GitHub **template repo** (already set `isTemplate:true`).
+2. Team members initialize with `--mode=git` degit or `gh ... --template` respectively.
+3. Shared `bmad-*` skills are installed by each person at user level (once).
+4. **Do not** write any enterprise intranet/interface/SSO dependency into configuration--keep it offline-runnable.
 
-> `【可选扩展·需企业/网络环境】`：组织级 instructions 分发、私有 registry、cloud agents——
-> 这些不在主路径，按需另行接入，不影响本地自包含。
+> `【Optional · needs enterprise env】`: org-level instructions distribution, private registry, cloud agents--
+> these are not on the main path; add them separately as needed without affecting local self-containment.
 
-## 10.4 版本化与升级
+## 10.4 Versioning and upgrades
 
-- 每次改 EOS 配置：改 `docs/eos/VERSION`（如 `eos-1.4.1`→`eos-1.6.0`），跑 `validate-config.mjs`，Conventional Commits 提交。
-- 升级既有项目：从新版模板 diff `.github/`，挑选合并；用户级 `bmad-*` 独立升级。
+- Every EOS configuration change: update `docs/eos/VERSION` (e.g., `eos-1.4.1`→`eos-1.6.0`), run `validate-config.mjs`, commit with Conventional Commits.
+- Upgrading existing projects: diff `.github/` from the new template version, selectively merge; user-level `bmad-*` upgrades independently.
 
 ---
 
-# 第 11 章 新增技术栈
+# Chapter 11 Adding a technology stack
 
-EOS 的栈规则是**可插拔**的。新增一个栈 = 加一个 `*.instructions.md` + 对应 `applyTo`：
+EOS stack rules are **pluggable**. Adding a stack = add one `*.instructions.md` + corresponding `applyTo`:
 
-1. 在 `.github/instructions/` 下建子文件夹（如 `backend/`）。
-2. 新建 `NN-backend-go.instructions.md`，frontmatter：
+1. Create a subfolder under `.github/instructions/` (such as `backend/`).
+2. Create `NN-backend-go.instructions.md`, frontmatter:
    ```yaml
    ---
    name: 'Backend (Go)'
@@ -1005,179 +956,173 @@ EOS 的栈规则是**可插拔**的。新增一个栈 = 加一个 `*.instruction
    applyTo: "**/*.go"
    ---
    ```
-3. 写该栈的分层/校验/错误处理/lint-format-test 约定。
-4. **确保 glob 与现有规则互斥**（避免和 `**/*.ts` 等重叠）；跑 `validate-config.mjs` 验 S3。
-5. 若新栈的 test/lint 命令不同，同步更新 `00-workspace.instructions.md` 的 Local commands。
+3. Write that stack's layering/validation/error-handling/lint-format-test conventions.
+4. **Ensure the glob is mutually exclusive with existing rules** (avoid overlapping with `**/*.ts`, etc.); run `validate-config.mjs` to validate S3.
+5. If the new stack has different test/lint commands, also update `Local commands` in `00-workspace.instructions.md`.
 
-> 默认参考栈：前端 TS+Next.js、后端 Node/TS 或 Python/FastAPI、数据 PostgreSQL+OpenAPI。
-> 全部可替换——换栈只是换 `applyTo` 和正文，不动 EOS 骨架。
+> Default reference stacks: frontend TS+Next.js, backend Node/TS or Python/FastAPI, data PostgreSQL+OpenAPI.
+> All are replaceable--changing stack only changes `applyTo` and body text, not the EOS skeleton.
 >
-> **省事**：Node/Python/Go/Java/Rust/.NET 六大后端栈 + React 前端的 R3 规则均已随模板发布；
-> 各栈成品命令行 + frontmatter 见 `docs/eos/stack-presets.md`（配方册），复制对应块即可，不用手写。
+> **Shortcut**: R3 rules for six major backend stacks Node/Python/Go/Java/Rust/.NET + React frontend are already shipped with the template;
+> finished command lines + frontmatter for each stack are in `docs/eos/stack-presets.md` (recipe book). Copy the matching block; no need to handwrite.
 
 ---
 
-# 第 12 章 反模式速查
+# Chapter 12 Anti-patterns quick reference
 
-| # | 反模式 | 后果 | EOS 防御 |
+| # | Anti-pattern | Consequence | EOS defense |
 |---|---|---|---|
-| P1 | 只写功能 Spec 不写 NFR | SLO 上线爆 | C-nfr 是 G2 必过项 |
-| P2 | 运营需求不前置 | 上线后返工×3 | D-ops + `eos-operational-readiness` + G2 |
-| P3 | 全部规则塞进 copilot-instructions.md | always-on 爆、污染所有会话 | R1≤40 行；按 applyTo 分薄片 |
-| P4 | 重复造轮子（已有 bmad-* 却新建） | 双维护、漂移 | 交付件标来源；agent-map.md |
-| P5 | 以为有原生优先级 | 版本变化后静默错 | 靠 applyTo + Hooks，不靠顺序 |
-| P6 | 逗号串多 glob `"a,b"` | 行为未验证 | 用花括号 `{a,b}` + 子文件夹；S2/S3 |
-| P7 | PreToolUse 用 `decision:"block"` | 拦不住危险操作 | 用 `permissionDecision:"deny"` |
-| P8 | 规则膨胀单文件超长 | token 超预算被截断 | 单一职责拆分 |
-| P9 | 无 ADR 做不可逆决策 | 团队失忆 | G4 必须有 ADR；`/adr` |
-| P10 | 跳过 Spec 直接出码 | 代码与需求漂移 | G3 是 G5 前置；无 prd.md 不进 Planning |
-| P11 | 无回滚/灰度就发布 | 出事无法撤 | G8 五项门禁；`/release-gate` |
-| P12 | 本地配置硬编码企业接口 | 离开内网即损坏 | 纯本地约束；只写可本地验证内容 |
-| P13 | 用户级放项目专属配置 | 跨项目污染 | 通用放用户级，专属放 `.github/` |
-| P14 | 改规则不验证就发布 | 静默失效 | 每次改完跑 `validate-config.mjs` + rubric |
+| P1 | Write only functional Spec, no NFR | SLO explodes after launch | C-nfr is required for G2 |
+| P2 | Operational requirements not moved upfront | Post-launch rework ×3 | D-ops + `eos-operational-readiness` + G2 |
+| P3 | Stuff all rules into copilot-instructions.md | always-on blows up and pollutes all sessions | R1≤40 lines; split thin slices by applyTo |
+| P4 | Rebuild wheels (existing bmad-* but create new) | Dual maintenance and drift | Mark source for deliverables; agent-map.md |
+| P5 | Assume native priority exists | Silent errors after version changes | Rely on applyTo + Hooks, not order |
+| P6 | Comma-string multi-glob `"a,b"` | Behavior unverified | Use braces `{a,b}` + subfolders; S2/S3 |
+| P7 | Use `decision:"block"` in PreToolUse | Cannot block dangerous operations | Use `permissionDecision:"deny"` |
+| P8 | Rule bloat in one overlong file | Token overbudget and truncation | Split by single responsibility |
+| P9 | Make irreversible decisions with no ADR | Team amnesia | G4 requires ADR; `/adr` |
+| P10 | Skip Spec and output code directly | Code drifts from requirements | G3 is prerequisite to G5; no prd.md, no Planning |
+| P11 | Release with no rollback/canary | Cannot recover from incidents | G8 five gates; `/release-gate` |
+| P12 | Hardcode enterprise interfaces in local config | Breaks outside intranet | Pure-local constraint; only write locally verifiable content |
+| P13 | Put project-specific config at user level | Cross-project pollution | Generic goes user-level; specific goes `.github/` |
+| P14 | Publish rule changes without validation | Silent failure | Run `validate-config.mjs` + rubric after every change |
 
 ---
 
-# 附录 A 术语表
+# Appendix A Glossary
 
-| 术语 | 含义 |
+| Term | Meaning |
 |---|---|
-| EOS | Engineering Operating System，本套工程操作系统 |
-| Gate（G1–G10） | 决策门；未过门不进下一阶段 |
-| 硬门 | G2（需求）、G8（发布），有 BLOCKER 即阻断 |
-| applyTo | instructions frontmatter 字段，用 glob 限定规则生效的文件范围 |
-| always-on | 进入每次会话的规则（R1/R2/R7），最稀缺资源 |
-| handoff | agent frontmatter 里定义的"交棒"到下一 agent/prompt |
-| BMAD | 已装的 73 个 `bmad-*` skill 体系，EOS 优先复用 |
-| ADR | Architecture Decision Record，一文件一决策 |
-| AC | Acceptance Criteria，验收标准，须可度量、可测试 |
-| NFR | 非功能需求（性能/容量/容灾/安全/可观测…） |
-| trace 矩阵 | AC ↔ 测试的映射表，确保无漏测 |
-| Hook | `.github/hooks/` 下的生命周期事件脚本（Preview） |
-| 契约性 vs 技术权威 | CI 门"存在"是契约性；只有下游开启**服务端分支保护**要求 `verify` 通过，才变成"合并阻断"的技术权威 |
-| activation（实例化后硬化） | 从模板实例化后的一次性动作（分支保护 + CODEOWNERS + 审批基线 [+ 受监管则合规档案]）；台账 `docs/eos/activation.md`，引导 `/eos-init`，详解附录 D |
-| keystone | 让门禁具备权威的"拱心石"：CODEOWNERS + settings 基线随仓提供，服务端分支保护由下游启用 |
+| EOS | Engineering Operating System, this engineering operating system |
+| Gate (G1–G10) | Decision gate; do not enter the next phase until the gate passes |
+| hard gate | G2 (requirements), G8 (release); any BLOCKER blocks |
+| applyTo | instructions frontmatter field that limits rule scope with glob |
+| always-on | Rules that enter every session (R1/R2/R7), the scarcest resource |
+| handoff | "handoff" to the next agent/prompt defined in agent frontmatter |
+| BMAD | Installed 73 `bmad-*` skill system; EOS prioritizes reuse |
+| ADR | Architecture Decision Record, one decision per file |
+| AC | Acceptance Criteria, must be measurable and testable |
+| NFR | Non-functional requirements (performance/capacity/DR/security/observability...) |
+| trace matrix | AC ↔ test mapping table, ensuring no missed tests |
+| Hook | Lifecycle event scripts under `.github/hooks/` (Preview) |
+| Contractual vs technical authority | CI gates "existing" is contractual; only when downstream enables **server-side branch protection** requiring `verify` to pass does it become "merge-blocking" technical authority |
+| activation (post-instantiation hardening) | One-time actions after instantiating from the template (branch protection + CODEOWNERS + approval baseline [+ compliance profile if regulated]); ledger `docs/eos/activation.md`, guided by `/eos-init`, detailed in Appendix D |
+| keystone | The "keystone" that makes gates authoritative: CODEOWNERS + settings baseline are provided with the repo, while server-side branch protection is enabled downstream |
 
 ---
 
-# 附录 B 命令速查卡
+# Appendix B Command cheat sheet
 
 ```
-# ── 终端 ──
-npx degit --mode=git niaodian/eos-template my-app   # 新建项目
-node .github/hooks/validate-config.mjs              # 配置自检（期望 PASS）
-npm test                                            # 跑测试（质量门同款）
-npm audit                                           # 发布前依赖审计
+# ── Terminal ──
+npx degit --mode=git niaodian/eos-template my-app   # create new project
+node .github/hooks/validate-config.mjs              # config self-check (expect PASS)
+npm test                                            # run tests (same as quality gate)
+npm audit                                           # dependency audit before release
 
-# ── Copilot Chat（Agent 模式）──
-/eos-help                    # 迷路了？打印记忆卡 + 你在哪个阶段 + 下一步（只读，不改文件）
-/eos-init                    # 阶段0：一次性硬化（分支保护 + CODEOWNERS + 审批基线 → activation.md）
-（agent）eos-discovery        # 阶段1：问题定义        → G1
-/requirements "<feature>"    # 阶段2：需求+运营前置    → G2★
-/spec                        # 阶段3：PRD 真相源       → G3
-/ux-spec                     # 阶段3.5：UX 视觉+体验契约 → G-UX（面向用户必做，纯后端跳过）
-（agent）eos-architecture     # 阶段4：架构            → G4
-  /adr "<decision>"          #   └ 每个不可逆决策
-  /nfr                       #   └ 填 NFR 目标值
-（agent）eos-plan             # 阶段5：拆 story         → G5
-bmad-dev-story               # 阶段6：实现            → G6
-bmad-code-review             #   └ 完成前代码审查(无阻断项) → G6
-bmad-tea / bmad-testarch-*   # 阶段7：测试+追溯        → G7
-/runbook <service>           # 阶段8：先备 runbook
-/release-gate                # 阶段8：发布门禁         → G8★
-/telemetry-plan              # 阶段9：埋点闭环         → G9
-（agent）eos-review           # 阶段10：迭代回写        → G10
-/validate-config             # 任意时：配置语义体检
+# ── Copilot Chat (Agent mode) ──
+/eos-help                    # lost? print memory card + current phase + next step (read-only, no file changes)
+/eos-init                    # Phase 0: one-time hardening (branch protection + CODEOWNERS + approval baseline → activation.md)
+(agent) eos-discovery        # Phase 1: problem definition        → G1
+/requirements "<feature>"    # Phase 2: requirements+operational pre-flight → G2★
+/spec                        # Phase 3: PRD source of truth      → G3
+/ux-spec                     # Phase 3.5: UX visual+experience contract → G-UX (required for user-facing, skip pure backend)
+(agent) eos-architecture     # Phase 4: architecture             → G4
+  /adr "<decision>"          #   └ every irreversible decision
+  /nfr                       #   └ fill NFR target values
+(agent) eos-plan             # Phase 5: break stories            → G5
+bmad-dev-story               # Phase 6: implementation           → G6
+bmad-code-review             #   └ pre-completion code review (no blockers) → G6
+bmad-tea / bmad-testarch-*   # Phase 7: testing+traceability     → G7
+/runbook <service>           # Phase 8: prepare runbook first
+/release-gate                # Phase 8: release gate             → G8★
+/telemetry-plan              # Phase 9: telemetry loop           → G9
+(agent) eos-review           # Phase 10: iteration write-back    → G10
+/validate-config             # Anytime: configuration semantic health check
 ```
 
 ---
 
-# 附录 C 端到端样例（my-app）
+# Appendix C End-to-end example (my-app)
 
-真实跑通的 dry-run（功能：用户登录），**12/12 门全过**，可作为"标准答案"对照。
+A real dry-run that passed end to end (feature: user login), **12/12 gates passed**, usable as a "golden answer" reference.
 
-| 阶段 | 样例产物 |
+| Phase | Example artifact |
 |---|---|
 | 1 Discovery | `my-app/docs/discovery.md` |
-| 2 Requirements | `my-app/docs/requirements.md`（11 项运营决策表 + authz 矩阵） |
-| 3 Spec | `my-app/docs/prd.md`（FR1–5 + AC + 迭代日志） |
-| 4 Architecture | `my-app/docs/adr/0001-session-strategy.md`、`my-app/api/openapi.yaml` |
+| 2 Requirements | `my-app/docs/requirements.md` (11-item operational decision table + authz matrix) |
+| 3 Spec | `my-app/docs/prd.md` (FR1–5 + AC + iteration log) |
+| 4 Architecture | `my-app/docs/adr/0001-session-strategy.md`, `my-app/api/openapi.yaml` |
 | 5 Planning | `my-app/docs/stories/story-001-auth.md` |
-| 6 Development | `my-app/src/auth.js`（零依赖 node:crypto） |
-| 7 Testing | `my-app/test/auth.test.js`（10 AC-traced，全绿）、`my-app/docs/trace-matrix.md` |
-| 8 Release | `my-app/docs/release-gate.md`、`my-app/ops/runbook-auth.md` |
-| 9 Observability | `src/auth.js` 5 个 `auth.*` 事件 |
-| 10 Iteration | `my-app/docs/prd.md §6`（CR-001 回写） |
-| 验收报告 | `my-app/docs/eos/walkthrough.md`（完整 scorecard + 复现命令） |
+| 6 Development | `my-app/src/auth.js` (zero-dependency node:crypto) |
+| 7 Testing | `my-app/test/auth.test.js` (10 AC-traced, all green), `my-app/docs/trace-matrix.md` |
+| 8 Release | `my-app/docs/release-gate.md`, `my-app/ops/runbook-auth.md` |
+| 9 Observability | 5 `auth.*` events in `src/auth.js` |
+| 10 Iteration | `my-app/docs/prd.md §6` (CR-001 write-back) |
+| Acceptance report | `my-app/docs/eos/walkthrough.md` (full scorecard + reproduction commands) |
 
-**复现**（终端）：
+**Reproduce** (terminal):
 ```sh
 npx degit --mode=git niaodian/eos-template my-app && cd my-app
 node .github/hooks/validate-config.mjs        # PASS
-npm test                                       # 10/10 green
+npm test                                      # 10/10 green
 echo '{"tool_input":{"command":"rm -rf /tmp/x"}}' | node .github/hooks/deny-dangerous.js  # deny
 ```
 
 ---
 
-# 附录 D 实例化后硬化（让门禁具备权威）
+# Appendix D Post-instantiation hardening (make gates authoritative)
 
-> 为什么需要这一步：EOS 的硬强制是**"契约性"**的 —— 3 道 CI 硬门（validate-config / eos-doctor /
-> secret-scan）与 hooks 本身**存在，但要变成"合并阻断权威"，取决于你在 GitHub 服务端补齐分支保护**。
-> 模板无法替你的组织做这些服务端决定（`【需组织/GitHub 设置】`），但下面是一次性的确切步骤。
-> 这直接回应第三方审计的 keystone 项（T1）："先让门具备权威，其余软门/自改风险才有意义去堵。"
+> Why this step is needed: EOS hard enforcement is **"contractual"**--the 3 CI hard gates (validate-config / eos-doctor / secret-scan) and hooks themselves **exist, but becoming "merge-blocking authority" depends on you completing branch protection on the GitHub server side**.
+> The template cannot make these server-side decisions for your organization (`【Needs org/GitHub settings】`), but below are exact one-time steps.
+> This directly answers the keystone item (T1) from third-party audit: "first make gates authoritative; only then does it make sense to block the remaining soft-gate/self-modification risks."
 
-> **进度追踪**：本附录是"完整步骤（怎么做）"；随仓的 `docs/eos/activation.md` 是"可勾选台账（做到哪了）"，
-> 被 `eos-doctor` 每次 advisory 提示、被 `/release-gate`（G8）发布前再核。引导式执行用 **`/eos-init`**——
-> 它会替你做本地能做的（换 handle、拷基线），并把服务端分支保护的确切步骤打印给你（模板无法代开）。
+> **Progress tracking**: this appendix is the "complete steps (how to do it)"; the repo's `docs/eos/activation.md` is the "checkable ledger (what is done)",
+> advisory-reminded by `eos-doctor` every run and rechecked before release by `/release-gate` (G8). Use **`/eos-init`** for guided execution--
+> it does what can be done locally for you (replace handles, copy baseline) and prints the exact server-side branch-protection steps (the template cannot enable them for you).
 
-## D.1 让 3 道 CI 硬门成为"必需检查" `【需组织/GitHub 设置】`
+## D.1 Make 3 CI hard gates "required checks" `【Needs org/GitHub settings】`
 
-GitHub 仓库 → **Settings → Branches → Add branch ruleset**（或 Add rule），针对默认分支：
+GitHub repository → **Settings → Branches → Add branch ruleset** (or Add rule), targeting the default branch:
 
-1. 勾选 **Require a pull request before merging**（禁止直接 push 到默认分支）。
-2. 勾选 **Require status checks to pass before merging** → 搜索并选中 **`verify`**（`eos-ci.yml` 的 job）。
-   —— 这一步把 validate-config / eos-doctor / secret-scan 从"绿灯建议"变成"红灯阻断"。
-3. 勾选 **Require review from Code Owners**（配合 D.2 的 CODEOWNERS）。
-4. （推荐）勾选 **Do not allow bypassing the above settings**，避免管理员随手绕过。
+1. Check **Require a pull request before merging** (forbid direct push to the default branch).
+2. Check **Require status checks to pass before merging** → search and select **`verify`** (the job in `eos-ci.yml`).
+   -- This step turns validate-config / eos-doctor / secret-scan from "green-light advice" into "red-light block".
+3. Check **Require review from Code Owners** (paired with CODEOWNERS in D.2).
+4. (Recommended) Check **Do not allow bypassing the above settings**, to avoid casual administrator bypass.
 
-> 本地无法验证服务端是否已开：请在 Settings 里自查。个人命名空间仓库默认**没有**这些保护。
+> Server-side enablement cannot be verified locally: please self-check in Settings. Personal namespace repositories have **no** such protection by default.
 
-## D.2 启用 CODEOWNERS 治理保护
+## D.2 Enable CODEOWNERS governance protection
 
-模板已随仓提供 `.github/CODEOWNERS`（覆盖 `instructions/ agents/ hooks/ workflows/ prompts/`
-与 `docs/eos/`、安全/合规清单）。**实例化后**把其中的 `@niaodian` 全部替换为你的团队 handle
-（推荐团队而非个人，如 `@your-org/platform-team`）。配合 D.1 的 "Require review from Code Owners"，
-即可阻止 agent 或任何写权限者**免评审改动治理文件**（回应审计 E1/H5：agent `editFiles` 自改规则）。
+The template provides `.github/CODEOWNERS` with the repo (covering `instructions/ agents/ hooks/ workflows/ prompts/` and `docs/eos/`, security/compliance checklists). **After instantiation**, replace all `@niaodian` entries with your team handle (teams recommended over individuals, e.g., `@your-org/platform-team`). Together with D.1 "Require review from Code Owners", this prevents agents or anyone with write access from **modifying governance files without review** (answering audit E1/H5: agent `editFiles` self-modifying rules).
 
-## D.3 固定本地审批基线
+## D.3 Pin the local approval baseline
 
 ```sh
-cp .vscode/settings.json.example .vscode/settings.json    # 活跃文件保持本地（git-ignored）
+cp .vscode/settings.json.example .vscode/settings.json    # active file remains local (git-ignored)
 ```
 
-关键项：`chat.tools.global.autoApprove` 保持 `false`（`true` 等于 /yolo，关闭关键安全保护）；
-`chat.tools.terminal.autoApprove` 内置危险命令 denylist（与 `deny-dangerous.js` 纵深防御）。
-设置键均已核对官方 `docs/agents/reference/ai-settings.md`；自动审批演进较快，请在你的版本复核。
+Key item: keep `chat.tools.global.autoApprove` as `false` (`true` equals /yolo and disables key safety protection);
+`chat.tools.terminal.autoApprove` has a built-in dangerous-command denylist (defense-in-depth with `deny-dangerous.js`).
+The setting keys have been checked against official `docs/agents/reference/ai-settings.md`; auto-approval evolves quickly, so re-verify in your version.
 
-## D.4 已知取舍与残余风险（诚实清单）
+## D.4 Known trade-offs and residual risks (honest list)
 
-以下是 EOS **有意的设计取舍**（local-first / opt-in / reuse-first 的固有成本）。不是 bug，但请
-显式确认团队接受其残余风险，并知悉缓解手段：
+The following are **intentional design trade-offs** in EOS (inherent costs of local-first / opt-in / reuse-first). They are not bugs, but please explicitly confirm that the team accepts the residual risks and knows the mitigations:
 
-| 取舍 | 残余风险 | 缓解 |
+| Trade-off | Residual risk | Mitigation |
 |---|---|---|
-| `.vscode/*` 默认 gitignore，`mcp.json` opt-in 后本地留存（审计 F2/C2） | 沙箱/审批基线可被本地私改而无人发现 | 随仓 `settings.json.example`/`mcp.json.example` 安全基线 + 评审；团队约定 |
-| `bmad-*` 技能装在**用户级**、未 pin 版本（审计 H4/T6） | 不同机器技能版本/存否不一 → agentic 行为不完全可复现 | 在 `docs/` 记录团队统一的 bmad 版本；关键技能可 vendor/子模块化 |
-| Hooks 是 Preview、逐机器、解析失败放行、CI 不调用（审计 G2） | 破坏性操作实时拦截非权威，可绕过 | 权威在 D.1 的 CI 硬门 + 人工评审；hooks 仅作减速带 |
-| agent 具 `editFiles`（审计 H5） | 原则上可改自身治理文件 | D.2 CODEOWNERS + D.1 必审（开启后即阻断） |
-| `gitleaks` 深扫是**可选增强**（opt-in、never required），未装即静默降级 | 只跑零依赖内置正则时，覆盖弱于 gitleaks 全量规则 | 内置 `secret-scan.mjs` 始终作为 CI 硬门运行（保底）；CI/本机装 `gitleaks` 即自动叠加深扫 |
-| **Windows**：核心 hook 为 Node（跨平台）；早期 `quality.json` 曾用 `sh -c`（round-2 N1 已改为 `node .github/hooks/quality.mjs`，原生 Windows 无需 WSL/Git-Bash） | 无 `git` 时的目录回退遍历在 Windows 上曾显示绝对路径（已用 `path.relative` 归一化）；`bmad-*` 与 `act`（需 Docker Desktop）等外部工具的可用性仍随平台 | 三个核心 hook + `quality.mjs` 已按跨平台实现；**权威质量门在 CI（`ubuntu-latest`）**，与本机 OS 无关 |
+| `.vscode/*` is gitignored by default; `mcp.json` remains local after opt-in (audit F2/C2) | Sandbox/approval baseline can be privately changed locally without detection | Repo-provided `settings.json.example`/`mcp.json.example` safety baselines + review; team convention |
+| `bmad-*` skills are installed **user-level** and not pinned (audit H4/T6) | Skill versions/presence differ across machines → agentic behavior is not fully reproducible | Record the team's unified bmad version in `docs/`; critical skills may be vendored/submoduled |
+| Hooks are Preview, per-machine, allow on parse failure, and CI does not call them (audit G2) | Real-time interception of destructive operations is not authoritative and can be bypassed | Authority is D.1 CI hard gates + human review; hooks are only speed bumps |
+| agent has `editFiles` (audit H5) | In principle it can modify its own governance files | D.2 CODEOWNERS + D.1 required review (blocks once enabled) |
+| `gitleaks` deep scan is an **optional enhancement** (opt-in, never required); if absent it silently degrades | Running only zero-dependency built-in regexes is weaker than full gitleaks rules | Built-in `secret-scan.mjs` always runs as a CI hard gate (baseline); installing `gitleaks` in CI/local automatically adds deep scan |
+| **Windows**: core hooks are Node (cross-platform); early `quality.json` once used `sh -c` (round-2 N1 changed it to `node .github/hooks/quality.mjs`, native Windows no longer needs WSL/Git-Bash) | Directory fallback traversal without `git` once showed absolute paths on Windows (normalized with `path.relative`); availability of external tools such as `bmad-*` and `act` (requires Docker Desktop) still varies by platform | Three core hooks + `quality.mjs` are implemented cross-platform; **authoritative quality gate is in CI (`ubuntu-latest`)**, independent of local OS |
 
-**须组织决策（模板不代做，`【需组织标准】`）**：CI runner 标准（现 `ubuntu-latest`）、批准的密钥库、
-命名空间/仓库归属、模型 pin/注册策略、制品完整性（SBOM/签名/SLSA）。这些不是违规，是组织标准问题。
+**Requires organization decision (template does not decide, `【Needs org standard】`)**: CI runner standard (currently `ubuntu-latest`), approved secret store, namespace/repository ownership, model pin/registration strategy, artifact integrity (SBOM/signing/SLSA). These are not violations; they are organization-standard questions.
 
 ---
 
-> 本手册随模板版本演进。改动请同步 `docs/eos/VERSION` 并跑 `validate-config.mjs`。
-> 设计原理（为什么这么设计）见 `docs/eos/blueprint.md`；本手册只讲"怎么用"。
+> This manual evolves with the template version. For changes, sync `docs/eos/VERSION` and run `validate-config.mjs`.
+> For design rationale (why it is designed this way), see `docs/eos/blueprint.md`; this manual only covers "how to use it".
