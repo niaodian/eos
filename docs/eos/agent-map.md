@@ -1,6 +1,6 @@
 # EOS ↔ BMAD Reuse Map
 
-| Stage | Use (skills / agents) |
+| Phase | Use (skills / agents) |
 |---|---|
 | Discovery | bmad-brainstorming, bmad-agent-analyst, bmad-forge-idea |
 | Requirements | bmad-agent-pm, bmad-create-prd, bmad-product-brief, eos-operational-readiness |

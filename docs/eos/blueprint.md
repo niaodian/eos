@@ -10,7 +10,7 @@
 - [Part 1](#part-1-assumptions--boundaries) Assumptions & boundaries
 - [Part 2](#part-2-overall-design-principles) Overall design principles
 - [Part 3](#part-3-six-layer-architecture) Six-layer architecture
-- [Part 4](#part-4-end-to-end-development-flow-10-stages) End-to-end development flow (10 stages)
+- [Part 4](#part-4-end-to-end-development-flow-10-phases) End-to-end development flow (10 phases)
 - [Part 5](#part-5-requirements-phase-hardening-directly-targeting-large-scale-post-launch-rework) Requirements-phase hardening
 - [Part 6](#part-6-revised--rule-system-design--per-stack-layering) Rule-system design ✅ revised
 - [Part 7](#part-7-revised--key-implementation-step-corrections) Implementation steps ✅ revised
@@ -216,7 +216,7 @@ The right approach: implement an Enterprise-grade "shape" with locally runnable 
 - `~/.agents/skills/` and `~/.claude/skills/` are legal personal skills paths recognized by VS Code
 
 **③ Main path vs optional extensions**
-- **Main path**: local-first, Git-based, offline runnable; rules/prompt/agent/skill/hook/**local MCP (such as Playwright MCP driving localhost, Stage 7 opt-in, inert by default)** are all self-contained
+- **Main path**: local-first, Git-based, offline runnable; rules/prompt/agent/skill/hook/**local MCP (such as Playwright MCP driving localhost, Phase 7 opt-in, inert by default)** are all self-contained
 - `【Optional · needs enterprise/network env】`: org-level instructions, MCP connected to real services, cloud agents, private model backend
 
 ---
@@ -228,7 +228,7 @@ The right approach: implement an Enterprise-grade "shape" with locally runnable 
 **Rule layering**: officially there is no native priority; the only reliable control mechanism is `applyTo` scope. Slice thinly by mutually exclusive globs,
 so "which rule applies to which file type" is determined by deterministic globs, serving token budget and cross-project reuse.
 
-**Process layering**: the value of SDLC is the decision gate. Each stage has explicit inputs/outputs/pass criteria;
+**Process layering**: the value of SDLC is the decision gate. Each phase has explicit inputs/outputs/pass criteria;
 turning a "linear conversation" into a "state machine with checkpoints" is the core of reducing rework.
 
 **Context layering**: four kinds of mechanisms correspond to four loading moments:
@@ -311,26 +311,26 @@ Data flow: discovery→requirements→prd→ux→architecture→stories→code�
 
 ---
 
-# Part 4. End-to-end development flow (10 stages)
+# Part 4. End-to-end development flow (10 phases)
 
-> State machine: every `→` is a decision gate; do not enter the next stage until the gate is passed.
+> State machine: every `→` is a decision gate; do not enter the next phase until the gate is passed.
 > `I:` = instructions · `P:` = prompt · `A:` = agent · `H:` = hook
 
-| Stage | Goal | Main executor | Decision gate | Effective rules | Key rework prevention |
+| Phase | Goal | Main executor | Decision gate | Effective rules | Key rework prevention |
 |---|---|---|---|---|---|
 | 1 Discovery | Converge to a single falsifiable problem statement + measurable success metrics | `bmad-brainstorming`, `bmad-agent-analyst`(Mary), `bmad-forge-idea` | G1: problem is falsifiable + metrics are measurable | `I:00-workspace` | Cheapest correction point: lock the problem against drift |
 | 2 Requirement | Expand functional + NFR + **operational readiness** | `/requirements` (wraps `bmad-create-prd`) + skill `eos-operational-readiness` | **G2: all five checklists pass review (add F if regulated)** | `P:requirements`, `P:nfr`, `I:security` | Main turnstile: blocks large-scale post-launch rework |
 | 3 Spec | PRD becomes the single source of truth | `bmad-create-prd`; validation `bmad-validate-prd` | G3: every requirement has acceptance criteria | `P:spec` | Spec is the contract; downstream only recognizes `docs/prd.md` |
 | 3.5 UX & Design (conditional) | Visual + experience contract (mandatory for user-facing products) | `/ux-spec` (wraps `bmad-ux`), `bmad-agent-ux-designer`(Sally), `bmad-cis-design-thinking`(Maya) | **G-UX: every user-facing requirement has screens/flows/three states/a11y/visual tokens; pure backend SKIP+reason** | `P:ux-spec`, `A:eos-design`, `I:frontend` | UI/UX front-loaded: prevents "discovering interaction/information architecture is wrong only after implementation" |
-| 4 Architecture | Technical approach + data model + API contract + NFR where it lands + ADR + **lock tech stack** + **deployment topology** | `eos-architecture` (wraps `bmad-architecture` Winston); `/adr`; `/deploy-topology` | G4: key irreversible decisions have ADRs; NFR has where it lands; **tech stack is locked** (update `00-workspace` + enable corresponding R3 + write tech-stack ADR); **deployment topology selected** (NFR basis + deployment-topology ADR) | `I:data-api`, `A:eos-architecture` | API contract before implementation; scalability explicitly reviewed; **stack is locked here** — Stage 0 only leaves a Node placeholder to avoid conflict between always-on rules and the real stack; **topology selects the simplest option satisfying NFR, not K8s by default** |
+| 4 Architecture | Technical approach + data model + API contract + NFR where it lands + ADR + **lock tech stack** + **deployment topology** | `eos-architecture` (wraps `bmad-architecture` Winston); `/adr`; `/deploy-topology` | G4: key irreversible decisions have ADRs; NFR has where it lands; **tech stack is locked** (update `00-workspace` + enable corresponding R3 + write tech-stack ADR); **deployment topology selected** (NFR basis + deployment-topology ADR) | `I:data-api`, `A:eos-architecture` | API contract before implementation; scalability explicitly reviewed; **stack is locked here** — Phase 0 only leaves a Node placeholder to avoid conflict between always-on rules and the real stack; **topology selects the simplest option satisfying NFR, not K8s by default** |
 | 5 Planning | Epics→Stories, each story self-contained with context + acceptance tests first (ATDD) | `bmad-create-epics-and-stories`→`bmad-create-story`→`bmad-sprint-planning`; `bmad-testarch-atdd`; `bmad-check-implementation-readiness` | G5: story ready + every AC has acceptance-test design | `A:eos-plan` | Readiness gate prevents missing context; shift-left testing prevents "adding tests after the fact" |
 | 6 Development | Implement by story, constrained by stack rules + guardrails, **code review before completion** | `bmad-dev-story`, `bmad-agent-dev`(Amelia), **`bmad-code-review`** | G6: lint/typecheck/unit tests all green **and code review has no blocking items** | `I:frontend/backend/data-api` (`applyTo` auto-injection) + `H:guardrails` (PreToolUse) + `H:quality` (PostToolUse) | Hooks deterministic interception + review covers design/logic/boundary/security issues automation cannot find |
-| 7 Testing | Validate by test strategy + spec↔test traceability + **NFR validation** + **quantified spec alignment** | `bmad-tea`(Murat), `bmad-testarch-trace`, `bmad-testarch-nfr`, `bmad-qa-generate-e2e-tests`, `/e2e` (Playwright framework+E2E+trace; during development Playwright MCP drives the browser, **Stage 7 opt-in**), `/spec-align` | G7: every acceptance item has ≥1 test and all green; **user-facing flow E2E green**; **NFR validated**; **spec-alignment: AC coverage / first-pass rate / no drift** | `I:testing` | trace matrix ensures no untested AC; **spec-align quantifies Agent output's spec alignment and first-pass rate** |
+| 7 Testing | Validate by test strategy + spec↔test traceability + **NFR validation** + **quantified spec alignment** | `bmad-tea`(Murat), `bmad-testarch-trace`, `bmad-testarch-nfr`, `bmad-qa-generate-e2e-tests`, `/e2e` (Playwright framework+E2E+trace; during development Playwright MCP drives the browser, **Phase 7 opt-in**), `/spec-align` | G7: every acceptance item has ≥1 test and all green; **user-facing flow E2E green**; **NFR validated**; **spec-alignment: AC coverage / first-pass rate / no drift** | `I:testing` | trace matrix ensures no untested AC; **spec-align quantifies Agent output's spec alignment and first-pass rate** |
 | 8 Release | Ship after quality/security/rollback/canary/NFR gates pass | `/release-gate`; `/runbook` | **G8: all 5 gate items pass (mandatory items)** | `I:release-ops`, `H:quality` | No rollback/no canary means no release; unvalidated NFR means no release |
 | 9 Observability | Telemetry launched, metrics visible, operational loop closed | `/telemetry-plan` | G9: critical-path telemetry is in production | `I:release-ops` | Telemetry is designed in requirements; here only implementation validation is done |
 | 10 Iteration | Metrics feedback drives next requirements cycle; manage architecture evolution | `bmad-correct-course`, `bmad-retrospective`, `bmad-document-project`, `bmad-sprint-status` | G10: changes written back to Spec | `A:eos-review` (handoff back to requirements) | Changes must be written back to Spec to prevent "code drifting from the source of truth" |
 
-> The main axis is 10 gates (G1–G10). **3.5 UX & Design is a conditional sub-stage** (mandatory for user-facing products; pure backend/CLI projects SKIP+reason),
+> The main axis is 10 gates (G1–G10). **3.5 UX & Design is a conditional sub-phase** (mandatory for user-facing products; pure backend/CLI projects SKIP+reason),
 > inserted between Spec(G3) and Architecture(G4) — PRD defines *what to build*, UX defines *what it looks like/how it interacts*, and architecture defines *how to implement it*.
 > The order cannot be omitted; otherwise stories are sliced without screen/state basis. It fully reuses `bmad-ux` and does not rebuild the capability.
 >
@@ -356,7 +356,7 @@ Data flow: discovery→requirements→prd→ux→architecture→stories→code�
 
 ## 5.2 Operational-readiness mapping table
 
-| Operational element | Requirements-stage artifact | Architecture-stage where it lands |
+| Operational element | Requirements-phase artifact | Architecture-phase where it lands |
 |---|---|---|
 | telemetry | Key event checklist + corresponding success metrics | event schema, reporting channel |
 | authz | role/resource/action matrix | authorization middleware, policy point |
@@ -393,7 +393,7 @@ regime selection (HIPAA/PCI-DSS/SOC2/SOX/GDPR/CCPA/PIPL) → cascade into specif
 minimum-necessary access, vendor **BAA/DPA**, **Agentic data egress** decision: BAA · self-hosting · redaction gateway · exclude regulated data).
 > **Not legal advice**: this only enforces early engineering decisions; compliance/legal still requires human sign-off. `【New-build】`
 
-**G. Deployment topology decision** (`docs/checklists/G-deployment.md`, **review during Stage 4 architecture, gate G4**, not G2):
+**G. Deployment topology decision** (`docs/checklists/G-deployment.md`, **review during Phase 4 architecture, gate G4**, not G2):
 selection matrix (bare process/Docker/K8s/serverless/PaaS) × NFR triggers × rollback/canary/health contract × team-size cost.
 Rule: **choose the simplest topology satisfying NFR, do not default to K8s**; paired `/deploy-topology` walkthrough lands a `deployment-topology` ADR.
 Real cluster/registry/cloud is `【Needs enterprise/network env】`; local can still run without relying on it. `【New-build · pairs with bmad-architecture】`
@@ -436,11 +436,11 @@ Script: `.github/hooks/validate-config.mjs`, zero-dependency, `node .github/hook
 `.github/prompts/validate-config.prompt.md` — lets the Agent read the `.github/` directory and validate:
 whether rules have contradictory logic, whether glob coverage has gaps, whether NFR in PRD and Spec has where it lands, and whether hook logic conflicts with rules.
 
-## 8.3 Smoke-acceptance Rubric (10-stage scorecard)
+## 8.3 Smoke-acceptance Rubric (10-phase scorecard)
 
-Run the process once with one minimal dry-run feature per stage (such as "user login"):
+Run the process once with one minimal dry-run feature per phase (such as "user login"):
 
-| Stage | Expected output | Pass criteria |
+| Phase | Expected output | Pass criteria |
 |---|---|---|
 | Discovery | single-sentence problem + success metrics | ☐ falsifiable ☐ measurable |
 | Requirements | PRD draft + five checklists | ☐ checklist has no unresolved BLOCKER |
@@ -469,7 +469,7 @@ Agent output does not match expectation
 
 | # | Symptom | Consequence | EOS defense |
 |---|---|---|---|
-| P1 | Only functional Spec is written, no NFR | SLO explodes after launch; there is already heavy coupling when tests are added | C-nfr checklist is mandatory for G2; architecture stage must have NFR where it lands |
+| P1 | Only functional Spec is written, no NFR | SLO explodes after launch; there is already heavy coupling when tests are added | C-nfr checklist is mandatory for G2; architecture phase must have NFR where it lands |
 | P2 | Operational requirements (telemetry/authz/canary) are not front-loaded | Post-launch patch rework costs × 3 | D-ops checklist + `eos-operational-readiness` skill + G2 | 
 | P3 | All rules are stuffed into `copilot-instructions.md` | always-on length explodes and pollutes every session | copilot-instructions.md ≤40 lines, S10 word-count gate |
 | P4 | Reinventing the wheel (creating similar prompts when `bmad-*` already exists) | double maintenance, output drift | every artifact must mark source; agent-map.md reference table |
@@ -496,8 +496,8 @@ Agent output does not match expectation
 | D2 | Complete rule directory structure | `docs/eos/blueprint.md` Part 7 / `README.md` | New-build |
 | D3 | Rule file templates (with real frontmatter) | `.github/instructions/**/*.instructions.md` | New-build |
 | D4 | Mainstream tech-stack sub-rule template set + cookbook | `instructions/frontend/`, `backend/` (node/python/go/java/rust/dotnet), `ai/`, `data-api/`; `docs/eos/stack-presets.md` | New-build |
-| D5 | Standard development flow diagram (10 stages) | this document Part 4 | New-build |
-| D6 | Requirements-stage gap checklist | `docs/checklists/A-gap.md` | New-build |
+| D5 | Standard development flow diagram (10 phases) | this document Part 4 | New-build |
+| D6 | Requirements-phase gap checklist | `docs/checklists/A-gap.md` | New-build |
 | D7 | Non-functional requirements checklist | `docs/checklists/C-nfr.md` | New-build |
 | D8 | Telemetry and operational-readiness checklist | `docs/checklists/D-ops.md` | New-build |
 | D9 | Quality/release gate checklist | `docs/checklists/B-rework.md`; `/release-gate` prompt | New-build + BMAD extension |
@@ -505,13 +505,13 @@ Agent output does not match expectation
 | D11 | New-project Quickstart + cross-project migration guide | `docs/eos/quickstart.md` | New-build |
 | D12 | End-to-end implementation walkthrough | this document Part 4 × Part 8 rubric (using "user login" dry-run) | New-build |
 | D13 | MVP vs Enterprise solution comparison | see table below | New-build |
-| — | UX/design planning stage (visual + experience contract) | `/ux-spec`, `A:eos-design`; produces `docs/DESIGN.md`+`docs/EXPERIENCE.md` | Reuse BMAD (bmad-ux/Sally)+extension |
+| — | UX/design planning phase (visual + experience contract) | `/ux-spec`, `A:eos-design`; produces `docs/DESIGN.md`+`docs/EXPERIENCE.md` | Reuse BMAD (bmad-ux/Sally)+extension |
 | D14 | Regulated-industry compliance checklist + regime front-loading + Agentic data egress gate | `docs/checklists/F-compliance.md` (+ appendices `F-compliance-hipaa.md`/`F-compliance-pci-dss.md`/`F-compliance-gdpr-pipl.md`); `/compliance` + `/requirements` Step 2.5; `eos-doctor` D5 | New-build |
-| D15 | Deployment-topology decision checklist + selection gate (Stage 4/G4) | `docs/checklists/G-deployment.md`; `/deploy-topology`; connected to `eos-architecture`(G4) + `/release-gate`(G8) + R8 `release-ops` rules | New-build extension (pairs with bmad-architecture) |
+| D15 | Deployment-topology decision checklist + selection gate (Phase 4/G4) | `docs/checklists/G-deployment.md`; `/deploy-topology`; connected to `eos-architecture`(G4) + `/release-gate`(G8) + R8 `release-ops` rules | New-build extension (pairs with bmad-architecture) |
 | D16 | Third-party audit hardening (enforcement authority / portability / detection coverage) | keystone scaffold `.github/CODEOWNERS` + `.vscode/settings.json.example` + user-manual Appendix D; `eos-doctor` D5 warn→error (regulated+LLM+no boundary), D1/D2 dependency-signal directory-name escape elimination; `secret-scan` extension/no-extension coverage + same-line false-negative tightening; `deny-dangerous` denylist gap-fill + honest positioning; if CI has package.json then require test script; `/release-gate` connects to `spec-align --strict`; G1 event names checked against official `hooks-reference.md` (audit false positive) + Preview wording unified | New-build extension (audit-driven) |
 | D17 | Second-round review refinements (eos-1.9.1, Low/info) | N2: `agents` directory only counts as an LLM signal when **LLM dependency co-occurs** (`ai/llm/rag` remains OR), eliminating false positives from traditional SaaS `src/agents/` for D1/D5; N1: `quality.json` changed from `sh -c` to `node quality.mjs` (native Windows runnable) + three core hooks use `path.relative` for path normalization; N4: `settings.json.example` adds `autoApproveWorkspaceNpmScripts:false` (official v1.108 verified); `deny-dangerous` allows safer `--force-with-lease`, adds `rm` long flags/`-R`; N3: `secret-scan` PLACEHOLDER generic terms add word boundaries to narrow false-negative surface; Appendix D.4 adds Windows/gitleaks trade-off row | New-build extension (review-driven) |
 | D18 | Third-round (final-round) audit closure (eos-1.9.2, nit polish; audit 91/100 "production ready · requires downstream enforcement", no new active defects) | ① added in-repo guardrail regression test `.github/hooks/deny-dangerous.test.mjs` (zero-dep `node:test`) and **wired it into CI**: makes "`--force-with-lease` must be allowed / `rm` long flags+`-R` must be blocked / benign must not false-positive" a **visible and CI-enforced** invariant instead of temporary empirical proof (residual #9/#11) ② `quality.mjs` per-edit narrowed to `lint`+`typecheck` (full `test` stays in CI, avoiding slowing each tool-call agent loop; residual #6) ③ `deny-dangerous` git push regex adds `/i`, unifying case-sensitivity wording with `rm` rules and `settings.json.example` mirror (nit #8). Remaining 9 points are structural ceiling (downstream branch protection + organizational compliance file, both 🅟 not self-solvable by the template) | New-build extension (final-round audit-driven) |
-| D19 | Guided Activation: moving the actions that "take back downstream points" into the main flow (eos-1.10.0) | Of the missing 9 points in audit 91/100, "enforcement authority (+4) + organizational compliance (+2)" are **one-time downstream actions**, but before this they passively lived only in Appendix D (manual line 1113), with **zero prompts** in the main flow (Stage 0 / Day-1 / quick-reference table / release gate) → a systemic forgetting vector. Add: ① in-repo **checkable ledger** `docs/eos/activation.md` (`[ ]`/`[x]`/`[~]waived:reason`, human-readable+machine-readable; template intentionally all unchecked = honest self-reporting) ② discoverable `/eos-init` guided command (does what local can do + prints exact server-side steps + stamps ledger) ③ `eos-doctor` A0 **advisory** activation facet (each run/CI shows remaining items, always exit 0 — local cannot verify server side, so it reminds but does not block) ④ `/release-gate` adds "enforcement authority active" check line ⑤ `validate-config` S7 makes ledger required (cannot be silently deleted) + footer NOTE ⑥ main-flow wiring (Stage 0 row / §3.4 / §6.x anti-forgetting note / glossary / Appendix D cross-link / quickstart / README) ⑦ new `/eos-help` targeted command (read-only: detects current stage + prints memory card + next step + activation status; discoverable in `/` menu, beginner-friendly). Triple visibility upgrade: guided-init → continuous-advisory → release-checklist, with waiver available to experts and strong guidance for beginners | New-build extension (final-round DX-driven) |
+| D19 | Guided Activation: moving the actions that "take back downstream points" into the main flow (eos-1.10.0) | Of the missing 9 points in audit 91/100, "enforcement authority (+4) + organizational compliance (+2)" are **one-time downstream actions**, but before this they passively lived only in Appendix D (manual line 1113), with **zero prompts** in the main flow (Phase 0 / Day-1 / quick-reference table / release gate) → a systemic forgetting vector. Add: ① in-repo **checkable ledger** `docs/eos/activation.md` (`[ ]`/`[x]`/`[~]waived:reason`, human-readable+machine-readable; template intentionally all unchecked = honest self-reporting) ② discoverable `/eos-init` guided command (does what local can do + prints exact server-side steps + stamps ledger) ③ `eos-doctor` A0 **advisory** activation facet (each run/CI shows remaining items, always exit 0 — local cannot verify server side, so it reminds but does not block) ④ `/release-gate` adds "enforcement authority active" check line ⑤ `validate-config` S7 makes ledger required (cannot be silently deleted) + footer NOTE ⑥ main-flow wiring (Phase 0 row / §3.4 / §6.x anti-forgetting note / glossary / Appendix D cross-link / quickstart / README) ⑦ new `/eos-help` targeted command (read-only: detects current phase + prints memory card + next step + activation status; discoverable in `/` menu, beginner-friendly). Triple visibility upgrade: guided-init → continuous-advisory → release-checklist, with waiver available to experts and strong guidance for beginners | New-build extension (final-round DX-driven) |
 | D20 | Fourth-round audit closure (eos-1.10.0, consistency nit; audit 94/100 "production ready · main flow now guides downstream hardening", compared with 91 ↑3, no new active defects, no regression) | Only low-risk finding: the `/eos-init` ending "Next" breadcrumb wrote discovery as slash command `/discovery`, but `discovery.prompt.md` does not exist (no such command in `/` menu), contradicting the consistent convention elsewhere in the system: "switch to the **eos-discovery** agent" (quickstart L31 / user-manual L79/L519 / sister command eos-help) — violating the division of labor where "agents manage open-ended exploration, commands manage structured outputs." Fix: that line `/discovery` → "switch to the **eos-discovery** agent" (keep `/requirements` fallback; **do not add** `/discovery` command). Verified as the only dangling slash reference in the repository. After the fix, audit consistency dimension 14→15, total score 94→95. The other two non-blocking audit items are structural ceilings (self-reporting ≠ server-side verification / profile-neutral does not certify organizational compliance), still 🅟 downstream/org actions and outside this scope | New-build extension (fourth-round audit-driven) |
 | — | Agentic Engineering extension pack (LLM/agent products) | `ai/10-ai-llm` rules, `/eval-spec`(G-EVAL), C-nfr/security/telemetry extensions; produces `docs/eval-plan.md`; starter skeleton `docs/eos/examples/eval-starter/` | New-build extension (borrows from bmad-eval-runner) |
 | — | BMAD reuse map (73 bmad-*) | `docs/eos/agent-map.md` | Reuse BMAD |
@@ -528,7 +528,7 @@ Agent output does not match expectation
 |---|---|---|
 | Rule distribution | Git template / degit | `【Needs enterprise env】` org-level instructions |
 | AI Agent backend | Copilot (local) | `【Needs enterprise env】` private model backend |
-| External integration | **local MCP** (such as Playwright MCP driving localhost, local-first, Stage 7 opt-in, inert by default) / none / mock | `【Needs enterprise env】` MCP servers connected to real enterprise backends |
+| External integration | **local MCP** (such as Playwright MCP driving localhost, local-first, Phase 7 opt-in, inert by default) / none / mock | `【Needs enterprise env】` MCP servers connected to real enterprise backends |
 | Quality gate | npm scripts + Hooks + **act local CI** (`eos-ci.yml`, requires Docker) | `【Needs enterprise env】` hosted runner / org-level pipeline |
 | Monitoring | console / local mock | `【Needs enterprise env】` cloud observability platform |
 | Rule review | validate-config.mjs (local) | `【Needs enterprise env】` org-level policy scan |
