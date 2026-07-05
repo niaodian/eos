@@ -1,6 +1,5 @@
-> ⚠️ **中文存档 · 非权威 · 可能滞后 (Archived Chinese snapshot — non-authoritative, may lag).**
-> 冻结于 baseline `eos-1.10.0-zh`。权威且持续维护的版本为英文：[`../eos/activation.md`](../eos/activation.md)。
-> The canonical, maintained version is English: [`../eos/activation.md`](../eos/activation.md).
+> 🌐 **与英文版同步 · 英文为参照语言 (in sync with English · English is the reference language).**
+> 本文与英文权威版 [`../eos/activation.md`](../eos/activation.md) **内容对等、同步维护**；若翻译出现歧义，以英文为准（EOS 的配置与门禁均以英文实现）。
 
 ---
 

@@ -1,20 +1,24 @@
-# 中文文档存档 · Chinese Docs Archive
+# 中文文档 · Chinese Docs
 
-> ⚠️ **非权威 · 可能滞后 (non-authoritative · may lag).** English is canonical.
+> 🌐 **与英文版同步 · 英文为参照语言 (in sync with English · English is the reference language).**
 >
-> 这些是冻结于 baseline `eos-1.10.0-zh` 的中文快照，**不再持续维护，可能与英文权威版本产生偏差**。
-> 若中英文有冲突，**以英文版为准**。
+> 本目录的中文文档与 [`../eos/`](../eos/) 下的英文权威版**内容对等、同步维护**；
+> 若翻译出现歧义，**以英文为准**（EOS 的配置与门禁均以英文实现）。
 >
-> These are frozen Chinese snapshots from baseline `eos-1.10.0-zh`. They are **no longer maintained and
-> may drift** from the authoritative English docs. If the two disagree, **the English version wins**.
-> The canonical, maintained documentation lives in English under [`../eos/`](../eos/).
+> The Chinese docs here are kept in **content parity and maintained in sync** with the authoritative
+> English docs under [`../eos/`](../eos/). If a translation is ambiguous, **the English version is the
+> reference**.
 
-| 中文存档 (archived zh) | 权威英文版 (canonical English) |
+| 中文 (Chinese) | 英文参照版 (English reference) |
 |---|---|
+| [quickstart.md](quickstart.md) | [../eos/quickstart.md](../eos/quickstart.md) |
 | [user-manual.md](user-manual.md) | [../eos/user-manual.md](../eos/user-manual.md) |
 | [blueprint.md](blueprint.md) | [../eos/blueprint.md](../eos/blueprint.md) |
 | [activation.md](activation.md) | [../eos/activation.md](../eos/activation.md) |
 | [stack-presets.md](stack-presets.md) | [../eos/stack-presets.md](../eos/stack-presets.md) |
+| [agent-map.md](agent-map.md) | [../eos/agent-map.md](../eos/agent-map.md) |
 
-新用户中文上手（简短导航）见仓库根目录的 [`README.zh.md`](../../README.zh.md)。
-For a short Chinese on-ramp, see [`README.zh.md`](../../README.zh.md) at the repo root.
+> 注：`docs/eos/` 下的 `examples/`（示例制品）与 `VERSION` 保持英文，不做翻译。
+
+中文总览见仓库根目录的 [`README.zh.md`](../../README.zh.md)。
+For the Chinese overview, see [`README.zh.md`](../../README.zh.md) at the repo root.

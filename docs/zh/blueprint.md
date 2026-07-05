@@ -1,6 +1,5 @@
-> ⚠️ **中文存档 · 非权威 · 可能滞后 (Archived Chinese snapshot — non-authoritative, may lag).**
-> 冻结于 baseline `eos-1.10.0-zh`。权威且持续维护的版本为英文：[`../eos/blueprint.md`](../eos/blueprint.md)。
-> The canonical, maintained version is English: [`../eos/blueprint.md`](../eos/blueprint.md).
+> 🌐 **与英文版同步 · 英文为参照语言 (in sync with English · English is the reference language).**
+> 本文与英文权威版 [`../eos/blueprint.md`](../eos/blueprint.md) **内容对等、同步维护**；若翻译出现歧义，以英文为准（EOS 的配置与门禁均以英文实现）。
 
 ---
 
@@ -423,16 +422,16 @@ rollback-flag / monitoring-alerting / canary / rate-limit-quota / i18n-l10n /
 
 | 检查项 | 说明 | Hooks 联动 |
 |---|---|---|
-| S1 | 主规则文件必须存在 | — |
-| S2 | 每个 `.instructions.md` 有合法 `applyTo` | `config-check.json` PostToolUse 每次写规则文件后自动跑 |
-| S3 | 非 `"**"` 文件无重复 glob（`"**"` 合法共存） | — |
-| S4 | 所有 `#tool:` 引用的 skill 名称存在于磁盘 | — |
-| S5 | `*.prompt.md` 有 `description` | — |
-| S6 | `*.agent.md` 有 `description` 和 `tools[]` | — |
-| S7 | hook JSON 有 `event` 字段 | — |
-| S8 | `deny-dangerous.js` 使用正确 PreToolUse schema | — |
-| S9 | `AGENTS.md` 存在且非空 | — |
-| S10 | 规则文件总字数 ≤ budget（全局≤400词，栈规则≤300词） | — |
+| S1 | 每个 `.instructions.md` 有合法 YAML frontmatter | — |
+| S2 | 每个 `.instructions.md` 有合法 `applyTo`（否则只能手动挂载） | `config-check.json` PostToolUse 每次写规则文件后自动跑 `validate-config` |
+| S3 | 非 `"**"` 文件无重复 glob（`"**"` 可合法共存） | — |
+| S4 | 常见源码类型（`.ts`/`.tsx`/`.py`/`.sql`）有规则覆盖 | — |
+| S5 | Always-on 预算：`copilot-instructions.md` ≤40 行（error）；每个 `applyTo:"**"` 规则文件 ≤300 词（warn） | — |
+| S6 | 文件名符合 `NN-area[-stack].instructions.md` | — |
+| S7 | 必需路径存在（`copilot-instructions.md`、`instructions/`、`prompts/`、`agents/`、`hooks/`、`docs/eos/agent-map.md`、`docs/eos/activation.md`） | — |
+| S9 | hook JSON 合法且事件名合法 | — |
+| S10 | 每个 `.agent.md` 有合法 `name`（error）+ `description`（warn） | — |
+| S11 | 每个 `.prompt.md` 有 `description` | — |
 
 **目标**：0 errors, 0 warnings（当前已通过，见 work_done）。
 
@@ -463,8 +462,8 @@ rollback-flag / monitoring-alerting / canary / rate-limit-quota / i18n-l10n /
 Agent 输出不符预期
 ├─ 某类文件时不生效 → 检查 applyTo glob（S2/S3）
 ├─ 规则被覆盖/矛盾 → 检查多 "**" 文件是否有冲突措辞（语义验证 prompt）
-├─ prompt 未被识别 → 检查 description 字段（S5）
-├─ 危险操作未被拦截 → 检查 deny-dangerous.js schema（S8），grep hookSpecificOutput.permissionDecision
+├─ prompt 未被识别 → 检查 description 字段（S11）
+├─ 危险操作未被拦截 → 检查 deny-dangerous.js schema，grep hookSpecificOutput.permissionDecision
 └─ 全局规则不生效 → 确认 .github/copilot-instructions.md 路径正确（S1）
 ```
 
@@ -476,12 +475,12 @@ Agent 输出不符预期
 |---|---|---|---|
 | P1 | 只写功能 Spec，不写 NFR | SLO 上线后爆，补测时已有大量耦合 | C-nfr 清单是 G2 必过项；架构阶段须有 NFR 落点 |
 | P2 | 运营需求（埋点/authz/灰度）不前置 | 上线后打补丁返工 × 3 倍成本 | D-ops 清单 + `eos-operational-readiness` skill + G2 | 
-| P3 | 所有规则塞进 `copilot-instructions.md` | always-on 长度爆、污染所有会话 | copilot-instructions.md ≤40 行，S10 词数门禁 |
+| P3 | 所有规则塞进 `copilot-instructions.md` | always-on 长度爆、污染所有会话 | copilot-instructions.md ≤40 行，S5 always-on 预算门禁 |
 | P4 | 重复造轮子（已有 `bmad-*` 却新建相似 prompt） | 双维护、输出漂移 | 所有交付件须标注来源；agent-map.md 引用表 |
 | P5 | 误以为多规则有原生优先级 | 版本变化后静默错误 | 官方已核验：顺序不保证；靠 applyTo + Hooks 控制 |
 | P6 | 用逗号分隔多 glob 放在单个 `applyTo` | 未在官方文档验证，行为未知 | S2 检查；推荐：用 brace expansion `{a,b}` 代替 |
-| P7 | `deny-dangerous.js` 用 PostToolUse schema 的 `decision:"block"` | PreToolUse 无效，危险操作通过 | S8 检查；正确字段：`hookSpecificOutput.permissionDecision:"deny"` |
-| P8 | 规则膨胀，单文件超 300 词 | Token 超预算，规则被截断 | S10 词数检查；按"单一职责"拆分文件 |
+| P7 | `deny-dangerous.js` 用 PostToolUse schema 的 `decision:"block"` | PreToolUse 无效，危险操作通过 | `deny-dangerous.test.mjs` 不变式测试；正确字段：`hookSpecificOutput.permissionDecision:"deny"` |
+| P8 | 规则膨胀，单文件超 300 词 | Token 超预算，规则被截断 | S5 词数检查（always-on 文件）；按“单一职责”拆分文件 |
 | P9 | 无 ADR 就做不可逆架构决策 | 团队失忆，演进时没有决策上下文 | G4 必须有 ADR；`/adr` prompt |
 | P10 | 让 Agent 直接生成代码跳过 Spec | 代码与需求漂移，测试无可追溯目标 | G3 是 G5 前置门；无 `docs/prd.md` 不得进入 Planning |
 | P11 | 无回滚/灰度就发布 | 出问题无法撤，用户全部受影响 | G8 五项门禁；`/release-gate` prompt 强制 |

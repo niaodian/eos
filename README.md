@@ -1,6 +1,6 @@
 # EOS Template — Engineering Operating System
 
-> 🌏 Chinese on-ramp: **[README.zh.md](README.zh.md)** — English is the canonical version.
+> 🌏 Chinese: **[README.zh.md](README.zh.md)** (full parity translation) — English is the reference language.
 
 A portable, **local-first** engineering operating system for VS Code + GitHub Copilot,
 orchestrating the installed **BMAD** skills (73 `bmad-*`) across the full SDLC. Version: **eos-1.10.0**.

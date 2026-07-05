@@ -1,9 +1,9 @@
-# EOS 模板 · 中文导航 (onramp)
+# EOS 模板 · Engineering Operating System
 
-> ⚠️ **英文为权威 (English is canonical).** 本文件只是给中文用户的**简短入口**，不是完整文档。
-> 完整且持续维护的文档在英文版；中文全文存档见 [`docs/zh/`](docs/zh/)（**非权威 · 可能滞后**，冲突时以英文为准）。
+> 🌐 **与英文版同步 · 英文为参照语言 (in sync with English · English is the reference language).**
+> 本文与英文权威版 [`README.md`](README.md) **内容对等、同步维护**；若翻译出现歧义，以英文为准。
 
-**EOS** 是一套可移植、**纯本地优先**的「工程操作系统」模板，面向 VS Code + GitHub Copilot，
+一套可移植、**纯本地优先（local-first）**的「工程操作系统」，面向 VS Code + GitHub Copilot，
 在完整 SDLC 上编排已安装的 **BMAD** 技能（73 个 `bmad-*`）。当前版本：**eos-1.10.0**。
 
 **在同一框架内支持两种范式：**
@@ -12,25 +12,63 @@
 
 两者**显式隔离**——一个项目可以是其一、或两者兼具，而不发生范式交叉污染。
 
-## 从这里开始（英文权威文档）
-| 想做什么 | 看这里（英文，权威） |
-|---|---|
-| 快速上手（前置条件 + Day-1） | [`docs/eos/quickstart.md`](docs/eos/quickstart.md) |
-| 完整用户手册（点子 → 上线 → 迭代；含 SaaS / Agentic 两条新手路径） | [`docs/eos/user-manual.md`](docs/eos/user-manual.md) |
-| 设计理念（为什么这样构建） | [`docs/eos/blueprint.md`](docs/eos/blueprint.md) |
-| 各技术栈配方（Node/Python/Go/Java/Rust/.NET + AI/LLM） | [`docs/eos/stack-presets.md`](docs/eos/stack-presets.md) |
-| 项目总览 | [`README.md`](README.md) |
-
-第一条命令（期望 PASS）：
-```sh
-node .github/hooks/validate-config.mjs
+## 内含什么
+```
+.github/
+  copilot-instructions.md       # R1 always-on 全局规则（极简）
+  instructions/                 # 分域规则（applyTo glob）：6 个后端栈 + 前端 + data-api
+                                #   + ai/llm + testing + security + release-ops
+  prompts/                      # 斜杠命令工作流（/eos-help /eos-init /requirements /spec /ux-spec /eval-spec
+                                #   /spec-align /adr /nfr /telemetry-plan /release-gate /runbook /validate-config）
+  agents/                       # 5 个编排 agent（discovery/design/architecture/plan/review）
+  skills/                       # 项目级能力（operational-readiness）
+  hooks/                        # 护栏 + 验证器（validate-config、eos-doctor、secret-scan、spec-align）
+  workflows/                    # 本地 CI（eos-ci.yml）——经 act 运行，无需云端 runner
+docs/
+  checklists/                   # A-gap、B-rework、C-nfr、D-ops、E-security
+  eos/                          # blueprint、user-manual、quickstart、stack-presets、agent-map、examples、VERSION
+  adr/ epics/ stories/          # SDD 制品
+api/ ops/ src/
 ```
 
+## 三道强制层（全部本地）
+1. **逐次编辑 hooks**（实时）：护栏拦截破坏性 / 供应链投毒 / 密钥泄露操作；
+   每次编辑后 quality + config-check 跑验证器。
+2. **静态验证器**（按需）：`validate-config.mjs`（配置 S1–S11）、`eos-doctor.mjs`（SDLC 门，
+   含 G-EVAL）、`secret-scan.mjs`（+gitleaks）、`spec-align.mjs`（spec 对齐度量）。
+3. **全仓 CI**（合并/发布前）：`act push` 运行 `.github/workflows/eos-ci.yml`。
+
+## 本机已验证
+- 较新版本的 VS Code + Copilot Chat · brace glob（`**/*.{ts,tsx}`）正确加载。
+- PreToolUse 护栏拦截破坏性/投毒/密钥操作（`permissionDecision: "deny"`）。
+- `act` 一次性拉取镜像后离线跑 CI；73 个 `bmad-*` 技能从用户级目录加载。
+
+## 从这里开始
+见 [docs/zh/quickstart.md](docs/zh/quickstart.md)（前置条件 + Day-1）。第一条命令：
+```
+node .github/hooks/validate-config.mjs    # 期望 PASS
+```
+
+> **一次性硬化（让 CI 门真正合并阻断，而非仅 advisory）：** 从模板实例化真实仓库后，
+> 在 Copilot Chat 里跑 `/eos-init`。它带你走 branch protection + 替换 CODEOWNERS handle +
+> 审批基线，并在 [docs/zh/activation.md](docs/zh/activation.md) 记录进度。`eos-doctor` 每次运行
+> 都会提示尚未完成的项，`/release-gate` 在发布前再核一次——因此不会被系统性遗忘。
+
 > **把项目文件夹本身作为工作区根目录打开**（在其中执行 `code .`）。VS Code 只在被打开的根目录发现
-> `.github/{agents,instructions,hooks,prompts}`——若打开的是**上层**父文件夹，自定义 agents、instructions、hooks 会静默失效。
+> `.github/{agents,instructions,hooks,prompts}`——若打开的是**上层**父文件夹，自定义 agents、
+> instructions、hooks 会静默失效。
 
-## 中文存档（非权威）
-冻结于基线 `eos-1.10.0-zh` 的中文全文快照在 [`docs/zh/`](docs/zh/)，**不再持续维护、可能与英文权威版本产生偏差**；
-若中英文有冲突，**以英文为准**。
+**完整用户手册**（点子 → 上线 → 迭代；含面向新手的分步 **SaaS** 与 **Agentic** 两条路径）：
+[docs/zh/user-manual.md](docs/zh/user-manual.md)。
 
-> 纯本地 · 零企业/网络依赖 · 可随 Git 携带。有问题欢迎在 Issues / Discussions 提出。
+设计理念（为什么这样构建）：[docs/zh/blueprint.md](docs/zh/blueprint.md)。
+
+各技术栈配方（Node/Python/Go/Java/Rust/.NET + AI/LLM）：[docs/zh/stack-presets.md](docs/zh/stack-presets.md)。
+
+## 说明
+- 无组织/网络依赖：完全本地、可随 Git 携带。
+- 本地 CI 经 `act` 运行（在本地跑 GitHub Actions，需 Docker）——`.github/workflows/eos-ci.yml`。
+  没有 Docker？直接跑同样的门禁：`node .github/hooks/validate-config.mjs && node .github/hooks/eos-doctor.mjs`。
+- Hooks 是 VS Code **Preview** 功能（官方：配置格式/行为可能变化）——`.github/hooks/*.json`
+  经 `chat.hookFilesLocations` 默认加载。见 `docs/zh/user-manual.md` §2.4 + 附录 D。
+- **没有原生规则优先级**——靠 `applyTo` 作用域 + 约定 + hooks 控制。

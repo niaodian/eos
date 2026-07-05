@@ -1,6 +1,5 @@
-> ⚠️ **中文存档 · 非权威 · 可能滞后 (Archived Chinese snapshot — non-authoritative, may lag).**
-> 冻结于 baseline `eos-1.10.0-zh`。权威且持续维护的版本为英文：[`../eos/user-manual.md`](../eos/user-manual.md)。
-> The canonical, maintained version is English: [`../eos/user-manual.md`](../eos/user-manual.md).
+> 🌐 **与英文版同步 · 英文为参照语言 (in sync with English · English is the reference language).**
+> 本文与英文权威版 [`../eos/user-manual.md`](../eos/user-manual.md) **内容对等、同步维护**；若翻译出现歧义，以英文为准（EOS 的配置与门禁均以英文实现）。
 
 ---
 
@@ -108,11 +107,16 @@ bmad-code-review                   → 审查无阻断项           (Gate G6)
 
 | 组件 | 要求 | 自检命令 |
 |---|---|---|
-| macOS | 任意近期版本（zsh） | `sw_vers` |
+| OS | macOS、Windows 10/11 或 Linux —— EOS 跨平台；原生 Windows 跑核心流程无需 WSL | macOS `sw_vers` · Windows `winver` · Linux `uname -sr` |
 | VS Code | 较新版本（自定义 agent / hooks 需近版） | 关于面板查看真实版本（`code --version` 可能是 shim，不准） |
 | GitHub Copilot | 已登录（企业 license 仅作 license，不作配置依赖） | Chat 面板可用 |
 | Node.js | 18+（验证器与 hooks 用） | `node -v` |
-| BMAD skills | 73 个 `bmad-*`（用户级） | `ls ~/.agents/skills | grep -c '^bmad-'` |
+| BMAD skills | 73 个 `bmad-*`（用户级） | macOS/Linux `ls ~/.agents/skills &#124; grep -c '^bmad-'` · Windows `(Get-ChildItem ~/.agents/skills -Filter 'bmad-*').Count` |
+
+> **在 Windows 或 Linux 上？** 核心流程完全一致 —— 所有 hooks/validators 都是 Node、路径已跨平台归一化，
+> 因此**原生 Windows 无需 WSL/Git-Bash**。Windows 专属细节（PowerShell 5.1 的 `&&` 注意事项、
+> 用 `.gitattributes` 保证 LF、`act` 需 Docker Desktop、`build-pdf.sh` 走 Git-Bash）见
+> quickstart 的 [**Windows** 设置说明](quickstart.md#windows)。
 
 ## 2.2 BMAD skills 在哪
 
@@ -222,7 +226,7 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 
 ## 4.2 always-on 是最稀缺资源
 
-`copilot-instructions.md`（R1）会进入**每一次**会话，所以它必须极简（≈40 行）：只放
+`copilot-instructions.md`（R1）会进入**每一次**会话，所以它必须极简（≤40 行，由 `validate-config` S5 强制）：只放
 "跨项目、永远成立"的工程信念（真相源、复用优先、安全红线、运营意识）。
 **能用窄作用域（applyTo）就绝不用 always-on。**
 
@@ -887,6 +891,7 @@ node .github/hooks/validate-config.mjs
 | S2 | warn | 每个 `.instructions.md` 有 `applyTo`（否则只能手动挂载） |
 | S3 | error | 非 `**` 文件无重复 glob（`**` 合法共存，被豁免） |
 | S4 | warn | 常见源码类型（如 .ts/.tsx/.py/.sql）都有规则覆盖 |
+| S5 | error/warn | Always-on 预算：`copilot-instructions.md` ≤40 行（error）；每个 `applyTo:"**"` 规则文件 ≤300 词（warn） |
 | S6 | warn | 文件名符合 `NN-area[-stack].instructions.md` 规范 |
 | S7 | error | 必需路径/文件存在（copilot-instructions.md、instructions/、prompts/、agents/、hooks/、docs/eos/agent-map.md） |
 | S9 | error | hook JSON 合法且 event 名有效 |
@@ -1029,7 +1034,7 @@ EOS 的栈规则是**可插拔**的。新增一个栈 = 加一个 `*.instruction
 |---|---|---|---|
 | P1 | 只写功能 Spec 不写 NFR | SLO 上线爆 | C-nfr 是 G2 必过项 |
 | P2 | 运营需求不前置 | 上线后返工×3 | D-ops + `eos-operational-readiness` + G2 |
-| P3 | 全部规则塞进 copilot-instructions.md | always-on 爆、污染所有会话 | R1≤40 行；按 applyTo 分薄片 |
+| P3 | 全部规则塞进 copilot-instructions.md | always-on 爆、污染所有会话 | R1≤40 行（S5 门禁）；按 applyTo 分薄片 |
 | P4 | 重复造轮子（已有 bmad-* 却新建） | 双维护、漂移 | 交付件标来源；agent-map.md |
 | P5 | 以为有原生优先级 | 版本变化后静默错 | 靠 applyTo + Hooks，不靠顺序 |
 | P6 | 逗号串多 glob `"a,b"` | 行为未验证 | 用花括号 `{a,b}` + 子文件夹；S2/S3 |

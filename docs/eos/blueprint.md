@@ -458,8 +458,8 @@ Run the process once with one minimal dry-run feature per phase (such as "user l
 Agent output does not match expectation
 ├─ Ineffective for a certain file type → check applyTo glob (S2/S3)
 ├─ Rule overwritten/contradictory → check whether multiple "**" files have conflicting wording (semantic validation prompt)
-├─ prompt not recognized → check description field (S5)
-├─ dangerous operation not blocked → check deny-dangerous.js schema (S8), grep hookSpecificOutput.permissionDecision
+├─ prompt not recognized → check description field (S11)
+├─ dangerous operation not blocked → check deny-dangerous.js schema, grep hookSpecificOutput.permissionDecision
 └─ global rule ineffective → confirm .github/copilot-instructions.md path is correct (S1)
 ```
 
@@ -475,7 +475,7 @@ Agent output does not match expectation
 | P4 | Reinventing the wheel (creating similar prompts when `bmad-*` already exists) | double maintenance, output drift | every artifact must mark source; agent-map.md reference table |
 | P5 | Assuming multiple rules have native priority | silent errors after version changes | officially verified: order is not guaranteed; control with applyTo + Hooks |
 | P6 | Using comma-separated multiple globs in a single `applyTo` | not verified in official docs, behavior unknown | S2 check; recommendation: use brace expansion `{a,b}` instead |
-| P7 | `deny-dangerous.js` uses the PostToolUse schema `decision:"block"` | PreToolUse ineffective, dangerous operation passes | S8 check; correct field: `hookSpecificOutput.permissionDecision:"deny"` |
+| P7 | `deny-dangerous.js` uses the PostToolUse schema `decision:"block"` | PreToolUse ineffective, dangerous operation passes | `deny-dangerous.test.mjs` invariants; correct field: `hookSpecificOutput.permissionDecision:"deny"` |
 | P8 | Rule bloat, a single file exceeds 300 words | Token exceeds budget and rules are truncated | S5 word-count check (always-on files); split files by "single responsibility" |
 | P9 | Irreversible architecture decisions are made without ADR | team memory is lost; no decision context during evolution | G4 must have ADR; `/adr` prompt |
 | P10 | Letting Agent generate code directly and skip Spec | code drifts from requirements; tests have no traceable target | G3 is the prerequisite gate for G5; no `docs/prd.md`, no Planning |
