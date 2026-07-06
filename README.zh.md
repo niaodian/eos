@@ -72,3 +72,7 @@ node .github/hooks/validate-config.mjs    # 期望 PASS
 - Hooks 是 VS Code **Preview** 功能（官方：配置格式/行为可能变化）——`.github/hooks/*.json`
   经 `chat.hookFilesLocations` 默认加载。见 `docs/zh/user-manual.md` §2.4 + 附录 D。
 - **没有原生规则优先级**——靠 `applyTo` 作用域 + 约定 + hooks 控制。
+
+## 许可证 (License)
+
+[MIT](LICENSE) © 2026 Xavier Zhang。

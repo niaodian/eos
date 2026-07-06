@@ -24,6 +24,7 @@ Scan the repo and report the FURTHEST phase reached, then the single next action
 | `docs/stories/` non-empty | 5 Planning | `bmad-dev-story` |
 | `src/` has implementation | 6 Development | `bmad-code-review` → `/e2e` |
 | `docs/trace-matrix.md` | 7 Testing | `/release-gate` |
+| `docs/release-gate.md` | 8 Release | `/telemetry-plan` |
 | `docs/telemetry-plan.md` | 9 Observability | switch to **eos-review** agent (iterate) |
 
 Report it as one line, e.g.: `You're at Phase 3 (Spec) — docs/prd.md exists. Next: /ux-spec, or eos-architecture for a backend-only service.`

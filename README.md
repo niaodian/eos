@@ -74,3 +74,7 @@ Per-stack setup presets (Node/Python/Go/Java/Rust/.NET + AI/LLM): [docs/eos/stac
   load by default via `chat.hookFilesLocations`. See `docs/eos/user-manual.md` §2.4 + Appendix D.
 - There is **no native rule priority** — control is via `applyTo` scope + conventions + hooks.
 
+## License
+
+[MIT](LICENSE) © 2026 Xavier Zhang.
+
