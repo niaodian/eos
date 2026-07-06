@@ -1,0 +1,41 @@
+node_modules/
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa
+id_ed25519
+.npmrc
+credentials.json
+secrets.*
+*.secret
+dist/
+build/
+.DS_Store
+
+# compiled Java class files (compliance-starter is source-only; compile out-of-tree)
+*.class
+
+# Python bytecode cache (compliance-starter Python port)
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# generated docs (rebuild via docs/eos/tools/build-pdf.sh)
+docs/eos/*.pdf
+docs/zh/*.pdf
+docs/eos/.*.html
+docs/zh/.*.html
+
+# VS Code: keep local editor settings out. We ship the browser-MCP config as an INERT
+# `.vscode/mcp.json.example` (no MCP client reads `.example`), so nothing auto-starts at
+# Phase 1. A user OPTS IN at Phase 7 by copying it to `.vscode/mcp.json` — which stays LOCAL
+# (still ignored) so an always-on browser server is never committed back into the template.
+# A global `.vscode/` ignore excludes the whole dir, so re-include the dir, then just the examples.
+!.vscode/
+.vscode/*
+!.vscode/mcp.json.example
+!.vscode/settings.json.example

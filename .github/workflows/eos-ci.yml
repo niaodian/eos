@@ -1,0 +1,76 @@
+name: EOS CI
+# Local-first CI. Runnable with `act` (nektos/act) — no cloud runner required:
+#   act push            # run the whole workflow locally in Docker
+#   act -j verify       # run just the verify job
+#   act -l              # list jobs (fast, no Docker execution)
+#
+# PREREQUISITE: Docker must be running. FIRST RUN needs network ONCE to pull a runner
+# image (~500MB) + the actions (checkout, setup-node); they are cached under ~/.cache/act
+# and ~/Library/Containers/com.docker.*, so EVERY LATER RUN is fully offline:
+#   act push --pull=false --action-offline-mode
+# No Docker? Skip CI and run the same checks directly (see docs/eos/quickstart.md Prerequisites):
+#   node .github/hooks/validate-config.mjs && node .github/hooks/check-doc-parity.mjs \
+#     && node .github/hooks/eos-doctor.mjs && npm run -s verify --if-present
+# This is the batch, whole-repo gate (complements per-edit hooks + validate-config.mjs).
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: EOS config validation (S1–S11)
+        run: node .github/hooks/validate-config.mjs
+
+      - name: EOS doc parity (zh ⇄ en lockstep — structure + factual codes)
+        # English is the reference language; every docs/eos/<f>.md must have a docs/zh/<f>.md
+        # (+ README ⇄ README.zh) with matching structure + S/G/P/D/R codes + versions. Blocks
+        # an en-only edit from silently drifting the Chinese tree out of parity.
+        run: node .github/hooks/check-doc-parity.mjs
+
+      - name: EOS SDLC gate doctor (G-EVAL / G-UX wiring + secret hygiene)
+        run: node .github/hooks/eos-doctor.mjs
+
+      - name: EOS secret scan (built-in patterns + gitleaks if available)
+        run: node .github/hooks/secret-scan.mjs
+
+      - name: EOS spec-alignment (advisory — AC coverage / first-pass rate)
+        run: node .github/hooks/spec-align.mjs
+
+      - name: EOS guardrail regression tests (deny-dangerous invariants)
+        # Enforces the fragile PreToolUse contract: --force-with-lease ALLOWED, rm long-flags/-R DENIED,
+        # benign not over-blocked. Zero-dep node:test, offline. [round-3 audit residual #9]
+        run: node --test .github/hooks/deny-dangerous.test.mjs
+
+      - name: EOS doc-parity regression tests (drift gate still catches drift)
+        # Locks check-doc-parity.mjs: PASS on parity, FAIL on coverage/structure/factual-code drift,
+        # no false positive on shared incidental tokens. Zero-dep node:test, offline.
+        run: node --test .github/hooks/check-doc-parity.test.mjs
+
+      - name: Quality gate + evals (only if the project has a package.json)
+        shell: bash
+        run: |
+          if [ -f package.json ]; then
+            # E2: a package.json project MUST define a runnable test script — a green-but-empty gate
+            # is worse than no gate. Static check (no network), so it never flakes offline. [audit E2]
+            node -e "const s=(require('./package.json').scripts)||{}; if(!s.test){console.error('EOS FAIL: package.json present but no \"test\" script. Add a real test script (or a documented no-op) so the quality gate cannot vacuously pass.'); process.exit(1)}"
+            # Offline-tolerant install: prefer cache, fall back, never hard-fail the gate on network.
+            npm ci --prefer-offline --no-audit --no-fund 2>/dev/null \
+              || npm install --prefer-offline --no-audit --no-fund 2>/dev/null \
+              || echo "EOS: dependency install skipped (offline / no lockfile) — continuing."
+            npm run -s lint --if-present
+            npm run -s typecheck --if-present
+            npm test --silent --if-present
+            npm run -s eval --if-present   # G-EVAL: runs the eval baseline (fails on regression)
+          else
+            echo "No package.json — config-only template; skipping tests/evals."
+          fi

@@ -1,0 +1,51 @@
+// EOS SAFE BASELINE for VS Code Copilot agent approvals — .vscode/settings.json.example  [audit C1]
+//
+// WHY: without a pinned baseline, tool auto-approval is per-machine and un-auditable — one dev can
+// silently enable "approve everything". This example pins a conservative, review-friendly default.
+//
+// USE IT: copy to an ACTIVE settings file, then customize —
+//     cp .vscode/settings.json.example .vscode/settings.json     # workspace scope (git-ignored, local)
+//   or merge these keys into your VS Code User settings.
+// Keys verified against the official docs (docs/agents/reference/ai-settings.md, agents/approvals.md).
+// Auto-approval is a fast-moving area — re-check the keys/semantics on your VS Code version.
+{
+  // The single most important guardrail: never auto-approve ALL tools across all workspaces.
+  // `true` disables critical security protections (equivalent to the /yolo command). Keep it false.
+  "chat.tools.global.autoApprove": false,
+
+  // Terminal auto-approve: `true` = auto-run, `false` = require approval. Wrap regex in / / (JSON-escaped).
+  // Defense-in-depth alongside .github/hooks/deny-dangerous.js. The built-in defaults already deny
+  // rm/rmdir/del/kill/curl/wget/eval/chmod/chown — we pin them explicitly and add common escapes.
+  "chat.tools.terminal.autoApprove": {
+    "rm": false,
+    "rmdir": false,
+    "del": false,
+    "kill": false,
+    "curl": false,
+    "wget": false,
+    "eval": false,
+    "chmod": false,
+    "chown": false,
+    "sudo": false,
+    "dd": false,
+    "mkfs": false,
+    "/\\brm\\s+(-[a-z]*[rf]|--(recursive|force))/i": false,
+    "/git\\s+push\\b.*\\s(-f|--force)(?![\\w-])/i": false,
+    "/git\\s+reset\\s+--hard/i": false,
+    "/(curl|wget).*\\|\\s*(sudo\\s+)?(ba|z|k|c)?sh/i": false,
+    "/(curl|wget).*\\|\\s*(python3?|node|perl|ruby)\\b/i": false,
+    "/find\\b.*-delete/i": false,
+    "/^Remove-Item\\b/i": false
+  },
+
+  // Supply-chain: VS Code auto-approves npm/pnpm/yarn scripts declared in package.json BY DEFAULT
+  // (official release-notes v1.108). A poisoned package.json script would then run without a prompt.
+  // Disable that convenience for defense-in-depth (re-check the key on your VS Code version).
+  "chat.tools.terminal.autoApproveWorkspaceNpmScripts": false
+
+  // OPTIONAL — protect governance files from unreviewed agent edits (a local mirror of CODEOWNERS).
+  // `chat.tools.edits.autoApprove` uses glob patterns to mark paths handling before an edit applies.
+  // Verify the exact boolean semantics for EDITS on your VS Code version (docs/agents/approvals.md)
+  // before relying on it, then enable, e.g.:
+  //   "chat.tools.edits.autoApprove": { "**/.github/**": false, "**/docs/eos/**": false }
+}

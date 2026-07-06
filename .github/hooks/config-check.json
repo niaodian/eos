@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "type": "command",
+        "command": "node .github/hooks/validate-config.mjs || echo 'EOS: config validation failed'"
+      },
+      {
+        "type": "command",
+        "command": "node .github/hooks/eos-doctor.mjs || echo 'EOS: SDLC gate check failed (G-EVAL: LLM code under ai/llm/rag needs docs/eval-plan.md)'"
+      }
+    ]
+  }
+}

@@ -1,0 +1,178 @@
+#!/usr/bin/env node
+// EOS static config validator — zero external deps.
+// Run from project root: node .github/hooks/validate-config.mjs
+import { readFileSync, readdirSync, existsSync } from 'node:fs';
+import { join, relative } from 'node:path';
+
+const root = process.cwd();
+const errors = [];
+const warns = [];
+
+const fm = (txt) => {
+  const m = txt.match(/^---\n([\s\S]*?)\n---/);
+  return m ? m[1] : null;
+};
+
+// Recursively collect *.instructions.md (supports subfolder organization)
+function walk(dir, acc = []) {
+  if (!existsSync(dir)) return acc;
+  for (const e of readdirSync(dir, { withFileTypes: true })) {
+    const p = join(dir, e.name);
+    if (e.isDirectory()) walk(p, acc);
+    else if (e.name.endsWith('.instructions.md')) acc.push(p);
+  }
+  return acc;
+}
+
+// S7 directory + key-file completeness
+const required = [
+  '.github/copilot-instructions.md',
+  '.github/instructions',
+  '.github/prompts',
+  '.github/agents',
+  '.github/hooks',
+  'docs/eos/agent-map.md',
+  'docs/eos/activation.md',
+];
+for (const p of required) {
+  if (!existsSync(join(root, p))) errors.push(`S7 missing required path: ${p}`);
+}
+
+// Collect & validate instruction files
+const instrDir = join(root, '.github/instructions');
+const files = walk(instrDir);
+const globsByArea = {};
+
+for (const full of files) {
+  const rel = relative(root, full).split(/[\\/]/).join('/');
+  const base = rel.split('/').pop();
+  const txt = readFileSync(full, 'utf8');
+  const head = fm(txt);
+
+  // S1 frontmatter present
+  if (!head) {
+    errors.push(`S1 ${rel}: missing/invalid YAML frontmatter`);
+    continue;
+  }
+  // S6 naming convention (warn only — subfolders relax this)
+  if (!/^\d\d-[a-z0-9-]+\.instructions\.md$/.test(base)) {
+    warns.push(`S6 ${rel}: filename not "NN-area[-stack].instructions.md"`);
+  }
+  // S2 applyTo present
+  const m = head.match(/applyTo:\s*["']?(.+?)["']?\s*$/m);
+  if (!m) {
+    warns.push(`S2 ${rel}: no applyTo (rule won't auto-apply; manual attach only)`);
+    continue;
+  }
+  const glob = m[1].trim().replace(/^["']|["']$/g, '');
+  // area = top folder under instructions/, else 'root'
+  const parts = rel.replace('.github/instructions/', '').split('/');
+  const area = parts.length > 1 ? parts[0] : 'root';
+  (globsByArea[area] ||= []).push({ rel, glob });
+}
+
+// S3 duplicate identical SPECIFIC glob (heuristic overlap detection).
+// The universal "**" scope is an intentionally shared pattern for multiple thin
+// always-on rule files (e.g. workspace conventions + security), so it is exempt.
+const seen = {};
+for (const area in globsByArea) {
+  for (const { rel, glob } of globsByArea[area]) {
+    if (glob === '**') continue; // always-on scope: additive, not a conflict
+    if (seen[glob]) errors.push(`S3 duplicate glob "${glob}" in ${seen[glob]} and ${rel}`);
+    else seen[glob] = rel;
+  }
+}
+
+// S4 coverage of common source types (warn)
+const allGlobs = Object.values(globsByArea).flat().map((x) => x.glob).join(' ');
+for (const [label, needle] of [['*.ts', 'ts'], ['*.tsx', 'tsx'], ['*.py', 'py'], ['*.sql', 'sql']]) {
+  if (!allGlobs.includes(needle)) warns.push(`S4 no rule appears to cover ${label}`);
+}
+
+// S5 always-on budget — copilot-instructions.md (R1) enters EVERY session, and applyTo:"**" rule files
+// share that per-session cost ("always-on is the scarcest resource"). Enforces blueprint P3/P8, which
+// documented this budget but left it unchecked. R1 line cap is a hard gate; the word cap is advisory.
+const bodyWords = (s) => (s.replace(/^---\n[\s\S]*?\n---\n?/, '').match(/\S+/g) || []).length;
+const R1 = '.github/copilot-instructions.md';
+if (existsSync(join(root, R1))) {
+  const t = readFileSync(join(root, R1), 'utf8');
+  const lines = t.replace(/\n+$/, '').split('\n').length;
+  if (lines > 40) errors.push(`S5 ${R1}: ${lines} lines (>40) — R1 enters every session; keep it minimal, split thin slices by applyTo`);
+  if (bodyWords(t) > 300) warns.push(`S5 ${R1}: ${bodyWords(t)} words (>300 budget) — split thin slices by applyTo`);
+}
+for (const { rel, glob } of Object.values(globsByArea).flat()) {
+  if (glob !== '**') continue; // only always-on files share the every-session cost
+  const w = bodyWords(readFileSync(join(root, rel), 'utf8'));
+  if (w > 300) warns.push(`S5 ${rel}: ${w} words (>300 budget) — trim or move a slice to a scoped applyTo rule`);
+}
+
+// S9 hooks JSON validity + event-name validity.
+// These 8 names are the official VS Code Copilot hook events, confirmed against
+// docs/agents/reference/hooks-reference.md (they also happen to match Claude Code's set).
+// Hooks are a VS Code *Preview* feature — names/schema may change; re-verify on your version. [audit G1]
+const validEvents = [
+  'SessionStart', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse',
+  'PreCompact', 'SubagentStart', 'SubagentStop', 'Stop',
+];
+const hooksDir = join(root, '.github/hooks');
+if (existsSync(hooksDir)) {
+  for (const f of readdirSync(hooksDir).filter((f) => f.endsWith('.json'))) {
+    try {
+      const j = JSON.parse(readFileSync(join(hooksDir, f), 'utf8'));
+      for (const ev of Object.keys(j.hooks || {})) {
+        if (!validEvents.includes(ev)) errors.push(`S9 ${f}: invalid hook event "${ev}"`);
+      }
+    } catch (e) {
+      errors.push(`S9 ${f}: invalid JSON (${e.message})`);
+    }
+  }
+}
+
+// S10 agent files must have valid name + description frontmatter (VS Code lists/switches by name)
+// VS Code accepts agent names matching /^[a-z0-9-]+$/ and de-dupes by name; guard both.
+const agentsDir = join(root, '.github/agents');
+if (existsSync(agentsDir)) {
+  const seenNames = new Map();
+  for (const f of readdirSync(agentsDir).filter((f) => f.endsWith('.agent.md'))) {
+    const head = fm(readFileSync(join(agentsDir, f), 'utf8'));
+    if (!head) { errors.push(`S10 agents/${f}: missing YAML frontmatter`); continue; }
+    const nameM = head.match(/^name:\s*(.+?)\s*$/m);
+    if (!nameM) {
+      errors.push(`S10 agents/${f}: missing "name" (agent won't list/switch by name in Chat)`);
+    } else {
+      const name = nameM[1].replace(/^['"]|['"]$/g, '');
+      if (!/^[a-z0-9-]+$/.test(name)) errors.push(`S10 agents/${f}: name "${name}" must match ^[a-z0-9-]+$ (no uppercase/spaces) or Chat drops it`);
+      if (seenNames.has(name)) errors.push(`S10 agents/${f}: duplicate name "${name}" (also in ${seenNames.get(name)}) — collides in the Chat picker`);
+      else seenNames.set(name, f);
+    }
+    if (!/^description:\s*\S/m.test(head)) warns.push(`S10 agents/${f}: missing "description"`);
+  }
+}
+
+// S11 prompt files must have name + description frontmatter
+const promptsDir = join(root, '.github/prompts');
+if (existsSync(promptsDir)) {
+  for (const f of readdirSync(promptsDir).filter((f) => f.endsWith('.prompt.md'))) {
+    const head = fm(readFileSync(join(promptsDir, f), 'utf8'));
+    if (!head) { errors.push(`S11 prompts/${f}: missing YAML frontmatter`); continue; }
+    if (!/^description:\s*\S/m.test(head)) warns.push(`S11 prompts/${f}: missing "description"`);
+  }
+}
+
+// Report
+console.log(`EOS config check — ${files.length} instruction file(s) scanned\n`);
+for (const w of warns) console.log('  WARN  ' + w);
+for (const e of errors) console.log('  ERROR ' + e);
+console.log('');
+// Non-failing reminder: VS Code only discovers .github/{agents,instructions,hooks,prompts}
+// at the OPENED workspace root. Opening a PARENT folder makes all of them silently inactive.
+console.log('  NOTE  In VS Code, open THIS folder as the workspace root (File > Open Folder > select it).');
+console.log('        If you open a parent folder, custom agents/instructions/hooks are NOT discovered.');
+console.log('  NOTE  One-time: run /eos-init to make the CI gates merge-blocking (branch protection +');
+console.log('        CODEOWNERS + approval baseline). Progress is tracked in docs/eos/activation.md.');
+console.log('');
+if (errors.length) {
+  console.log(`FAIL: ${errors.length} error(s), ${warns.length} warning(s)`);
+  process.exit(1);
+}
+console.log(`PASS${warns.length ? ` (${warns.length} warning(s))` : ''}`);

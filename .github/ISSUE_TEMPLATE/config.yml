@@ -1,0 +1,12 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question / usage help
+    url: https://github.com/niaodian/eos/discussions
+    about: >-
+      Ask how to use EOS, the slash commands, agents, or the SDLC gates.
+      Please use Discussions for questions so the issue tracker stays focused on bugs and proposals.
+  - name: Security vulnerability (private)
+    url: https://github.com/niaodian/eos/security/advisories/new
+    about: >-
+      Report a security issue privately via GitHub Security Advisories.
+      Do NOT open a public issue for vulnerabilities. See SECURITY.md.

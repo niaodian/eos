@@ -1,0 +1,12 @@
+# C. NFR Checklist (fill: target value / not applicable + reason)
+- [ ] Performance (backend): P95 latency ____ / throughput ____
+- [ ] Frontend performance budget/CWV (if there is a frontend): LCP ____ (≤2.5s) / INP ____ (≤200ms) / CLS ____ (≤0.1) / JS bundle size ____
+- [ ] Capacity & scalability: peak ____ / growth ____ / horizontal scaling strategy ____
+- [ ] Availability & disaster recovery: SLO ____ / RTO ____ / RPO ____
+- [ ] Security & compliance: authentication ____ / encryption ____ / data classification ____ / compliance regime (none|HIPAA|PCI-DSS|SOC2|SOX|GDPR|CCPA|PIPL) ____ / see `F-compliance.md` ____
+- [ ] Observability: logs ____ / metrics ____ / tracing ____
+- [ ] Maintainability: module boundaries ____ / ADR ____
+- [ ] Accessibility a11y: target level ____ (WCAG 2.1 AA) / contrast ____ / keyboard accessible ____
+- [ ] Internationalization (if applicable): time zone (UTC storage) ____ / currency (minor units/Decimal+ISO) ____ / copy externalization ____ / RTL ____
+- [ ] Multi-tenancy (if applicable): isolation level (row/database/instance) ____ / cross-tenant deny by default ____
+- [ ] LLM/agentic (if applicable): per-request cost/token budget ____ / single-call P95 latency ____ / quality threshold (eval score) ____

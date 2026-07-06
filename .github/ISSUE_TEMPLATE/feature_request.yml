@@ -1,0 +1,53 @@
+name: Feature request / proposal
+description: Suggest an improvement to the EOS template — a rule, prompt, agent, gate, or doc.
+title: "feat: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        EOS is **reuse-first** (it orchestrates the installed `bmad-*` skills) and **local-first**
+        (no enterprise/network dependency on the main path). Proposals that respect both are easiest to accept.
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Pre-flight
+      options:
+        - label: I searched existing issues/discussions and this is not a duplicate.
+          required: true
+        - label: I considered whether an existing `bmad-*` skill already covers this (reuse-first).
+          required: false
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / motivation
+      description: What friction or gap are you hitting? Describe the situation, not just the solution.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+      description: What should EOS do? Which layer does it touch (rule / prompt / agent / gate / doc)?
+    validations:
+      required: true
+  - type: dropdown
+    id: paradigm
+    attributes:
+      label: Which paradigm does this affect?
+      options:
+        - "Both (cross-cutting)"
+        - "Traditional SaaS (deterministic)"
+        - "Agentic / LLM (probabilistic)"
+        - "Neither / tooling only"
+    validations:
+      required: true
+  - type: checkboxes
+    id: constraints
+    attributes:
+      label: Fit with EOS principles
+      options:
+        - label: This keeps the main path local-first (any network/enterprise need is an optional extension).
+          required: false
+        - label: This does not claim a native rule-priority mechanism (merge order is unspecified).
+          required: false

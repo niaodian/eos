@@ -1,0 +1,18 @@
+---
+name: 'Release & Ops'
+description: 'Release gating and operational conventions'
+applyTo: "**/{Dockerfile,*.yml,*.yaml}"
+---
+# Release & Ops Rules
+
+- The deployment topology is an architecture-phase (G4) decision — see `docs/checklists/G-deployment.md`
+  + its `docs/adr/*-deployment-topology.md`. These manifests (Dockerfile / compose / k8s yaml /
+  serverless) must honor the chosen topology's rollback/canary/health contract. Pick the simplest
+  topology that meets the NFRs; never default to Kubernetes.
+- Builds must be reproducible & pinned (lockfiles committed).
+- `【Optional · maturity】` Artifact integrity for regulated/enterprise delivery: SBOM (e.g. CycloneDX/Syft),
+  signed artifacts/commits (Sigstore/cosign), SLSA provenance. Not required for local-first; add when
+  shipping to a controlled supply chain.
+- No release without: passing quality gate, rollback plan, canary strategy.
+- Every service exposes health/readiness endpoints.
+- Document operational steps in `ops/runbook-<service>.md`.
