@@ -33,8 +33,9 @@ api/ ops/ src/
 ## Three enforcement layers (all local)
 1. **Per-edit hooks** (real-time): guardrail denies destructive / supply-chain-poison / secret-leak ops;
    quality + config-check run validators after each edit.
-2. **Static validators** (on demand): `validate-config.mjs` (config S1–S11), `eos-doctor.mjs` (SDLC gates
-   incl. G-EVAL), `secret-scan.mjs` (+gitleaks), `spec-align.mjs` (spec-alignment metric).
+2. **Static validators** (on demand): `validate-config.mjs` (config S1–S11), `check-doc-parity.mjs`
+   (zh⇄en doc parity), `eos-doctor.mjs` (SDLC gates incl. G-EVAL), `secret-scan.mjs` (+gitleaks),
+   `spec-align.mjs` (spec-alignment metric).
 3. **Whole-repo CI** (before merge/release): `act push` runs `.github/workflows/eos-ci.yml`.
 
 ## Verified on this machine

@@ -17,8 +17,11 @@ These are the beliefs the template is built on. Changes are easiest to accept wh
   never the default path.
 - **Reuse-first.** EOS orchestrates the 73 installed `bmad-*` skills. Prefer reusing an existing skill
   over inventing a new capability. Tag new artifacts honestly as reuse / new / hybrid.
-- **English is canonical.** All config and docs are authored in English. `docs/zh/` is a *frozen,
-  non-maintained* archive — do not try to keep it in lockstep. A short `README.zh.md` on-ramp is fine.
+- **English is the reference language; Chinese is kept in parity.** All config and docs are authored in
+  English — the tie-breaker when a translation is ambiguous. Every `docs/eos/<f>.md` has a `docs/zh/<f>.md`
+  mirror kept in **content parity** (and `README.md` ⇄ `README.zh.md`). If you edit an English doc, mirror
+  the change to its Chinese counterpart **in the same PR** — CI's `check-doc-parity.mjs` enforces matching
+  structure + factual codes, so an en-only edit fails the build.
 - **Anti-hallucination.** Every feature, filename, YAML key, or setting you document must match the
   official VS Code + GitHub Copilot docs. If a mechanism is Preview/experimental or version-dependent,
   say so. Do not claim a native rule-*priority* mechanism — multiple instruction files merge in an
@@ -75,6 +78,7 @@ Authority is CI, but run these locally first — they're fast and offline:
 
 ```sh
 node .github/hooks/validate-config.mjs            # S1–S11 config validation (must PASS)
+node .github/hooks/check-doc-parity.mjs           # zh⇄en doc parity — lockstep (must PASS)
 node .github/hooks/eos-doctor.mjs                 # SDLC gate + secret-hygiene advisories (exit 0)
 git add -A && node .github/hooks/secret-scan.mjs  # tracked-file secret scan (must be clean)
 node --test .github/hooks/deny-dangerous.test.mjs # guardrail invariants (must pass)
@@ -86,8 +90,10 @@ If you changed the user manual, also run:
 node docs/eos/tools/check-anchors.mjs docs/eos/user-manual.md
 ```
 
-`docs/eos/user-manual.md` is the **only** PDF source: adding a new top-level `#` appendix requires a
-matching Table-of-Contents line or `check-anchors` fails.
+`docs/eos/user-manual.md` is the primary PDF source and the one with a full Table of Contents: adding a
+new top-level `#` appendix requires a matching Table-of-Contents line or `check-anchors` fails.
+(`build-pdf.sh` can render any doc — incl. `docs/zh/*.md` — to a CJK-safe PDF; the manual is just the
+one whose TOC must stay in sync.)
 
 You can run the whole batch gate the way CI does (needs Docker): `act push -j verify --pull=false`.
 

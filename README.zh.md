@@ -34,8 +34,8 @@ api/ ops/ src/
 ## 三道强制层（全部本地）
 1. **逐次编辑 hooks**（实时）：护栏拦截破坏性 / 供应链投毒 / 密钥泄露操作；
    每次编辑后 quality + config-check 跑验证器。
-2. **静态验证器**（按需）：`validate-config.mjs`（配置 S1–S11）、`eos-doctor.mjs`（SDLC 门，
-   含 G-EVAL）、`secret-scan.mjs`（+gitleaks）、`spec-align.mjs`（spec 对齐度量）。
+2. **静态验证器**（按需）：`validate-config.mjs`（配置 S1–S11）、`check-doc-parity.mjs`（中⇄英文档对等）、
+   `eos-doctor.mjs`（SDLC 门，含 G-EVAL）、`secret-scan.mjs`（+gitleaks）、`spec-align.mjs`（spec 对齐度量）。
 3. **全仓 CI**（合并/发布前）：`act push` 运行 `.github/workflows/eos-ci.yml`。
 
 ## 本机已验证

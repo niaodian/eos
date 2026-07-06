@@ -9,7 +9,8 @@ name: EOS CI
 # and ~/Library/Containers/com.docker.*, so EVERY LATER RUN is fully offline:
 #   act push --pull=false --action-offline-mode
 # No Docker? Skip CI and run the same checks directly (see docs/eos/quickstart.md Prerequisites):
-#   node .github/hooks/validate-config.mjs && node .github/hooks/eos-doctor.mjs && npm run -s verify --if-present
+#   node .github/hooks/validate-config.mjs && node .github/hooks/check-doc-parity.mjs \
+#     && node .github/hooks/eos-doctor.mjs && npm run -s verify --if-present
 # This is the batch, whole-repo gate (complements per-edit hooks + validate-config.mjs).
 
 on:
@@ -30,6 +31,12 @@ jobs:
       - name: EOS config validation (S1–S11)
         run: node .github/hooks/validate-config.mjs
 
+      - name: EOS doc parity (zh ⇄ en lockstep — structure + factual codes)
+        # English is the reference language; every docs/eos/<f>.md must have a docs/zh/<f>.md
+        # (+ README ⇄ README.zh) with matching structure + S/G/P/D/R codes + versions. Blocks
+        # an en-only edit from silently drifting the Chinese tree out of parity.
+        run: node .github/hooks/check-doc-parity.mjs
+
       - name: EOS SDLC gate doctor (G-EVAL / G-UX wiring + secret hygiene)
         run: node .github/hooks/eos-doctor.mjs
 
@@ -43,6 +50,11 @@ jobs:
         # Enforces the fragile PreToolUse contract: --force-with-lease ALLOWED, rm long-flags/-R DENIED,
         # benign not over-blocked. Zero-dep node:test, offline. [round-3 audit residual #9]
         run: node --test .github/hooks/deny-dangerous.test.mjs
+
+      - name: EOS doc-parity regression tests (drift gate still catches drift)
+        # Locks check-doc-parity.mjs: PASS on parity, FAIL on coverage/structure/factual-code drift,
+        # no false positive on shared incidental tokens. Zero-dep node:test, offline.
+        run: node --test .github/hooks/check-doc-parity.test.mjs
 
       - name: Quality gate + evals (only if the project has a package.json)
         shell: bash
