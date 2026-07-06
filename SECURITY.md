@@ -19,7 +19,7 @@ This is a rolling template; only the latest tagged version receives fixes.
 **Please do not open a public issue for security problems.**
 
 Report privately via GitHub Security Advisories:
-**[Security → Report a vulnerability](https://github.com/niaodian/eos-template/security/advisories/new)**
+**[Security → Report a vulnerability](https://github.com/niaodian/eos/security/advisories/new)**
 (the repository's *Security* tab → *Report a vulnerability*).
 
 If private reporting is unavailable to you, contact the maintainer

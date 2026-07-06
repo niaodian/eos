@@ -159,15 +159,15 @@ bmad-code-review                   → 审查无阻断项           (Gate G6)
 
 **方式 A — degit（推荐，最快）**
 ```sh
-# 私有模板必须加 --mode=git
-npx degit --mode=git niaodian/eos-template my-new-app
+# public 模板 —— 直接 degit（无需鉴权）
+npx degit niaodian/eos my-new-app
 cd my-new-app
-git init && git add -A && git commit -m "chore: scaffold from eos-template"
+git init && git add -A && git commit -m "chore: scaffold from eos"
 ```
 
 **方式 B — gh + GitHub template**
 ```sh
-gh repo create my-new-app --template niaodian/eos-template --private --clone
+gh repo create my-new-app --template niaodian/eos --private --clone
 cd my-new-app
 ```
 
@@ -191,8 +191,8 @@ node .github/hooks/validate-config.mjs      # 期望：PASS
 ## 3.4 Day-1 完整序列（复制即用）
 
 ```sh
-npx degit --mode=git niaodian/eos-template my-new-app && cd my-new-app
-git init && git add -A && git commit -q -m "chore: scaffold from eos-template"
+npx degit niaodian/eos my-new-app && cd my-new-app
+git init && git add -A && git commit -q -m "chore: scaffold from eos"
 node .github/hooks/validate-config.mjs
 # 关键：从项目目录内执行 `code .`，让 my-new-app 成为工作区根（含 .github/）。
 # 不要打开它的父目录，否则自定义 agent / instructions / hooks 都不会被发现。
@@ -301,7 +301,7 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 | 项 | 内容 |
 |---|---|
 | **目标** | 从模板得到一个配置健康的空项目 |
-| **怎么启动** | `npx degit --mode=git niaodian/eos-template my-app && cd my-app` |
+| **怎么启动** | `npx degit niaodian/eos my-app && cd my-app` |
 | **产出** | 完整 `.github/` + `docs/` 骨架 |
 | **门** | `node .github/hooks/validate-config.mjs` → **PASS** |
 | **必查** | PASS 0 errors。**栈未定则先别改** `00-workspace`——保留 Node 占位即可；栈是不可逆决策，权威锁定在**阶段 4（ADR）**。已知栈可即抄 `docs/eos/stack-presets.md`（快路径）。 |
@@ -571,7 +571,7 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 
 ### 第 0 步：建项目 + 选栈（5 分钟）
 ```sh
-npx degit --mode=git niaodian/eos-template todo-api && cd todo-api
+npx degit niaodian/eos todo-api && cd todo-api
 node .github/hooks/validate-config.mjs          # 期望 PASS
 ```
 **已定栈**？打开 `.github/instructions/00-workspace.instructions.md` 把 `Local commands` 抄成你的栈块（`docs/eos/stack-presets.md`，快路径）。
@@ -634,7 +634,7 @@ SaaS 的 **G7** 要求：每条 AC ≥1 测试、**API 契约测试**（对 open
 
 ### 第 0 步：建项目 + 建 AI 目录
 ```sh
-npx degit --mode=git niaodian/eos-template cs-agent && cd cs-agent
+npx degit niaodian/eos cs-agent && cd cs-agent
 mkdir -p ai/prompts evals                       # AI 代码放这里，自动叠加 Agentic 规则
 node .github/hooks/validate-config.mjs          # 期望 PASS
 ```
@@ -979,17 +979,17 @@ Agent 输出不符预期
 ## 10.2 一键初始化新项目
 
 ```sh
-# 方式 A：degit（私有库加 --mode=git）
-npx degit --mode=git niaodian/eos-template my-app
+# 方式 A：degit（public 模板，无需鉴权）
+npx degit niaodian/eos my-app
 
 # 方式 B：gh + template
-gh repo create my-app --template niaodian/eos-template --private --clone
+gh repo create my-app --template niaodian/eos --private --clone
 ```
 
 ## 10.3 分发给团队（纯本地、无企业依赖）
 
-1. 把 `eos-template` 设为 GitHub **template repo**（已设 `isTemplate:true`）。
-2. 团队成员各自 `--mode=git` degit 或 `gh ... --template` 初始化。
+1. 把 `eos` 设为 GitHub **template repo**（已设 `isTemplate:true`）。
+2. 团队成员各自 `degit` 或 `gh ... --template` 初始化。
 3. 共享的 `bmad-*` 各自在本机用户级安装（一次）。
 4. **不要**在配置里写任何企业内网/接口/SSO 依赖——保持离线可运行。
 
@@ -1075,7 +1075,7 @@ EOS 的栈规则是**可插拔**的。新增一个栈 = 加一个 `*.instruction
 
 ```
 # ── 终端 ──
-npx degit --mode=git niaodian/eos-template my-app   # 新建项目
+npx degit niaodian/eos my-app   # 新建项目
 node .github/hooks/validate-config.mjs              # 配置自检（期望 PASS）
 npm test                                            # 跑测试（质量门同款）
 npm audit                                           # 发布前依赖审计
@@ -1123,7 +1123,7 @@ bmad-tea / bmad-testarch-*   # 阶段7：测试+追溯        → G7
 
 **复现**（终端）：
 ```sh
-npx degit --mode=git niaodian/eos-template my-app && cd my-app
+npx degit niaodian/eos my-app && cd my-app
 node .github/hooks/validate-config.mjs        # PASS
 npm test                                       # 10/10 green
 echo '{"tool_input":{"command":"rm -rf /tmp/x"}}' | node .github/hooks/deny-dangerous.js  # deny

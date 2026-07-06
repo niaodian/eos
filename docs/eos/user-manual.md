@@ -141,15 +141,15 @@ If you want to promote some `eos-*.agent.md` files to "available in all projects
 
 **Method A — degit (recommended, fastest)**
 ```sh
-# Private templates must add --mode=git
-npx degit --mode=git niaodian/eos-template my-new-app
+# Public template — plain degit works (no auth needed)
+npx degit niaodian/eos my-new-app
 cd my-new-app
-git init && git add -A && git commit -m "chore: scaffold from eos-template"
+git init && git add -A && git commit -m "chore: scaffold from eos"
 ```
 
 **Method B — gh + GitHub template**
 ```sh
-gh repo create my-new-app --template niaodian/eos-template --private --clone
+gh repo create my-new-app --template niaodian/eos --private --clone
 cd my-new-app
 ```
 
@@ -173,8 +173,8 @@ Open `.github/instructions/00-workspace.instructions.md` and change it to the re
 ## 3.4 Full Day-1 sequence (copy-ready)
 
 ```sh
-npx degit --mode=git niaodian/eos-template my-new-app && cd my-new-app
-git init && git add -A && git commit -q -m "chore: scaffold from eos-template"
+npx degit niaodian/eos my-new-app && cd my-new-app
+git init && git add -A && git commit -q -m "chore: scaffold from eos"
 node .github/hooks/validate-config.mjs
 # Key: run `code .` from inside the project directory so my-new-app becomes the workspace root (including .github/).
 # Do not open its parent directory, or custom agents / instructions / hooks will not be discovered.
@@ -280,7 +280,7 @@ So EOS **never depends on "Rule A overriding Rule B"**. The only reliable contro
 | Item | Content |
 |---|---|
 | **Goal** | Get an empty project with healthy configuration from the template |
-| **How to start** | `npx degit --mode=git niaodian/eos-template my-app && cd my-app` |
+| **How to start** | `npx degit niaodian/eos my-app && cd my-app` |
 | **Output** | Complete `.github/` + `docs/` skeleton |
 | **Gate** | `node .github/hooks/validate-config.mjs` → **PASS** |
 | **Must check** | PASS 0 errors. **If the stack is undecided, do not change** `00-workspace` yet--keep the Node placeholder; the stack is an irreversible decision, and the authority is locked in **Phase 4 (ADR)**. If the stack is known, copy `docs/eos/stack-presets.md` directly (fast path). |
@@ -542,7 +542,7 @@ So EOS **never depends on "Rule A overriding Rule B"**. The only reliable contro
 
 ### Step 0: Create project + choose stack (5 minutes)
 ```sh
-npx degit --mode=git niaodian/eos-template todo-api && cd todo-api
+npx degit niaodian/eos todo-api && cd todo-api
 node .github/hooks/validate-config.mjs          # expect PASS
 ```
 **Stack already decided?** Open `.github/instructions/00-workspace.instructions.md` and copy `Local commands` from your stack block (`docs/eos/stack-presets.md`, fast path).
@@ -601,7 +601,7 @@ SaaS **G7** requires: every AC has ≥1 test, **API contract tests** (against op
 
 ### Step 0: Create project + create AI directories
 ```sh
-npx degit --mode=git niaodian/eos-template cs-agent && cd cs-agent
+npx degit niaodian/eos cs-agent && cd cs-agent
 mkdir -p ai/prompts evals                       # AI code goes here; Agentic rules overlay automatically
 node .github/hooks/validate-config.mjs          # expect PASS
 ```
@@ -925,17 +925,17 @@ Agent output does not match expectation
 ## 10.2 One-command new project initialization
 
 ```sh
-# Method A: degit (private repos add --mode=git)
-npx degit --mode=git niaodian/eos-template my-app
+# Method A: degit (public template — no auth needed)
+npx degit niaodian/eos my-app
 
 # Method B: gh + template
-gh repo create my-app --template niaodian/eos-template --private --clone
+gh repo create my-app --template niaodian/eos --private --clone
 ```
 
 ## 10.3 Distribution to a team (purely local, no enterprise dependency)
 
-1. Set `eos-template` as a GitHub **template repo** (already set `isTemplate:true`).
-2. Team members initialize with `--mode=git` degit or `gh ... --template` respectively.
+1. Set `eos` as a GitHub **template repo** (already set `isTemplate:true`).
+2. Team members initialize with `degit` or `gh ... --template` respectively.
 3. Shared `bmad-*` skills are installed by each person at user level (once).
 4. **Do not** write any enterprise intranet/interface/SSO dependency into configuration--keep it offline-runnable.
 
@@ -1021,7 +1021,7 @@ EOS stack rules are **pluggable**. Adding a stack = add one `*.instructions.md` 
 
 ```
 # ── Terminal ──
-npx degit --mode=git niaodian/eos-template my-app   # create new project
+npx degit niaodian/eos my-app   # create new project
 node .github/hooks/validate-config.mjs              # config self-check (expect PASS)
 npm test                                            # run tests (same as quality gate)
 npm audit                                           # dependency audit before release
@@ -1069,7 +1069,7 @@ A real dry-run that passed end to end (feature: user login), **12/12 gates passe
 
 **Reproduce** (terminal):
 ```sh
-npx degit --mode=git niaodian/eos-template my-app && cd my-app
+npx degit niaodian/eos my-app && cd my-app
 node .github/hooks/validate-config.mjs        # PASS
 npm test                                      # 10/10 green
 echo '{"tool_input":{"command":"rm -rf /tmp/x"}}' | node .github/hooks/deny-dangerous.js  # deny

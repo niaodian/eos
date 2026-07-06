@@ -156,18 +156,18 @@ let s = ''; process.stdin.on('data', d => (s += d)); process.stdin.on('end', () 
 
 The decision principle is unchanged: **general and stable → user level; project-specific or repository-reviewed → workspace level.**
 
-## 10.3.2 One-command initialization (revised · note for private repositories)
+## 10.3.2 One-command initialization (public template repository)
 
-This template has been published as a **template repository**: `niaodian/eos-template` (Private).
+This template has been published as a public **template repository**: `niaodian/eos`.
 
 ```bash
-# A. gh CLI (recommended; works for private)
-gh repo create my-app --template niaodian/eos-template --private --clone
+# A. gh CLI (creates your new repo; --private makes YOUR repo private)
+gh repo create my-app --template niaodian/eos --private --clone
 cd my-app && node .github/hooks/validate-config.mjs    # expect PASS
 
-# B. degit —— ⚠️ private repositories must use git mode
-npx degit --mode=git niaodian/eos-template my-app
-#   (if the repository is Public, standard `npx degit niaodian/eos-template my-app` is enough)
+# B. degit (public template — plain degit, no auth needed)
+npx degit niaodian/eos my-app
+#   (forking it private instead? use: `npx degit --mode=git niaodian/eos my-app`)
 
 # C. git template directory (offline local)
 mkdir -p ~/.git-templates/eos && cp -R <golden>/.github ~/.git-templates/eos/

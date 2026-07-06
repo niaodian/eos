@@ -160,18 +160,18 @@ let s = ''; process.stdin.on('data', d => (s += d)); process.stdin.on('end', () 
 
 判定原则不变：**通用且稳定 → 用户级；项目特异或需随仓审查 → 工作区级。**
 
-## 10.3.2 一键初始化（修正版 · private 仓库注意）
+## 10.3.2 一键初始化（public 模板仓库）
 
-本模板已发布为 **template repository**：`niaodian/eos-template`（Private）。
+本模板已发布为 public **template repository**：`niaodian/eos`。
 
 ```bash
-# A. gh CLI（推荐，private 可用）
-gh repo create my-app --template niaodian/eos-template --private --clone
+# A. gh CLI（创建你的新仓库；--private 让你的仓库私有）
+gh repo create my-app --template niaodian/eos --private --clone
 cd my-app && node .github/hooks/validate-config.mjs    # 期望 PASS
 
-# B. degit —— ⚠️ private 仓库必须走 git 模式
-npx degit --mode=git niaodian/eos-template my-app
-#   （仓库若设为 Public，则标准 `npx degit niaodian/eos-template my-app` 即可）
+# B. degit（public 模板 —— 直接 degit，无需鉴权）
+npx degit niaodian/eos my-app
+#   （若改为 fork 成 private，用：`npx degit --mode=git niaodian/eos my-app`）
 
 # C. git template directory（离线本地）
 mkdir -p ~/.git-templates/eos && cp -R <golden>/.github ~/.git-templates/eos/
