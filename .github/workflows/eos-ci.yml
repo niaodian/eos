@@ -10,8 +10,13 @@ name: EOS CI
 #   act push --pull=false --action-offline-mode
 # No Docker? Skip CI and run the same checks directly (see docs/eos/quickstart.md Prerequisites):
 #   node .github/hooks/validate-config.mjs && node .github/hooks/check-doc-parity.mjs \
-#     && node .github/hooks/eos-doctor.mjs && npm run -s verify --if-present
+#     && node .github/hooks/eos-doctor.mjs && node .github/hooks/project-gate.mjs
 # This is the batch, whole-repo gate (complements per-edit hooks + validate-config.mjs).
+#
+# NON-NODE STACKS: the product-quality step below runs whatever `.eos/project.json` declares, so a
+# Python/Go/Java/Rust/.NET project's tests DO run and DO fail CI. Add your toolchain's setup step
+# (actions/setup-python, setup-go, setup-java, dtolnay/rust-toolchain, setup-dotnet…) before it —
+# a missing toolchain is reported as BLOCKED and fails, it is never silently skipped.
 
 on:
   push:
@@ -28,7 +33,7 @@ jobs:
         with:
           node-version: '20'
 
-      - name: EOS config validation (S1–S11)
+      - name: EOS config validation (S1–S12)
         run: node .github/hooks/validate-config.mjs
 
       - name: EOS doc parity (zh ⇄ en lockstep — structure + factual codes)
@@ -60,21 +65,11 @@ jobs:
         # no false positive on shared incidental tokens. Zero-dep node:test, offline.
         run: node --test .github/hooks/check-doc-parity.test.mjs
 
-      - name: Quality gate + evals (only if the project has a package.json)
-        shell: bash
-        run: |
-          if [ -f package.json ]; then
-            # E2: a package.json project MUST define a runnable test script — a green-but-empty gate
-            # is worse than no gate. Static check (no network), so it never flakes offline. [audit E2]
-            node -e "const s=(require('./package.json').scripts)||{}; if(!s.test){console.error('EOS FAIL: package.json present but no \"test\" script. Add a real test script (or a documented no-op) so the quality gate cannot vacuously pass.'); process.exit(1)}"
-            # Offline-tolerant install: prefer cache, fall back, never hard-fail the gate on network.
-            npm ci --prefer-offline --no-audit --no-fund 2>/dev/null \
-              || npm install --prefer-offline --no-audit --no-fund 2>/dev/null \
-              || echo "EOS: dependency install skipped (offline / no lockfile) — continuing."
-            npm run -s lint --if-present
-            npm run -s typecheck --if-present
-            npm test --silent --if-present
-            npm run -s eval --if-present   # G-EVAL: runs the eval baseline (fails on regression)
-          else
-            echo "No package.json — config-only template; skipping tests/evals."
-          fi
+      - name: EOS project-gate regression tests (cross-stack quality contract)
+        run: node --test .github/hooks/project-gate.test.mjs
+
+      - name: Product quality gate + evals (declared in .eos/project.json — every stack)
+        # Runs the PROJECT's own install/lint/typecheck/test/eval commands for whatever stack it
+        # declares. Replaces the old `if [ -f package.json ]` branch, which silently skipped
+        # Python/Go/Java/Rust/.NET projects so their failing tests could never fail CI. [audit EOS-002]
+        run: node .github/hooks/project-gate.mjs
