@@ -10,6 +10,10 @@ handoffs:
       findings before the story is done (G6). Then Testing (G7): bmad-tea / bmad-testarch-* to build
       AC-traced tests + trace-matrix and verify NFR targets & LLM evals. Then run /release-gate (G8).
     send: false
+  - label: Back to EOS Guide (recompute the next action)
+    agent: eos-guide
+    prompt: This stage is finished. Recompute the state and tell me the one next action.
+    send: false
 ---
 # EOS Planning Agent
 
@@ -26,3 +30,13 @@ criteria WITH acceptance tests designed (ATDD), and pulls telemetry/authz/rollba
 concrete tasks.
 
 Output: docs/epics/*, docs/stories/* (each carrying an acceptance-test outline).
+
+## Return protocol (do not skip)
+
+When this stage's artifacts exist: run the gate, report the machine result, then return to
+`eos-guide` — the next step is decided by the router from the new state, not by this agent.
+
+```
+node .github/eos/eos.mjs check --gate story-ready --scope <STORY-ID>
+node .github/eos/eos.mjs next
+```

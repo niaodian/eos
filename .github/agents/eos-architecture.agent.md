@@ -7,6 +7,10 @@ handoffs:
     agent: eos-plan
     prompt: Break the approved architecture into epics & stories using bmad-create-epics-and-stories.
     send: false
+  - label: Back to EOS Guide (recompute the next action)
+    agent: eos-guide
+    prompt: This stage is finished. Recompute the state and tell me the one next action.
+    send: false
 ---
 # EOS Architecture Agent
 
@@ -42,3 +46,13 @@ points above are designed (async boundary, separated fault models, layered state
 
 Output: docs/architecture.md (incl. a Deployment section), docs/data-model.md, api/openapi.yaml,
 docs/checklists/G-deployment.md (filled), docs/adr/* (incl. the tech-stack ADR + the deployment-topology ADR).
+
+## Return protocol (do not skip)
+
+When this stage's artifacts exist, return to `eos-guide` — the next step is decided by the router
+from the new state, not by this agent. This stage's gate (G4) is reviewed by a human this round;
+the router still verifies that the artifact exists before it lets the baseline advance.
+
+```
+node .github/eos/eos.mjs next
+```
