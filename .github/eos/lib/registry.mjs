@@ -94,8 +94,8 @@ export function resolveAction(root, agentMap, actionId) {
   };
 }
 
-/** BMAD skills live at user level, so absence is diagnosable but never fatal to the router. */
-export function skillDiagnostics(skills) {
+/** BMAD skills live at user level; EOS ships some at project level. Absence is diagnosable, never fatal. */
+export function skillDiagnostics(skills, root = null) {
   const roots = [process.env.HOME, process.env.USERPROFILE].filter(Boolean);
   const dirs = [];
   for (const home of roots) {
@@ -104,13 +104,15 @@ export function skillDiagnostics(skills) {
       if (existsSync(d)) dirs.push(d);
     }
   }
-  if (!dirs.length) return { checked: false, missing: [], note: 'no user-level skill directory found — skill availability was not checked' };
+  // Project-level skills travel with the repository and are always available.
+  if (root && existsSync(join(root, '.github/skills'))) dirs.push(join(root, '.github/skills'));
+  if (!dirs.length) return { checked: false, missing: [], note: 'no skill directory found — skill availability was not checked' };
   const installed = new Set();
   for (const d of dirs) {
     try { for (const e of readdirSync(d, { withFileTypes: true })) if (e.isDirectory()) installed.add(e.name); } catch { /* unreadable */ }
   }
   const missing = skills.filter((s) => !installed.has(s));
-  return { checked: true, missing, note: missing.length ? `not installed at user level: ${missing.join(', ')}` : '' };
+  return { checked: true, missing, note: missing.length ? `not installed: ${missing.join(', ')}` : '' };
 }
 
 /** Local focus only. Any authority-looking key is dropped on read (defence in depth). */

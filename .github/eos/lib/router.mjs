@@ -34,6 +34,7 @@ const TITLES = {
   'verify-story': 'Verify the story',
   'repair-verification': 'Repair the failing verification',
   'build-trace-matrix': 'Trace the acceptance criteria to passing tests',
+  'refresh-stale-evidence': 'Re-run the gate whose evidence went stale',
   'record-spike-outcome': 'Record the spike outcome',
   'prepare-release': 'Prepare the release',
   'repair-release': 'Close the release blockers',
@@ -61,7 +62,7 @@ const CHECK_ACTION = {
   'tests-executed': 'repair-verification',
   'trace-complete': 'build-trace-matrix',
   'eval-threshold': 'design-eval-cases',
-  'evidence-current': 'complete-story-readiness',
+  'evidence-current': 'refresh-stale-evidence',
   'stories-verified': 'repair-release',
   'spec-alignment': 'repair-release',
   'secret-scan': 'repair-release',
@@ -83,12 +84,27 @@ function drivingCheck(gate) {
   return candidates.reduce((best, c) => (SEVERITY[c.status] > SEVERITY[best.status] ? c : best), candidates[0]);
 }
 
+/**
+ * Decide the repair for a failing gate.
+ * STALE is special: nothing is *wrong*, an input moved, so the answer is always "re-run", never
+ * "go fix the tests". Sending a developer to debug a passing suite because a doc changed is exactly
+ * the kind of misleading advice this router exists to prevent.
+ */
+function repairFor(gate, driver, fallbackAction, fallbackCommand) {
+  const stale = driver?.status === 'STALE';
+  const withCommand = (gate.checks || []).find((c) => c.command);
+  return {
+    id: stale ? 'refresh-stale-evidence' : (CHECK_ACTION[driver?.id] || fallbackAction),
+    command: withCommand?.command || driver?.command || fallbackCommand,
+  };
+}
+
 function action(snapshot, id, { reason, targetGate = null, command = null, doneWhen = [], scopeId = null }) {
   const mapped = snapshot.agentMap
     ? resolveAction(snapshot.root, snapshot.agentMap, id)
     : { ...(BOOTSTRAP_MAP[id] || { agent: null, prompt: null, skills: [] }), handoff: '', blocked: snapshot.agentMapErrors?.length ? snapshot.agentMapErrors.join('; ') : null };
   const skills = mapped.skills || [];
-  const diag = skills.length ? skillDiagnostics(skills) : { checked: false, missing: [], note: '' };
+  const diag = skills.length ? skillDiagnostics(skills, snapshot.root) : { checked: false, missing: [], note: '' };
   return {
     action: {
       id,
@@ -211,10 +227,11 @@ export function route(snapshot, { now = new Date() } = {}) {
     const g = gate('release-ready', 'release', scope.id);
     if (isBlocking(g.status)) {
       const driver = drivingCheck(g);
-      take(action(snapshot, CHECK_ACTION[driver?.id] || 'repair-release', {
+      const repair = repairFor(g, driver, 'repair-release', `${CLI} check --gate release-ready --scope ${scope.id}`);
+      take(action(snapshot, repair.id, {
         reason: driver?.detail || 'the release is not ready',
         targetGate: 'release-ready',
-        command: `${CLI} check --gate release-ready --scope ${scope.id}`,
+        command: repair.command,
         doneWhen: ['`eos check --gate release-ready` passes', 'every required story is VERIFIED with fresh evidence'],
       }));
       blockers.push(...blockersOf(g));
@@ -249,10 +266,11 @@ export function route(snapshot, { now = new Date() } = {}) {
     const prd = gate('prd-ready', 'product', 'product');
     if (isBlocking(prd.status)) {
       const driver = drivingCheck(prd);
-      take(action(snapshot, CHECK_ACTION[driver?.id] || 'repair-prd', {
+      const repair = repairFor(prd, driver, 'repair-prd', `${CLI} check --gate prd-ready`);
+      take(action(snapshot, repair.id, {
         reason: driver?.detail || 'the PRD is not ready',
         targetGate: 'prd-ready',
-        command: `${CLI} check --gate prd-ready`,
+        command: repair.command,
         doneWhen: ['`eos check --gate prd-ready` passes'],
       }));
       blockers.push(...blockersOf(prd));
@@ -317,10 +335,11 @@ export function route(snapshot, { now = new Date() } = {}) {
     const g = gate('story-ready', 'story', scope.id);
     if (isBlocking(g.status)) {
       const driver = drivingCheck(g);
-      take(action(snapshot, CHECK_ACTION[driver?.id] || 'complete-story-readiness', {
+      const repair = repairFor(g, driver, 'complete-story-readiness', `${CLI} check --gate story-ready --scope ${scope.id}`);
+      take(action(snapshot, repair.id, {
         reason: driver?.detail || 'the story is not ready for development',
         targetGate: 'story-ready',
-        command: `${CLI} check --gate story-ready --scope ${scope.id}`,
+        command: repair.command,
         doneWhen: [driver?.fix || 'the failing readiness check is closed', `\`eos check --gate story-ready --scope ${scope.id}\` passes`],
       }));
       blockers.push(...blockersOf(g));
@@ -353,10 +372,11 @@ export function route(snapshot, { now = new Date() } = {}) {
     const g = gate('verified', 'story', scope.id);
     if (isBlocking(g.status)) {
       const driver = drivingCheck(g);
-      take(action(snapshot, CHECK_ACTION[driver?.id] || 'repair-verification', {
+      const repair = repairFor(g, driver, 'repair-verification', `${CLI} check --gate verified --scope ${scope.id}`);
+      take(action(snapshot, repair.id, {
         reason: driver?.detail || 'verification is incomplete',
         targetGate: 'verified',
-        command: `${CLI} check --gate verified --scope ${scope.id}`,
+        command: repair.command,
         doneWhen: [driver?.fix || 'the failing verification check is closed', `\`eos check --gate verified --scope ${scope.id}\` passes`],
       }));
       blockers.push(...blockersOf(g));

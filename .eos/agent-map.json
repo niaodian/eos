@@ -74,6 +74,12 @@
       "skills": ["bmad-check-implementation-readiness"],
       "handoff": "Close the listed story-readiness gaps (telemetry / authorization / rollback / dependencies) only."
     },
+    "refresh-stale-evidence": {
+      "agent": null,
+      "prompt": null,
+      "skills": [],
+      "handoff": "Nothing is wrong with the work — an input moved, so the recorded proof no longer describes it. Re-run the gates in order."
+    },
     "promote-story": {
       "agent": null,
       "prompt": null,

@@ -25,6 +25,9 @@ node .github/eos/eos.mjs transition --scope story --id STORY-012 --to READY_FOR_
 （`cp .vscode/tasks.json.example .vscode/tasks.json`，或执行 `eos init --write`）。
 
 以上全部不需要网络、云服务、VS Code 扩展或包管理器。
+想先看一遍完整循环再决定是否相信它？`node .github/eos/journey.demo.mjs` 会在本仓库的一份临时副本里
+重放一个完整功能——Story 被阻断 → 修复 → 验证 → 输入改动（STALE）→ 恢复 → 合并 → 发布判定——
+并打印每一步的真实输出。
 
 ## 2. 设计原则（为什么它是这样运转的）
 

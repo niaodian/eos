@@ -4,7 +4,7 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { listStories } from './story.mjs';
-import { recordedGateStatus } from './gates.mjs';
+import { recordedGateStatus, evaluateGate } from './gates.mjs';
 import { readEvidence, evidenceFreshness } from './evidence.mjs';
 import { scopeState } from './state.mjs';
 
@@ -38,7 +38,12 @@ export function planTransition({ workflow }, { scopeType, from, to }) {
   return { legal: true, reason: '', transition, legalTargets: legalTransitions(workflow, scopeType, from).map((t) => t.to) };
 }
 
-/** Walk the product machine forward while each guard holds — the product state is DERIVED. */
+/**
+ * Walk the product machine forward while each guard holds — the product state is DERIVED.
+ * Derivation evaluates gates LIVE (cheap mode) rather than reading recorded evidence: it is a
+ * read-only projection, not a promotion, so requiring the developer to run a gate just to see an
+ * accurate status would be noise. Promotions (`checkTransition`) still demand recorded evidence.
+ */
 export function deriveProductState(snapshot) {
   const machine = machineOf(snapshot.workflow, 'product');
   let state = machine.initial;
@@ -46,7 +51,7 @@ export function deriveProductState(snapshot) {
   for (;;) {
     const next = machine.transitions.find((t) => t.from === state && !t.rollback);
     if (!next) break;
-    const check = guardResult(snapshot, next, 'product', 'product');
+    const check = guardResult(snapshot, next, 'product', 'product', { live: true });
     if (!check.ok) return { state, blockedBy: { transition: next, ...check }, guardsMet };
     guardsMet.push(`${next.from} → ${next.to}`);
     state = next.to;
@@ -54,8 +59,8 @@ export function deriveProductState(snapshot) {
   return { state, blockedBy: null, guardsMet };
 }
 
-/** Evaluate one transition guard against recorded evidence + the filesystem. */
-export function guardResult(snapshot, transition, scopeType, scopeId) {
+/** Evaluate one transition guard against recorded evidence (or, for a read-only projection, live). */
+export function guardResult(snapshot, transition, scopeType, scopeId, { live = false } = {}) {
   if (transition.requiresFile && !existsSync(join(snapshot.root, transition.requiresFile))) {
     return { ok: false, reason: `${transition.requiresFile} does not exist`, kind: 'file', missing: transition.requiresFile };
   }
@@ -63,9 +68,13 @@ export function guardResult(snapshot, transition, scopeType, scopeId) {
     return { ok: false, reason: 'there is no story under docs/stories/ yet', kind: 'stories' };
   }
   if (transition.requiresGate) {
-    const g = recordedGateStatus(snapshot, transition.requiresGate, scopeType === 'product' ? 'product' : scopeType, scopeId);
+    const target = scopeType === 'product' ? 'product' : scopeType;
+    const g = live
+      ? evaluateGate(snapshot, transition.requiresGate, target, scopeId, { mode: 'cheap' })
+      : recordedGateStatus(snapshot, transition.requiresGate, target, scopeId);
     if (!PROMOTABLE.has(g.status)) {
-      return { ok: false, reason: `gate "${transition.requiresGate}" is ${g.status} — ${g.detail}`, kind: 'gate', gate: transition.requiresGate, status: g.status };
+      const why = g.detail || (g.checks || []).filter((c) => !PROMOTABLE.has(c.status)).map((c) => c.detail).filter(Boolean)[0] || '';
+      return { ok: false, reason: `gate "${transition.requiresGate}" is ${g.status}${why ? ` — ${why}` : ''}`, kind: 'gate', gate: transition.requiresGate, status: g.status };
     }
     if (transition.requiresFresh) {
       const def = snapshot.gates?.gates.find((x) => x.id === transition.requiresGate);

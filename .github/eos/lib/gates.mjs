@@ -196,7 +196,16 @@ const evaluators = {
     if (!prior.present) return fail(`no story-ready evidence for ${ctx.scopeId} — run \`eos check --gate story-ready --scope ${ctx.scopeId}\` first`);
     const def = ctx.snapshot.gates?.gates.find((g) => g.id === 'story-ready');
     const f = evidenceFreshness(ctx.root, prior.evidence, { gateDefinition: def });
-    if (f.status === 'STALE') return { status: 'STALE', detail: `the story-ready evidence is stale: ${f.reasons.join('; ')}` };
+    if (f.status === 'STALE') {
+      // Name the command that actually clears this: re-running THIS gate cannot refresh the
+      // PREREQUISITE gate's evidence, and sending the developer round that loop is the exact
+      // "you are blocked but not told what to do" failure this layer exists to remove.
+      return {
+        status: 'STALE',
+        detail: `the story-ready evidence is stale: ${f.reasons.join('; ')} — re-run story-ready first, then this gate`,
+        command: `node .github/eos/eos.mjs check --gate story-ready --scope ${ctx.scopeId} && node .github/eos/eos.mjs check --gate verified --scope ${ctx.scopeId}`,
+      };
+    }
     if (prior.evidence.status !== 'PASS' && prior.evidence.status !== 'WAIVED') {
       return fail(`story-ready is ${prior.evidence.status} for ${ctx.scopeId} — a story cannot be verified before it was ready`);
     }

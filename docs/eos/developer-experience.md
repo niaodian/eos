@@ -27,6 +27,9 @@ In VS Code it is the **EOS: Next / Resume / Verify Current Gate / Release Status
 (`cp .vscode/tasks.json.example .vscode/tasks.json`, or `eos init --write`).
 
 Nothing here needs the network, a cloud service, a VS Code extension or a package manager.
+Want to watch the whole loop before trusting it? `node .github/eos/journey.demo.mjs` replays a
+complete feature — blocked story → repair → verify → an input moves (STALE) → recover → merge →
+release verdict — in a throwaway copy of this repository, and prints the real output of every step.
 
 ## 2. Design principles (why it behaves the way it does)
 

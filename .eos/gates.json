@@ -61,7 +61,7 @@
         { "id": "tests-executed", "title": "the declared test command ran and passed", "evaluator": "testsExecuted", "fix": "Run `node .github/hooks/project-gate.mjs` and fix failures; a missing toolchain is BLOCKED, never a pass." },
         { "id": "trace-complete", "title": "every story AC has a passing trace-matrix row", "evaluator": "traceComplete", "fix": "Produce docs/trace-matrix.md at G7 (bmad-testarch-trace) so each AC maps to a passing test." },
         { "id": "eval-threshold", "title": "eval baseline met (agentic products only)", "evaluator": "evalThreshold", "fix": "Run the declared commands.eval and record the result; see docs/eval-plan.md." },
-        { "id": "evidence-current", "title": "the evidence matches the current inputs", "evaluator": "evidenceCurrent", "fix": "Re-run `eos check --gate verified --scope <STORY-ID>` after changing story or spec inputs." }
+        { "id": "evidence-current", "title": "the evidence matches the current inputs", "evaluator": "evidenceCurrent", "fix": "An input moved after the prerequisite gate ran: re-run `eos check --gate story-ready --scope <STORY-ID>` first, then `eos check --gate verified --scope <STORY-ID>`." }
       ]
     },
     {
