@@ -1,0 +1,85 @@
+{
+  "$schema": "./schemas/gate-definition.schema.json",
+  "schemaVersion": 1,
+  "gates": [
+    {
+      "id": "activation",
+      "code": "G0",
+      "scope": "product",
+      "version": "1.0.0",
+      "waivable": false,
+      "title": "EOS is locally activated",
+      "summary": "The project declares what it is and how it is verified, and the workflow profile resolves. Everything downstream reads these files, so a broken declaration is an ERROR, never a skip.",
+      "checks": [
+        { "id": "project-declaration", "title": ".eos/project.json exists and validates", "evaluator": "projectDeclaration", "fix": "Copy your stack's block from docs/eos/stack-presets.md into .eos/project.json (projectType + stacks + commands.test)." },
+        { "id": "declaration-matches-repo", "title": "the declaration is not the untouched template once code exists", "evaluator": "declarationMatchesRepo", "fix": "Change projectType from \"config-only\" to \"application\" (or \"library\") and declare commands.test." },
+        { "id": "workflow-profile", "title": "workflowProfile resolves in .eos/workflow.json", "evaluator": "workflowProfileResolves", "fix": "Set \"workflowProfile\" to a profile that exists in .eos/workflow.json (default: standard-product)." },
+        { "id": "activation-ledger", "title": "docs/eos/activation.md tracks the one-time hardening items", "evaluator": "activationLedger", "fix": "Run /eos-init in Copilot Chat; it creates and maintains docs/eos/activation.md." }
+      ]
+    },
+    {
+      "id": "prd-ready",
+      "code": "G3",
+      "scope": "product",
+      "version": "1.0.0",
+      "waivable": false,
+      "title": "PRD is the single source of truth",
+      "summary": "The PRD exists, its acceptance criteria are individually addressable, and nothing in it is still marked as an unresolved blocker.",
+      "checks": [
+        { "id": "prd-present", "title": "docs/prd.md exists", "evaluator": "prdPresent", "fix": "Run /spec to produce docs/prd.md (bmad-create-prd, validated by bmad-validate-prd)." },
+        { "id": "ac-parseable", "title": "the PRD contains parseable AC<n>.<n> ids", "evaluator": "prdAcParseable", "fix": "Give every requirement acceptance criteria with stable ids like AC1.1, AC1.2." },
+        { "id": "ac-unique", "title": "no acceptance-criterion id is defined twice", "evaluator": "prdAcUnique", "fix": "Renumber the duplicated AC ids so each one addresses exactly one statement." },
+        { "id": "no-open-blockers", "title": "no unresolved BLOCKER / TBD marker remains", "evaluator": "prdNoOpenBlockers", "fix": "Resolve every line marked BLOCKER or TBD, or move it out of the PRD into the backlog." }
+      ]
+    },
+    {
+      "id": "story-ready",
+      "code": "G5",
+      "scope": "story",
+      "version": "1.0.0",
+      "waivable": true,
+      "title": "Story is ready for development",
+      "summary": "The story is context-self-contained: it references real PRD acceptance criteria, every one of them has a designed test intent (ATDD), LLM-backed criteria carry an eval case, and telemetry / authorization / rollback are concrete tasks rather than intentions.",
+      "checks": [
+        { "id": "story-present", "title": "the story file exists and parses", "evaluator": "storyPresent", "fix": "Create docs/stories/<STORY-ID>.md with an \"Acceptance criteria\" table (see docs/eos/developer-experience.md)." },
+        { "id": "state-not-hand-edited", "title": "the story does not claim a state the ledger disagrees with", "evaluator": "storyStateNotHandEdited", "fix": "Remove the state: field from the story front matter and use `eos transition` — hand-edited state is not evidence." },
+        { "id": "ac-references-resolve", "title": "every referenced AC exists in the PRD", "evaluator": "storyAcResolves", "fix": "Reference AC ids that exist in docs/prd.md, or add the criterion to the PRD first." },
+        { "id": "ac-test-intent", "title": "every acceptance criterion has a test intent", "evaluator": "storyAcTestIntent", "fix": "Use bmad-testarch-atdd to design one concrete test intent per AC before implementation." },
+        { "id": "agentic-eval-case", "title": "LLM-backed acceptance criteria have an eval case", "evaluator": "storyAgenticEvalCase", "fix": "Add an eval case id (EVAL-<n>) for every AC whose behaviour depends on model output; see docs/eos/examples/eval-starter/." },
+        { "id": "ops-tasks", "title": "telemetry, authorization and rollback are concrete tasks", "evaluator": "storyOpsTasks", "fix": "Add explicit Telemetry / Authorization / Rollback lines under an \"Operational tasks\" section (or record SKIP + reason)." }
+      ]
+    },
+    {
+      "id": "verified",
+      "code": "G7",
+      "scope": "story",
+      "version": "1.0.0",
+      "waivable": false,
+      "title": "Story is verified by executed tests",
+      "summary": "Tests really ran for the declared stack, every story acceptance criterion has a passing trace row, evals meet their threshold for agentic products, and the evidence belongs to the current inputs.",
+      "checks": [
+        { "id": "tests-executed", "title": "the declared test command ran and passed", "evaluator": "testsExecuted", "fix": "Run `node .github/hooks/project-gate.mjs` and fix failures; a missing toolchain is BLOCKED, never a pass." },
+        { "id": "trace-complete", "title": "every story AC has a passing trace-matrix row", "evaluator": "traceComplete", "fix": "Produce docs/trace-matrix.md at G7 (bmad-testarch-trace) so each AC maps to a passing test." },
+        { "id": "eval-threshold", "title": "eval baseline met (agentic products only)", "evaluator": "evalThreshold", "fix": "Run the declared commands.eval and record the result; see docs/eval-plan.md." },
+        { "id": "evidence-current", "title": "the evidence matches the current inputs", "evaluator": "evidenceCurrent", "fix": "Re-run `eos check --gate verified --scope <STORY-ID>` after changing story or spec inputs." }
+      ]
+    },
+    {
+      "id": "release-ready",
+      "code": "G8",
+      "scope": "release",
+      "version": "1.0.0",
+      "waivable": false,
+      "title": "Release candidate is shippable",
+      "summary": "Every story in the release is VERIFIED with fresh evidence, security and compliance gates hold, no waiver has expired, and the operational artifacts (runbook, rollback) exist.",
+      "checks": [
+        { "id": "stories-verified", "title": "all stories in the release are VERIFIED or MERGED", "evaluator": "releaseStoriesVerified", "fix": "Finish or drop the unverified stories; `eos release-status` lists them." },
+        { "id": "spec-alignment", "title": "spec-align --strict passes (no drift, no orphans)", "evaluator": "releaseSpecAlignment", "fix": "Run `node .github/hooks/spec-align.mjs --strict` and close drift/orphans/failing rows." },
+        { "id": "secret-scan", "title": "secret scan is clean", "evaluator": "releaseSecretScan", "fix": "Run `node .github/hooks/secret-scan.mjs` and remove or rotate anything it finds." },
+        { "id": "compliance-boundary", "title": "the compliance data boundary holds", "evaluator": "releaseComplianceBoundary", "fix": "Run /compliance to record docs/compliance-profile.json; eos-doctor D5 explains what is missing." },
+        { "id": "no-expired-waivers", "title": "no waiver in this release has expired", "evaluator": "releaseWaiversValid", "fix": "Renew the waiver with a new expiry and approver, or close the gap it was covering." },
+        { "id": "ops-artifacts", "title": "runbook and rollback plan exist", "evaluator": "releaseOpsArtifacts", "fix": "Run /runbook and record the rollback procedure before shipping." }
+      ]
+    }
+  ]
+}

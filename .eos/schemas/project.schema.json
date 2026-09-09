@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eos.local/schemas/project.schema.json",
+  "title": "EOS project declaration",
+  "description": "What this project IS and how it is verified. Authoritative for the product-quality gate (project-gate.mjs), the G-EVAL paradigm signal (eos-doctor.mjs) and the workflow profile (.github/eos/eos.mjs).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["projectType"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "projectType": { "enum": ["application", "library", "config-only"] },
+    "stacks": {
+      "type": "array",
+      "items": { "enum": ["node", "python", "go", "java", "rust", "dotnet", "other"] }
+    },
+    "productParadigms": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "enum": ["deterministic", "agentic"] }
+    },
+    "commands": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "install": { "$ref": "#/$defs/command" },
+        "lint": { "$ref": "#/$defs/command" },
+        "typecheck": { "$ref": "#/$defs/command" },
+        "test": { "$ref": "#/$defs/command" },
+        "eval": { "$ref": "#/$defs/command" }
+      }
+    },
+    "workflowProfile": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]+$",
+      "description": "Key into .eos/workflow.json profiles. Defaults to standard-product."
+    },
+    "complianceProfile": {
+      "enum": ["none", "regulated"],
+      "description": "Advisory declaration only, and it can only TIGHTEN: docs/compliance-profile.json stays the authoritative record of the data-boundary decision (audit EOS-004). Declaring \"regulated\" here turns the compliance checks on even before that file exists; declaring \"none\" never turns them off."
+    },
+    "evalRequired": { "type": "boolean" },
+    "evalWaiver": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reason", "approvedBy"],
+      "properties": {
+        "reason": { "type": "string", "minLength": 10 },
+        "approvedBy": { "type": "string", "minLength": 1 }
+      }
+    },
+    "rationale": { "type": "string" }
+  },
+  "$defs": {
+    "command": {
+      "description": "A command string, an argv array, or an array of command strings to chain. Null means explicitly not applicable.",
+      "anyOf": [
+        { "type": "string", "minLength": 1 },
+        { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        { "type": "null" }
+      ]
+    }
+  }
+}

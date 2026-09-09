@@ -258,7 +258,14 @@ const REGULATED = /\b(HIPAA|PCI[\s-]?DSS|SOC\s?2|SOX|GDPR|CCPA|CPRA|PIPL)\b/i;
 const proseRegulated = regimeText.trim() !== '' && REGULATED.test(regimeText);
 // A valid profile is authoritative about WHETHER a regime applies; prose only raises the question.
 const declaredRegulated = compliance.profile ? compliance.profile.regulated : null;
-const regulated = declaredRegulated !== null ? declaredRegulated : proseRegulated;
+// `.eos/project.json` may ALSO declare `complianceProfile: "regulated"`. That flag can only ever
+// TIGHTEN: it switches the boundary check on before docs/compliance-profile.json exists, and
+// "none" there never switches anything off — the structured profile remains the sole authority.
+const projectRegulated = proj.config?.complianceProfile === 'regulated';
+const regulated = (declaredRegulated !== null ? declaredRegulated : proseRegulated) || projectRegulated;
+if (declaredRegulated === false && projectRegulated) {
+  warns.push(`D5 Compliance: ${PROJECT_CONFIG_PATH} declares complianceProfile "regulated" while ${COMPLIANCE_PROFILE_PATH} declares regimes ["none"]. The stricter of the two wins — resolve the disagreement.`);
+}
 if (declaredRegulated === false && proseRegulated) {
   warns.push(`D5 Compliance: ${COMPLIANCE_PROFILE_PATH} declares regimes ["none"] while docs/requirements.md or docs/compliance-profile.md names a regulatory regime. The structured profile wins — make sure its noneRationale still holds.`);
 }

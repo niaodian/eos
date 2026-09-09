@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eos.local/schemas/handoff.schema.json",
+  "title": "EOS handoff context package",
+  "description": "A minimal, scoped context cache handed to the next agent. It is a CACHE, never authority: `commit` + `files[].sha256` are re-verified before use.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "scope", "state", "goal", "doneWhen", "returnCommand", "files", "generatedAt"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "id"],
+      "properties": {
+        "type": { "enum": ["product", "story", "release"] },
+        "id": { "type": "string", "minLength": 1 }
+      }
+    },
+    "state": { "type": "string", "minLength": 1 },
+    "changeType": { "type": ["string", "null"] },
+    "goal": { "type": "string", "minLength": 1 },
+    "acceptanceCriteria": { "type": "array", "items": { "type": "string" } },
+    "approvedDecisions": { "type": "array", "items": { "type": "string" } },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "sha256"],
+        "properties": {
+          "path": { "type": "string", "minLength": 1 },
+          "sha256": { "type": ["string", "null"] }
+        }
+      }
+    },
+    "blockers": { "type": "array", "items": { "type": "string" } },
+    "nonGoals": { "type": "array", "items": { "type": "string" } },
+    "recommended": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "agent": { "type": ["string", "null"] },
+        "prompt": { "type": ["string", "null"] },
+        "skills": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "doneWhen": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+    "returnCommand": { "type": "string", "minLength": 1 },
+    "commit": { "type": ["string", "null"] },
+    "generatedAt": { "type": "string", "minLength": 20 }
+  }
+}

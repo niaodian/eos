@@ -20,8 +20,9 @@ export const STACKS = ['node', 'python', 'go', 'java', 'rust', 'dotnet', 'other'
 export const STEPS = ['install', 'lint', 'typecheck', 'test', 'eval'];
 const TOP_LEVEL_KEYS = new Set([
   '$schema', 'projectType', 'stacks', 'commands', 'productParadigms', 'evalRequired',
-  'evalWaiver', 'rationale',
+  'evalWaiver', 'rationale', 'workflowProfile', 'complianceProfile',
 ]);
+export const COMPLIANCE_PROFILES = ['none', 'regulated'];
 
 // Manifests that prove a real code project exists, so "config-only" can't be used to hide one.
 export const STACK_MANIFESTS = {
@@ -199,6 +200,18 @@ export function loadProjectConfig(root) {
     }
   }
 
+  if (parsed.workflowProfile !== undefined
+      && (typeof parsed.workflowProfile !== 'string' || !/^[a-z0-9-]+$/.test(parsed.workflowProfile))) {
+    errors.push(`${PROJECT_CONFIG_PATH}: "workflowProfile" must be a lower-case key of .eos/workflow.json profiles (e.g. "standard-product")`);
+  }
+
+  // `complianceProfile` can only ever TIGHTEN: docs/compliance-profile.json stays the authoritative
+  // record of the data-boundary decision (audit EOS-004), so declaring "none" here never switches a
+  // compliance check off — it just says nothing. Declaring "regulated" turns them on early.
+  if (parsed.complianceProfile !== undefined && !COMPLIANCE_PROFILES.includes(parsed.complianceProfile)) {
+    errors.push(`${PROJECT_CONFIG_PATH}: unknown complianceProfile "${parsed.complianceProfile}" (expected ${COMPLIANCE_PROFILES.join(' | ')}). The authoritative record stays docs/compliance-profile.json.`);
+  }
+
   if (parsed.evalRequired !== undefined && typeof parsed.evalRequired !== 'boolean') {
     errors.push(`${PROJECT_CONFIG_PATH}: "evalRequired" must be a boolean`);
   }
@@ -235,6 +248,8 @@ export function loadProjectConfig(root) {
     stacks,
     commands,
     productParadigms,
+    workflowProfile: typeof parsed.workflowProfile === 'string' ? parsed.workflowProfile : undefined,
+    complianceProfile: COMPLIANCE_PROFILES.includes(parsed.complianceProfile) ? parsed.complianceProfile : undefined,
     evalRequired: parsed.evalRequired,
     evalWaiver,
     rationale: typeof parsed.rationale === 'string' ? parsed.rationale : '',

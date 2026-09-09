@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eos.local/schemas/workflow.schema.json",
+  "title": "EOS workflow definition",
+  "description": "Change-type gate policy + the three scope state machines. Data, not code: the transition validator and the next-best-action router both read this file.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "version", "profiles", "stateMachines"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schemaVersion": { "const": 1 },
+    "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+    "defaultProfile": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+    "profiles": {
+      "type": "object",
+      "minProperties": 1,
+      "patternProperties": {
+        "^[a-z0-9-]+$": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["description", "changeTypes"],
+          "properties": {
+            "description": { "type": "string", "minLength": 1 },
+            "defaultChangeType": { "$ref": "#/$defs/changeType" },
+            "changeTypes": {
+              "type": "object",
+              "minProperties": 1,
+              "patternProperties": {
+                "^[A-Z_]+$": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["scope", "gates"],
+                  "properties": {
+                    "scope": { "enum": ["product", "story", "release"] },
+                    "description": { "type": "string" },
+                    "gates": {
+                      "type": "object",
+                      "patternProperties": {
+                        "^[a-z0-9-]+$": { "enum": ["required", "waivable", "not_applicable"] }
+                      },
+                      "additionalProperties": false
+                    }
+                  }
+                }
+              },
+              "additionalProperties": false
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "stateMachines": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["product", "story", "release"],
+      "properties": {
+        "product": { "$ref": "#/$defs/machine" },
+        "story": { "$ref": "#/$defs/machine" },
+        "release": { "$ref": "#/$defs/machine" }
+      }
+    }
+  },
+  "$defs": {
+    "changeType": {
+      "enum": ["PRODUCT_BASELINE", "FEATURE", "BUGFIX", "SPIKE", "HOTFIX", "DOC_ONLY", "GOVERNANCE", "RELEASE"]
+    },
+    "machine": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["initial", "states", "transitions"],
+      "properties": {
+        "initial": { "type": "string", "pattern": "^[A-Z_]+$" },
+        "states": { "type": "array", "minItems": 2, "items": { "type": "string", "pattern": "^[A-Z_]+$" } },
+        "transitions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["from", "to"],
+            "properties": {
+              "from": { "type": "string", "pattern": "^[A-Z_]+$" },
+              "to": { "type": "string", "pattern": "^[A-Z_]+$" },
+              "rollback": { "type": "boolean" },
+              "requiresGate": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+              "requiresFile": { "type": "string", "minLength": 1 },
+              "requiresFresh": { "type": "boolean" },
+              "requiresStories": { "type": "boolean" },
+              "requiresSeparateApprover": { "type": "boolean" },
+              "requiresCandidateCommit": { "type": "boolean" }
+            }
+          }
+        }
+      }
+    }
+  }
+}
