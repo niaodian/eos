@@ -14,11 +14,89 @@
 
 1. 打开 `.github/instructions/00-workspace.instructions.md`，把 `## Local commands` 那一行换成下面你这个栈的成品行。
 2. 启用对应的 **R3 栈规则文件**（六大后端栈 Node/Python/Go/Java/Rust/.NET + 前端 React 均随模板发布，留着即可）。其余不用的栈规则文件是**惰性的**——只有当仓库里真有对应后缀文件时才生效，留着无害，想删也行。
-3.（可选）若用非 Node 栈又想让自动质量门禁生效，按下表替换 `.github/hooks/quality.json` 里 `PostToolUse` 的命令（现有那条是 Node 专用：探测 `npm`+`package.json`，非 Node 自动 no-op）。
+3. **把同一套命令写进 `.eos/project.json`**（见下一节）——这是 CI 和 `project-gate` 真正执行的那一份，
+   决定"测试失败能不能让 CI 变红"。**不写就 fail closed**：仓库里有 `pyproject.toml` / `go.mod` / …
+   却没有声明时，`project-gate` 直接报错，而不是无声跳过。
+4.（可选）若用非 Node 栈又想让**编辑时**的质量门禁生效，按下表替换 `.github/hooks/quality.json` 里 `PostToolUse` 的命令（现有那条是 Node 专用：探测 `npm`+`package.json`，非 Node 自动 no-op）。注意 PostToolUse 只是**提示性**的，权威门禁是 CI 里的 `project-gate`。
 
 > **互斥提醒**：每个 R3 文件的 `applyTo` glob 必须互不重叠（`**/*.ts` / `**/*.py` / `**/*.go` / `**/*.java` / `**/*.rs` / `**/*.cs` / `**/*.{tsx,jsx}`）。改完跑 `node .github/hooks/validate-config.mjs` 验 S3。
 
 ---
+
+## `.eos/project.json`（产品质量门禁的唯一入口）
+
+EOS 的 CI 曾经只有一句 `if [ -f package.json ]`，于是 **Python/Go/Java/Rust/.NET 项目里失败的
+测试根本不会被执行**——"EOS 配置绿 != 产品测试绿"。现在改成一份**显式声明**，由零依赖、跨平台的
+`node .github/hooks/project-gate.mjs` 读取并执行。
+
+| 字段 | 说明 |
+|---|---|
+| `projectType` | `application` \| `library` \| `config-only`。前两者**必须**有 `commands.test`；`config-only` 只有在仓库里**找不到任何栈清单文件**时才允许，且**不得**声明 `commands`（不会被执行） |
+| `stacks` | `node` \| `python` \| `go` \| `java` \| `rust` \| `dotnet` \| `other`（数组，可多栈）。栈没有清单文件（shell / Terraform / 裸脚本）就用 `other` |
+| `commands` | `install` / `lint` / `typecheck` / `test` / `eval`。缺省=N/A；声明了就**必须真的能跑通** |
+| `productParadigms` | `deterministic` \| `agentic`（数组）。含 `agentic` => G-EVAL 门打开 |
+| `evalRequired` | 可选 `boolean`，显式覆盖上面的推断 |
+| `evalWaiver` | `{ reason, approvedBy }`——自动检测到 LLM 依赖但你坚持声明为 deterministic 时必须给，且要有真实理由 |
+
+**执行语义（全部 fail closed）**
+
+- 声明了却跑不通 => **FAIL**；工具链没装（命令不在 PATH）=> **BLOCKED + 退出码 1**，绝不伪装成 PASS。
+- `application`/`library` 没有 `commands.test` => **FAIL**（拒绝空跑成绿）。
+- `config-only` 但扫到 `package.json`/`pyproject.toml`/`go.mod`/`Cargo.toml`/`pom.xml`/`*.csproj` => **FAIL**。
+- `config-only` 却写了 `commands` => **FAIL**（这些命令根本不会执行，不允许"假装有门"）。
+  代码所在的栈没有清单文件？用 `"projectType": "application"` + `"stacks": ["other"]`。
+- 没有 `.eos/project.json`：纯 Node 仓库退回旧的 npm 脚本默认值
+  （**向后兼容**，仍要求 `test` 脚本）；其它栈 => **FAIL**，要求先声明。
+- **命令不经过 shell**：`;` `&&` `|` `>` `` ` `` `$` 等元字符会在加载阶段被拒绝
+  （配置不可注入 shell）。需要串多条时给**数组**：`"test": ["ruff check .", "pytest -q"]`；
+  需要管道/通配符时，把它放进 npm script / Makefile / tox，再在这里调用那一条。
+  > 数组只有两种合法形态，**不能混用**（混用会报 ambiguous 并 FAIL）：
+  > 一条命令的 argv —— `["go", "test", "./..."]`；或多条完整命令 —— `["ruff check .", "pytest -q"]`。
+  > 参数里带空格时写成**带引号的单个字符串**：`"dotnet test \"My App.sln\""`。
+- CI 里跑非 Node 栈时，记得在 `.github/workflows/eos-ci.yml` 加上对应的 toolchain setup step
+  （`setup-python` / `setup-go` / `setup-java` / `rust-toolchain` / `setup-dotnet`），否则会 BLOCKED。
+
+```jsonc
+// Node.js / TypeScript
+{ "projectType": "application", "stacks": ["node"],
+  "commands": { "install": "npm ci", "lint": "npm run --silent lint",
+                "typecheck": "npm run --silent typecheck", "test": "npm test --silent" } }
+
+// Python
+{ "projectType": "application", "stacks": ["python"],
+  "commands": { "install": "pip install -r requirements.txt", "lint": "ruff check .",
+                "typecheck": "mypy .", "test": "pytest -q" } }
+
+// Go
+{ "projectType": "application", "stacks": ["go"],
+  "commands": { "install": "go mod download", "lint": "golangci-lint run",
+                "typecheck": "go vet ./...", "test": "go test ./..." } }
+
+// Java (Maven)
+{ "projectType": "application", "stacks": ["java"],
+  "commands": { "install": "mvn -q dependency:go-offline", "lint": "mvn -q spotless:check",
+                "test": "mvn -q test" } }
+
+// Rust
+{ "projectType": "application", "stacks": ["rust"],
+  "commands": { "install": "cargo fetch", "lint": ["cargo clippy -- -D warnings"],
+                "typecheck": "cargo check", "test": "cargo test" } }
+
+// .NET / C#
+{ "projectType": "application", "stacks": ["dotnet"],
+  "commands": { "install": "dotnet restore", "lint": "dotnet format --verify-no-changes",
+                "test": "dotnet test" } }
+
+// Agentic / LLM 产品（在后端栈基础上加 eval——声明了 agentic 就必须有 eval 命令）
+{ "projectType": "application", "stacks": ["python"], "productParadigms": ["deterministic", "agentic"],
+  "commands": { "lint": "ruff check .", "test": "pytest -q", "eval": "pytest evals/ -q" } }
+
+// 干净的 EOS 模板本身（还没有产品代码）
+{ "projectType": "config-only", "stacks": [], "productParadigms": ["deterministic"] }
+```
+
+> `jsonc` 只是为了在文档里写注释；**真实文件是严格 JSON，不能带注释**。改完跑
+> `node .github/hooks/validate-config.mjs`（S12 校验声明本身）和 `node .github/hooks/project-gate.mjs`。
 
 ## 速查表
 
@@ -124,7 +202,8 @@
 ## 改完必跑
 
 ```sh
-node .github/hooks/validate-config.mjs   # 期望 PASS：S3 glob 互斥、S4 类型覆盖、S7 必需路径
+node .github/hooks/validate-config.mjs   # 期望 PASS：S3 glob 互斥、S4 类型覆盖、S7 必需路径、S12 声明有效
+node .github/hooks/project-gate.mjs      # 期望 PASS：你声明的 lint/typecheck/test/eval 真的跑了
 ```
 
 > 新增/删除栈不动 EOS 骨架（agents / prompts / hooks / 治理流程都不变）——只换 `applyTo` 和正文。详见 user-manual 第 11 章。

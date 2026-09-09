@@ -7,12 +7,14 @@ applyTo: "**/{ai,llm,rag,agents}/**"
 
 > Scope note: targets LLM/agent/RAG product code under `ai/`, `llm/`, `rag/`, or `agents/` dirs.
 > This is ADDITIVE — a file at `src/llm/foo.py` also gets the Python backend rules.
-> Adjust the glob to your layout (e.g. add `**/inference/**`) if you organize differently. Note the
-> eos-doctor G-EVAL gate ALSO detects LLM code by dependency (an LLM SDK in your manifest), so code
-> outside these dirs still triggers the eval-plan requirement — the glob is for rule scope, not the gate.
+> Adjust the glob to your layout (e.g. add `**/inference/**`) if you organize differently. The
+> eos-doctor **G-EVAL gate does not depend on this glob**: it is driven by the explicit
+> `"productParadigms": ["agentic"]` declaration in `.eos/project.json`, with dir/SDK discovery only
+> as a safety net. Declare the paradigm — a self-hosted gateway or a private wrapper package leaves
+> no SDK fingerprint, so detection alone can never be complete.
 > This governs the *product's* AI code. EOS's own `.github/agents`/`.github/prompts` are config, not
 > product code; if this glob also matches them the guidance is additive and harmless. The real
-> enforcement is the eos-doctor gate (dependency-based), not this advisory rule scope.
+> enforcement is the eos-doctor gate (declaration-driven), not this advisory rule scope.
 
 ## Prompts are versioned artifacts
 - Store prompts as files (not inline string literals). One prompt per file, with an id/version.

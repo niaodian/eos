@@ -48,23 +48,53 @@ This is the #1 late-stage rework landmine: sending PHI/PAN/regulated personal da
 model is often prohibited or needs a signed BAA/DPA. Choose and record ONE (not "decide later"):
 **(a)** BAA/DPA signed with the provider, **(b)** self-hosted / on-prem model, **(c)** redaction /
 tokenization gateway before any provider call, or **(d)** exclude regulated data from the AI path.
-Land the choice in an ADR (`/adr`) and `docs/architecture.md` so `eos-doctor` D5 can see it.
+Land the choice in an ADR (`/adr`) and `docs/architecture.md`, **and record it as data** in
+`docs/compliance-profile.json` — that structured file, not the prose, is what `eos-doctor` D5 enforces.
+> **(c)** = `thirdPartyModelPolicy: "redaction-gateway"` **plus** `controls.redaction: "implemented"`.
+> Writing "we will add redaction later" (or "no redaction is implemented") in the narrative does NOT
+> pass: D5 reads enumerated status values, not keywords.
 > **Building the 🟡 items?** Skill `eos-compliance-skeletons` points at runnable, zero-dep starters
 > in `docs/eos/examples/compliance-starter/` (redaction/consent/DSAR/audit — a port per default
 > reference stack: Node/ESM · Python · Go · Java). Option **(c)** = the `redaction` `assertClean()`
 > boundary guard, and `redactorFromProfile('docs/compliance-profile.md')` auto-scopes the redactor
 > to the **Regulatory regime:** line this workflow writes (Step 1) — no hardcoded regime list.
 
+## Step 3b — Emit the machine-checkable profile (`docs/compliance-profile.json`)
+Copy `docs/eos/examples/compliance-profile.example.json` and fill every field. Enumerated values only:
+
+| Field | Values |
+|---|---|
+| `regimes` | `none` \| `HIPAA` \| `PCI-DSS` \| `SOC2` \| `SOX` \| `GDPR` \| `CCPA-CPRA` \| `PIPL` \| `other` |
+| `regulatedDataCategories` | `none` \| `phi` \| `pan` \| `personal-data` \| `sensitive-personal-data` \| `financial` \| `biometric` \| `government-id` \| `other` |
+| `thirdPartyModelPolicy` | `baa-dpa-signed` \| `self-hosted` \| `redaction-gateway` \| `excluded` \| `not-applicable` (needs a waiver) |
+| `controls.*` | `implemented` \| `in_progress` \| `planned` \| `not_implemented` \| `not_applicable` |
+| `implementationStatus` | `implemented` \| `in_progress` \| `planned` \| `deferred` |
+| `owner` / `approval` | accountable human/role · `approvedBy` + `approvedOn` + `reviewBy` (ISO dates) |
+
+Fail-closed rules enforced by `node .github/hooks/eos-doctor.mjs` (D5):
+- regulated regime + LLM/agent code + **no** `docs/compliance-profile.json` → BLOCKER.
+- policy `redaction-gateway` without an `implemented` redaction/tokenization/de-identification control → BLOCKER.
+- policy `baa-dpa-signed` without a `signed` entry in `agreements` → BLOCKER.
+- `implementationStatus` other than `implemented` → BLOCKER (planned ≠ shipped).
+- missing `owner`/`approval`, unknown or misspelled enum values, or `approval.reviewBy` in the past → BLOCKER.
+- `regimes: ["none"]` requires `noneRationale`; it silences prose-based regime detection.
+**Never auto-fill an approval or auto-waive** — a human owns that decision.
+
 ## Step 4 — Wire into gates
 - **G2 (requirements):** any unresolved regulated item = **BLOCKER**; do not proceed to Spec.
 - Feed NFR-shaped items (encryption/audit-retention/residency) into `docs/checklists/C-nfr.md`.
 - **G8 (release):** re-verify via `/release-gate`; the data-boundary must be **implemented, not deferred**.
-- `node .github/hooks/eos-doctor.mjs` D5 flags regulated + LLM code with no boundary decision.
+- `node .github/hooks/eos-doctor.mjs` D5 validates `docs/compliance-profile.json` and blocks a
+  regulated + LLM project whose boundary is unapproved, unowned, expired or unimplemented.
 
 ## Output
-Write `docs/compliance-profile.md` — **first content line** is the canonical `**Regulatory regime:**`
-line from Step 1 (the anchor the compliance-starter `redactorFromProfile()` reads), followed by the
-rationale + control decision table + data-boundary choice — and add one summary line to `docs/requirements.md`.
+Write BOTH:
+1. `docs/compliance-profile.md` — **first content line** is the canonical `**Regulatory regime:**`
+   line from Step 1 (the anchor the compliance-starter `redactorFromProfile()` reads), followed by the
+   rationale + control decision table + data-boundary choice.
+2. `docs/compliance-profile.json` — the structured profile from Step 3b (what the gate enforces).
+
+Add one summary line to `docs/requirements.md`.
 
 > **Next:** unresolved BLOCKERs → resolve before `/spec` (G3). Irreversible boundary choice → `/adr`.
 > Regulated + LLM/agent → confirm the data-boundary lands in `docs/architecture.md` (checked by eos-doctor D5).

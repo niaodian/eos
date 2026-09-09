@@ -10,11 +10,91 @@
 
 1. Open `.github/instructions/00-workspace.instructions.md` and replace the `## Local commands` line with the finished line for your stack below.
 2. Enable the matching **R3 stack-rule file** (all six backends — Node/Python/Go/Java/Rust/.NET — plus the React frontend ship with the template; just keep them). The unused stack-rule files are **lazy**: they only take effect when the repo actually contains files with the matching extension, so keeping them is harmless (delete them if you prefer).
-3. (Optional) If you use a non-Node stack and want the automatic quality gate to fire, replace the `PostToolUse` command in `.github/hooks/quality.json` per the table below (the shipped one is Node-only: it probes for `npm` + `package.json` and no-ops automatically on non-Node repos).
+3. **Put the same commands into `.eos/project.json`** (see the next section) — that is the copy CI and
+   `project-gate` actually execute, and it decides whether a failing test can turn CI red. **Omitting it
+   fails closed**: if the repo contains a `pyproject.toml` / `go.mod` / … with no declaration,
+   `project-gate` errors out instead of silently skipping.
+4. (Optional) If you use a non-Node stack and want the **edit-time** quality gate to fire, replace the `PostToolUse` command in `.github/hooks/quality.json` per the table below (the shipped one is Node-only: it probes for `npm` + `package.json` and no-ops automatically on non-Node repos). Note PostToolUse is **advisory**; the authoritative gate is `project-gate` in CI.
 
 > **Mutual-exclusion reminder**: every R3 file's `applyTo` glob must be non-overlapping (`**/*.ts` / `**/*.py` / `**/*.go` / `**/*.java` / `**/*.rs` / `**/*.cs` / `**/*.{tsx,jsx}`). After editing, run `node .github/hooks/validate-config.mjs` to check S3.
 
 ---
+
+## `.eos/project.json` (the single entry point of the product-quality gate)
+
+EOS CI used to be one line — `if [ -f package.json ]` — so a **Python/Go/Java/Rust/.NET project's failing
+tests were never executed**: "EOS config green != product tests green". It is now an **explicit
+declaration**, executed by the zero-dependency, cross-platform `node .github/hooks/project-gate.mjs`.
+
+| Field | Meaning |
+|---|---|
+| `projectType` | `application` \| `library` \| `config-only`. The first two **must** have `commands.test`; `config-only` is allowed only when **no stack manifest exists** in the repo, and must **not** declare `commands` (they would never run) |
+| `stacks` | `node` \| `python` \| `go` \| `java` \| `rust` \| `dotnet` \| `other` (array, multi-stack ok). Use `other` for a stack with no manifest file (shell / Terraform / plain scripts) |
+| `commands` | `install` / `lint` / `typecheck` / `test` / `eval`. Absent = N/A; declared = **must actually run and pass** |
+| `productParadigms` | `deterministic` \| `agentic` (array). Contains `agentic` => the G-EVAL gate turns on |
+| `evalRequired` | Optional `boolean`, explicitly overriding the inference above |
+| `evalWaiver` | `{ reason, approvedBy }` — required when an LLM dependency is discovered but you still declare `deterministic`; the reason must be real |
+
+**Execution semantics (all fail closed)**
+
+- Declared but not runnable => **FAIL**; toolchain missing (command not on PATH) => **BLOCKED + exit 1**, never a fake PASS.
+- `application`/`library` without `commands.test` => **FAIL** (a vacuously green gate is refused).
+- `config-only` while a `package.json`/`pyproject.toml`/`go.mod`/`Cargo.toml`/`pom.xml`/`*.csproj` exists => **FAIL**.
+- `config-only` that declares `commands` => **FAIL** (they would never run — no pretending a gate exists).
+  Code in a stack with no manifest file? Use `"projectType": "application"` + `"stacks": ["other"]`.
+- No `.eos/project.json` at all: a pure Node repo falls back to the legacy npm-script defaults
+  (**backwards compatible**, still requiring a `test` script); any other stack => **FAIL**, declare it first.
+- **Commands never reach a shell**: `;` `&&` `|` `>` `` ` `` `$` and friends are rejected at load time
+  (config cannot be an injection vector). To chain, pass an **array**: `"test": ["ruff check .", "pytest -q"]`;
+  for pipes/globs, move the pipeline into an npm script / Makefile / tox and call that one command here.
+  > An array has exactly two legal shapes and **must not be mixed** (mixing errors out as ambiguous):
+  > one command's argv — `["go", "test", "./..."]`; or several complete commands — `["ruff check .", "pytest -q"]`.
+  > An argument containing a space belongs in a **quoted single string**: `"dotnet test \"My App.sln\""`.
+- Running a non-Node stack in CI? Add the matching toolchain setup step to `.github/workflows/eos-ci.yml`
+  (`setup-python` / `setup-go` / `setup-java` / `rust-toolchain` / `setup-dotnet`), or it reports BLOCKED.
+
+```jsonc
+// Node.js / TypeScript
+{ "projectType": "application", "stacks": ["node"],
+  "commands": { "install": "npm ci", "lint": "npm run --silent lint",
+                "typecheck": "npm run --silent typecheck", "test": "npm test --silent" } }
+
+// Python
+{ "projectType": "application", "stacks": ["python"],
+  "commands": { "install": "pip install -r requirements.txt", "lint": "ruff check .",
+                "typecheck": "mypy .", "test": "pytest -q" } }
+
+// Go
+{ "projectType": "application", "stacks": ["go"],
+  "commands": { "install": "go mod download", "lint": "golangci-lint run",
+                "typecheck": "go vet ./...", "test": "go test ./..." } }
+
+// Java (Maven)
+{ "projectType": "application", "stacks": ["java"],
+  "commands": { "install": "mvn -q dependency:go-offline", "lint": "mvn -q spotless:check",
+                "test": "mvn -q test" } }
+
+// Rust
+{ "projectType": "application", "stacks": ["rust"],
+  "commands": { "install": "cargo fetch", "lint": ["cargo clippy -- -D warnings"],
+                "typecheck": "cargo check", "test": "cargo test" } }
+
+// .NET / C#
+{ "projectType": "application", "stacks": ["dotnet"],
+  "commands": { "install": "dotnet restore", "lint": "dotnet format --verify-no-changes",
+                "test": "dotnet test" } }
+
+// Agentic / LLM product (adds eval on top of the backend stack — declaring agentic REQUIRES an eval command)
+{ "projectType": "application", "stacks": ["python"], "productParadigms": ["deterministic", "agentic"],
+  "commands": { "lint": "ruff check .", "test": "pytest -q", "eval": "pytest evals/ -q" } }
+
+// The clean EOS template itself (no product code yet)
+{ "projectType": "config-only", "stacks": [], "productParadigms": ["deterministic"] }
+```
+
+> `jsonc` is only so the examples can carry comments; **the real file is strict JSON and cannot contain them**.
+> After editing, run `node .github/hooks/validate-config.mjs` (S12 validates the declaration itself) and
+> `node .github/hooks/project-gate.mjs`.
 
 ## Quick reference
 
@@ -120,7 +200,8 @@ The React frontend rule `frontend/10-frontend.instructions.md` (`**/*.{tsx,jsx}`
 ## Run after editing
 
 ```sh
-node .github/hooks/validate-config.mjs   # expect PASS: S3 glob exclusivity, S4 type coverage, S7 required paths
+node .github/hooks/validate-config.mjs   # expect PASS: S3 glob exclusivity, S4 type coverage, S7 required paths, S12 valid declaration
+node .github/hooks/project-gate.mjs      # expect PASS: your declared lint/typecheck/test/eval actually ran
 ```
 
 > Adding or removing a stack doesn't touch the EOS skeleton (agents / prompts / hooks / governance flow are all unchanged) — you only swap `applyTo` and the body text. See user-manual Chapter 11 for details.

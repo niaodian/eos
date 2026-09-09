@@ -8,9 +8,13 @@
 > commitment that still needs human sign-off. `【New-build】`
 
 ## Step 0 — Regime selection (do this first, at Discovery/Requirements)
-Tick every regime that applies, then record the result in `docs/compliance-profile.md`
-(one file per project) and one line in `docs/requirements.md`. If none apply, say so explicitly —
-"Regulatory regime: none (generic PII handling per the security rule)" — and skip the packs below.
+Tick every regime that applies, then record the result in **two** places:
+`docs/compliance-profile.md` (the human narrative, whose first content line is the canonical
+`**Regulatory regime:** …` anchor) **and** `docs/compliance-profile.json` (the machine-checkable
+profile that `eos-doctor` D5 actually enforces — see "Agentic data-boundary" below). Add one summary
+line to `docs/requirements.md`. If none apply, say so explicitly in both — prose
+"Regulatory regime: none (generic PII handling per the security rule)" and JSON
+`{"regimes": ["none"], "noneRationale": "…"}` — and skip the packs below.
 
 - [ ] **none / generic PII only** (default; still follow `E-security.md` + the data-api rule)
 - [ ] **HIPAA** — US healthcare / PHI
@@ -72,6 +76,28 @@ Choose and implement one (not "decide later"):
 - [ ] (c) **Redaction / tokenization gateway** strips regulated fields before any provider call, **or**
   > Runnable starter: `docs/eos/examples/compliance-starter/redaction.mjs` (`assertClean()` boundary guard) — skill `eos-compliance-skeletons`.
 - [ ] (d) **Exclude regulated data** from the AI path entirely (design the feature around it)
+
+**Then record it as machine-checkable data**, in `docs/compliance-profile.json`
+(template: `docs/eos/examples/compliance-profile.example.json`):
+
+```json
+{
+  "regimes": ["HIPAA"],
+  "regulatedDataCategories": ["phi"],
+  "thirdPartyModelPolicy": "redaction-gateway",
+  "controls": { "redaction": "implemented" },
+  "owner": "compliance-lead@example.com",
+  "approval": { "approvedBy": "…", "approvedOn": "2026-01-05", "reviewBy": "2027-01-05" },
+  "implementationStatus": "implemented"
+}
+```
+
+> **Why a JSON file and not the prose doc?** `eos-doctor` D5 used to grep the narrative for the words
+> *BAA / DPA / self-host / redact*, so the sentence "no redaction is implemented; regulated data may be
+> sent to third-party models" **passed the gate** — the keyword was there, the negation was not read.
+> Prose stays for humans; only the enumerated, owned, dated profile authorizes. A control that is
+> `planned` / `not_implemented`, a missing owner or approval, an unknown enum value, or an approval
+> past its `reviewBy` date all **fail closed**.
 
 ---
 Any unresolved regulated item at G2 is a **BLOCKER** (do not proceed to Spec). Re-verify at G8 release.

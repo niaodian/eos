@@ -5,7 +5,7 @@
 
 # EOS 用户手册（Engineering Operating System User Manual）
 
-> 版本：与 `docs/eos/VERSION` 同步（当前 `eos-1.10.0`）
+> 版本：与 `docs/eos/VERSION` 同步（当前 `eos-1.11.0`）
 > 适用：较新版本的 VS Code + GitHub Copilot Chat（自定义 agent / hooks 属近版能力，用「关于 VS Code」面板确认版本）+ 已安装 73 个 `bmad-*` skill（用户级）
 > 定位：本手册是**操作指南（怎么用）**；设计原理与取舍见同目录 `blueprint.md`（为什么这么设计）。
 > 约定：正文中文；文件名/路径/命令/配置键保留英文原文。
@@ -807,12 +807,14 @@ LLM tracing（token/成本/context/tool-span）。
 | 文件 | 事件 | 作用 |
 |---|---|---|
 | `guardrails.json` + `deny-dangerous.js` | PreToolUse | 拦截危险操作 + **供应链投毒（`curl\|bash`/`--unsafe-perm`）+ 硬编码密钥字面量**（输出 `permissionDecision:"deny"`） |
-| `quality.json` | PostToolUse | 写文件后跑 lint+typecheck+test 质量门 |
-| `config-check.json` | PostToolUse | 每次编辑后自动跑 `validate-config.mjs`（配置 S1–S11）**＋ `eos-doctor.mjs`（SDLC 门诊 / G-EVAL 连线 / 密钥扫描）** |
-| `validate-config.mjs` | 手动/被 hook 调用 | 零依赖静态验证器（S1–S11：规则/agent/prompt frontmatter、glob、必需路径、hook 事件） |
-| `eos-doctor.mjs` | **PostToolUse（逐编辑，经 `config-check.json`）** / 手动 / 被 CI 调用 | 零依赖 SDLC 门诊：G-EVAL、G-UX、**D4 密钥扫描（调 `secret-scan.mjs`）** |
+| `quality.json` | PostToolUse | 写文件后跑 lint+typecheck+test 质量门（**提示性**，非权威门禁：固定 exit 0；权威门禁是 CI 里的 `project-gate.mjs`） |
+| `config-check.json` | PostToolUse | 每次编辑后自动跑 `validate-config.mjs`（配置 S1–S12）**＋ `eos-doctor.mjs`（SDLC 门诊 / G-EVAL 连线 / 密钥扫描）**（同样是提示性的） |
+| `validate-config.mjs` | 手动/被 hook 调用 | 零依赖静态验证器（S1–S12：规则/agent/prompt frontmatter、glob、必需路径、hook 事件、**S12 `.eos/project.json` 项目声明有效性**） |
+| `project-gate.mjs` | 手动 / **被 CI 调用（权威）** | 跨栈产品质量门：按 `.eos/project.json` 真的执行 install/lint/typecheck/test/eval。**fail closed**——`application` 缺 `commands.test`、有栈清单却没声明、工具链没装（BLOCKED）都是 exit 1 |
+| `eos-doctor.mjs` | **PostToolUse（逐编辑，经 `config-check.json`）** / 手动 / 被 CI 调用 | 零依赖 SDLC 门诊：**D0 项目声明**、D1/D2 G-EVAL（以 `productParadigms` 声明为准，SDK/目录探测只是补网）、D3 G-UX、**D4 密钥扫描（调 `secret-scan.mjs`）**、**D5 合规数据边界（校验结构化 `docs/compliance-profile.json`，不再靠散文关键词）** |
 | `secret-scan.mjs` | 手动 / 被 eos-doctor + CI 调用 | 密钥扫描：内置零依赖正则（硬编码密钥/私钥、误提交 `.env`）**＋ 若装了 `gitleaks` 自动叠加深度扫描**（`.gitleaks.toml` 白名单）；命中 exit 1、输出脱敏 |
-| `spec-align.mjs` | 手动（`/spec-align`）/ 被 CI 调用 | 规范对齐量化：解析 `prd.md`+`trace-matrix.md` → AC 覆盖率 / 一次过率 / 漂移；`--strict` 命中即 exit 1 |
+| `spec-align.mjs` | 手动（`/spec-align`）/ 被 CI 调用 | 规范对齐量化：解析 `prd.md`+`trace-matrix.md` → AC 覆盖率 / 一次过率 / 漂移；`--strict` **fail closed**：缺文件、PRD 无 AC、矩阵无行、漂移、孤儿行、失败行均 exit 1 |
+| `*.test.mjs` | `node --test` / CI | 门禁自身的回归测试（deny-dangerous / spec-align / project-gate / eos-doctor / check-doc-parity）——防止未来改动把这些语义悄悄改回"绿但空" |
 
 **手动测试护栏**（终端）：
 ```sh

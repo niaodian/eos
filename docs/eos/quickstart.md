@@ -16,7 +16,7 @@
   Run the identical gate directly:
   ```sh
   node .github/hooks/validate-config.mjs && node .github/hooks/eos-doctor.mjs \
-    && npm run -s verify --if-present     # verify = tests + evals, if package.json has it
+    && node .github/hooks/project-gate.mjs   # your declared lint/typecheck/test/eval — any stack
   ```
 - `npm audit` (a G8 item) needs a lockfile — run `npm i --package-lock-only` first; offline it may
   defer (re-run when online), never a hard local blocker.
@@ -53,7 +53,10 @@ core flow (hooks, validators, tests are all Node, and paths are normalized cross
 5. Commit.
 
 > First time: set project facts in `.github/instructions/00-workspace.instructions.md` —
-> copy your stack's preset from `docs/eos/stack-presets.md` (Node/Python/Go/Java/Rust/.NET).
+> copy your stack's preset from `docs/eos/stack-presets.md` (Node/Python/Go/Java/Rust/.NET), and
+> declare the same commands in **`.eos/project.json`** so the product-quality gate actually runs
+> your tests. The template ships as `projectType: "config-only"`; leaving it there once real code
+> exists is a **hard failure**, not a silent skip.
 
 ## Happy Path (shortest entry)
 ```
@@ -68,6 +71,7 @@ New feature:   /requirements "<feature>" → /spec → /ux-spec → (agent) eos-
 One-time harden: /eos-init   (branch protection + CODEOWNERS + approval baseline → docs/eos/activation.md)
 Before release: /release-gate
 Self-check:     node .github/hooks/validate-config.mjs
+Product gate:   node .github/hooks/project-gate.mjs   (runs .eos/project.json commands — any stack)
 Local CI:       act push -j verify   (validate-config + eos-doctor + tests + evals; needs Docker)
 ```
 
