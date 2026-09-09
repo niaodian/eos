@@ -8,6 +8,7 @@ import { readdirSync, existsSync, readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { execSync } from 'node:child_process';
 import { loadProjectConfig, PROJECT_CONFIG_PATH } from './lib/project-config.mjs';
+import { loadComplianceProfile, evaluateDataBoundary, COMPLIANCE_PROFILE_PATH } from './lib/compliance-profile.mjs';
 
 const root = process.cwd();
 const errors = [];
@@ -243,24 +244,35 @@ if (existsSync(scanner)) {
 }
 
 // --- D5: Compliance data-boundary — a regulated regime + third-party LLM must decide the data boundary ---
-// Reads ONLY project output files (never docs/eos or the checklists), so it can't false-fire on the
-// template's own docs. Fires the Agentic landmine: PHI/PAN to a third-party model needs a boundary decision.
+// The decision is read from the STRUCTURED docs/compliance-profile.json (enumerated policy + control
+// status + owner + non-expired approval). Prose is used ONLY to notice that a regime exists — never
+// to authorize: the old keyword test accepted "no redaction is implemented" as a boundary decision
+// because it contained the substring "redact". Deny-by-default. [audit H3/T3 · EOS-004]
 const readIf = (p) => { try { return readFileSync(join(root, p), 'utf8'); } catch { return ''; } };
+const compliance = loadComplianceProfile(root);
+for (const e of compliance.errors) errors.push(`D5 Compliance: ${e}`);
+for (const w of compliance.warnings) warns.push(`D5 Compliance: ${w}`);
+
 const regimeText = readIf('docs/compliance-profile.md') + '\n' + readIf('docs/requirements.md');
 const REGULATED = /\b(HIPAA|PCI[\s-]?DSS|SOC\s?2|SOX|GDPR|CCPA|CPRA|PIPL)\b/i;
-if (regimeText.trim() && REGULATED.test(regimeText) && llmPresent) {
-  let boundaryText = regimeText;
-  const adrDir = join(root, 'docs/adr');
-  if (existsSync(adrDir)) {
-    for (const f of readdirSync(adrDir)) if (f.endsWith('.md')) boundaryText += '\n' + readIf(`docs/adr/${f}`);
-  }
-  boundaryText += '\n' + readIf('docs/architecture.md');
-  const BOUNDARY = /\bBAA\b|\bDPA\b|self[\s-]?host|on[\s-]?prem|redact|tokeniz|de[\s-]?identif|exclude regulated|no PHI|no PAN/i;
-  if (!BOUNDARY.test(boundaryText)) {
-    // BLOCKER (deny-by-default) per security rule: a regulated regime + LLM/agent is the Agentic
-    // compliance landmine. Only fires when regime IS declared AND LLM IS present AND no boundary is
-    // recorded — non-regulated projects are unaffected (preserves local-first). [audit H3/T3]
-    errors.push('D5 Compliance (BLOCKER): a regulated regime is declared and LLM/agent code exists, but no data-boundary decision was found (BAA/DPA · self-host · redaction · exclude regulated data). Deny-by-default per security rules — resolve F-compliance.md "Agentic data-boundary" before shipping.');
+const proseRegulated = regimeText.trim() !== '' && REGULATED.test(regimeText);
+// A valid profile is authoritative about WHETHER a regime applies; prose only raises the question.
+const declaredRegulated = compliance.profile ? compliance.profile.regulated : null;
+const regulated = declaredRegulated !== null ? declaredRegulated : proseRegulated;
+if (declaredRegulated === false && proseRegulated) {
+  warns.push(`D5 Compliance: ${COMPLIANCE_PROFILE_PATH} declares regimes ["none"] while docs/requirements.md or docs/compliance-profile.md names a regulatory regime. The structured profile wins — make sure its noneRationale still holds.`);
+}
+
+if (regulated && (llmPresent || autoLlm)) {
+  // NB: `autoLlm` is included deliberately. An evalWaiver can switch OFF the eval gate (D1/D2) —
+  // that is its purpose — but it must never switch off the compliance boundary: "we decided not to
+  // evaluate model output" says nothing about whether regulated data reaches a model. [review]
+  if (!compliance.present) {
+    errors.push(`D5 Compliance (BLOCKER): a regulated regime applies and LLM/agent code exists, but there is no ${COMPLIANCE_PROFILE_PATH}. Prose cannot authorize this — record the structured data-boundary decision (regimes · data categories · thirdPartyModelPolicy · control status · owner · approval) via /compliance. Deny-by-default per security rules.`);
+  } else {
+    for (const problem of evaluateDataBoundary(compliance.profile)) {
+      errors.push(`D5 Compliance (BLOCKER): regulated data + LLM/agent path — ${problem}. Resolve F-compliance.md "Agentic data-boundary" before shipping.`);
+    }
   }
 }
 

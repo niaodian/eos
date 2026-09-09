@@ -3,6 +3,8 @@
 // [audit EOS-003: `llmPresent` was inferred from a short SDK regex + the dir names ai/llm/rag, so an
 //  agentic product using litellm (or a self-wrapped model gateway) from src/virtual_employee/ passed
 //  the eval gate with no eval plan and no harness at all.]
+// [audit EOS-004: D5 accepted any occurrence of "redact"/"BAA"/"self-host" in prose, so the sentence
+//  "no redaction is implemented" READ AS a recorded data-boundary decision.]
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
@@ -137,6 +139,22 @@ test('declared deterministic while an LLM SDK is present: exit 1 until a reasone
   assert.match(waived.out, /WARN/);
 });
 
+test('an eval waiver must NOT switch off the D5 compliance boundary', () => {
+  // An evalWaiver says "we don't need to grade model output". It says nothing about whether
+  // regulated data reaches a model, so D5 still has to fire. [review of the EOS-003 fix]
+  const { code, out } = run(project({
+    '.eos/project.json': {
+      projectType: 'application', stacks: ['python'], productParadigms: ['deterministic'],
+      commands: { test: 'pytest -q' },
+      evalWaiver: { reason: 'openai is only used by an offline doc generator', approvedBy: 'ada@example.com' },
+    },
+    'requirements.txt': 'openai==1.40.0\n',
+    'docs/requirements.md': '# Requirements\n\nHIPAA applies to this product.\n',
+  }));
+  assert.equal(code, 1);
+  assert.match(out, /D5 Compliance/);
+});
+
 test('ordinary English in manifest prose is NOT mistaken for an LLM SDK', () => {
   // The widened SDK list contains words like bedrock/together/transformers/instructor. They are
   // matched against extracted dependency identifiers only — never against description text.
@@ -203,4 +221,145 @@ test('TOML dependency tables and arrays DO trip the gate', () => {
     const { code, out } = run(project({ [file]: body }));
     assert.equal(code, 1, `${file} dependency should trip G-EVAL:\n${out}`);
   }
+});
+
+// ---------- D5 compliance data boundary ----------
+
+const AGENTIC_DECL = { projectType: 'application', stacks: ['node'], productParadigms: ['agentic'], commands: { test: 'npm test', eval: 'npm run eval' } };
+const EVAL_OK = { ...EVAL_PLAN, ...EVAL_RUNNER };
+
+test('EOS-004: regulated + LLM + "no redaction is implemented" prose: exit 1', () => {
+  const { code, out } = run(project({
+    '.eos/project.json': AGENTIC_DECL, ...EVAL_OK,
+    'docs/requirements.md': '# Requirements\n\nGDPR applies to this product.\n',
+    'docs/compliance-profile.md': '**Regulatory regime:** GDPR\n\nDecision: no redaction is implemented;\nregulated data may be sent to third-party models.\n',
+  }));
+  assert.equal(code, 1);
+  assert.match(out, /D5 Compliance/);
+});
+
+test('regulated + LLM + a structured, approved, implemented boundary: exit 0', () => {
+  const { code, out } = run(project({
+    '.eos/project.json': AGENTIC_DECL, ...EVAL_OK,
+    'docs/requirements.md': '# Requirements\n\nGDPR applies.\n',
+    'docs/compliance-profile.json': {
+      regimes: ['GDPR'],
+      regulatedDataCategories: ['personal-data'],
+      thirdPartyModelPolicy: 'redaction-gateway',
+      controls: { redaction: 'implemented' },
+      dataRetention: { policy: 'P30D', status: 'implemented' },
+      owner: 'dpo@example.com',
+      approval: { approvedBy: 'dpo@example.com', approvedOn: '2026-01-05', reviewBy: '2099-01-05' },
+      implementationStatus: 'implemented',
+    },
+  }));
+  assert.equal(code, 0, out);
+});
+
+test('a boundary control that is declared but NOT implemented: exit 1', () => {
+  const { code, out } = run(project({
+    '.eos/project.json': AGENTIC_DECL, ...EVAL_OK,
+    'docs/requirements.md': '# Requirements\n\nHIPAA applies.\n',
+    'docs/compliance-profile.json': {
+      regimes: ['HIPAA'],
+      regulatedDataCategories: ['phi'],
+      thirdPartyModelPolicy: 'redaction-gateway',
+      controls: { redaction: 'not_implemented' },
+      owner: 'dpo@example.com',
+      approval: { approvedBy: 'dpo@example.com', approvedOn: '2026-01-05', reviewBy: '2099-01-05' },
+      implementationStatus: 'implemented',
+    },
+  }));
+  assert.equal(code, 1);
+  assert.match(out, /redaction/i);
+});
+
+test('missing owner / approval fields: exit 1', () => {
+  const { code, out } = run(project({
+    '.eos/project.json': AGENTIC_DECL, ...EVAL_OK,
+    'docs/requirements.md': '# Requirements\n\nPCI-DSS applies.\n',
+    'docs/compliance-profile.json': {
+      regimes: ['PCI-DSS'],
+      regulatedDataCategories: ['pan'],
+      thirdPartyModelPolicy: 'self-hosted',
+      implementationStatus: 'implemented',
+    },
+  }));
+  assert.equal(code, 1);
+  assert.match(out, /owner|approval/i);
+});
+
+test('an unknown / misspelled enum value: exit 1', () => {
+  const { code, out } = run(project({
+    '.eos/project.json': AGENTIC_DECL, ...EVAL_OK,
+    'docs/requirements.md': '# Requirements\n\nGDPR applies.\n',
+    'docs/compliance-profile.json': {
+      regimes: ['GDPR'],
+      regulatedDataCategories: ['personal-data'],
+      thirdPartyModelPolicy: 'redaction_gatway',
+      controls: { redaction: 'implemented' },
+      owner: 'dpo@example.com',
+      approval: { approvedBy: 'dpo@example.com', approvedOn: '2026-01-05', reviewBy: '2099-01-05' },
+      implementationStatus: 'implemented',
+    },
+  }));
+  assert.equal(code, 1);
+  assert.match(out, /thirdPartyModelPolicy/);
+});
+
+test('an expired approval: exit 1', () => {
+  const { code, out } = run(project({
+    '.eos/project.json': AGENTIC_DECL, ...EVAL_OK,
+    'docs/requirements.md': '# Requirements\n\nGDPR applies.\n',
+    'docs/compliance-profile.json': {
+      regimes: ['GDPR'],
+      regulatedDataCategories: ['personal-data'],
+      thirdPartyModelPolicy: 'self-hosted',
+      owner: 'dpo@example.com',
+      approval: { approvedBy: 'dpo@example.com', approvedOn: '2020-01-05', reviewBy: '2021-01-05' },
+      implementationStatus: 'implemented',
+    },
+  }));
+  assert.equal(code, 1);
+  assert.match(out, /expired|reviewBy/i);
+});
+
+test('regulated + LLM but no structured profile at all: exit 1 (deny by default)', () => {
+  const { code, out } = run(project({
+    '.eos/project.json': AGENTIC_DECL, ...EVAL_OK,
+    'docs/requirements.md': '# Requirements\n\nGDPR applies to this product.\n',
+  }));
+  assert.equal(code, 1);
+  assert.match(out, /compliance-profile\.json/);
+});
+
+test('a non-regulated project is unaffected by D5', () => {
+  const { code, out } = run(project({
+    '.eos/project.json': AGENTIC_DECL, ...EVAL_OK,
+    'docs/requirements.md': '# Requirements\n\nA plain internal tool. No regulated data.\n',
+  }));
+  assert.equal(code, 0, out);
+});
+
+test('an explicit "regimes: none" profile with a rationale passes and silences prose detection', () => {
+  const { code, out } = run(project({
+    '.eos/project.json': AGENTIC_DECL, ...EVAL_OK,
+    'docs/requirements.md': '# Requirements\n\nWe explicitly analysed GDPR and concluded it does not apply.\n',
+    'docs/compliance-profile.json': {
+      regimes: ['none'],
+      noneRationale: 'No personal data of EU/UK residents is collected, stored or processed.',
+      owner: 'dpo@example.com',
+      approval: { approvedBy: 'dpo@example.com', approvedOn: '2026-01-05', reviewBy: '2099-01-05' },
+    },
+  }));
+  assert.equal(code, 0, out);
+});
+
+test('an invalid compliance profile is an error even before the regime is known', () => {
+  const { code, out } = run(project({
+    '.eos/project.json': AGENTIC_DECL, ...EVAL_OK,
+    'docs/compliance-profile.json': '{ not valid json',
+  }));
+  assert.equal(code, 1);
+  assert.match(out, /compliance-profile\.json/);
 });
