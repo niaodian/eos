@@ -4,6 +4,7 @@
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync, existsSync, rmSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { project, write, run, runJson, cleanup, story } from './test-support.mjs';
 
@@ -204,9 +205,41 @@ test('migration: a ledger written before the head record existed warns, it does 
   const s = run(dir, ['status']);
   assert.equal(s.code, 0, s.out);
   assert.match(s.out, /IN_REVIEW/);
+  // ...the unverifiable property is visible everywhere, not only in `ledger --verify`
+  assert.match(s.out, /Unverified/);
+  assert.equal(run(dir, ['doctor']).code, 2);
   // ...and the head record is restored by the next recorded event
   run(dir, ['transition', '--scope', 'story', '--id', 'S1', '--to', 'DRAFT']);
   const after = run(dir, ['ledger', '--verify']);
   assert.equal(after.code, 0, after.out);
   assert.match(after.out, /PASS —/);
+  assert.equal(run(dir, ['doctor']).code, 0);
+});
+
+test('bypass: regressing the artifact and recomputing one input hash is caught by the content binding', () => {
+  const dir = project({ '.eos/project.json': APP, 'docs/prd.md': PRD, 'docs/stories/S1.md': story({ id: 'S1' }) });
+  assert.equal(run(dir, ['check', '--gate', 'story-ready', '--scope', 'S1']).code, 0); // a GENUINE pass
+  assert.equal(run(dir, ['transition', '--scope', 'story', '--id', 'S1', '--to', 'IN_REVIEW']).code, 0);
+
+  // regress the story so it would now fail, then repair the single input hash in the evidence
+  write(dir, 'docs/stories/S1.md', WEAK());
+  const p = join(dir, '.eos/evidence/story-ready__story__S1.json');
+  const ev = JSON.parse(readFileSync(p, 'utf8'));
+  const target = ev.inputs.find((i) => i.path === 'docs/stories/S1.md');
+  target.sha256 = createHash('sha256').update(readFileSync(join(dir, 'docs/stories/S1.md'))).digest('hex');
+  writeFileSync(p, JSON.stringify(ev, null, 2));
+
+  const t = run(dir, ['transition', '--scope', 'story', '--id', 'S1', '--to', 'READY_FOR_DEV']);
+  assert.equal(t.code, 1, t.out);
+  assert.match(t.out, /changed since the ledger recorded it/);
+  assert.equal(run(dir, ['doctor']).code, 2);
+});
+
+test('doctor reports a malformed evidence file instead of crashing on it', () => {
+  const dir = project({ '.eos/project.json': APP, 'docs/prd.md': PRD, 'docs/stories/S1.md': story({ id: 'S1' }) });
+  write(dir, '.eos/evidence/zz__story__X.json', {});
+  const d = run(dir, ['doctor']);
+  assert.equal(d.code, 2, d.out);
+  assert.match(d.out, /zz__story__X\.json/);
+  assert.doesNotMatch(d.out, /Cannot read properties/);
 });

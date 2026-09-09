@@ -24,6 +24,7 @@
     "to": { "type": ["string", "null"] },
     "gate": { "type": ["string", "null"] },
     "status": { "type": ["string", "null"] },
+    "evidenceSha256": { "type": ["string", "null"], "description": "Digest of the evidence file this event recorded. It is part of the hashed body, so the chain protects it and a regenerated evidence file cannot be passed off as the one that was verified." },
     "actor": { "type": "string" },
     "commit": { "type": ["string", "null"] },
     "notApplicableGates": { "type": "array", "items": { "type": "string" } },

@@ -107,6 +107,22 @@ export function evidenceFreshness(root, evidence, { gateDefinition = null, expec
   return { status: reasons.length ? 'STALE' : 'FRESH', reasons };
 }
 
+/**
+ * Is this object usable as evidence at all? `doctor` must be able to REPORT a malformed evidence
+ * file, not crash on it — it is exactly the file it exists to diagnose.
+ * @returns {string|null} a reason, or null when the shape is usable
+ */
+export function validateEvidenceShape(root, evidence) {
+  if (!evidence || typeof evidence !== 'object') return 'not a JSON object';
+  if (typeof evidence.gate !== 'string' || !evidence.scope || typeof evidence.scope.type !== 'string' || evidence.scope.id === undefined) {
+    return 'missing gate/scope identity — evidence is machine-written; regenerate it with `eos check`';
+  }
+  let schema = null;
+  try { schema = JSON.parse(readFileSync(join(root, '.eos/schemas/gate-evidence.schema.json'), 'utf8')); } catch { return null; }
+  const v = validate(schema, evidence, { label: 'evidence' });
+  return v.valid ? null : `not valid gate evidence — ${v.errors.slice(0, 2).join('; ')}`;
+}
+
 export function listEvidence(root) {
   const dir = join(root, EVIDENCE_DIR);
   if (!existsSync(dir)) return [];

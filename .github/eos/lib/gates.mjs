@@ -12,7 +12,7 @@ import { detectStacks } from '../../hooks/lib/project-config.mjs';
 import { loadComplianceProfile, evaluateDataBoundary } from '../../hooks/lib/compliance-profile.mjs';
 import { EVALUATOR_VERSION, posix } from './registry.mjs';
 import { gatePolicy, changeTypeOf, scopeState, gateInputs, gateCollections, ARTIFACTS } from './state.mjs';
-import { hashInputs, GOVERNANCE_INPUTS, writeEvidence, readEvidence, evidenceFreshness, evidenceFile } from './evidence.mjs';
+import { hashInputs, GOVERNANCE_INPUTS, writeEvidence, readEvidence, evidenceFreshness, evidenceFile, sha256File } from './evidence.mjs';
 import { lastGateEvent } from './ledger.mjs';
 import { findWaiver, expiredWaivers } from './waivers.mjs';
 import { AC_ID } from './story.mjs';
@@ -402,6 +402,13 @@ export function evidenceIntegrity(snapshot, evidence) {
     problems.push(`the append-only ledger has no record of ${evidence.gate} running for ${evidence.scope.id} — evidence without a ledger entry is not proof`);
   } else if (event.status !== evidence.status) {
     problems.push(`the ledger recorded ${evidence.gate} as ${event.status} but this file claims ${evidence.status} — the ledger is hash-chained and wins`);
+  } else if (event.evidenceSha256) {
+    // Content binding: without this, an attacker holding one genuine PASS could regress the
+    // artifact and recompute a single input hash, leaving every other assertion satisfied.
+    const digest = sha256File(snapshot.root, evidenceFile(evidence.gate, evidence.scope.type, evidence.scope.id));
+    if (digest !== event.evidenceSha256) {
+      problems.push(`the evidence file has changed since the ledger recorded it (the chain pins its digest) — re-run the gate instead of editing the file`);
+    }
   }
   return problems;
 }

@@ -18,7 +18,7 @@ import { appendEvent, readEvents, verifyChain, LEDGER_PATH } from './lib/ledger.
 import { route, activeScope } from './lib/router.mjs';
 import { renderCard, renderGate, renderExplain } from './lib/render.mjs';
 import { buildHandoff, writeHandoff, readHandoff, verifyHandoff, handoffPath } from './lib/handoff.mjs';
-import { listEvidence, evidenceFreshness } from './lib/evidence.mjs';
+import { listEvidence, evidenceFreshness, validateEvidenceShape, sha256File } from './lib/evidence.mjs';
 import { loadWaivers, expiredWaivers } from './lib/waivers.mjs';
 import { resolveAction, ACTIVE_WORK_PATH } from './lib/registry.mjs';
 
@@ -115,6 +115,7 @@ const commands = {
       stories,
       active: decision.current,
       blockers: decision.blockers,
+      warnings: snapshot.warnings,
       ...(flags.changed ? { changed: { files: changed, staleEvidence: touched } } : {}),
     };
     const lines = [`EOS · ${snapshot.profileName}`, ''];
@@ -126,6 +127,13 @@ const commands = {
       lines.push('', 'State', '  not reported — EOS cannot derive state from a source it cannot verify', '');
       emit(flags, { ...json, product: { state: null, blockedBy: null }, stories: [], errors: snapshot.errors }, lines.join('\n'));
       return EXIT.ERROR;
+    }
+    if (snapshot.warnings.length) {
+      // A property EOS could not check has to be visible here too, or `status` would quietly look
+      // as authoritative as a fully verified one.
+      lines.push('Unverified');
+      for (const w of snapshot.warnings) lines.push(`  WARN  ${w}`);
+      lines.push('');
     }
     lines.push('Product', `  ${product.state}${product.blockedBy ? ` — next guard: ${product.blockedBy.reason}` : ''}`, '');
     if (stories.length) {
@@ -190,6 +198,9 @@ const commands = {
       changeType: result.changeType,
       gate: result.gate,
       status: result.status,
+      // The digest goes INTO the hashed body, so regenerating or editing the evidence file after
+      // the fact no longer matches what the chain says was verified.
+      evidenceSha256: evidenceFile ? sha256File(snapshot.root, evidenceFile) : null,
       commit: snapshot.commit,
       detail: evidenceFile || '',
     });
@@ -433,6 +444,8 @@ const commands = {
     for (const e of waiverErrors) problems.push({ level: 'ERROR', detail: e });
     for (const { file, evidence } of listEvidence(snapshot.root)) {
       if (!evidence) { problems.push({ level: 'ERROR', detail: `${file}: unreadable evidence` }); continue; }
+      const shape = validateEvidenceShape(snapshot.root, evidence);
+      if (shape) { problems.push({ level: 'ERROR', detail: `${file}: ${shape}` }); continue; }
       // A hand-edited evidence file is the most valuable thing to forge, so doctor says so loudly
       // instead of leaving it to be discovered at the transition that it would have granted.
       for (const t of evidenceIntegrity(snapshot, evidence)) problems.push({ level: 'ERROR', detail: `${file}: ${t}` });
@@ -446,7 +459,9 @@ const commands = {
     }
     const chain = verifyChain(readEvents(snapshot.root).events, { root: snapshot.root });
     for (const p of chain.problems) problems.push({ level: 'ERROR', detail: `ledger: ${p}` });
-    for (const w of chain.warnings) notes.push(`ledger: ${w}`);
+    // An unverifiable ledger is BLOCKED, not a note: "PASS (1 note)" would be the same
+    // absence-of-proof-as-proof that this layer exists to refuse.
+    for (const w of chain.warnings) problems.push({ level: 'BLOCKED', detail: `ledger: ${w}` });
 
     const lines = ['EOS doctor', ''];
     for (const n of notes) lines.push(`  NOTE    ${n}`);
