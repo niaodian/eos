@@ -51,6 +51,10 @@ jobs:
         # benign not over-blocked. Zero-dep node:test, offline. [round-3 audit residual #9]
         run: node --test .github/hooks/deny-dangerous.test.mjs
 
+      - name: EOS validator regression tests (spec-align strict/advisory contract)
+        # Locks the fail-closed release-gate semantics: strict must never pass on absent evidence.
+        run: node --test .github/hooks/spec-align.test.mjs
+
       - name: EOS doc-parity regression tests (drift gate still catches drift)
         # Locks check-doc-parity.mjs: PASS on parity, FAIL on coverage/structure/factual-code drift,
         # no false positive on shared incidental tokens. Zero-dep node:test, offline.
