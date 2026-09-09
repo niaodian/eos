@@ -352,6 +352,7 @@ const commands = {
     const { events, errors } = readEvents(snapshot.root);
     const chain = verifyChain(events, { root: snapshot.root });
     const problems = [...errors, ...chain.problems];
+    const warnings = [...chain.warnings];
     if (flags.against && flags.against !== true) {
       const r = spawnSync('git', ['show', `${flags.against}:${LEDGER_PATH}`], { cwd: snapshot.root, encoding: 'utf8' });
       if (r.status === 0) {
@@ -360,8 +361,8 @@ const commands = {
         if (!current.startsWith(base)) problems.push(`the ledger is not append-only relative to ${flags.against}: earlier bytes changed`);
       }
     }
-    const json = { events: events.length, ok: problems.length === 0, problems };
-    emit(flags, json, [`EOS ledger · ${events.length} event(s)`, '', ...problems.map((p) => `  ERROR ${p}`), '',
+    const json = { events: events.length, ok: problems.length === 0, problems, warnings };
+    emit(flags, json, [`EOS ledger · ${events.length} event(s)`, '', ...warnings.map((w) => `  WARN  ${w}`), ...problems.map((p) => `  ERROR ${p}`), '',
       problems.length ? `FAIL: the append-only ledger is broken (${problems.length} problem(s))` : 'PASS — the hash chain is intact.', ''].join('\n'));
     return problems.length ? EXIT.FAIL : EXIT.OK;
   },
@@ -435,6 +436,7 @@ const commands = {
     }
     const chain = verifyChain(readEvents(snapshot.root).events, { root: snapshot.root });
     for (const p of chain.problems) problems.push({ level: 'ERROR', detail: `ledger: ${p}` });
+    for (const w of chain.warnings) notes.push(`ledger: ${w}`);
 
     const lines = ['EOS doctor', ''];
     for (const n of notes) lines.push(`  NOTE    ${n}`);

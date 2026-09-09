@@ -3,7 +3,7 @@
 //   node --test .github/eos/bypass.test.mjs
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { project, write, run, runJson, cleanup, story } from './test-support.mjs';
 
@@ -173,4 +173,21 @@ test('bypass: deleting the tail of the ledger is detected', () => {
   assert.equal(v.code, 1, v.out);
   assert.match(v.out, /removed from the end|head\.json/);
   assert.equal(run(dir, ['status']).code, 3);
+});
+
+test('migration: a ledger written before the head record existed warns, it does not brick the repo', () => {
+  const dir = project({ '.eos/project.json': APP, 'docs/prd.md': PRD, 'docs/stories/S1.md': story({ id: 'S1' }) });
+  run(dir, ['transition', '--scope', 'story', '--id', 'S1', '--to', 'IN_REVIEW']);
+  // simulate a pre-head-record ledger
+  rmSync(join(dir, '.eos/ledger/head.json'), { force: true });
+  const v = run(dir, ['ledger', '--verify']);
+  assert.equal(v.code, 0, v.out);
+  assert.match(v.out, /WARN/);
+  const s = run(dir, ['status']);
+  assert.equal(s.code, 0, s.out);
+  assert.match(s.out, /IN_REVIEW/);
+  // ...and the head record is restored by the next recorded event
+  run(dir, ['transition', '--scope', 'story', '--id', 'S1', '--to', 'DRAFT']);
+  assert.equal(run(dir, ['ledger', '--verify']).code, 0);
+  assert.doesNotMatch(run(dir, ['ledger', '--verify']).out, /WARN/);
 });

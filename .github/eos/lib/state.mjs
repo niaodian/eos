@@ -59,6 +59,7 @@ export function readSnapshot(root, { withGit = true } = {}) {
   // make the whole tamper-evidence story decorative. A broken chain is an ERROR for every consumer.
   const chain = verifyChain(events, { root });
   for (const p of chain.problems) errors.push(`${LEDGER_PATH}: ${p} — run \`node .github/eos/eos.mjs ledger --verify\` and restore the file from version control`);
+  for (const w of chain.warnings) warnings.push(`${LEDGER_PATH}: ${w}`);
 
   const artifacts = {};
   for (const [key, rel] of Object.entries(ARTIFACTS)) artifacts[key] = existsSync(join(root, rel)) ? posix(rel) : null;

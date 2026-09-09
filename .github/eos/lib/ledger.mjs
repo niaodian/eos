@@ -52,9 +52,15 @@ function writeHead(root, events) {
   writeFileSync(full, JSON.stringify({ schemaVersion: 1, count: events.length, hash: events.at(-1)?.hash || null }, null, 2) + '\n', 'utf8');
 }
 
-/** @returns {{ok: boolean, problems: string[]}} */
+/**
+ * @returns {{ok: boolean, problems: string[], warnings: string[]}}
+ * `problems` are tamper evidence (hard ERROR everywhere). `warnings` are migration facts — a
+ * ledger written before the head record existed cannot be *verified* for truncation, but it is not
+ * itself evidence of tampering, so it must not brick an existing repository.
+ */
 export function verifyChain(events, { root = null } = {}) {
   const problems = [];
+  const warnings = [];
   let prevHash = null;
   events.forEach((e, i) => {
     const at = `event #${i + 1}`;
@@ -69,13 +75,13 @@ export function verifyChain(events, { root = null } = {}) {
     if (error) problems.push(error);
     else if (!present) {
       // Only a ledger that predates the head record may lack one; an EMPTY ledger is fine.
-      if (events.length) problems.push(`${LEDGER_HEAD_PATH} is missing — it pins the ledger length so truncation is detectable; regenerate it by recording any event, then review the diff`);
+      if (events.length) warnings.push(`${LEDGER_HEAD_PATH} is missing — it pins the ledger length so truncation becomes detectable. It is written on the next recorded event; review that diff.`);
     } else {
       if (head.count !== events.length) problems.push(`${LEDGER_HEAD_PATH} expects ${head.count} event(s) but the ledger has ${events.length} — line(s) were removed from the end`);
       if ((head.hash ?? null) !== (events.at(-1)?.hash ?? null)) problems.push(`${LEDGER_HEAD_PATH} does not point at the last event — the tail of the ledger was rewritten`);
     }
   }
-  return { ok: problems.length === 0, problems };
+  return { ok: problems.length === 0, problems, warnings };
 }
 
 export function appendEvent(root, event) {
