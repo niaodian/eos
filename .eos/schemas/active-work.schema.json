@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://eos.local/schemas/active-work.schema.json",
   "title": "EOS local active work",
-  "description": "This machine's current focus ONLY (.eos/local/active-work.json, gitignored). It must never carry a gate result, an approval or a release state — those live in the ledger and in evidence files.",
+  "description": "This machine's current focus ONLY (.eos/local/active-work.json, gitignored). It must never carry a gate result, an approval, a release state or a change type — a change type selects the gate policy, so it is authority and lives in the tracked story file.",
   "type": "object",
   "additionalProperties": false,
   "required": ["schemaVersion", "scopeType", "scopeId"],
@@ -10,9 +10,6 @@
     "schemaVersion": { "const": 1 },
     "scopeType": { "enum": ["product", "story", "release"] },
     "scopeId": { "type": "string", "minLength": 1 },
-    "changeType": {
-      "enum": ["PRODUCT_BASELINE", "FEATURE", "BUGFIX", "SPIKE", "HOTFIX", "DOC_ONLY", "GOVERNANCE", "RELEASE"]
-    },
     "note": { "type": "string" },
     "updatedAt": { "type": "string" }
   }

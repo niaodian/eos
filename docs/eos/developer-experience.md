@@ -75,8 +75,9 @@ Layout on disk:
   local/active-work.json# this machine's current focus only (gitignored, never authoritative)
 ```
 
-`.eos/local/active-work.json` holds a scope id and a change type. It never holds a gate result, an
-approval or a release state — those live in the ledger and in evidence files.
+`.eos/local/active-work.json` holds a scope id and nothing else. It never holds a gate result, an
+approval, a release state — or a change type, because a change type selects the gate policy and is
+therefore authority: a story's classification is read only from the tracked story file.
 
 ## 4. State model (three scopes, not one global machine)
 
@@ -176,8 +177,19 @@ the real commands executed with their exit codes · each individual check result
 
 Evidence becomes `STALE` automatically when any input hash changes, when an input disappears, when
 the gate definition version changes, or when `.eos/gates.json` / `.eos/workflow.json` change — the
-governance-change rule. Release verification additionally requires the evidence commit to equal the
-candidate commit.
+governance-change rule. The recorded input *set* must also still match what the gate reads today, so
+evidence that simply declares no inputs is stale rather than eternally fresh; a recorded `WAIVED`
+binds the waiver file, so an expired, deleted or self-approved waiver invalidates it; and a gate
+that asserts something about a *set* (release readiness over the stories) records a digest of that
+set, so a story added afterwards invalidates it. Release verification additionally requires the
+evidence commit to equal the candidate commit.
+
+**What this does and does not prove.** These are tamper-*evident*, not tamper-*proof*, mechanisms:
+the ledger is hash-chained and pinned by `.eos/ledger/head.json` so rewriting, deleting or
+truncating it is detected, and the state readers refuse to derive anything from a ledger whose
+chain is broken. Someone with write access can still forge both files locally — which is why the
+ledger, the gate definitions, the workflow, the agent map and the project declaration are
+CODEOWNERS-protected, and why CI re-verifies the chain against the commit the build sits on.
 
 ## 6. Change types (branch the flow without unknown paths)
 

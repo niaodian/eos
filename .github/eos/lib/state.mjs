@@ -1,12 +1,14 @@
 // Project state reader — the single deterministic snapshot every other component works from.
 // Nothing here reads a chat transcript, a prose summary or a hand-written status field: state is
 // derived from the tracked registries, the artifacts on disk, the append-only ledger and evidence.
+import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { loadProjectConfig } from '../../hooks/lib/project-config.mjs';
 import { loadWorkflow, loadGates, loadAgentMap, loadActiveWork, posix } from './registry.mjs';
-import { readEvents, stateOf } from './ledger.mjs';
+import { LEDGER_PATH } from './ledger.mjs';
+import { readEvents, stateOf, verifyChain } from './ledger.mjs';
 import { listStories, prdAcceptanceCriteria } from './story.mjs';
 
 export const ARTIFACTS = {
@@ -53,6 +55,10 @@ export function readSnapshot(root, { withGit = true } = {}) {
 
   const { events, errors: ledgerErrors } = readEvents(root);
   errors.push(...ledgerErrors);
+  // Story and release state come from this file, so trusting it without verifying the chain would
+  // make the whole tamper-evidence story decorative. A broken chain is an ERROR for every consumer.
+  const chain = verifyChain(events, { root });
+  for (const p of chain.problems) errors.push(`${LEDGER_PATH}: ${p} — run \`node .github/eos/eos.mjs ledger --verify\` and restore the file from version control`);
 
   const artifacts = {};
   for (const [key, rel] of Object.entries(ARTIFACTS)) artifacts[key] = existsSync(join(root, rel)) ? posix(rel) : null;
@@ -103,12 +109,15 @@ export function gatePolicy(snapshot, changeType, gateId) {
 
 export function changeTypeOf(snapshot, scopeType, scopeId) {
   if (scopeType === 'story') {
+    // The story file is tracked and reviewable, so it is the only thing allowed to classify a
+    // story. `.eos/local/active-work.json` is gitignored and carries NO authority: letting it
+    // supply a change type would let an untracked local file switch this story's gates off.
     const s = snapshot.stories.find((x) => x.id === scopeId);
-    if (s?.changeType) return s.changeType;
+    return s?.changeType || snapshot.profile?.defaultChangeType || 'FEATURE';
   }
   if (scopeType === 'release') return 'RELEASE';
-  if (snapshot.activeWork?.scopeId === scopeId && snapshot.activeWork?.changeType) return snapshot.activeWork.changeType;
   if (scopeType === 'product') return 'PRODUCT_BASELINE';
+  if (snapshot.activeWork?.scopeId === scopeId && snapshot.activeWork?.changeType) return snapshot.activeWork.changeType;
   return snapshot.profile?.defaultChangeType || 'FEATURE';
 }
 
@@ -132,6 +141,17 @@ export function gateInputs(snapshot, gateId, scopeType, scopeId) {
     for (const s of snapshot.stories) inputs.push(s.path);
   }
   return inputs.filter(Boolean);
+}
+
+/**
+ * Set-membership digests a gate depends on. `release-ready` asserts something about the SET of
+ * stories, so adding a story after the gate ran must invalidate it even though no recorded file
+ * hash changed.
+ */
+export function gateCollections(snapshot, gateId) {
+  if (gateId !== 'release-ready') return {};
+  const ids = snapshot.stories.map((s) => `${s.id}:${s.path}`).sort().join('\n');
+  return { stories: createHash('sha256').update(ids).digest('hex') };
 }
 
 /** Read a doc once, tolerating absence (callers decide whether absence is a failure). */

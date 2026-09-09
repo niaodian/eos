@@ -120,11 +120,13 @@ export function loadActiveWork(root) {
   const { present, data, error } = readJson(root, ACTIVE_WORK_PATH);
   if (!present || error || !data || typeof data !== 'object') return { present: false, activeWork: null, errors: error ? [error] : [] };
   const { schema } = loadSchema(root, 'active-work.schema.json');
+  // `changeType` selects the gate policy, so it IS an authority-carrying key: it is dropped here
+  // and a story's classification is read only from the tracked story file. The local focus may
+  // point at work; it may never decide how strictly that work is verified.
   const cleaned = {
     schemaVersion: 1,
     scopeType: data.scopeType,
     scopeId: data.scopeId,
-    ...(data.changeType ? { changeType: data.changeType } : {}),
     ...(data.note ? { note: data.note } : {}),
     ...(data.updatedAt ? { updatedAt: data.updatedAt } : {}),
   };

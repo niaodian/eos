@@ -43,6 +43,7 @@
 /.eos/agent-map.json                @niaodian
 /.eos/schemas/                      @niaodian
 /.eos/waivers/                      @niaodian
+/.eos/ledger/                       @niaodian
 
 # --- EOS spine + security/compliance docs: changes alter the methodology itself. ---
 /docs/eos/                          @niaodian

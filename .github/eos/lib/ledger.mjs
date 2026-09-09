@@ -3,10 +3,14 @@
 // Markdown field. Each line carries `prevHash` + `hash` over the canonical event body, so deleting
 // or rewriting an earlier line is detectable offline by `eos ledger --verify` (and in CI).
 import { createHash } from 'node:crypto';
-import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 export const LEDGER_PATH = '.eos/ledger/events.jsonl';
+// A forward-only chain cannot notice that the TAIL was cut off: deleting the last lines leaves
+// every seq and prevHash intact. The head record pins the expected length + last hash, so
+// truncation now requires forging two tracked files instead of trimming one. [review]
+export const LEDGER_HEAD_PATH = '.eos/ledger/head.json';
 
 const HASHED_FIELDS = ['seq', 'ts', 'type', 'scope', 'changeType', 'from', 'to', 'gate', 'status', 'actor', 'commit', 'notApplicableGates', 'detail', 'prevHash'];
 
@@ -34,8 +38,22 @@ export function readEvents(root) {
   return { events, errors };
 }
 
+export function readHead(root) {
+  const full = join(root, LEDGER_HEAD_PATH);
+  if (!existsSync(full)) return { present: false, head: null, error: null };
+  try { return { present: true, head: JSON.parse(readFileSync(full, 'utf8')), error: null }; } catch (e) {
+    return { present: true, head: null, error: `${LEDGER_HEAD_PATH}: invalid JSON (${e.message})` };
+  }
+}
+
+function writeHead(root, events) {
+  const full = join(root, LEDGER_HEAD_PATH);
+  mkdirSync(dirname(full), { recursive: true });
+  writeFileSync(full, JSON.stringify({ schemaVersion: 1, count: events.length, hash: events.at(-1)?.hash || null }, null, 2) + '\n', 'utf8');
+}
+
 /** @returns {{ok: boolean, problems: string[]}} */
-export function verifyChain(events) {
+export function verifyChain(events, { root = null } = {}) {
   const problems = [];
   let prevHash = null;
   events.forEach((e, i) => {
@@ -46,6 +64,17 @@ export function verifyChain(events) {
     if (e.hash !== expected) problems.push(`${at}: hash mismatch — this event was tampered with after it was recorded`);
     prevHash = e.hash;
   });
+  if (root) {
+    const { present, head, error } = readHead(root);
+    if (error) problems.push(error);
+    else if (!present) {
+      // Only a ledger that predates the head record may lack one; an EMPTY ledger is fine.
+      if (events.length) problems.push(`${LEDGER_HEAD_PATH} is missing — it pins the ledger length so truncation is detectable; regenerate it by recording any event, then review the diff`);
+    } else {
+      if (head.count !== events.length) problems.push(`${LEDGER_HEAD_PATH} expects ${head.count} event(s) but the ledger has ${events.length} — line(s) were removed from the end`);
+      if ((head.hash ?? null) !== (events.at(-1)?.hash ?? null)) problems.push(`${LEDGER_HEAD_PATH} does not point at the last event — the tail of the ledger was rewritten`);
+    }
+  }
   return { ok: problems.length === 0, problems };
 }
 
@@ -64,6 +93,7 @@ export function appendEvent(root, event) {
   const full = join(root, LEDGER_PATH);
   mkdirSync(dirname(full), { recursive: true });
   appendFileSync(full, JSON.stringify(body) + '\n', 'utf8');
+  writeHead(root, [...events, body]);
   return body;
 }
 

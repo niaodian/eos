@@ -11,7 +11,7 @@
 import { existsSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { readSnapshot, gatePolicy, changeTypeOf, scopeState } from './lib/state.mjs';
+import { readSnapshot, gatePolicy, changeTypeOf, scopeState, gateInputs, gateCollections } from './lib/state.mjs';
 import { runGate, evaluateGate, recordedGateStatus, isBlocking } from './lib/gates.mjs';
 import { checkTransition, deriveProductState, legalTransitions } from './lib/transitions.mjs';
 import { appendEvent, readEvents, verifyChain, LEDGER_PATH } from './lib/ledger.mjs';
@@ -41,7 +41,7 @@ usage: node .github/eos/eos.mjs <command> [flags]
   waive --gate <id> --scope <id> --reason <text> --risk-owner <who> --expires <YYYY-MM-DD> --control <text>
   handoff --scope <type> --id <id> [--verify]
   ledger [--verify] [--against <git-ref>]
-  focus --scope <type> --id <id> [--change-type <TYPE>]
+  focus --scope <type> --id <id>          set this machine's local focus (no authority)
   init [--write]                          report or create local, non-destructive integration files
   doctor                                  is EOS itself wired correctly?
 
@@ -119,9 +119,13 @@ const commands = {
     };
     const lines = [`EOS · ${snapshot.profileName}`, ''];
     if (snapshot.errors.length) {
+      // Printing derived state next to "the state source is broken" would be the worst of both:
+      // it looks authoritative while resting on data EOS has just declared untrustworthy.
       lines.push('Errors');
       for (const e of snapshot.errors) lines.push(`  ERROR ${e}`);
-      lines.push('');
+      lines.push('', 'State', '  not reported — EOS cannot derive state from a source it cannot verify', '');
+      emit(flags, { ...json, product: { state: null, blockedBy: null }, stories: [], errors: snapshot.errors }, lines.join('\n'));
+      return EXIT.ERROR;
     }
     lines.push('Product', `  ${product.state}${product.blockedBy ? ` — next guard: ${product.blockedBy.reason}` : ''}`, '');
     if (stories.length) {
@@ -161,7 +165,6 @@ const commands = {
         schemaVersion: 1,
         scopeType: decision.current.scopeType,
         scopeId: decision.current.scopeId,
-        ...(decision.current.changeType ? { changeType: decision.current.changeType } : {}),
         updatedAt: new Date().toISOString(),
       }, null, 2) + '\n', 'utf8');
     }
@@ -347,7 +350,7 @@ const commands = {
 
   ledger(snapshot, flags) {
     const { events, errors } = readEvents(snapshot.root);
-    const chain = verifyChain(events);
+    const chain = verifyChain(events, { root: snapshot.root });
     const problems = [...errors, ...chain.problems];
     if (flags.against && flags.against !== true) {
       const r = spawnSync('git', ['show', `${flags.against}:${LEDGER_PATH}`], { cwd: snapshot.root, encoding: 'utf8' });
@@ -369,7 +372,11 @@ const commands = {
     if (!scopeId || scopeId === true) { console.log('focus requires --scope <type> --id <id>'); return EXIT.FAIL; }
     const full = join(snapshot.root, ACTIVE_WORK_PATH);
     mkdirSync(dirname(full), { recursive: true });
-    const body = { schemaVersion: 1, scopeType, scopeId: String(scopeId), ...(flags['change-type'] && flags['change-type'] !== true ? { changeType: flags['change-type'] } : {}), updatedAt: new Date().toISOString() };
+    if (flags['change-type']) {
+      console.log('focus does not accept --change-type: a change type selects the gate policy, so it belongs in the tracked story file, not in a gitignored local file.');
+      return EXIT.FAIL;
+    }
+    const body = { schemaVersion: 1, scopeType, scopeId: String(scopeId), updatedAt: new Date().toISOString() };
     writeFileSync(full, JSON.stringify(body, null, 2) + '\n', 'utf8');
     emit(flags, body, `EOS focus · ${scopeType}/${scopeId} (local only — ${ACTIVE_WORK_PATH} is gitignored and carries no authority)\n`);
     return EXIT.OK;
@@ -419,10 +426,14 @@ const commands = {
     for (const { file, evidence } of listEvidence(snapshot.root)) {
       if (!evidence) { problems.push({ level: 'ERROR', detail: `${file}: unreadable evidence` }); continue; }
       const def = snapshot.gates?.gates.find((g) => g.id === evidence.gate);
-      const f = evidenceFreshness(snapshot.root, evidence, { gateDefinition: def });
+      const f = evidenceFreshness(snapshot.root, evidence, {
+        gateDefinition: def,
+        expectedInputs: gateInputs(snapshot, evidence.gate, evidence.scope.type, evidence.scope.id),
+        collections: gateCollections(snapshot, evidence.gate),
+      });
       if (f.status === 'STALE') notes.push(`${file} is STALE: ${f.reasons[0]}`);
     }
-    const chain = verifyChain(readEvents(snapshot.root).events);
+    const chain = verifyChain(readEvents(snapshot.root).events, { root: snapshot.root });
     for (const p of chain.problems) problems.push({ level: 'ERROR', detail: `ledger: ${p}` });
 
     const lines = ['EOS doctor', ''];

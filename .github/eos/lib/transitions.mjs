@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { listStories } from './story.mjs';
 import { recordedGateStatus, evaluateGate } from './gates.mjs';
 import { readEvidence, evidenceFreshness } from './evidence.mjs';
-import { scopeState, changeTypeOf } from './state.mjs';
+import { scopeState, changeTypeOf, gateInputs, gateCollections } from './state.mjs';
 
 export const PROMOTABLE = new Set(['PASS', 'WAIVED', 'NOT_APPLICABLE']);
 
@@ -80,7 +80,11 @@ export function guardResult(snapshot, transition, scopeType, scopeId, { live = f
       const def = snapshot.gates?.gates.find((x) => x.id === transition.requiresGate);
       const stored = readEvidence(snapshot.root, transition.requiresGate, scopeType, scopeId);
       if (stored.evidence) {
-        const f = evidenceFreshness(snapshot.root, stored.evidence, { gateDefinition: def });
+        const f = evidenceFreshness(snapshot.root, stored.evidence, {
+          gateDefinition: def,
+          expectedInputs: gateInputs(snapshot, transition.requiresGate, scopeType, scopeId),
+          collections: gateCollections(snapshot, transition.requiresGate),
+        });
         if (f.status === 'STALE') {
           return { ok: false, reason: `gate "${transition.requiresGate}" evidence is STALE: ${f.reasons.join('; ')}`, kind: 'stale', gate: transition.requiresGate, status: 'STALE' };
         }
@@ -121,10 +125,19 @@ export function classificationBlock(snapshot, { scopeType, scopeId, to }) {
   const changeType = changeTypeOf(snapshot, scopeType, scopeId);
   const cfg = snapshot.profile?.changeTypes?.[changeType];
   if (!cfg) return `change type "${changeType}" is not defined in workflow profile "${snapshot.profileName}" — every change must follow a declared policy`;
+  // A change type declares the scope it governs. PRODUCT_BASELINE and RELEASE disable the story
+  // gates because they are not story work at all — applying one to a story would inherit that
+  // exemption for free, which is the same bypass as relabelling to SPIKE.
+  if (cfg.scope !== 'story') {
+    return `change type "${changeType}" governs the ${cfg.scope} scope, not a story, so it cannot classify ${scopeId}. Use a story change type (${Object.entries(snapshot.profile.changeTypes).filter(([, c]) => c.scope === 'story').map(([n]) => n).join(', ')}).`;
+  }
   if (to === 'MERGED' && cfg.mergeable === false) {
     return `a ${changeType} change may never reach MERGED (${cfg.description}). Open a FEATURE or BUGFIX story for anything that should ship, and record the outcome in an ADR.`;
   }
-  if (cfg.requiresClassificationReason && to !== 'DRAFT') {
+  // DERIVED, not declared: any classification that switches off BOTH readiness and verification
+  // must be justified, even if someone forgets the flag in workflow.json.
+  const disablesVerification = ['story-ready', 'verified'].every((g) => (cfg.gates || {})[g] === 'not_applicable');
+  if ((cfg.requiresClassificationReason || disablesVerification) && to !== 'DRAFT') {
     const story = snapshot.stories.find((s) => s.id === scopeId);
     const reason = (story?.classificationReason || '').trim();
     if (reason.length < 15) {

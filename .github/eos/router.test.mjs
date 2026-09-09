@@ -114,6 +114,20 @@ test('local active work never carries authority: a gate status in it is ignored'
   assert.equal(r.json.recommendedAction.id, 'design-acceptance-tests');
 });
 
+test('local active work cannot reclassify a story into a gate-free change type', () => {
+  const dir = project({
+    '.eos/project.json': APP_PROJECT,
+    'docs/prd.md': PRD_2AC,
+    // no changeType in the story front matter — the strictest default must apply
+    'docs/stories/STORY-001.md': story({ rows: [['AC1.1', 'log in', '—', '—']] }).replace('changeType: FEATURE\n', ''),
+    '.eos/local/active-work.json': { schemaVersion: 1, scopeType: 'story', scopeId: 'STORY-001', changeType: 'DOC_ONLY' },
+  });
+  const r = runJson(dir, ['next']);
+  assert.equal(r.json.current.changeType, 'FEATURE', 'an untracked local file must not classify a story');
+  assert.equal(r.json.recommendedAction.id, 'design-acceptance-tests');
+  assert.equal(r.code, 2, r.out);
+});
+
 test('a story that is MERGED hands the focus back to the next change', () => {
   const dir = project({
     '.eos/project.json': APP_PROJECT,

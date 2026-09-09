@@ -48,6 +48,19 @@
         }
       }
     },
+    "collections": {
+      "description": "Digests of SET membership (for example the set of stories a release gate covered). A file hash cannot notice that a new member appeared.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["key", "digest"],
+        "properties": {
+          "key": { "type": "string", "minLength": 1 },
+          "digest": { "type": "string", "minLength": 8 }
+        }
+      }
+    },
     "commands": {
       "type": "array",
       "items": {

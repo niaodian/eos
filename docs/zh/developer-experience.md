@@ -73,8 +73,8 @@ Next Best Action 引擎   纯函数：状态 → 恰好一个推荐动作
   local/active-work.json# 仅本机当前焦点（gitignored，永不权威）
 ```
 
-`.eos/local/active-work.json` 只保存 Scope ID 和 Change Type，绝不保存门禁结果、审批或发布状态 ——
-那些活在 Ledger 和证据文件里。
+`.eos/local/active-work.json` 只保存 Scope ID，别的都不存：门禁结果、审批、发布状态 —— 以及 Change
+Type，因为 Change Type 决定门禁策略，本身就是权威；Story 的分类只从纳入版本管理的 Story 文件读取。
 
 ## 4. 状态模型（三层 Scope，而不是一个全局状态机）
 
@@ -168,7 +168,15 @@ Commit SHA · Gate 定义版本 · Evaluator 版本 · 每个输入文件的 SHA
 真实执行的命令及其退出码 · 每一项 Check 结果 · 生成时间。
 
 当任一输入哈希改变、输入文件消失、Gate 定义版本变化，或 `.eos/gates.json` / `.eos/workflow.json`
-改变（治理变更规则）时，证据自动变为 `STALE`。发布验证还额外要求证据 Commit 等于候选 Commit。
+改变（治理变更规则）时，证据自动变为 `STALE`。此外：记录下来的输入*集合*必须仍与该门禁今天实际读取的
+一致，因此一份"声称没有任何输入"的证据是 STALE 而不是永远新鲜；记录为 `WAIVED` 的证据绑定该 Waiver
+文件，所以过期、被删除或自批准的 Waiver 会让它失效；而对某个*集合*作断言的门禁（发布就绪对全部 Story）
+会记录该集合的摘要，因此事后新增一个 Story 同样会让它失效。发布验证还额外要求证据 Commit 等于候选 Commit。
+
+**它能证明什么、不能证明什么。** 这些是**可发现篡改**而非**不可篡改**的机制：账本是哈希链式的，并由
+`.eos/ledger/head.json` 钉住长度与链尾，因此改写、删除或截断都会被检测到；而且状态读取方拒绝从一条断链
+的账本推导任何东西。拥有写权限的人仍然可以在本地同时伪造这两个文件 —— 这正是账本、门禁定义、工作流、
+Agent 映射和项目声明都受 CODEOWNERS 保护，以及 CI 会针对本次构建所基于的提交重新校验链的原因。
 
 ## 6. Change Type（分流流程，但不留未知路径）
 

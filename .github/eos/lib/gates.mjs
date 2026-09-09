@@ -11,14 +11,16 @@ import { spawnSync } from 'node:child_process';
 import { detectStacks } from '../../hooks/lib/project-config.mjs';
 import { loadComplianceProfile, evaluateDataBoundary } from '../../hooks/lib/compliance-profile.mjs';
 import { EVALUATOR_VERSION, posix } from './registry.mjs';
-import { gatePolicy, changeTypeOf, scopeState, gateInputs, ARTIFACTS } from './state.mjs';
+import { gatePolicy, changeTypeOf, scopeState, gateInputs, gateCollections, ARTIFACTS } from './state.mjs';
 import { hashInputs, GOVERNANCE_INPUTS, writeEvidence, readEvidence, evidenceFreshness } from './evidence.mjs';
 import { findWaiver, expiredWaivers } from './waivers.mjs';
 import { AC_ID } from './story.mjs';
 
 export const STATUSES = ['PASS', 'FAIL', 'BLOCKED', 'PENDING', 'WAIVED', 'NOT_APPLICABLE', 'STALE', 'ERROR'];
 const SEVERITY = { ERROR: 6, BLOCKED: 5, FAIL: 4, STALE: 3, PENDING: 2, WAIVED: 1, NOT_APPLICABLE: 0, PASS: 0 };
-export const isBlocking = (s) => ['ERROR', 'BLOCKED', 'FAIL', 'STALE'].includes(s);
+// An unrecognised status must be treated as the WORST case, never as "not blocking": a stored
+// `status: "failed"` must not slip through because it is not spelled the way we expect.
+export const isBlocking = (s) => !['PASS', 'WAIVED', 'NOT_APPLICABLE', 'PENDING'].includes(s);
 
 /** Checks that shell out to another process. They are skipped (→ PENDING) in "cheap" mode. */
 const EXPENSIVE = new Set(['tests-executed', 'eval-threshold', 'spec-alignment', 'secret-scan']);
@@ -195,7 +197,11 @@ const evaluators = {
     if (prior.error) return { status: 'ERROR', detail: prior.error };
     if (!prior.present) return fail(`no story-ready evidence for ${ctx.scopeId} — run \`eos check --gate story-ready --scope ${ctx.scopeId}\` first`);
     const def = ctx.snapshot.gates?.gates.find((g) => g.id === 'story-ready');
-    const f = evidenceFreshness(ctx.root, prior.evidence, { gateDefinition: def });
+    const f = evidenceFreshness(ctx.root, prior.evidence, {
+      gateDefinition: def,
+      expectedInputs: gateInputs(ctx.snapshot, 'story-ready', 'story', ctx.scopeId),
+      collections: gateCollections(ctx.snapshot, 'story-ready'),
+    });
     if (f.status === 'STALE') {
       // Name the command that actually clears this: re-running THIS gate cannot refresh the
       // PREREQUISITE gate's evidence, and sending the developer round that loop is the exact
@@ -264,6 +270,7 @@ const evaluators = {
 
 function aggregate(results) {
   if (!results.length) return 'ERROR';
+  if (results.some((r) => !STATUSES.includes(r.status))) return 'ERROR';
   const worst = results.reduce((acc, r) => (SEVERITY[r.status] > SEVERITY[acc] ? r.status : acc), 'PASS');
   if (worst === 'PASS' && results.every((r) => r.status === 'NOT_APPLICABLE')) return 'NOT_APPLICABLE';
   return worst;
@@ -296,7 +303,12 @@ export function evaluateGate(snapshot, gateId, scopeType, scopeId, { mode = 'all
     let result;
     if (mode === 'cheap' && EXPENSIVE.has(check.id)) {
       const stored = prior.present && prior.evidence ? (prior.evidence.checks || []).find((c) => c.id === check.id) : null;
-      const fresh = prior.evidence ? evidenceFreshness(snapshot.root, prior.evidence, { gateDefinition: def }) : { status: 'STALE', reasons: [] };
+      const fresh = prior.evidence ? evidenceFreshness(snapshot.root, prior.evidence, {
+        gateDefinition: def,
+        expectedInputs: gateInputs(snapshot, def.id, scopeType, scopeId),
+        collections: gateCollections(snapshot, def.id),
+        now,
+      }) : { status: 'STALE', reasons: [] };
       if (stored && fresh.status === 'FRESH') result = { status: stored.status, detail: `${stored.detail || ''} (from recorded evidence)`.trim() };
       else if (stored) result = { status: 'STALE', detail: `previous result ${stored.status} is stale: ${fresh.reasons.join('; ')}` };
       else result = { status: 'PENDING', detail: `not executed yet — run \`eos check --gate ${def.id}${scopeType === 'story' ? ` --scope ${scopeId}` : ''}\`` };
@@ -338,6 +350,11 @@ export function runGate(snapshot, gateId, scopeType, scopeId, { now = new Date()
   const result = evaluateGate(snapshot, gateId, scopeType, scopeId, { mode: 'all', now });
   if (result.status === 'ERROR' && !result.checks.length) return { result, evidenceFile: null };
   const def = snapshot.gates?.gates.find((g) => g.id === result.gate);
+  // The honoring waiver becomes an INPUT, so deleting it, editing it, or letting it expire makes
+  // the recorded WAIVED stale instead of permanent.
+  const inputPaths = gateInputs(snapshot, result.gate, scopeType, scopeId);
+  if (result.waiver?.file) inputPaths.push(result.waiver.file);
+  const collections = Object.entries(gateCollections(snapshot, result.gate)).map(([key, digest]) => ({ key, digest }));
   const evidence = {
     schemaVersion: 1,
     gate: result.gate,
@@ -347,8 +364,9 @@ export function runGate(snapshot, gateId, scopeType, scopeId, { now = new Date()
     changeType: result.changeType,
     status: result.status,
     commit: snapshot.commit,
-    inputs: hashInputs(snapshot.root, gateInputs(snapshot, result.gate, scopeType, scopeId)),
+    inputs: hashInputs(snapshot.root, inputPaths),
     governanceInputs: hashInputs(snapshot.root, GOVERNANCE_INPUTS),
+    ...(collections.length ? { collections } : {}),
     commands: result.commands,
     checks: result.checks.map((c) => ({ id: c.id, status: c.status, ...(c.detail ? { detail: String(c.detail).slice(0, 600) } : {}), ...(c.fix ? { fix: c.fix } : {}) })),
     generatedAt: now.toISOString(),
@@ -368,7 +386,12 @@ export function recordedGateStatus(snapshot, gateId, scopeType, scopeId) {
   const { present, evidence, error } = readEvidence(snapshot.root, def.id, scopeType, scopeId);
   if (error) return { status: 'ERROR', detail: error };
   if (!present) return { status: 'PENDING', detail: `${def.id} has never been run for ${scopeId} — run \`eos check --gate ${def.id}${scopeType === 'story' ? ` --scope ${scopeId}` : ''}\`` };
-  const f = evidenceFreshness(snapshot.root, evidence, { gateDefinition: def });
+  const f = evidenceFreshness(snapshot.root, evidence, {
+    gateDefinition: def,
+    expectedInputs: gateInputs(snapshot, def.id, scopeType, scopeId),
+    collections: gateCollections(snapshot, def.id),
+  });
   if (f.status === 'STALE') return { status: 'STALE', detail: `the recorded ${evidence.status} is STALE: ${f.reasons.join('; ')}`, evidence };
+  if (!STATUSES.includes(evidence.status)) return { status: 'ERROR', detail: `evidence records an unknown status "${evidence.status}"` };
   return { status: evidence.status, detail: `recorded ${evidence.status} at ${evidence.generatedAt}`, evidence };
 }
