@@ -12,9 +12,12 @@ EOS exists to make Agent output stable, controllable, and measurable. This quant
 1. Ensure `docs/prd.md` (ACs) and `docs/trace-matrix.md` (AC ↔ test/eval) exist (produced by G3/G7).
 2. Run the metric:
    ```sh
-   node .github/hooks/spec-align.mjs          # advisory
-   node .github/hooks/spec-align.mjs --strict # gate: exit 1 on any gap
+   node .github/hooks/spec-align.mjs          # advisory — gaps report but exit 0
+   node .github/hooks/spec-align.mjs --strict # gate: exit 1 on any gap (incl. MISSING evidence)
    ```
+   > **`--strict` is fail-closed.** If `docs/prd.md` or `docs/trace-matrix.md` is absent, strict mode
+   > FAILS (a release gate must never pass on absent proof). Advisory mode prints `ADVISORY / SKIP`
+   > and exits 0 so every-push CI stays non-blocking before G7.
 3. Report three numbers and act on them:
    - **AC coverage %** — PRD ACs that have a trace row. < 100% ⇒ spec drift (built less than specced,
      or forgot to trace). List the missing ACs and add tests or mark explicitly deferred.

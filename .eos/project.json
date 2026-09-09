@@ -1,0 +1,6 @@
+{
+  "projectType": "config-only",
+  "stacks": [],
+  "productParadigms": ["deterministic"],
+  "rationale": "Clean EOS template: governance config + docs only, no product code yet. Change projectType to \"application\" (or \"library\"), list your stacks and fill in commands.test as soon as real code lands — see docs/eos/stack-presets.md. Building an LLM/agent product? Add \"agentic\" to productParadigms so the G-EVAL gate turns on."
+}

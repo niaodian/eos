@@ -4,7 +4,7 @@
 > 本文与英文权威版 [`README.md`](README.md) **内容对等、同步维护**；若翻译出现歧义，以英文为准。
 
 一套可移植、**纯本地优先（local-first）**的「工程操作系统」，面向 VS Code + GitHub Copilot，
-在完整 SDLC 上编排已安装的 **BMAD** 技能（73 个 `bmad-*`）。当前版本：**eos-1.10.0**。
+在完整 SDLC 上编排已安装的 **BMAD** 技能（73 个 `bmad-*`）。当前版本：**eos-1.11.0**。
 
 **在同一框架内支持两种范式：**
 - **传统 SaaS**（确定性）：事务、韧性（熔断/退避）、REST/OpenAPI、RBAC/多租户、OTel 可观测性。
@@ -22,8 +22,12 @@
                                 #   /spec-align /adr /nfr /telemetry-plan /release-gate /runbook /validate-config）
   agents/                       # 5 个编排 agent（discovery/design/architecture/plan/review）
   skills/                       # 项目级能力（operational-readiness）
-  hooks/                        # 护栏 + 验证器（validate-config、eos-doctor、secret-scan、spec-align）
+  hooks/                        # 护栏 + 验证器（validate-config、eos-doctor、secret-scan、
+                                #   spec-align、project-gate）
   workflows/                    # 本地 CI（eos-ci.yml）——经 act 运行，无需云端 runner
+.eos/
+  project.json                  # 项目声明：projectType + stacks + 质量命令
+                                #   （产品质量门禁真正执行的那一份——适用任意技术栈）
 docs/
   checklists/                   # A-gap、B-rework、C-nfr、D-ops、E-security
   eos/                          # blueprint、user-manual、quickstart、stack-presets、agent-map、examples、VERSION
@@ -34,9 +38,12 @@ api/ ops/ src/
 ## 三道强制层（全部本地）
 1. **逐次编辑 hooks**（实时）：护栏拦截破坏性 / 供应链投毒 / 密钥泄露操作；
    每次编辑后 quality + config-check 跑验证器。
-2. **静态验证器**（按需）：`validate-config.mjs`（配置 S1–S11）、`check-doc-parity.mjs`（中⇄英文档对等）、
-   `eos-doctor.mjs`（SDLC 门，含 G-EVAL）、`secret-scan.mjs`（+gitleaks）、`spec-align.mjs`（spec 对齐度量）。
+2. **静态验证器**（按需）：`validate-config.mjs`（配置 S1–S12）、`check-doc-parity.mjs`（中⇄英文档对等）、
+   `eos-doctor.mjs`（SDLC 门，含 G-EVAL）、`secret-scan.mjs`（+gitleaks）、`spec-align.mjs`（spec 对齐度量，
+   `--strict` 为 fail-closed）、`project-gate.mjs`（项目自己的 lint/typecheck/test/eval——适用任意技术栈）。
 3. **全仓 CI**（合并/发布前）：`act push` 运行 `.github/workflows/eos-ci.yml`。
+   产品测试按 **`.eos/project.json` 声明的技术栈**执行（Node/Python/Go/Java/Rust/.NET）——
+   测试失败即 CI 失败；未声明或无法测试的项目 fail closed，而不是被跳过。
 
 ## 本机已验证
 - 较新版本的 VS Code + Copilot Chat · brace glob（`**/*.{ts,tsx}`）正确加载。

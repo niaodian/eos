@@ -1,0 +1,30 @@
+{
+  "$comment": "EXAMPLE compliance profile — copy to docs/compliance-profile.json and edit. This is the MACHINE-CHECKABLE decision record that eos-doctor D5 enforces; docs/compliance-profile.md stays as the human narrative and never authorizes anything on its own.",
+  "regimes": ["GDPR", "HIPAA"],
+  "regulatedDataCategories": ["personal-data", "phi"],
+  "thirdPartyModelPolicy": "redaction-gateway",
+  "approvedRegions": ["eu-west-1", "eu-central-1"],
+  "agreements": [
+    { "provider": "Acme Model Co.", "type": "dpa", "status": "signed", "reference": "DPA-2026-0042" }
+  ],
+  "controls": {
+    "redaction": "implemented",
+    "tokenization": "not_applicable",
+    "deIdentification": "not_applicable",
+    "regulatedDataExcluded": "not_applicable",
+    "encryptionAtRest": "implemented",
+    "encryptionInTransit": "implemented",
+    "auditTrail": "implemented",
+    "accessControl": "implemented",
+    "dataResidency": "implemented"
+  },
+  "dataRetention": { "policy": "P30D for prompts/completions, P7Y for audit records", "status": "implemented" },
+  "owner": "compliance-lead@example.com",
+  "approval": {
+    "approvedBy": "dpo@example.com",
+    "approvedOn": "2026-01-05",
+    "reviewBy": "2027-01-05"
+  },
+  "implementationStatus": "implemented",
+  "notes": "Redaction gateway strips PHI + direct identifiers before any provider call; see docs/adr/004-agentic-data-boundary.md and docs/architecture.md#llm-boundary."
+}

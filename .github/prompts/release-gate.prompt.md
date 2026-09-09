@@ -7,10 +7,14 @@ tools: ['search', 'runCommands']
 # Release Gate (EOS) — Gate G8
 
 Verify and report PASS/FAIL for each:
-- [ ] Quality gate green (lint + typecheck + tests). Run locally.
+- [ ] Quality gate green (lint + typecheck + tests). Run `node .github/hooks/project-gate.mjs` — it
+      executes the commands declared in `.eos/project.json` for THIS project's stack(s). A missing
+      declaration, a missing `commands.test`, or a missing toolchain is a FAIL/BLOCKED, never a skip.
 - [ ] Spec alignment (no drift): `node .github/hooks/spec-align.mjs --strict` PASS — every PRD
       acceptance criterion has a passing trace-matrix row. This is where the "never implement beyond
       the approved spec" red line is ENFORCED (every-push CI runs it advisory; release runs it strict).
+      **Strict is fail-closed**: absent `docs/prd.md` / `docs/trace-matrix.md`, an AC-less PRD, an
+      empty matrix, drift, orphan rows or failing rows all exit 1 — there is no "nothing to score" pass.
       N/A only if the project tracks specs outside docs/prd.md + docs/trace-matrix.md (state so).
 - [ ] No leaked secrets: `node .github/hooks/secret-scan.mjs` PASS (no hardcoded creds/keys/`.env`).
 - [ ] Supply chain: lockfile committed, versions pinned, deps vetted (no typosquat / remote-script-to-shell).
@@ -21,10 +25,13 @@ Verify and report PASS/FAIL for each:
 - [ ] NFR targets from `docs/checklists/C-nfr.md` verified (perf P95/throughput,
       availability SLO/RTO/RPO) — via `bmad-testarch-nfr` at G7; any deferral carries an
       explicit trigger, never silent.
-- [ ] Regulatory controls verified: if a regime was selected (see `docs/compliance-profile.md`),
-      every item in `docs/checklists/F-compliance.md` is ADOPT / N/A+reason (no unresolved BLOCKER).
-      For regulated + LLM/agent: the data-boundary (BAA/DPA · self-host · redaction) is **implemented,
-      not deferred**. If regime = none, state so.
+- [ ] Regulatory controls verified: if a regime was selected (see `docs/compliance-profile.md` +
+      the structured `docs/compliance-profile.json`), every item in `docs/checklists/F-compliance.md`
+      is ADOPT / N/A+reason (no unresolved BLOCKER). For regulated + LLM/agent: the data-boundary
+      (BAA/DPA · self-host · redaction) is **implemented, not deferred** — proven by
+      `thirdPartyModelPolicy` + an `implemented` control + a non-expired `approval` in the JSON
+      profile, which `eos-doctor` D5 checks. Prose alone does not authorize. If regime = none, the
+      profile says `regimes: ["none"]` with a rationale.
 - [ ] Rollback plan exists and is executable (link `ops/runbook-*.md`).
 - [ ] Canary/gradual rollout strategy documented.
 - [ ] Health/readiness endpoints present.
