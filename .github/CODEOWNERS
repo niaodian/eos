@@ -29,9 +29,19 @@
 /.github/agents/                    @niaodian
 /.github/prompts/                   @niaodian
 /.github/hooks/                     @niaodian
+/.github/eos/                       @niaodian
 /.github/workflows/                 @niaodian
 /.github/CODEOWNERS                 @niaodian
 /AGENTS.md                          @niaodian
+
+# --- Workflow spine: gate definitions, gate policy and the action→agent map decide what is
+#     enforced and what a developer is told to do next. Changing them invalidates prior evidence
+#     by design, so they must never be self-modifiable without review.
+/.eos/gates.json                    @niaodian
+/.eos/workflow.json                 @niaodian
+/.eos/agent-map.json                @niaodian
+/.eos/schemas/                      @niaodian
+/.eos/waivers/                      @niaodian
 
 # --- EOS spine + security/compliance docs: changes alter the methodology itself. ---
 /docs/eos/                          @niaodian
