@@ -12,7 +12,8 @@ import { detectStacks } from '../../hooks/lib/project-config.mjs';
 import { loadComplianceProfile, evaluateDataBoundary } from '../../hooks/lib/compliance-profile.mjs';
 import { EVALUATOR_VERSION, posix } from './registry.mjs';
 import { gatePolicy, changeTypeOf, scopeState, gateInputs, gateCollections, ARTIFACTS } from './state.mjs';
-import { hashInputs, GOVERNANCE_INPUTS, writeEvidence, readEvidence, evidenceFreshness } from './evidence.mjs';
+import { hashInputs, GOVERNANCE_INPUTS, writeEvidence, readEvidence, evidenceFreshness, evidenceFile } from './evidence.mjs';
+import { lastGateEvent } from './ledger.mjs';
 import { findWaiver, expiredWaivers } from './waivers.mjs';
 import { AC_ID } from './story.mjs';
 
@@ -196,6 +197,8 @@ const evaluators = {
     const prior = readEvidence(ctx.root, 'story-ready', 'story', ctx.scopeId);
     if (prior.error) return { status: 'ERROR', detail: prior.error };
     if (!prior.present) return fail(`no story-ready evidence for ${ctx.scopeId} — run \`eos check --gate story-ready --scope ${ctx.scopeId}\` first`);
+    const tampered = evidenceIntegrity(ctx.snapshot, prior.evidence);
+    if (tampered.length) return { status: 'ERROR', detail: `the story-ready evidence is not trustworthy: ${tampered.join('; ')}` };
     const def = ctx.snapshot.gates?.gates.find((g) => g.id === 'story-ready');
     const f = evidenceFreshness(ctx.root, prior.evidence, {
       gateDefinition: def,
@@ -375,6 +378,34 @@ export function runGate(snapshot, gateId, scopeType, scopeId, { now = new Date()
   return { result, evidence, evidenceFile };
 }
 
+/**
+ * Evidence integrity. The evidence file is an ordinary file: editing one word in a genuine one
+ * would otherwise grant a promotion, because every input hash still matches (no input changed).
+ * Two cheap cross-checks close that, using data that already exists:
+ *   (a) the top-level status must be what its own checks aggregate to;
+ *   (b) it must agree with the hash-chained ledger, which recorded the same run and cannot be
+ *       edited without breaking the chain.
+ * @returns {string[]} problems (empty = consistent)
+ */
+export function evidenceIntegrity(snapshot, evidence) {
+  const problems = [];
+  const recomputed = aggregate(evidence.checks || []);
+  const waived = evidence.status === 'WAIVED';
+  if (!waived && recomputed !== evidence.status) {
+    problems.push(`the recorded status "${evidence.status}" is not what its own checks aggregate to ("${recomputed}") — this file was edited by hand`);
+  }
+  if (waived && !isBlocking(recomputed) && recomputed !== 'PENDING') {
+    problems.push(`recorded as WAIVED although its checks aggregate to "${recomputed}" — a waiver only applies to a failing gate`);
+  }
+  const event = lastGateEvent(snapshot.events, evidence.scope.type, evidence.scope.id, evidence.gate);
+  if (!event) {
+    problems.push(`the append-only ledger has no record of ${evidence.gate} running for ${evidence.scope.id} — evidence without a ledger entry is not proof`);
+  } else if (event.status !== evidence.status) {
+    problems.push(`the ledger recorded ${evidence.gate} as ${event.status} but this file claims ${evidence.status} — the ledger is hash-chained and wins`);
+  }
+  return problems;
+}
+
 /** The recorded (not live) status of a gate — what a transition guard is allowed to trust. */
 export function recordedGateStatus(snapshot, gateId, scopeType, scopeId) {
   const def = snapshot.gates?.gates.find((g) => g.id === gateId || g.code === gateId);
@@ -386,6 +417,8 @@ export function recordedGateStatus(snapshot, gateId, scopeType, scopeId) {
   const { present, evidence, error } = readEvidence(snapshot.root, def.id, scopeType, scopeId);
   if (error) return { status: 'ERROR', detail: error };
   if (!present) return { status: 'PENDING', detail: `${def.id} has never been run for ${scopeId} — run \`eos check --gate ${def.id}${scopeType === 'story' ? ` --scope ${scopeId}` : ''}\`` };
+  const integrity = evidenceIntegrity(snapshot, evidence);
+  if (integrity.length) return { status: 'ERROR', detail: `${evidenceFile(def.id, scopeType, scopeId)}: ${integrity.join('; ')}. Re-run \`eos check --gate ${def.id}${scopeType === 'story' ? ` --scope ${scopeId}` : ''}\`.`, evidence };
   const f = evidenceFreshness(snapshot.root, evidence, {
     gateDefinition: def,
     expectedInputs: gateInputs(snapshot, def.id, scopeType, scopeId),

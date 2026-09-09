@@ -4,6 +4,7 @@
 // or rewriting an earlier line is detectable offline by `eos ledger --verify` (and in CI).
 import { createHash } from 'node:crypto';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 
 export const LEDGER_PATH = '.eos/ledger/events.jsonl';
@@ -74,8 +75,14 @@ export function verifyChain(events, { root = null } = {}) {
     const { present, head, error } = readHead(root);
     if (error) problems.push(error);
     else if (!present) {
-      // Only a ledger that predates the head record may lack one; an EMPTY ledger is fine.
-      if (events.length) warnings.push(`${LEDGER_HEAD_PATH} is missing — it pins the ledger length so truncation becomes detectable. It is written on the next recorded event; review that diff.`);
+      // "Never had one" (a ledger predating this record) is a migration fact. "Had one and it is
+      // gone" is exactly what deleting the truncation defence looks like, so git decides which
+      // it is; with no git repository we stay on the safe side of the two only for the tracked case.
+      if (events.length) {
+        const tracked = spawnSync('git', ['ls-files', '--error-unmatch', LEDGER_HEAD_PATH], { cwd: root, encoding: 'utf8' }).status === 0;
+        if (tracked) problems.push(`${LEDGER_HEAD_PATH} is tracked in git but missing from the working tree — the truncation defence was removed; restore it from version control`);
+        else warnings.push(`${LEDGER_HEAD_PATH} is missing, so this ledger cannot be checked for truncation. It is written on the next recorded event; review that diff.`);
+      }
     } else {
       if (head.count !== events.length) problems.push(`${LEDGER_HEAD_PATH} expects ${head.count} event(s) but the ledger has ${events.length} — line(s) were removed from the end`);
       if ((head.hash ?? null) !== (events.at(-1)?.hash ?? null)) problems.push(`${LEDGER_HEAD_PATH} does not point at the last event — the tail of the ledger was rewritten`);

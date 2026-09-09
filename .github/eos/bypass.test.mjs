@@ -118,7 +118,22 @@ test('bypass: a hand-written PASS evidence file does not grant a promotion', () 
   });
   const t = run(dir, ['transition', '--scope', 'story', '--id', 'S1', '--to', 'READY_FOR_DEV']);
   assert.equal(t.code, 1, t.out);
-  assert.match(t.out, /STALE|does not cover/);
+  // The hash-chained ledger has no record of this gate ever running, and it wins over a file.
+  assert.match(t.out, /no record of story-ready running|STALE|does not cover/);
+});
+
+test('bypass: editing the status of a GENUINE evidence file does not grant a promotion', () => {
+  const dir = project({ '.eos/project.json': APP, 'docs/prd.md': PRD, 'docs/stories/S1.md': WEAK() });
+  assert.equal(run(dir, ['check', '--gate', 'story-ready', '--scope', 'S1']).code, 1); // really FAILs
+  assert.equal(run(dir, ['transition', '--scope', 'story', '--id', 'S1', '--to', 'IN_REVIEW']).code, 0);
+  const p = join(dir, '.eos/evidence/story-ready__story__S1.json');
+  const ev = JSON.parse(readFileSync(p, 'utf8'));
+  ev.status = 'PASS'; // one word, every input hash still valid
+  writeFileSync(p, JSON.stringify(ev, null, 2));
+  const t = run(dir, ['transition', '--scope', 'story', '--id', 'S1', '--to', 'READY_FOR_DEV']);
+  assert.equal(t.code, 1, t.out);
+  assert.match(t.out, /edited by hand|ledger recorded/);
+  assert.equal(run(dir, ['doctor']).code, 2);
 });
 
 test('bypass: an unrecognised status in stored evidence is treated as the worst case', () => {
@@ -180,14 +195,18 @@ test('migration: a ledger written before the head record existed warns, it does 
   run(dir, ['transition', '--scope', 'story', '--id', 'S1', '--to', 'IN_REVIEW']);
   // simulate a pre-head-record ledger
   rmSync(join(dir, '.eos/ledger/head.json'), { force: true });
+  // Not PASS — EOS must never claim to have verified something it could not check.
   const v = run(dir, ['ledger', '--verify']);
-  assert.equal(v.code, 0, v.out);
-  assert.match(v.out, /WARN/);
+  assert.equal(v.code, 2, v.out);
+  assert.match(v.out, /UNVERIFIED/);
+  assert.doesNotMatch(v.out, /PASS —/);
+  // ...but the repository still works: the chain itself is intact, so state is still readable.
   const s = run(dir, ['status']);
   assert.equal(s.code, 0, s.out);
   assert.match(s.out, /IN_REVIEW/);
   // ...and the head record is restored by the next recorded event
   run(dir, ['transition', '--scope', 'story', '--id', 'S1', '--to', 'DRAFT']);
-  assert.equal(run(dir, ['ledger', '--verify']).code, 0);
-  assert.doesNotMatch(run(dir, ['ledger', '--verify']).out, /WARN/);
+  const after = run(dir, ['ledger', '--verify']);
+  assert.equal(after.code, 0, after.out);
+  assert.match(after.out, /PASS —/);
 });

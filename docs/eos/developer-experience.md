@@ -184,12 +184,19 @@ that asserts something about a *set* (release readiness over the stories) record
 set, so a story added afterwards invalidates it. Release verification additionally requires the
 evidence commit to equal the candidate commit.
 
+An evidence file is an ordinary file, so it is never trusted on its own: its status must be what
+its own checks aggregate to, **and** it must agree with the hash-chained ledger, which recorded the
+same run and cannot be edited without breaking the chain. Editing one word in a genuine evidence
+file is therefore rejected rather than promoted.
+
 **What this does and does not prove.** These are tamper-*evident*, not tamper-*proof*, mechanisms:
 the ledger is hash-chained and pinned by `.eos/ledger/head.json` so rewriting, deleting or
 truncating it is detected, and the state readers refuse to derive anything from a ledger whose
-chain is broken. Someone with write access can still forge both files locally — which is why the
-ledger, the gate definitions, the workflow, the agent map and the project declaration are
-CODEOWNERS-protected, and why CI re-verifies the chain against the commit the build sits on.
+chain is broken. When a property genuinely cannot be checked, the verdict is `UNVERIFIED` (a
+non-zero exit) — never `PASS`. Someone with write access can still forge several tracked files at
+once locally — which is why the ledger, the gate definitions, the workflow, the agent map and the
+project declaration are CODEOWNERS-protected, and why CI re-verifies the chain against the commit
+the build sits on.
 
 ## 6. Change types (branch the flow without unknown paths)
 

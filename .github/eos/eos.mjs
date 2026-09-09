@@ -12,7 +12,7 @@ import { existsSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { readSnapshot, gatePolicy, changeTypeOf, scopeState, gateInputs, gateCollections } from './lib/state.mjs';
-import { runGate, evaluateGate, recordedGateStatus, isBlocking } from './lib/gates.mjs';
+import { runGate, evaluateGate, recordedGateStatus, evidenceIntegrity, isBlocking } from './lib/gates.mjs';
 import { checkTransition, deriveProductState, legalTransitions } from './lib/transitions.mjs';
 import { appendEvent, readEvents, verifyChain, LEDGER_PATH } from './lib/ledger.mjs';
 import { route, activeScope } from './lib/router.mjs';
@@ -361,10 +361,17 @@ const commands = {
         if (!current.startsWith(base)) problems.push(`the ledger is not append-only relative to ${flags.against}: earlier bytes changed`);
       }
     }
-    const json = { events: events.length, ok: problems.length === 0, problems, warnings };
-    emit(flags, json, [`EOS ledger · ${events.length} event(s)`, '', ...warnings.map((w) => `  WARN  ${w}`), ...problems.map((p) => `  ERROR ${p}`), '',
-      problems.length ? `FAIL: the append-only ledger is broken (${problems.length} problem(s))` : 'PASS — the hash chain is intact.', ''].join('\n'));
-    return problems.length ? EXIT.FAIL : EXIT.OK;
+    // An unverifiable ledger is UNVERIFIED, never PASS. Announcing "the chain is intact" for a
+    // ledger we have just said we cannot check for truncation would be the same "absence of proof
+    // reported as proof" this whole layer exists to prevent.
+    const verdict = problems.length
+      ? `FAIL: the append-only ledger is broken (${problems.length} problem(s))`
+      : warnings.length
+        ? `UNVERIFIED: the chain is internally consistent, but ${warnings.length} property could not be checked (see above).`
+        : 'PASS — the hash chain is intact.';
+    const json = { events: events.length, ok: problems.length === 0 && warnings.length === 0, problems, warnings, verdict: problems.length ? 'FAIL' : warnings.length ? 'UNVERIFIED' : 'PASS' };
+    emit(flags, json, [`EOS ledger · ${events.length} event(s)`, '', ...warnings.map((w) => `  WARN  ${w}`), ...problems.map((p) => `  ERROR ${p}`), '', verdict, ''].join('\n'));
+    return problems.length ? EXIT.FAIL : warnings.length ? EXIT.BLOCKED : EXIT.OK;
   },
 
   focus(snapshot, flags) {
@@ -426,6 +433,9 @@ const commands = {
     for (const e of waiverErrors) problems.push({ level: 'ERROR', detail: e });
     for (const { file, evidence } of listEvidence(snapshot.root)) {
       if (!evidence) { problems.push({ level: 'ERROR', detail: `${file}: unreadable evidence` }); continue; }
+      // A hand-edited evidence file is the most valuable thing to forge, so doctor says so loudly
+      // instead of leaving it to be discovered at the transition that it would have granted.
+      for (const t of evidenceIntegrity(snapshot, evidence)) problems.push({ level: 'ERROR', detail: `${file}: ${t}` });
       const def = snapshot.gates?.gates.find((g) => g.id === evidence.gate);
       const f = evidenceFreshness(snapshot.root, evidence, {
         gateDefinition: def,
