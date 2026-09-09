@@ -811,8 +811,8 @@ LLM tracing（token/成本/context/tool-span）。
 |---|---|---|
 | `guardrails.json` + `deny-dangerous.js` | PreToolUse | 拦截危险操作 + **供应链投毒（`curl\|bash`/`--unsafe-perm`）+ 硬编码密钥字面量**（输出 `permissionDecision:"deny"`） |
 | `quality.json` | PostToolUse | 写文件后跑 lint+typecheck+test 质量门（**提示性**，非权威门禁：固定 exit 0；权威门禁是 CI 里的 `project-gate.mjs`） |
-| `config-check.json` | PostToolUse | 每次编辑后自动跑 `validate-config.mjs`（配置 S1–S12）**＋ `eos-doctor.mjs`（SDLC 门诊 / G-EVAL 连线 / 密钥扫描）**（同样是提示性的） |
-| `validate-config.mjs` | 手动/被 hook 调用 | 零依赖静态验证器（S1–S12：规则/agent/prompt frontmatter、glob、必需路径、hook 事件、**S12 `.eos/project.json` 项目声明有效性**） |
+| `config-check.json` | PostToolUse | 每次编辑后自动跑 `validate-config.mjs`（配置 S1–S13）**＋ `eos-doctor.mjs`（SDLC 门诊 / G-EVAL 连线 / 密钥扫描）**（同样是提示性的） |
+| `validate-config.mjs` | 手动/被 hook 调用 | 零依赖静态验证器（S1–S13：规则/agent/prompt frontmatter、glob、必需路径、hook 事件、**S12 `.eos/project.json` 项目声明有效性**、**S13 `.eos/` 工作流主干及其交叉引用**） |
 | `project-gate.mjs` | 手动 / **被 CI 调用（权威）** | 跨栈产品质量门：按 `.eos/project.json` 真的执行 install/lint/typecheck/test/eval。**fail closed**——`application` 缺 `commands.test`、有栈清单却没声明、工具链没装（BLOCKED）都是 exit 1 |
 | `eos-doctor.mjs` | **PostToolUse（逐编辑，经 `config-check.json`）** / 手动 / 被 CI 调用 | 零依赖 SDLC 门诊：**D0 项目声明**、D1/D2 G-EVAL（以 `productParadigms` 声明为准，SDK/目录探测只是补网）、D3 G-UX、**D4 密钥扫描（调 `secret-scan.mjs`）**、**D5 合规数据边界（校验结构化 `docs/compliance-profile.json`，不再靠散文关键词）** |
 | `secret-scan.mjs` | 手动 / 被 eos-doctor + CI 调用 | 密钥扫描：内置零依赖正则（硬编码密钥/私钥、误提交 `.env`）**＋ 若装了 `gitleaks` 自动叠加深度扫描**（`.gitleaks.toml` 白名单）；命中 exit 1、输出脱敏 |
@@ -1079,13 +1079,21 @@ EOS 的栈规则是**可插拔**的。新增一个栈 = 加一个 `*.instruction
 # 附录 B 命令速查卡
 
 ```
-# ── 终端 ──
+# ── 终端 —— 唯一循环（日常只需要这些）──
 npx degit niaodian/eos my-app   # 新建项目
+node .github/eos/eos.mjs init --write               # 本地 VS Code 任务（绝不覆盖已有文件）
+node .github/eos/eos.mjs next                       # 唯一的下一步、为什么、怎么开始
+node .github/eos/eos.mjs resume                     # 新会话？接着上次继续
+node .github/eos/eos.mjs check --gate <id> --scope <id>   # 证明这一步，并写入证据
+node .github/eos/eos.mjs transition --scope story --id <id> --to <STATE>
+node .github/eos/eos.mjs explain <gate>             # 按需展开某一个门禁的完整规则
 node .github/hooks/validate-config.mjs              # 配置自检（期望 PASS）
 npm test                                            # 跑测试（质量门同款）
 npm audit                                           # 发布前依赖审计
 
 # ── Copilot Chat（Agent 模式）──
+（agent）eos-guide            # 统一入口：读状态、给一个动作、负责交接
+/eos-next  /eos-resume  /eos-status   # 同一循环的 prompt 形式
 /eos-help                    # 迷路了？打印记忆卡 + 你在哪个阶段 + 下一步（只读，不改文件）
 /eos-init                    # 阶段0：一次性硬化（分支保护 + CODEOWNERS + 审批基线 → activation.md）
 （agent）eos-discovery        # 阶段1：问题定义        → G1

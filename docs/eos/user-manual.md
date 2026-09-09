@@ -767,8 +767,8 @@ When writing AI code, Agentic rules take effect **automatically**: prompts saved
 |---|---|---|
 | `guardrails.json` + `deny-dangerous.js` | PreToolUse | Blocks dangerous operations + **supply-chain poisoning (`curl&#124;bash`/`--unsafe-perm`) + hardcoded secret literals** (outputs `permissionDecision:"deny"`) |
 | `quality.json` | PostToolUse | Runs lint+typecheck+test quality gate after file writes (**advisory**, not the authoritative gate: it always exits 0; the authority is `project-gate.mjs` in CI) |
-| `config-check.json` | PostToolUse | Automatically runs `validate-config.mjs` after every edit (configuration S1–S12) **+ `eos-doctor.mjs` (SDLC clinic / G-EVAL wiring / secret scan)** (also advisory) |
-| `validate-config.mjs` | Manual/called by hook | Zero-dependency static validator (S1–S12: rule/agent/prompt frontmatter, glob, required paths, hook events, **S12 `.eos/project.json` declaration validity**) |
+| `config-check.json` | PostToolUse | Automatically runs `validate-config.mjs` after every edit (configuration S1–S13) **+ `eos-doctor.mjs` (SDLC clinic / G-EVAL wiring / secret scan)** (also advisory) |
+| `validate-config.mjs` | Manual/called by hook | Zero-dependency static validator (S1–S13: rule/agent/prompt frontmatter, glob, required paths, hook events, **S12 `.eos/project.json` declaration validity**, **S13 the `.eos/` workflow spine and its cross-references**) |
 | `project-gate.mjs` | Manual / **called by CI (authoritative)** | Cross-stack product-quality gate: actually executes install/lint/typecheck/test/eval as declared in `.eos/project.json`. **Fail closed** — an `application` without `commands.test`, a stack manifest with no declaration, or a missing toolchain (BLOCKED) all exit 1 |
 | `eos-doctor.mjs` | **PostToolUse (per edit, via `config-check.json`)** / manual / called by CI | Zero-dependency SDLC clinic: **D0 project declaration**, D1/D2 G-EVAL (driven by the `productParadigms` declaration; SDK/dir discovery is only a safety net), D3 G-UX, **D4 secret scan (calls `secret-scan.mjs`)**, **D5 compliance data boundary (validates the structured `docs/compliance-profile.json`, no longer prose keywords)** |
 | `secret-scan.mjs` | Manual / called by eos-doctor + CI | Secret scanning: built-in zero-dependency regexes (hardcoded secrets/private keys, accidentally committed `.env`) **+ if `gitleaks` is installed, automatically adds deep scan** (`.gitleaks.toml` allowlist); hits exit 1 and output is redacted |
@@ -1027,13 +1027,21 @@ EOS stack rules are **pluggable**. Adding a stack = add one `*.instructions.md` 
 # Appendix B Command cheat sheet
 
 ```
-# ── Terminal ──
+# ── Terminal — the loop (this is all you need day to day) ──
 npx degit niaodian/eos my-app   # create new project
+node .github/eos/eos.mjs init --write               # local VS Code tasks (never overwrites)
+node .github/eos/eos.mjs next                       # the ONE next action, why, how to start it
+node .github/eos/eos.mjs resume                     # new session? pick up where you stopped
+node .github/eos/eos.mjs check --gate <id> --scope <id>   # prove a step, record the evidence
+node .github/eos/eos.mjs transition --scope story --id <id> --to <STATE>
+node .github/eos/eos.mjs explain <gate>             # the full rule set for one gate, on demand
 node .github/hooks/validate-config.mjs              # config self-check (expect PASS)
 npm test                                            # run tests (same as quality gate)
 npm audit                                           # dependency audit before release
 
 # ── Copilot Chat (Agent mode) ──
+(agent) eos-guide            # unified entry point: reads the state, gives one action, hands off
+/eos-next  /eos-resume  /eos-status   # the same loop as prompts
 /eos-help                    # lost? print memory card + current phase + next step (read-only, no file changes)
 /eos-init                    # Phase 0: one-time hardening (branch protection + CODEOWNERS + approval baseline → activation.md)
 (agent) eos-discovery        # Phase 1: problem definition        → G1

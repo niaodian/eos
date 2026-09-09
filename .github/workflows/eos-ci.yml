@@ -33,7 +33,7 @@ jobs:
         with:
           node-version: '20'
 
-      - name: EOS config validation (S1–S12)
+      - name: EOS config validation (S1–S13)
         run: node .github/hooks/validate-config.mjs
 
       - name: EOS doc parity (zh ⇄ en lockstep — structure + factual codes)
