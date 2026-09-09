@@ -131,7 +131,7 @@ test('journey: a DOC_ONLY change is not dragged through the product gates', () =
   const dir = project({
     '.eos/project.json': APP,
     'docs/prd.md': PRD,
-    'docs/stories/DOC-001.md': story({ id: 'DOC-001', changeType: 'DOC_ONLY', rows: [] }),
+    'docs/stories/DOC-001.md': story({ id: 'DOC-001', changeType: 'DOC_ONLY', rows: [], classificationReason: 'Only prose in docs/ changes; no product code is touched.' }),
   });
   const r = runJson(dir, ['next']);
   assert.equal(r.code, 0, r.out);
@@ -140,4 +140,56 @@ test('journey: a DOC_ONLY change is not dragged through the product gates', () =
   assert.equal(run(dir, ['transition', '--scope', 'story', '--id', 'DOC-001', '--to', 'IN_REVIEW']).code, 0);
   const event = readFileSync(join(dir, '.eos/ledger/events.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l)).at(-1);
   assert.deepEqual(event.notApplicableGates.sort(), ['activation', 'prd-ready', 'release-ready', 'story-ready', 'verified']);
+});
+
+test('journey: a SPIKE may explore freely but can never reach MERGED', () => {
+  const dir = project({
+    '.eos/project.json': APP,
+    'docs/prd.md': PRD,
+    'docs/stories/SPIKE-007.md': story({
+      id: 'SPIKE-007', changeType: 'SPIKE', rows: [],
+      classificationReason: 'Two-day investigation of the queue option; nothing ships from it.',
+    }),
+  });
+  // exploration is unguarded up to the last step
+  for (const to of ['IN_REVIEW', 'READY_FOR_DEV', 'IN_DEVELOPMENT', 'READY_FOR_TEST', 'VERIFIED']) {
+    const r = run(dir, ['transition', '--scope', 'story', '--id', 'SPIKE-007', '--to', to]);
+    assert.equal(r.code, 0, `${to}: ${r.out}`);
+  }
+  // ...and then promotion is refused, so relabelling work as a SPIKE is not a bypass
+  const merge = run(dir, ['transition', '--scope', 'story', '--id', 'SPIKE-007', '--to', 'MERGED']);
+  assert.equal(merge.code, 1, merge.out);
+  assert.match(merge.out, /may never reach MERGED/);
+  assert.match(merge.out, /FEATURE or BUGFIX/);
+});
+
+test('journey: switching every gate off requires a recorded justification', () => {
+  const dir = project({
+    '.eos/project.json': APP,
+    'docs/prd.md': PRD,
+    'docs/stories/DOC-002.md': story({ id: 'DOC-002', changeType: 'DOC_ONLY', rows: [] }),
+  });
+  const r = runJson(dir, ['next']);
+  assert.equal(r.code, 2, r.out);
+  assert.equal(r.json.recommendedAction.id, 'justify-classification');
+  assert.match(JSON.stringify(r.json.blockers), /classificationReason/);
+  const blocked = run(dir, ['transition', '--scope', 'story', '--id', 'DOC-002', '--to', 'IN_REVIEW']);
+  assert.equal(blocked.code, 1, blocked.out);
+
+  write(dir, 'docs/stories/DOC-002.md', story({
+    id: 'DOC-002', changeType: 'DOC_ONLY', rows: [],
+    classificationReason: 'Only prose in docs/ changes; no product behaviour is affected.',
+  }));
+  assert.equal(run(dir, ['transition', '--scope', 'story', '--id', 'DOC-002', '--to', 'IN_REVIEW']).code, 0);
+});
+
+test('journey: an undeclared change type is refused rather than defaulted into freedom', () => {
+  const dir = project({
+    '.eos/project.json': APP,
+    'docs/prd.md': PRD,
+    'docs/stories/X-1.md': story({ id: 'X-1', changeType: 'WHATEVER', rows: [] }),
+  });
+  const r = run(dir, ['transition', '--scope', 'story', '--id', 'X-1', '--to', 'IN_REVIEW']);
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.out, /not defined in workflow profile/);
 });

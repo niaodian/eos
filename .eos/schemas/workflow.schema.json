@@ -33,6 +33,8 @@
                   "properties": {
                     "scope": { "enum": ["product", "story", "release"] },
                     "description": { "type": "string" },
+                    "mergeable": { "type": "boolean", "description": "false = work under this change type may never reach MERGED. Exploration stays free; promotion stays controlled." },
+                    "requiresClassificationReason": { "type": "boolean", "description": "true = the story must record WHY it carries this (gate-bypassing) classification before it can leave DRAFT." },
                     "gates": {
                       "type": "object",
                       "patternProperties": {

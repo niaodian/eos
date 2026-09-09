@@ -26,6 +26,8 @@
         "SPIKE": {
           "scope": "story",
           "description": "Time-boxed investigation. Nothing here may merge into the product path; the output is a decision record.",
+          "mergeable": false,
+          "requiresClassificationReason": true,
           "gates": { "activation": "required", "prd-ready": "not_applicable", "story-ready": "not_applicable", "verified": "not_applicable", "release-ready": "not_applicable" }
         },
         "HOTFIX": {
@@ -36,11 +38,13 @@
         "DOC_ONLY": {
           "scope": "story",
           "description": "Documentation-only change with no product-code or behaviour impact.",
+          "requiresClassificationReason": true,
           "gates": { "activation": "not_applicable", "prd-ready": "not_applicable", "story-ready": "not_applicable", "verified": "not_applicable", "release-ready": "not_applicable" }
         },
         "GOVERNANCE": {
           "scope": "product",
           "description": "Change to EOS itself (gates, workflow, agent map, instructions). Invalidates prior evidence by design.",
+          "requiresClassificationReason": true,
           "gates": { "activation": "required", "prd-ready": "not_applicable", "story-ready": "not_applicable", "verified": "not_applicable", "release-ready": "not_applicable" }
         },
         "RELEASE": {
@@ -57,11 +61,14 @@
         "SPIKE": {
           "scope": "story",
           "description": "Everything is a spike.",
+          "mergeable": false,
+          "requiresClassificationReason": true,
           "gates": { "activation": "required", "prd-ready": "not_applicable", "story-ready": "not_applicable", "verified": "not_applicable", "release-ready": "not_applicable" }
         },
         "DOC_ONLY": {
           "scope": "story",
           "description": "Documentation-only change.",
+          "requiresClassificationReason": true,
           "gates": { "activation": "not_applicable", "prd-ready": "not_applicable", "story-ready": "not_applicable", "verified": "not_applicable", "release-ready": "not_applicable" }
         }
       }

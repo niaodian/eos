@@ -74,6 +74,12 @@
       "skills": ["bmad-check-implementation-readiness"],
       "handoff": "Close the listed story-readiness gaps (telemetry / authorization / rollback / dependencies) only."
     },
+    "justify-classification": {
+      "agent": null,
+      "prompt": null,
+      "skills": [],
+      "handoff": "This change type turns verification gates off. Record in the story front matter why that is legitimate — EOS records the decision, it does not make it."
+    },
     "refresh-stale-evidence": {
       "agent": null,
       "prompt": null,

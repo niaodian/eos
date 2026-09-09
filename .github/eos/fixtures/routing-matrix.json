@@ -234,21 +234,32 @@
       "expectBlocker": "tests-executed"
     },
     {
-      "name": "a documentation-only change has no applicable gate",
+      "name": "a gate-disabling classification must be justified before it buys any freedom",
       "files": {
         "@project": "@APP",
         "docs/prd.md": "@PRD",
         "docs/stories/STORY-110.md": { "_story": { "id": "STORY-110", "changeType": "DOC_ONLY" } }
       },
+      "expectedAction": "justify-classification",
+      "expectedExitCode": 2,
+      "expectBlocker": "classification"
+    },
+    {
+      "name": "a justified documentation-only change has no applicable gate",
+      "files": {
+        "@project": "@APP",
+        "docs/prd.md": "@PRD",
+        "docs/stories/STORY-111.md": { "_story": { "id": "STORY-111", "changeType": "DOC_ONLY", "classificationReason": "Only docs/eos/*.md prose changes; no product code is touched." } }
+      },
       "expectedAction": "start-next-change",
       "expectedExitCode": 0
     },
     {
-      "name": "a spike is unguarded but must end in a decision record",
+      "name": "a justified spike is unguarded but must end in a decision record",
       "files": {
         "@project": "@APP",
         "docs/prd.md": "@PRD",
-        "docs/stories/SPIKE-001.md": { "_story": { "id": "SPIKE-001", "changeType": "SPIKE" } }
+        "docs/stories/SPIKE-001.md": { "_story": { "id": "SPIKE-001", "changeType": "SPIKE", "classificationReason": "Time-boxed 2-day investigation of the queue option; nothing ships from it." } }
       },
       "expectedAction": "record-spike-outcome",
       "expectedPrompt": "adr",

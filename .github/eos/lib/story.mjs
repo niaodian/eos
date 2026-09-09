@@ -71,6 +71,7 @@ export function parseStory(root, rel) {
     id: fm.id || rel.split('/').pop().replace(/\.md$/, ''),
     title: fm.title || '',
     changeType: fm.changeType || null,
+    classificationReason: fm.classificationReason || '',
     declaredState: fm.state || null,
     path: posix(rel),
     acs,
@@ -102,7 +103,7 @@ export function listStories(root) {
       } catch (err) {
         // An unreadable / unparseable story must surface as a failing gate, never disappear.
         out.push({
-          id: e.name.replace(/\.md$/, ''), title: '', changeType: null, declaredState: null,
+          id: e.name.replace(/\.md$/, ''), title: '', changeType: null, classificationReason: '', declaredState: null,
           path: posix(rel), acs: [], ops: { telemetry: '', authorization: '', rollback: '' },
           dependencies: null, errors: [`${posix(rel)}: could not be parsed (${err.message})`],
         });

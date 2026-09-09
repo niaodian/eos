@@ -97,12 +97,14 @@ export function story({
   id = 'STORY-001',
   title = 'Login',
   changeType = 'FEATURE',
+  classificationReason = '',
   state = null,
   rows = [['AC1.1', 'user can log in', 'tests/login.test.mjs::valid password', '—']],
   ops = true,
   deps = true,
 } = {}) {
   const fmLines = [`id: ${id}`, `title: ${title}`, `changeType: ${changeType}`];
+  if (classificationReason) fmLines.push(`classificationReason: ${classificationReason}`);
   if (state) fmLines.push(`state: ${state}`);
   const out = ['---', ...fmLines, '---', '', '## Acceptance criteria', '',
     '| AC | Statement | Test intent | Eval case |', '| --- | --- | --- | --- |'];

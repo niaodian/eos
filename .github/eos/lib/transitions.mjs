@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { listStories } from './story.mjs';
 import { recordedGateStatus, evaluateGate } from './gates.mjs';
 import { readEvidence, evidenceFreshness } from './evidence.mjs';
-import { scopeState } from './state.mjs';
+import { scopeState, changeTypeOf } from './state.mjs';
 
 export const PROMOTABLE = new Set(['PASS', 'WAIVED', 'NOT_APPLICABLE']);
 
@@ -110,6 +110,31 @@ export function guardResult(snapshot, transition, scopeType, scopeId, { live = f
  * Full validation of a requested transition.
  * @returns {{allowed:boolean, from:string, to:string, reasons:string[], transition:object|null}}
  */
+/**
+ * Change-type policy that is NOT a gate: a classification which switches gates off must be
+ * justified, and a classification that exists only for exploration must not be able to reach
+ * MERGED. Without these, relabelling a story `SPIKE` or `DOC_ONLY` would be a one-line bypass of
+ * every verification the rest of this engine performs.
+ */
+export function classificationBlock(snapshot, { scopeType, scopeId, to }) {
+  if (scopeType !== 'story') return null;
+  const changeType = changeTypeOf(snapshot, scopeType, scopeId);
+  const cfg = snapshot.profile?.changeTypes?.[changeType];
+  if (!cfg) return `change type "${changeType}" is not defined in workflow profile "${snapshot.profileName}" — every change must follow a declared policy`;
+  if (to === 'MERGED' && cfg.mergeable === false) {
+    return `a ${changeType} change may never reach MERGED (${cfg.description}). Open a FEATURE or BUGFIX story for anything that should ship, and record the outcome in an ADR.`;
+  }
+  if (cfg.requiresClassificationReason && to !== 'DRAFT') {
+    const story = snapshot.stories.find((s) => s.id === scopeId);
+    const reason = (story?.classificationReason || '').trim();
+    if (reason.length < 15) {
+      const off = Object.entries(cfg.gates || {}).filter(([, p]) => p === 'not_applicable').map(([g]) => g).join(', ');
+      return `"${changeType}" switches these gates off: ${off}. That classification must be justified: add \`classificationReason: <why this change needs no verification>\` (>= 15 characters) to the front matter of ${story ? story.path : `docs/stories/${scopeId}.md`}. EOS records the decision; it does not make it for you.`;
+    }
+  }
+  return null;
+}
+
 export function checkTransition(snapshot, { scopeType, scopeId, to }) {
   if (scopeType === 'product') {
     const derived = deriveProductState(snapshot);
@@ -127,6 +152,8 @@ export function checkTransition(snapshot, { scopeType, scopeId, to }) {
   const from = scopeState(snapshot, scopeType, scopeId);
   const plan = planTransition(snapshot, { scopeType, from, to });
   if (!plan.legal) return { allowed: false, from, to, transition: null, reasons: [plan.reason] };
+  const classification = classificationBlock(snapshot, { scopeType, scopeId, to });
+  if (classification) return { allowed: false, from, to, transition: plan.transition, reasons: [classification] };
   const guard = guardResult(snapshot, plan.transition, scopeType, scopeId);
   if (!guard.ok) return { allowed: false, from, to, transition: plan.transition, reasons: [guard.reason] };
   return { allowed: true, from, to, transition: plan.transition, reasons: [] };

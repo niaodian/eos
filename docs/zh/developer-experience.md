@@ -186,8 +186,11 @@ Commit SHA · Gate 定义版本 · Evaluator 版本 · 每个输入文件的 SHA
 | GOVERNANCE | 不适用 | 不适用 | 不适用 | 不适用 |
 | RELEASE | 不适用 | 不适用 | 不适用 | 必需 |
 
-"不适用"是*被记录进 Ledger 的决定*，而不是静默跳过：把一个 SPIKE 晋级到 `MERGED` 仍然会记录
-哪些门禁被声明为 N/A，以及 Change Type 为什么这么判定。
+"不适用"是*被记录进 Ledger 的决定*，而不是静默跳过 —— 而且一个会关掉门禁的分类不能只靠声称。
+有两条规则阻止"改个标签"变成一行绕过上面一切的捷径：Change Type 可以声明 `mergeable: false`
+（SPIKE 可以自由探索，但永远到不了 `MERGED` —— 要上线就走 FEATURE 或 BUGFIX），并且关掉验证的
+Change Type（`SPIKE`、`DOC_ONLY`、`GOVERNANCE`）必须在 Story front matter 里写明
+`classificationReason` 才能离开 `DRAFT`。未声明的 Change Type 会被直接拒绝，而不是默认放行。
 
 ### 6.1 Waiver
 

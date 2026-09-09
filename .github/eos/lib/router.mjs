@@ -5,7 +5,7 @@
 // to guess the phase, and it never returns a menu of twelve possibilities.
 import { resolveAction, skillDiagnostics } from './registry.mjs';
 import { evaluateGate, isBlocking } from './gates.mjs';
-import { deriveProductState } from './transitions.mjs';
+import { deriveProductState, classificationBlock } from './transitions.mjs';
 import { scopeState, changeTypeOf, gatePolicy } from './state.mjs';
 
 const CLI = 'node .github/eos/eos.mjs';
@@ -35,6 +35,7 @@ const TITLES = {
   'repair-verification': 'Repair the failing verification',
   'build-trace-matrix': 'Trace the acceptance criteria to passing tests',
   'refresh-stale-evidence': 'Re-run the gate whose evidence went stale',
+  'justify-classification': 'Justify the classification that switches the gates off',
   'record-spike-outcome': 'Record the spike outcome',
   'prepare-release': 'Prepare the release',
   'repair-release': 'Close the release blockers',
@@ -311,6 +312,19 @@ export function route(snapshot, { now = new Date() } = {}) {
   // --- story scope: the state machine drives the step ---------------------------------------------
   const state = current.state;
   const story = snapshot.stories.find((s) => s.id === scope.id) || null;
+
+  // A classification that switches gates off must be justified BEFORE it buys any freedom.
+  const classification = classificationBlock(snapshot, { scopeType: 'story', scopeId: scope.id, to: 'IN_REVIEW' });
+  if (classification) {
+    take(action(snapshot, 'justify-classification', {
+      reason: classification,
+      command: `${CLI} status`,
+      doneWhen: [`docs/stories/${scope.id}.md front matter carries a classificationReason`, `\`eos transition --scope story --id ${scope.id} --to IN_REVIEW\` is accepted`],
+    }), { blocker: { gate: 'workflow', check: 'classification', status: 'FAIL', detail: classification } });
+    exitCode = 2;
+    addAlternatives(snapshot, alternatives, recommended, scope);
+    return finish();
+  }
 
   if (changeType === 'SPIKE') {
     take(action(snapshot, 'record-spike-outcome', {

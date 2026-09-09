@@ -195,8 +195,13 @@ candidate commit.
 | GOVERNANCE | not applicable | not applicable | not applicable | not applicable |
 | RELEASE | not applicable | not applicable | not applicable | required |
 
-`not applicable` is a *decision recorded in the ledger*, not a silent skip: promoting a SPIKE to
-`MERGED` still records which gates were declared N/A and why the change type says so.
+`not applicable` is a *decision recorded in the ledger*, not a silent skip — and a classification
+that switches gates off cannot simply be asserted. Two rules stop relabelling from becoming a
+one-line bypass of everything above: a change type may declare `mergeable: false` (a SPIKE explores
+freely but can never reach `MERGED` — ship it as a FEATURE or BUGFIX instead), and a change type
+that turns verification off (`SPIKE`, `DOC_ONLY`, `GOVERNANCE`) requires a
+`classificationReason` in the story front matter before it may leave `DRAFT`. An undeclared change
+type is refused outright rather than defaulted into freedom.
 
 ### 6.1 Waivers
 
