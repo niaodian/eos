@@ -3,7 +3,7 @@
 > 🌏 Chinese: **[README.zh.md](README.zh.md)** (full parity translation) — English is the reference language.
 
 A portable, **local-first** engineering operating system for VS Code + GitHub Copilot,
-orchestrating the installed **BMAD** skills (73 `bmad-*`) across the full SDLC. Version: **eos-1.10.0**.
+orchestrating the installed **BMAD** skills (73 `bmad-*`) across the full SDLC. Version: **eos-1.11.0**.
 
 **Supports two paradigms in one framework:**
 - **Traditional SaaS** (deterministic): transactions, resilience (circuit-breaker/backoff), REST/OpenAPI, RBAC/multi-tenancy, OTel observability.
@@ -21,8 +21,12 @@ The two are **explicitly isolated** so a project can be either — or both — w
                                 #   /spec-align /adr /nfr /telemetry-plan /release-gate /runbook /validate-config)
   agents/                       # 5 orchestrator agents (discovery/design/architecture/plan/review)
   skills/                       # project-level capabilities (operational-readiness)
-  hooks/                        # guardrails + validators (validate-config, eos-doctor, secret-scan, spec-align)
+  hooks/                        # guardrails + validators (validate-config, eos-doctor, secret-scan,
+                                #   spec-align, project-gate)
   workflows/                    # local CI (eos-ci.yml) — runnable via act, no cloud runner
+.eos/
+  project.json                  # project declaration: projectType + stacks + quality commands
+                                #   (what the product-quality gate actually executes — any stack)
 docs/
   checklists/                   # A-gap, B-rework, C-nfr, D-ops, E-security
   eos/                          # blueprint, user-manual, quickstart, stack-presets, agent-map, examples, VERSION
@@ -33,10 +37,13 @@ api/ ops/ src/
 ## Three enforcement layers (all local)
 1. **Per-edit hooks** (real-time): guardrail denies destructive / supply-chain-poison / secret-leak ops;
    quality + config-check run validators after each edit.
-2. **Static validators** (on demand): `validate-config.mjs` (config S1–S11), `check-doc-parity.mjs`
+2. **Static validators** (on demand): `validate-config.mjs` (config S1–S12), `check-doc-parity.mjs`
    (zh⇄en doc parity), `eos-doctor.mjs` (SDLC gates incl. G-EVAL), `secret-scan.mjs` (+gitleaks),
-   `spec-align.mjs` (spec-alignment metric).
+   `spec-align.mjs` (spec-alignment metric; `--strict` is fail-closed), `project-gate.mjs` (the
+   project's own lint/typecheck/test/eval — for any stack).
 3. **Whole-repo CI** (before merge/release): `act push` runs `.github/workflows/eos-ci.yml`.
+   Product tests run for **whatever stack `.eos/project.json` declares** (Node/Python/Go/Java/Rust/.NET) —
+   a failing test fails CI, and an undeclared or untestable project fails closed rather than being skipped.
 
 ## Verified on this machine
 - A recent VS Code + Copilot Chat build · brace globs (`**/*.{ts,tsx}`) load correctly.

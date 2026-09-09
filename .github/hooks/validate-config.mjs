@@ -3,6 +3,7 @@
 // Run from project root: node .github/hooks/validate-config.mjs
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join, relative } from 'node:path';
+import { loadProjectConfig, detectStacks, PROJECT_CONFIG_PATH } from './lib/project-config.mjs';
 
 const root = process.cwd();
 const errors = [];
@@ -156,6 +157,26 @@ if (existsSync(promptsDir)) {
     const head = fm(readFileSync(join(promptsDir, f), 'utf8'));
     if (!head) { errors.push(`S11 prompts/${f}: missing YAML frontmatter`); continue; }
     if (!/^description:\s*\S/m.test(head)) warns.push(`S11 prompts/${f}: missing "description"`);
+  }
+}
+
+// S12 the project declaration itself must be valid — it decides which product gates run, so a typo
+// in it silently disables the quality/eval gate. Present-but-broken is always an ERROR. When it is
+// ABSENT, mirror project-gate.mjs exactly so the two never disagree: a plain Node repo keeps the
+// legacy npm defaults (WARN — no regression for repos created before this contract existed), while
+// any other stack has no legacy default and must declare itself (ERROR). [audit EOS-002/EOS-003]
+const proj = loadProjectConfig(root);
+for (const e of proj.errors) errors.push(`S12 ${e}`);
+for (const w of proj.warnings) warns.push(`S12 ${w}`);
+if (!proj.present) {
+  const detected = detectStacks(root);
+  const legacyNodeOnly = detected.length === 1 && detected[0] === 'node';
+  if (detected.length && !legacyNodeOnly) {
+    errors.push(`S12 stack manifest(s) found (${detected.join(', ')}) but no ${PROJECT_CONFIG_PATH} — declare projectType + stacks + commands.test so the product-quality gate actually runs (see docs/eos/stack-presets.md).`);
+  } else if (legacyNodeOnly) {
+    warns.push(`S12 no ${PROJECT_CONFIG_PATH} — falling back to the legacy Node defaults (npm scripts). Declare the project to pin your own commands (see docs/eos/stack-presets.md).`);
+  } else {
+    warns.push(`S12 no ${PROJECT_CONFIG_PATH} — add it when product code lands so tests/evals are gated for your stack.`);
   }
 }
 

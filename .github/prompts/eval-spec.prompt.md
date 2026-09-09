@@ -15,6 +15,15 @@ eval set defined up front.
 This gate applies **only to features with an LLM/agent/RAG component**. For a purely deterministic
 feature, write one line in `docs/eval-plan.md`: `SKIP — no LLM/agent component (reason: …)` and proceed.
 
+> **Declare it, don't rely on detection.** Set the paradigm in **`.eos/project.json`** —
+> `"productParadigms": ["deterministic", "agentic"]` (or `"evalRequired": true`). That declaration is
+> what `eos-doctor` treats as AUTHORITATIVE: an agentic project with no `docs/eval-plan.md` or no
+> runnable harness FAILS. SDK/dir auto-discovery still runs as a safety net, but it can never be
+> complete — a self-hosted gateway or a private wrapper leaves no fingerprint, so an undeclared
+> agentic product can slip past detection. If discovery finds LLM evidence while the declaration says
+> deterministic, the doctor fails until you either declare `agentic` or record
+> `"evalWaiver": { "reason": "…", "approvedBy": "…" }`.
+
 ## Produce `docs/eval-plan.md`
 For each LLM-backed acceptance criterion:
 1. **Eval dataset** — representative inputs + expected behavior (golden set). Include edge cases,
@@ -35,8 +44,9 @@ For each LLM-backed acceptance criterion:
   dataset + graders + runner + stub) and replace the stub with your agent.
 
 ## Gate G-EVAL (for LLM/agentic work)
+- [ ] `.eos/project.json` declares the agentic paradigm (this is what turns the gate on).
 - [ ] Every LLM-backed AC has ≥1 eval case with a grader and a pass threshold.
-- [ ] A regression baseline exists; the eval command runs locally.
+- [ ] A regression baseline exists; the eval command runs locally (`commands.eval`).
 - [ ] Adversarial/injection and cost/latency cases are included.
 
 Any unmet item => BLOCKER. Evals are designed here (planning) and **run at G7**; a prompt/model/tool
