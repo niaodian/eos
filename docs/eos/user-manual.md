@@ -1,6 +1,6 @@
 # EOS User Manual (Engineering Operating System)
 
-> Version: synced with `docs/eos/VERSION` (current `eos-1.11.0`)
+> Version: synced with `docs/eos/VERSION` (current `eos-1.12.0`)
 > Applies to: recent VS Code + GitHub Copilot Chat (custom agent / hooks are recent-version capabilities; confirm the version in the "About VS Code" panel) + 73 installed `bmad-*` skills (user-level)
 > Positioning: this manual is an **operating guide (how to use it)**; for design rationale and trade-offs, see `blueprint.md` in the same directory (why it is designed this way).
 > Conventions: prose in English; file names / paths / commands / config keys kept verbatim.
@@ -58,20 +58,25 @@ It solves four persistent hard problems:
 
 ## 1.2 Three commands you will use every day
 
-In **Copilot Chat (Agent mode)** in VS Code, enter:
+In the **terminal** — this is the whole loop, and it is all you have to remember:
 
 ```
-/requirements "<one-sentence feature description>"     # shortest entry into the formal development flow
-/release-gate                                           # pass the gate before launch
+node .github/eos/eos.mjs resume   # what was I doing, what is blocking it
+node .github/eos/eos.mjs next     # the ONE recommended next action, why, and how to start it
+node .github/eos/eos.mjs check --gate <id> --scope <id>   # prove the step, record the evidence
 ```
 
-In the **terminal**:
-
-```
-node .github/hooks/validate-config.mjs   # config self-check, expect PASS
-```
+In **Copilot Chat (Agent mode)** the same loop is the **eos-guide** agent, or the prompts
+`/eos-next` · `/eos-resume` · `/eos-status`. The router names the agent, the prompt and the minimal
+BMAD skills for each step, so you never choose from the 73 installed skills yourself. The full
+contract (state model, gates, evidence, exit codes) is
+[developer-experience.md](developer-experience.md).
 
 ## 1.3 Happy Path (shortest chain from idea to code)
+
+> You do not have to memorize this chain — `eos next` walks it for you, one step at a time, and
+> refuses to let you skip a gate whose evidence does not exist. It is written out here so you can
+> see the shape of the method.
 
 ```
 (switch agent) eos-discovery        → docs/discovery.md      (Gate G1)

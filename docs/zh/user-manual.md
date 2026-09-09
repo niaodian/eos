@@ -5,7 +5,7 @@
 
 # EOS 用户手册（Engineering Operating System User Manual）
 
-> 版本：与 `docs/eos/VERSION` 同步（当前 `eos-1.11.0`）
+> 版本：与 `docs/eos/VERSION` 同步（当前 `eos-1.12.0`）
 > 适用：较新版本的 VS Code + GitHub Copilot Chat（自定义 agent / hooks 属近版能力，用「关于 VS Code」面板确认版本）+ 已安装 73 个 `bmad-*` skill（用户级）
 > 定位：本手册是**操作指南（怎么用）**；设计原理与取舍见同目录 `blueprint.md`（为什么这么设计）。
 > 约定：正文中文；文件名/路径/命令/配置键保留英文原文。
@@ -65,20 +65,23 @@ EOS = 一套**纯本地、Git 化、可跨项目移植**的工程操作系统。
 
 ## 1.2 三条你每天都会用的命令
 
-在 VS Code 的 **Copilot Chat（Agent 模式）** 里输入：
+在**终端**里——这就是全部循环，也是你唯一需要记住的东西：
 
 ```
-/requirements "<一句话功能描述>"     # 进入正式开发流的最短入口
-/release-gate                        # 上线前过门禁
+node .github/eos/eos.mjs resume   # 我刚才在做什么、什么卡住了
+node .github/eos/eos.mjs next     # 唯一的推荐下一步、为什么、怎么开始
+node .github/eos/eos.mjs check --gate <id> --scope <id>   # 证明这一步，并写入证据
 ```
 
-在**终端**里：
-
-```
-node .github/hooks/validate-config.mjs   # 配置自检，期望输出 PASS
-```
+在 **Copilot Chat（Agent 模式）** 里，同一循环是 **eos-guide** agent，或者 prompts
+`/eos-next` · `/eos-resume` · `/eos-status`。Router 会为每一步点名 agent、prompt 和最小
+BMAD skill 链，所以你永远不用自己从 73 个已安装 skill 里挑。完整契约（状态模型、门禁、证据、
+退出码）见 [developer-experience.md](developer-experience.md)。
 
 ## 1.3 Happy Path（从 idea 到代码的最短链路）
+
+> 你不需要背这条链路——`eos next` 会一步一步带你走，并拒绝让你跳过任何证据不存在的门禁。
+> 这里把它写出来，只是为了让你看清方法论的形状。
 
 ```
 （切换 agent）eos-discovery        → docs/discovery.md      (Gate G1)

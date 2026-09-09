@@ -5,8 +5,13 @@
 
 # EOS ↔ BMAD 复用映射
 
+> **你并不需要靠这张表来干活。** `.eos/agent-map.json` 才是 Router 读取的机器可读版本：它把一个动作
+> 映射到一个主 agent（或 prompt）加最小 skill 链，而 `eos next` 已经把这个映射解析好交给你了。
+> 本页是面向人类的投影——想看全景时读它，而不是为了给当前这一步挑 skill。
+
 | 阶段 | 使用（skills / agents） |
 |---|---|
+| 导航（任意阶段） | EOS agent `eos-guide`；prompts `/eos-next`、`/eos-resume`、`/eos-status`；CLI `node .github/eos/eos.mjs next` |
 | 发现 Discovery | bmad-brainstorming, bmad-agent-analyst, bmad-forge-idea |
 | 需求 Requirements | bmad-agent-pm, bmad-create-prd, bmad-product-brief, eos-operational-readiness |
 | 规格 Spec | bmad-create-prd, bmad-validate-prd |
@@ -23,3 +28,5 @@
 | 安全评审 Security review | bmad-review-adversarial-general, bmad-code-review；EOS secret-scan.mjs + E-security 清单 + guardrail |
 
 > 73 个 `bmad-*` skill 安装在 `~/.agents/skills/` 与 `~/.claude/skills/`（用户级，跨项目共享）。
+> EOS 从不一次性加载全部：Router 每个动作最多点名一两个，且对未安装的 skill 报 BLOCKED 并给出
+> 替代路径，而不是推荐一个用不了的东西。

@@ -4,7 +4,7 @@
 > 本文与英文权威版 [`README.md`](README.md) **内容对等、同步维护**；若翻译出现歧义，以英文为准。
 
 一套可移植、**纯本地优先（local-first）**的「工程操作系统」，面向 VS Code + GitHub Copilot，
-在完整 SDLC 上编排已安装的 **BMAD** 技能（73 个 `bmad-*`）。当前版本：**eos-1.11.0**。
+在完整 SDLC 上编排已安装的 **BMAD** 技能（73 个 `bmad-*`）。当前版本：**eos-1.12.0**。
 
 **在同一框架内支持两种范式：**
 - **传统 SaaS**（确定性）：事务、韧性（熔断/退避）、REST/OpenAPI、RBAC/多租户、OTel 可观测性。
@@ -12,22 +12,37 @@
 
 两者**显式隔离**——一个项目可以是其一、或两者兼具，而不发生范式交叉污染。
 
+## 唯一循环（你不需要先读手册）
+```
+node .github/eos/eos.mjs resume   # 我刚才在做什么、什么卡住了
+node .github/eos/eos.mjs next     # 唯一的推荐下一步、为什么、怎么开始
+```
+在 Copilot Chat 中同一循环是 **eos-guide** agent，或 `/eos-next` · `/eos-resume` · `/eos-status`。
+EOS 从制品、证据和 append-only 账本推导阶段——绝不从散文摘要猜测——只推荐一个动作，
+并拒绝晋级任何没有证据支撑的工作。契约见 [docs/zh/developer-experience.md](docs/zh/developer-experience.md)。
+
 ## 内含什么
 ```
 .github/
   copilot-instructions.md       # R1 always-on 全局规则（极简）
   instructions/                 # 分域规则（applyTo glob）：6 个后端栈 + 前端 + data-api
                                 #   + ai/llm + testing + security + release-ops
-  prompts/                      # 斜杠命令工作流（/eos-help /eos-init /requirements /spec /ux-spec /eval-spec
-                                #   /spec-align /adr /nfr /telemetry-plan /release-gate /runbook /validate-config）
-  agents/                       # 5 个编排 agent（discovery/design/architecture/plan/review）
+  prompts/                      # 斜杠命令工作流（/eos-next /eos-resume /eos-status /eos-help
+                                #   /eos-init /requirements /spec /ux-spec /eval-spec /spec-align /adr
+                                #   /nfr /telemetry-plan /release-gate /runbook /validate-config）
+  agents/                       # eos-guide（统一入口）+ 5 个编排 agent（discovery/design/
+                                #   architecture/plan/review）
   skills/                       # 项目级能力（operational-readiness）
   hooks/                        # 护栏 + 验证器（validate-config、eos-doctor、secret-scan、
                                 #   spec-align、project-gate）
+  eos/                          # 引导式工作流 CLI（eos.mjs）+ 确定性引擎 + 测试
   workflows/                    # 本地 CI（eos-ci.yml）——经 act 运行，无需云端 runner
 .eos/
   project.json                  # 项目声明：projectType + stacks + 质量命令
                                 #   （产品质量门禁真正执行的那一份——适用任意技术栈）
+  workflow.json gates.json      # Change Type 门禁策略 + 机器化门禁定义
+  agent-map.json                # 动作 -> 一个 agent/prompt + 最小 BMAD skill 链
+  evidence/ waivers/ ledger/    # 门禁证据、受控例外、append-only 事件日志
 docs/
   checklists/                   # A-gap、B-rework、C-nfr、D-ops、E-security
   eos/                          # blueprint、user-manual、quickstart、stack-presets、agent-map、examples、VERSION
@@ -35,13 +50,16 @@ docs/
 api/ ops/ src/
 ```
 
-## 三道强制层（全部本地）
+## 四道强制层（全部本地）
 1. **逐次编辑 hooks**（实时）：护栏拦截破坏性 / 供应链投毒 / 密钥泄露操作；
    每次编辑后 quality + config-check 跑验证器。
-2. **静态验证器**（按需）：`validate-config.mjs`（配置 S1–S12）、`check-doc-parity.mjs`（中⇄英文档对等）、
+2. **静态验证器**（按需）：`validate-config.mjs`（配置 S1–S13）、`check-doc-parity.mjs`（中⇄英文档对等）、
    `eos-doctor.mjs`（SDLC 门，含 G-EVAL）、`secret-scan.mjs`（+gitleaks）、`spec-align.mjs`（spec 对齐度量，
    `--strict` 为 fail-closed）、`project-gate.mjs`（项目自己的 lint/typecheck/test/eval——适用任意技术栈）。
-3. **全仓 CI**（合并/发布前）：`act push` 运行 `.github/workflows/eos-ci.yml`。
+3. **门禁与迁移引擎**（按 Scope）：`node .github/eos/eos.mjs check --gate <id> --scope <id>`
+   真实执行门禁，并写入绑定 Commit、门禁版本与全部输入哈希的证据；`transition` 拒绝非法跳步、
+   缺失守卫和过期证据。工具缺失或 Validator 崩溃一律 BLOCKED，绝不 PASS。
+4. **全仓 CI**（合并/发布前）：`act push` 运行 `.github/workflows/eos-ci.yml`。
    产品测试按 **`.eos/project.json` 声明的技术栈**执行（Node/Python/Go/Java/Rust/.NET）——
    测试失败即 CI 失败；未声明或无法测试的项目 fail closed，而不是被跳过。
 
@@ -51,10 +69,12 @@ api/ ops/ src/
 - `act` 一次性拉取镜像后离线跑 CI；73 个 `bmad-*` 技能从用户级目录加载。
 
 ## 从这里开始
-见 [docs/zh/quickstart.md](docs/zh/quickstart.md)（前置条件 + Day-1）。第一条命令：
+在 VS Code 里打开本文件夹，然后：
 ```
-node .github/hooks/validate-config.mjs    # 期望 PASS
+node .github/eos/eos.mjs init --write     # 创建本地 VS Code 任务（绝不覆盖已有文件）
+node .github/eos/eos.mjs next             # 告诉你唯一该做的下一件事
 ```
+细节见 [docs/zh/quickstart.md](docs/zh/quickstart.md)（前置条件 + Day-1）。
 
 > **一次性硬化（让 CI 门真正合并阻断，而非仅 advisory）：** 从模板实例化真实仓库后，
 > 在 Copilot Chat 里跑 `/eos-init`。它带你走 branch protection + 替换 CODEOWNERS handle +

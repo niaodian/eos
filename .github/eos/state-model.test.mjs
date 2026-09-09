@@ -5,7 +5,7 @@ import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync, appendFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { project, write, run, runJson, cleanup, APP_PROJECT, PRD_2AC, story } from './test-support.mjs';
+import { project, write, run, runJson, cleanup, APP_PROJECT, PRD_2AC, story, EOS_DIR } from './test-support.mjs';
 import { validate } from './lib/schema.mjs';
 import { loadWorkflow, loadGates, loadAgentMap } from './lib/registry.mjs';
 import { legalTransitions, planTransition } from './lib/transitions.mjs';
@@ -24,6 +24,16 @@ test('schema: the shipped workflow / gates / agent-map files validate against th
   assert.deepEqual(wf.errors, [], wf.errors.join('\n'));
   assert.deepEqual(gates.errors, [], gates.errors.join('\n'));
   assert.deepEqual(map.errors, [], map.errors.join('\n'));
+});
+
+test('schema: the shipped .eos/project.json validates against project.schema.json', () => {
+  // The loader (hooks/lib/project-config.mjs) is what enforces the contract at runtime; this keeps
+  // the published schema — which editors and humans read — from silently drifting away from it.
+  const root = join(EOS_DIR, '..', '..');
+  const schema = JSON.parse(readFileSync(join(root, '.eos/schemas/project.schema.json'), 'utf8'));
+  const data = JSON.parse(readFileSync(join(root, '.eos/project.json'), 'utf8'));
+  const v = validate(schema, data, { label: '.eos/project.json' });
+  assert.equal(v.valid, true, v.errors.join('\n'));
 });
 
 test('schema: an unknown key is rejected (additionalProperties=false)', () => {

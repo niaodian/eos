@@ -2,6 +2,11 @@
 
 This repository uses an Engineering Operating System (EOS).
 
+**Start here:** `node .github/eos/eos.mjs next` — it derives the current phase from artifacts,
+recorded evidence and an append-only ledger, and returns the one recommended next action.
+In Copilot Chat use the `eos-guide` agent, or `/eos-next` · `/eos-resume` · `/eos-status`.
+
+- Guided-workflow contract: [docs/eos/developer-experience.md](docs/eos/developer-experience.md)
 - Always-on rules: [.github/copilot-instructions.md](.github/copilot-instructions.md)
 - Scoped rules: `.github/instructions/**` (auto-applied by `applyTo` globs)
 - Workflow commands (slash): `.github/prompts/**`
