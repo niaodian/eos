@@ -60,16 +60,32 @@
   - **Steps**: replace the placeholder content with your project's real stack and layout. (See §3.3)
   - **Verify**: the file no longer contains placeholders like `TODO` / `<replace`.
 
+- [ ] Project declaration: change `.eos/project.json` from `config-only` to your real project (`projectType` / `stacks` / `commands.test`)
+  - **Why**: this is the **only entry point of the product-quality gate**. CI will not guess how to test your
+    repo — no declaration means fail closed. Historical defect: CI ran tests only when a `package.json` existed,
+    so a Python/Go/Java/Rust/.NET project's **failing tests were never executed** and "EOS config green" was
+    misread as "product tests green". An LLM/Agentic product must also add `"productParadigms": ["agentic"]`
+    plus `commands.eval` — **that declaration, not SDK sniffing, is the authoritative G-EVAL switch**
+    (a self-hosted or self-wrapped gateway leaves no fingerprint to detect).
+  - **Steps**: copy your stack's block from `docs/eos/stack-presets.md` § `.eos/project.json`; for a non-Node
+    stack remember to add the matching toolchain setup step in `.github/workflows/eos-ci.yml`.
+  - **Verify**: `node .github/hooks/project-gate.mjs` is PASS **and actually ran** your lint/typecheck/test;
+    `node .github/hooks/validate-config.mjs` shows no S12 ERROR. **Never edit the declaration to turn a red gate green.**
+
 ## 2. Open the "org-compliance" axis (~+2 points) — only **regulated** projects need this
 
-- [ ] (If regulated) Compliance boundary: run `/compliance` to produce `docs/compliance-profile.md`, and confirm org standards
+- [ ] (If regulated) Compliance boundary: run `/compliance` to produce `docs/compliance-profile.md` **+ `docs/compliance-profile.json`**, and confirm org standards
   - **Why**: a profile-neutral template can't certify HIPAA/PCI-DSS etc. for you; once you declare a regulated
     regime AND an LLM/agent is present, `eos-doctor`'s **D5 (BLOCKER, deny-by-default)** requires you to first
     record the data boundary (BAA/DPA · self-host · redaction · excluding regulated data).
+    **The boundary must be written as structured JSON**: D5 validates enumerated values + control status +
+    owner + a non-expired approval, no longer prose keywords (a negation like "no redaction is implemented"
+    used to READ AS "boundary recorded" and passed). Template: `docs/eos/examples/compliance-profile.example.json`.
   - **Requires org decisions** (the template won't make them, `【Needs org standard】`): approved secret store,
     CI runner standard, model pin/registry policy, artifact integrity (SBOM / signing / SLSA). (See Appendix D.4)
-  - **Verify**: `docs/compliance-profile.md` exists and its first line `**Regulatory regime:**` is filled in
-    truthfully; `eos-doctor` shows no D5 ERROR.
+  - **Verify**: `docs/compliance-profile.md`'s first line `**Regulatory regime:**` is filled in truthfully;
+    `docs/compliance-profile.json` validates (`thirdPartyModelPolicy` + an `implemented` control +
+    `approval.reviewBy` not in the past); `eos-doctor` shows no D5 ERROR.
   - **Not regulated**? → record it with the waiver syntax:
     `- [~] Compliance profile · Reason: this project handles no regulated data (no PHI/PAN)`.
 

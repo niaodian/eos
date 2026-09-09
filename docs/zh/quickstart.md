@@ -21,7 +21,7 @@
   直接跑等价的门禁：
   ```sh
   node .github/hooks/validate-config.mjs && node .github/hooks/eos-doctor.mjs \
-    && npm run -s verify --if-present     # verify = tests + evals, if package.json has it
+    && node .github/hooks/project-gate.mjs   # 你声明的 lint/typecheck/test/eval——任意技术栈
   ```
 - `npm audit`（一个 G8 项）需要 lockfile——先跑 `npm i --package-lock-only`；离线时它可能
   deferred（联网后重跑），绝不作为本地硬阻断。
@@ -58,7 +58,9 @@ EOS **原生在 Windows 上运行**（PowerShell 或 Command Prompt）——核�
 5. 提交。
 
 > 首次：在 `.github/instructions/00-workspace.instructions.md` 填项目事实——
-> 从 `docs/eos/stack-presets.md` 复制你的栈预设（Node/Python/Go/Java/Rust/.NET）。
+> 从 `docs/eos/stack-presets.md` 复制你的栈预设（Node/Python/Go/Java/Rust/.NET），并把同一套命令
+> 写进 **`.eos/project.json`**，产品质量门禁才会真的跑你的测试。模板初始为
+> `projectType: "config-only"`；有了真实代码还留着它，会**直接失败**，而不是被无声跳过。
 
 ## Happy Path（最短入口）
 ```
@@ -73,6 +75,7 @@ EOS **原生在 Windows 上运行**（PowerShell 或 Command Prompt）——核�
 一次性硬化：   /eos-init   (branch protection + CODEOWNERS + 审批基线 → docs/eos/activation.md)
 发布前：       /release-gate
 自检：         node .github/hooks/validate-config.mjs
+产品门禁：     node .github/hooks/project-gate.mjs   （跑 .eos/project.json 的命令——任意技术栈）
 本地 CI：      act push -j verify   (validate-config + eos-doctor + tests + evals；需 Docker)
 ```
 

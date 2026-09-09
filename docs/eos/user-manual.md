@@ -1,6 +1,6 @@
 # EOS User Manual (Engineering Operating System)
 
-> Version: synced with `docs/eos/VERSION` (current `eos-1.10.0`)
+> Version: synced with `docs/eos/VERSION` (current `eos-1.11.0`)
 > Applies to: recent VS Code + GitHub Copilot Chat (custom agent / hooks are recent-version capabilities; confirm the version in the "About VS Code" panel) + 73 installed `bmad-*` skills (user-level)
 > Positioning: this manual is an **operating guide (how to use it)**; for design rationale and trade-offs, see `blueprint.md` in the same directory (why it is designed this way).
 > Conventions: prose in English; file names / paths / commands / config keys kept verbatim.
@@ -761,12 +761,14 @@ When writing AI code, Agentic rules take effect **automatically**: prompts saved
 | File | Event | Purpose |
 |---|---|---|
 | `guardrails.json` + `deny-dangerous.js` | PreToolUse | Blocks dangerous operations + **supply-chain poisoning (`curl&#124;bash`/`--unsafe-perm`) + hardcoded secret literals** (outputs `permissionDecision:"deny"`) |
-| `quality.json` | PostToolUse | Runs lint+typecheck+test quality gate after file writes |
-| `config-check.json` | PostToolUse | Automatically runs `validate-config.mjs` after every edit (configuration S1–S11) **+ `eos-doctor.mjs` (SDLC clinic / G-EVAL wiring / secret scan)** |
-| `validate-config.mjs` | Manual/called by hook | Zero-dependency static validator (S1–S11: rule/agent/prompt frontmatter, glob, required paths, hook events) |
-| `eos-doctor.mjs` | **PostToolUse (per edit, via `config-check.json`)** / manual / called by CI | Zero-dependency SDLC clinic: G-EVAL, G-UX, **D4 secret scan (calls `secret-scan.mjs`)** |
+| `quality.json` | PostToolUse | Runs lint+typecheck+test quality gate after file writes (**advisory**, not the authoritative gate: it always exits 0; the authority is `project-gate.mjs` in CI) |
+| `config-check.json` | PostToolUse | Automatically runs `validate-config.mjs` after every edit (configuration S1–S12) **+ `eos-doctor.mjs` (SDLC clinic / G-EVAL wiring / secret scan)** (also advisory) |
+| `validate-config.mjs` | Manual/called by hook | Zero-dependency static validator (S1–S12: rule/agent/prompt frontmatter, glob, required paths, hook events, **S12 `.eos/project.json` declaration validity**) |
+| `project-gate.mjs` | Manual / **called by CI (authoritative)** | Cross-stack product-quality gate: actually executes install/lint/typecheck/test/eval as declared in `.eos/project.json`. **Fail closed** — an `application` without `commands.test`, a stack manifest with no declaration, or a missing toolchain (BLOCKED) all exit 1 |
+| `eos-doctor.mjs` | **PostToolUse (per edit, via `config-check.json`)** / manual / called by CI | Zero-dependency SDLC clinic: **D0 project declaration**, D1/D2 G-EVAL (driven by the `productParadigms` declaration; SDK/dir discovery is only a safety net), D3 G-UX, **D4 secret scan (calls `secret-scan.mjs`)**, **D5 compliance data boundary (validates the structured `docs/compliance-profile.json`, no longer prose keywords)** |
 | `secret-scan.mjs` | Manual / called by eos-doctor + CI | Secret scanning: built-in zero-dependency regexes (hardcoded secrets/private keys, accidentally committed `.env`) **+ if `gitleaks` is installed, automatically adds deep scan** (`.gitleaks.toml` allowlist); hits exit 1 and output is redacted |
-| `spec-align.mjs` | Manual (`/spec-align`) / called by CI | Quantified spec alignment: parses `prd.md`+`trace-matrix.md` → AC coverage / first-pass rate / drift; `--strict` exits 1 on hits |
+| `spec-align.mjs` | Manual (`/spec-align`) / called by CI | Quantified spec alignment: parses `prd.md`+`trace-matrix.md` → AC coverage / first-pass rate / drift; `--strict` is **fail closed**: missing files, an AC-less PRD, an empty matrix, drift, orphan rows and failing rows all exit 1 |
+| `*.test.mjs` | `node --test` / CI | Regression tests for the gates themselves (deny-dangerous / spec-align / project-gate / eos-doctor / check-doc-parity) — so a future edit cannot quietly restore "green but empty" |
 
 **Manual guardrail test** (terminal):
 ```sh

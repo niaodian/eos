@@ -54,14 +54,30 @@
   - **步骤**：把占位内容替换为你项目的真实栈与布局。（见 §3.3）
   - **验证**：文件内不再含 `TODO` / `<替换` 一类占位符。
 
+- [ ] 项目声明: 把 `.eos/project.json` 从 `config-only` 改成真实项目（`projectType` / `stacks` / `commands.test`）
+  - **为什么**：这是**产品质量门禁的唯一入口**。CI 不会去猜怎么测你的仓库——没有声明就 fail closed。
+    历史缺陷：CI 曾只在有 `package.json` 时跑测试，于是 Python/Go/Java/Rust/.NET 项目里**失败的测试
+    根本不会被执行**，"EOS 配置绿"被误读成"产品测试绿"。LLM/Agentic 产品还要加
+    `"productParadigms": ["agentic"]` + `commands.eval`——**这条声明才是 G-EVAL 的权威开关**
+    （自封装 gateway / 私有 SDK 包裹探测不到）。
+  - **步骤**：从 `docs/eos/stack-presets.md` § `.eos/project.json` 拷你那个栈的块；非 Node 栈记得在
+    `.github/workflows/eos-ci.yml` 里加对应的 toolchain setup step。
+  - **验证**：`node .github/hooks/project-gate.mjs` 为 PASS 且**真的执行了**你的 lint/typecheck/test；
+    `node .github/hooks/validate-config.mjs` 无 S12 ERROR。**不要靠改声明来把红灯改绿。**
+
 ## 二、打开"组织合规"轴（约 +2 分）——仅**受监管**项目需要
 
-- [ ] （若受监管）合规边界: 跑 `/compliance` 产出 `docs/compliance-profile.md`，并确认组织标准
+- [ ] （若受监管）合规边界: 跑 `/compliance` 产出 `docs/compliance-profile.md` **+ `docs/compliance-profile.json`**，并确认组织标准
   - **为什么**：profile-neutral 模板无法替你认证 HIPAA/PCI-DSS 等；一旦声明受监管 regime 且存在 LLM/agent，
     `eos-doctor` 的 **D5（BLOCKER，deny-by-default）** 会要求先记录数据边界（BAA/DPA · 自托管 · 脱敏 · 排除受监管数据）。
+    **边界必须写成结构化 JSON**：D5 校验枚举值 + 控制项状态 + owner + 未过期审批，不再靠散文关键词
+    （"no redaction is implemented" 这类否定句曾被当成"已记录边界"放行）。模板：
+    `docs/eos/examples/compliance-profile.example.json`。
   - **须组织决策**（模板不代做，`【需组织标准】`）：批准的密钥库、CI runner 标准、模型 pin/注册策略、
     制品完整性（SBOM / 签名 / SLSA）。（详见附录 D.4）
-  - **验证**：`docs/compliance-profile.md` 存在且首行 `**Regulatory regime:**` 已如实填写；`eos-doctor` 无 D5 ERROR。
+  - **验证**：`docs/compliance-profile.md` 首行 `**Regulatory regime:**` 已如实填写；
+    `docs/compliance-profile.json` 通过校验（`thirdPartyModelPolicy` + `implemented` 的控制项 +
+    `approval.reviewBy` 未过期）；`eos-doctor` 无 D5 ERROR。
   - **不受监管**？→ 用豁免语法记为：`- [~] 合规档案 · 原因：本项目不处理受监管数据（无 PHI/PAN）`。
 
 ---
