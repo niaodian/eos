@@ -1,7 +1,13 @@
 # EOS ↔ BMAD Reuse Map
 
+> **You do not need this table to work.** `.eos/agent-map.json` is the machine-readable version the
+> router reads: it maps one action to one primary agent (or prompt) plus the minimal skill chain, and
+> `eos next` hands you that mapping already resolved. This page is the human-readable projection —
+> read it when you want the whole landscape, not to pick a skill for the step you are on.
+
 | Phase | Use (skills / agents) |
 |---|---|
+| Navigation (any phase) | EOS agent `eos-guide`; prompts `/eos-next`, `/eos-resume`, `/eos-status`; CLI `node .github/eos/eos.mjs next` |
 | Discovery | bmad-brainstorming, bmad-agent-analyst, bmad-forge-idea |
 | Requirements | bmad-agent-pm, bmad-create-prd, bmad-product-brief, eos-operational-readiness |
 | Spec | bmad-create-prd, bmad-validate-prd |
@@ -18,3 +24,5 @@
 | Security review | bmad-review-adversarial-general, bmad-code-review; EOS secret-scan.mjs + E-security checklist + guardrail |
 
 > 73 `bmad-*` skills are installed at `~/.agents/skills/` and `~/.claude/skills/` (user-level, shared across projects).
+> EOS never loads them all: the router names at most a couple per action, and reports a skill that is
+> not installed as BLOCKED with an alternative path rather than recommending something unusable.

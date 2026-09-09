@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eos.local/schemas/transition-event.schema.json",
+  "title": "EOS ledger event",
+  "description": "One append-only line of .eos/ledger/events.jsonl. `prevHash`/`hash` form a chain, so rewriting or deleting an earlier line is detectable by `eos ledger --verify`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["seq", "ts", "type", "scope", "hash"],
+  "properties": {
+    "seq": { "type": "integer", "minimum": 1 },
+    "ts": { "type": "string", "minLength": 20 },
+    "type": { "enum": ["transition", "gate", "waiver", "approval", "init", "release"] },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "id"],
+      "properties": {
+        "type": { "enum": ["product", "story", "release"] },
+        "id": { "type": "string", "minLength": 1 }
+      }
+    },
+    "changeType": { "type": "string", "pattern": "^[A-Z_]+$" },
+    "from": { "type": ["string", "null"] },
+    "to": { "type": ["string", "null"] },
+    "gate": { "type": ["string", "null"] },
+    "status": { "type": ["string", "null"] },
+    "evidenceSha256": { "type": ["string", "null"], "description": "Digest of the evidence file this event recorded. It is part of the hashed body, so the chain protects it and a regenerated evidence file cannot be passed off as the one that was verified." },
+    "actor": { "type": "string" },
+    "commit": { "type": ["string", "null"] },
+    "notApplicableGates": { "type": "array", "items": { "type": "string" } },
+    "detail": { "type": "string" },
+    "prevHash": { "type": ["string", "null"] },
+    "hash": { "type": "string", "minLength": 64 }
+  }
+}

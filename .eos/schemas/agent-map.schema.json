@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eos.local/schemas/agent-map.schema.json",
+  "title": "EOS action → agent / prompt / skill map",
+  "description": "One action maps to at most ONE primary Copilot agent (or one prompt) plus a minimal BMAD skill chain, so a developer never picks from the 73 installed skills.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "actions"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schemaVersion": { "const": 1 },
+    "actions": {
+      "type": "object",
+      "minProperties": 1,
+      "patternProperties": {
+        "^[a-z0-9-]+$": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["skills"],
+          "properties": {
+            "agent": { "type": ["string", "null"], "pattern": "^[a-z0-9-]+$" },
+            "prompt": { "type": ["string", "null"], "pattern": "^[a-z0-9-]+$" },
+            "skills": { "type": "array", "items": { "type": "string", "pattern": "^[a-z0-9-]+$" } },
+            "handoff": { "type": "string", "minLength": 1 }
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

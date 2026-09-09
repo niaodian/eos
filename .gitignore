@@ -39,3 +39,13 @@ docs/zh/.*.html
 .vscode/*
 !.vscode/mcp.json.example
 !.vscode/settings.json.example
+!.vscode/tasks.json.example
+
+# EOS guided workflow: the ledger, evidence and waivers ARE tracked (release evidence must be
+# shareable and auditable). Only the two local caches stay out of version control:
+#   - .eos/local/  this machine's current focus; it carries no authority by design
+#   - .eos/handoffs/  regenerable context packages bound to a commit + input hashes
+.eos/local/*
+!.eos/local/.gitkeep
+.eos/handoffs/*
+!.eos/handoffs/.gitkeep

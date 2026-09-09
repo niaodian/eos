@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eos.local/schemas/gate-evidence.schema.json",
+  "title": "EOS gate evidence",
+  "description": "Machine-generated proof that a gate ran. Never hand-write one: an evidence file whose input hashes no longer match the working tree is reported STALE, not PASS.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "gate", "gateVersion", "evaluatorVersion", "scope", "status", "checks", "inputs", "generatedAt"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schemaVersion": { "const": 1 },
+    "gate": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+    "gateVersion": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+    "evaluatorVersion": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "id"],
+      "properties": {
+        "type": { "enum": ["product", "story", "release"] },
+        "id": { "type": "string", "minLength": 1 }
+      }
+    },
+    "changeType": { "type": "string", "pattern": "^[A-Z_]+$" },
+    "status": { "enum": ["PASS", "FAIL", "BLOCKED", "PENDING", "WAIVED", "NOT_APPLICABLE", "STALE", "ERROR"] },
+    "commit": { "type": ["string", "null"] },
+    "inputs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "sha256"],
+        "properties": {
+          "path": { "type": "string", "minLength": 1 },
+          "sha256": { "type": ["string", "null"] }
+        }
+      }
+    },
+    "governanceInputs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "sha256"],
+        "properties": {
+          "path": { "type": "string", "minLength": 1 },
+          "sha256": { "type": ["string", "null"] }
+        }
+      }
+    },
+    "collections": {
+      "description": "Digests of SET membership (for example the set of stories a release gate covered). A file hash cannot notice that a new member appeared.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["key", "digest"],
+        "properties": {
+          "key": { "type": "string", "minLength": 1 },
+          "digest": { "type": "string", "minLength": 8 }
+        }
+      }
+    },
+    "commands": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["argv", "exitCode"],
+        "properties": {
+          "argv": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+          "exitCode": { "type": ["integer", "null"] },
+          "detail": { "type": "string" }
+        }
+      }
+    },
+    "checks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "status"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+          "status": { "enum": ["PASS", "FAIL", "BLOCKED", "PENDING", "WAIVED", "NOT_APPLICABLE", "STALE", "ERROR"] },
+          "detail": { "type": "string" },
+          "fix": { "type": "string" }
+        }
+      }
+    },
+    "generatedAt": { "type": "string", "minLength": 20 }
+  }
+}

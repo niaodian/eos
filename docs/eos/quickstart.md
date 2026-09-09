@@ -1,7 +1,8 @@
 # EOS Quickstart
 
-> **Lost at any point?** Run `/eos-help` in Copilot Chat — it detects which phase this repo is in,
-> prints the memory card, and tells you the exact next step (and any pending one-time hardening).
+> **Lost at any point?** Run `node .github/eos/eos.mjs next` (or the **eos-guide** agent / `/eos-next`
+> in Copilot Chat). It derives the phase from the repository itself and gives you one action, why it
+> is next, how to start it, and how you will know it is done. You never have to remember the gates.
 
 ## Prerequisites (local-first — nothing enterprise required)
 | Tool | Needed for | If absent |
@@ -40,17 +41,22 @@ core flow (hooks, validators, tests are all Node, and paths are normalized cross
 - **`build-pdf.sh`** (optional manual→PDF) is a Bash script — run it from **Git-Bash or WSL**, or just
   read `docs/eos/user-manual.md` directly.
 
-## Day-1 (from clone to first spec)
-1. Open this folder in VS Code.
-2. Validate config: `node .github/hooks/validate-config.mjs` (expect PASS).
-3. **One-time harden** (turns the CI gates from advisory into merge-blocking): run `/eos-init` in Copilot
-   Chat — it walks you through branch protection + CODEOWNERS + approval baseline, tracked in
-   `docs/eos/activation.md`. Personal/throwaway repo? Waive items with a reason; `eos-doctor` keeps score.
-4. In Copilot Chat (Agent mode):
-   - Switch to the **eos-discovery** agent → produces `docs/discovery.md`.
-   - Run `/requirements "<feature>"` → `docs/requirements.md` + operational decision table (Gate G2).
-   - Run `/spec` → `docs/prd.md` (reuses bmad-create-prd, validated by bmad-validate-prd).
-5. Commit.
+## Day-1 (three steps, then follow the recommendation)
+1. Open this folder in VS Code (the folder itself — not a parent).
+2. `node .github/eos/eos.mjs init --write` — creates the local **EOS: Next / Resume / Verify Current
+   Gate / Release Status** tasks. It never overwrites a file you already have.
+3. `node .github/eos/eos.mjs next` — and do what it says. Repeat.
+
+That is the whole loop. Everything below is reference material for when you want to know *why*.
+
+- The router walks you through discovery → requirements → PRD → UX → architecture → stories, then
+  per story: readiness → implementation → verification → merge. Each step names the Copilot agent (or
+  `/prompt`) and the minimal BMAD skills — you never pick from the 73 installed skills yourself.
+- **One-time harden** (turns the CI gates from advisory into merge-blocking): run `/eos-init` in
+  Copilot Chat — branch protection + CODEOWNERS + approval baseline, tracked in
+  `docs/eos/activation.md`. Personal/throwaway repo? Waive items with a reason; `eos-doctor` keeps score.
+- Starting a new chat later? `node .github/eos/eos.mjs resume` (or `/eos-resume`) restores what you
+  were doing, the last verified gate and the current blocker — no re-reading documents.
 
 > First time: set project facts in `.github/instructions/00-workspace.instructions.md` —
 > copy your stack's preset from `docs/eos/stack-presets.md` (Node/Python/Go/Java/Rust/.NET), and
@@ -60,17 +66,20 @@ core flow (hooks, validators, tests are all Node, and paths are normalized cross
 
 ## Happy Path (shortest entry)
 ```
-/requirements "<one-line feature>"
+node .github/eos/eos.mjs next
 ```
-Then follow handoffs: → /spec → /ux-spec (user-facing) → (agent) eos-architecture → (handoff) eos-plan → bmad-dev-story → bmad-code-review.
+Do the one action it names, then run it again. If you prefer Chat, the **eos-guide** agent runs the
+same command and offers the handoff button for the agent the router picked.
 
 ## Memory card
 ```
-New feature:   /requirements "<feature>" → /spec → /ux-spec → (agent) eos-architecture
-                                          → (handoff) eos-plan → bmad-dev-story → bmad-code-review
+The loop:       eos resume → do the one action → eos check --gate <id> --scope <id> → eos next
+Where am I:     node .github/eos/eos.mjs status         (add --changed for what your edits affect)
+Why this rule:  node .github/eos/eos.mjs explain <gate> (activation|prd-ready|story-ready|verified|release-ready)
+Promote work:   node .github/eos/eos.mjs transition --scope story --id <id> --to <STATE>
 One-time harden: /eos-init   (branch protection + CODEOWNERS + approval baseline → docs/eos/activation.md)
-Before release: /release-gate
-Self-check:     node .github/hooks/validate-config.mjs
+Before release: node .github/eos/eos.mjs release-status   then /release-gate
+Self-check:     node .github/hooks/validate-config.mjs · node .github/eos/eos.mjs doctor
 Product gate:   node .github/hooks/project-gate.mjs   (runs .eos/project.json commands — any stack)
 Local CI:       act push -j verify   (validate-config + eos-doctor + tests + evals; needs Docker)
 ```

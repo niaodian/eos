@@ -5,7 +5,7 @@
 
 # EOS 用户手册（Engineering Operating System User Manual）
 
-> 版本：与 `docs/eos/VERSION` 同步（当前 `eos-1.11.0`）
+> 版本：与 `docs/eos/VERSION` 同步（当前 `eos-1.12.0`）
 > 适用：较新版本的 VS Code + GitHub Copilot Chat（自定义 agent / hooks 属近版能力，用「关于 VS Code」面板确认版本）+ 已安装 73 个 `bmad-*` skill（用户级）
 > 定位：本手册是**操作指南（怎么用）**；设计原理与取舍见同目录 `blueprint.md`（为什么这么设计）。
 > 约定：正文中文；文件名/路径/命令/配置键保留英文原文。
@@ -65,20 +65,23 @@ EOS = 一套**纯本地、Git 化、可跨项目移植**的工程操作系统。
 
 ## 1.2 三条你每天都会用的命令
 
-在 VS Code 的 **Copilot Chat（Agent 模式）** 里输入：
+在**终端**里——这就是全部循环，也是你唯一需要记住的东西：
 
 ```
-/requirements "<一句话功能描述>"     # 进入正式开发流的最短入口
-/release-gate                        # 上线前过门禁
+node .github/eos/eos.mjs resume   # 我刚才在做什么、什么卡住了
+node .github/eos/eos.mjs next     # 唯一的推荐下一步、为什么、怎么开始
+node .github/eos/eos.mjs check --gate <id> --scope <id>   # 证明这一步，并写入证据
 ```
 
-在**终端**里：
-
-```
-node .github/hooks/validate-config.mjs   # 配置自检，期望输出 PASS
-```
+在 **Copilot Chat（Agent 模式）** 里，同一循环是 **eos-guide** agent，或者 prompts
+`/eos-next` · `/eos-resume` · `/eos-status`。Router 会为每一步点名 agent、prompt 和最小
+BMAD skill 链，所以你永远不用自己从 73 个已安装 skill 里挑。完整契约（状态模型、门禁、证据、
+退出码）见 [developer-experience.md](developer-experience.md)。
 
 ## 1.3 Happy Path（从 idea 到代码的最短链路）
+
+> 你不需要背这条链路——`eos next` 会一步一步带你走，并拒绝让你跳过任何证据不存在的门禁。
+> 这里把它写出来，只是为了让你看清方法论的形状。
 
 ```
 （切换 agent）eos-discovery        → docs/discovery.md      (Gate G1)
@@ -808,8 +811,8 @@ LLM tracing（token/成本/context/tool-span）。
 |---|---|---|
 | `guardrails.json` + `deny-dangerous.js` | PreToolUse | 拦截危险操作 + **供应链投毒（`curl\|bash`/`--unsafe-perm`）+ 硬编码密钥字面量**（输出 `permissionDecision:"deny"`） |
 | `quality.json` | PostToolUse | 写文件后跑 lint+typecheck+test 质量门（**提示性**，非权威门禁：固定 exit 0；权威门禁是 CI 里的 `project-gate.mjs`） |
-| `config-check.json` | PostToolUse | 每次编辑后自动跑 `validate-config.mjs`（配置 S1–S12）**＋ `eos-doctor.mjs`（SDLC 门诊 / G-EVAL 连线 / 密钥扫描）**（同样是提示性的） |
-| `validate-config.mjs` | 手动/被 hook 调用 | 零依赖静态验证器（S1–S12：规则/agent/prompt frontmatter、glob、必需路径、hook 事件、**S12 `.eos/project.json` 项目声明有效性**） |
+| `config-check.json` | PostToolUse | 每次编辑后自动跑 `validate-config.mjs`（配置 S1–S13）**＋ `eos-doctor.mjs`（SDLC 门诊 / G-EVAL 连线 / 密钥扫描）**（同样是提示性的） |
+| `validate-config.mjs` | 手动/被 hook 调用 | 零依赖静态验证器（S1–S13：规则/agent/prompt frontmatter、glob、必需路径、hook 事件、**S12 `.eos/project.json` 项目声明有效性**、**S13 `.eos/` 工作流主干及其交叉引用**） |
 | `project-gate.mjs` | 手动 / **被 CI 调用（权威）** | 跨栈产品质量门：按 `.eos/project.json` 真的执行 install/lint/typecheck/test/eval。**fail closed**——`application` 缺 `commands.test`、有栈清单却没声明、工具链没装（BLOCKED）都是 exit 1 |
 | `eos-doctor.mjs` | **PostToolUse（逐编辑，经 `config-check.json`）** / 手动 / 被 CI 调用 | 零依赖 SDLC 门诊：**D0 项目声明**、D1/D2 G-EVAL（以 `productParadigms` 声明为准，SDK/目录探测只是补网）、D3 G-UX、**D4 密钥扫描（调 `secret-scan.mjs`）**、**D5 合规数据边界（校验结构化 `docs/compliance-profile.json`，不再靠散文关键词）** |
 | `secret-scan.mjs` | 手动 / 被 eos-doctor + CI 调用 | 密钥扫描：内置零依赖正则（硬编码密钥/私钥、误提交 `.env`）**＋ 若装了 `gitleaks` 自动叠加深度扫描**（`.gitleaks.toml` 白名单）；命中 exit 1、输出脱敏 |
@@ -1076,13 +1079,21 @@ EOS 的栈规则是**可插拔**的。新增一个栈 = 加一个 `*.instruction
 # 附录 B 命令速查卡
 
 ```
-# ── 终端 ──
+# ── 终端 —— 唯一循环（日常只需要这些）──
 npx degit niaodian/eos my-app   # 新建项目
+node .github/eos/eos.mjs init --write               # 本地 VS Code 任务（绝不覆盖已有文件）
+node .github/eos/eos.mjs next                       # 唯一的下一步、为什么、怎么开始
+node .github/eos/eos.mjs resume                     # 新会话？接着上次继续
+node .github/eos/eos.mjs check --gate <id> --scope <id>   # 证明这一步，并写入证据
+node .github/eos/eos.mjs transition --scope story --id <id> --to <STATE>
+node .github/eos/eos.mjs explain <gate>             # 按需展开某一个门禁的完整规则
 node .github/hooks/validate-config.mjs              # 配置自检（期望 PASS）
 npm test                                            # 跑测试（质量门同款）
 npm audit                                           # 发布前依赖审计
 
 # ── Copilot Chat（Agent 模式）──
+（agent）eos-guide            # 统一入口：读状态、给一个动作、负责交接
+/eos-next  /eos-resume  /eos-status   # 同一循环的 prompt 形式
 /eos-help                    # 迷路了？打印记忆卡 + 你在哪个阶段 + 下一步（只读，不改文件）
 /eos-init                    # 阶段0：一次性硬化（分支保护 + CODEOWNERS + 审批基线 → activation.md）
 （agent）eos-discovery        # 阶段1：问题定义        → G1

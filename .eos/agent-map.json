@@ -1,0 +1,150 @@
+{
+  "$schema": "./schemas/agent-map.schema.json",
+  "schemaVersion": 1,
+  "actions": {
+    "fix-eos-configuration": {
+      "agent": null,
+      "prompt": "validate-config",
+      "skills": [],
+      "handoff": "EOS's own configuration does not load. Fix only the reported file(s); change nothing else."
+    },
+    "complete-local-activation": {
+      "agent": null,
+      "prompt": "eos-init",
+      "skills": [],
+      "handoff": "Walk the one-time activation: declare .eos/project.json, branch protection, CODEOWNERS, approval baseline."
+    },
+    "frame-the-problem": {
+      "agent": "eos-discovery",
+      "prompt": null,
+      "skills": ["bmad-brainstorming", "bmad-agent-analyst"],
+      "handoff": "Converge the idea into one falsifiable problem statement with a measurable success metric."
+    },
+    "expand-requirements": {
+      "agent": null,
+      "prompt": "requirements",
+      "skills": ["bmad-agent-pm", "eos-operational-readiness"],
+      "handoff": "Expand the approved problem into functional + NFR + operational-readiness requirements."
+    },
+    "write-prd": {
+      "agent": null,
+      "prompt": "spec",
+      "skills": ["bmad-create-prd", "bmad-validate-prd"],
+      "handoff": "Turn docs/requirements.md into docs/prd.md; every requirement gets addressable AC<n>.<n> ids."
+    },
+    "repair-prd": {
+      "agent": null,
+      "prompt": "spec",
+      "skills": ["bmad-validate-prd"],
+      "handoff": "Repair only the listed PRD defects (duplicate/missing AC ids, unresolved blockers). Do not restructure the PRD."
+    },
+    "design-ux": {
+      "agent": "eos-design",
+      "prompt": "ux-spec",
+      "skills": ["bmad-ux"],
+      "handoff": "Produce docs/DESIGN.md + docs/EXPERIENCE.md, or record SKIP + reason for a non-user-facing product."
+    },
+    "design-architecture": {
+      "agent": "eos-architecture",
+      "prompt": null,
+      "skills": ["bmad-architecture"],
+      "handoff": "Design the architecture, lock the tech stack in an ADR, and choose the deployment topology."
+    },
+    "plan-stories": {
+      "agent": "eos-plan",
+      "prompt": null,
+      "skills": ["bmad-create-epics-and-stories", "bmad-create-story"],
+      "handoff": "Slice the approved architecture into context-self-contained stories under docs/stories/."
+    },
+    "design-acceptance-tests": {
+      "agent": "eos-plan",
+      "prompt": null,
+      "skills": ["bmad-testarch-atdd"],
+      "handoff": "Create the missing acceptance-test intent for the listed acceptance criteria only."
+    },
+    "design-eval-cases": {
+      "agent": null,
+      "prompt": "eval-spec",
+      "skills": [],
+      "handoff": "Add an eval case (EVAL-<n>) for each LLM-backed acceptance criterion listed; do not touch the others."
+    },
+    "complete-story-readiness": {
+      "agent": "eos-plan",
+      "prompt": null,
+      "skills": ["bmad-check-implementation-readiness"],
+      "handoff": "Close the listed story-readiness gaps (telemetry / authorization / rollback / dependencies) only."
+    },
+    "justify-classification": {
+      "agent": null,
+      "prompt": null,
+      "skills": [],
+      "handoff": "This change type turns verification gates off. Record in the story front matter why that is legitimate — EOS records the decision, it does not make it."
+    },
+    "refresh-stale-evidence": {
+      "agent": null,
+      "prompt": null,
+      "skills": [],
+      "handoff": "Nothing is wrong with the work — an input moved, so the recorded proof no longer describes it. Re-run the gates in order."
+    },
+    "promote-story": {
+      "agent": null,
+      "prompt": null,
+      "skills": [],
+      "handoff": "Everything the gate requires is in place; record the evidence and promote the story."
+    },
+    "implement-story": {
+      "agent": "agent",
+      "prompt": null,
+      "skills": ["bmad-dev-story"],
+      "handoff": "Implement the ready story exactly to its acceptance criteria; do not widen scope."
+    },
+    "verify-story": {
+      "agent": "agent",
+      "prompt": null,
+      "skills": ["bmad-tea"],
+      "handoff": "Run the declared quality commands, then produce the trace matrix rows for this story's acceptance criteria."
+    },
+    "repair-verification": {
+      "agent": "agent",
+      "prompt": null,
+      "skills": ["bmad-dev-story", "bmad-code-review"],
+      "handoff": "Fix the failing checks listed by the verified gate. Do not edit tests to make failures green."
+    },
+    "build-trace-matrix": {
+      "agent": null,
+      "prompt": "spec-align",
+      "skills": ["bmad-testarch-trace"],
+      "handoff": "Map every listed acceptance criterion to a real, passing test row in docs/trace-matrix.md."
+    },
+    "record-spike-outcome": {
+      "agent": null,
+      "prompt": "adr",
+      "skills": [],
+      "handoff": "Write the spike's decision record; a spike never merges product code without a follow-up story."
+    },
+    "prepare-release": {
+      "agent": null,
+      "prompt": "release-gate",
+      "skills": [],
+      "handoff": "Walk the release gate for the candidate; record evidence, do not approve anything yourself."
+    },
+    "repair-release": {
+      "agent": null,
+      "prompt": "release-gate",
+      "skills": [],
+      "handoff": "Close the listed release blockers only, then re-run the release-ready gate."
+    },
+    "close-the-loop": {
+      "agent": "eos-review",
+      "prompt": null,
+      "skills": ["bmad-correct-course", "bmad-retrospective"],
+      "handoff": "Write the change back to the spec source of truth and open the next iteration."
+    },
+    "start-next-change": {
+      "agent": null,
+      "prompt": "requirements",
+      "skills": [],
+      "handoff": "Nothing is blocked. Start the next change from a requirement, not from code."
+    }
+  }
+}

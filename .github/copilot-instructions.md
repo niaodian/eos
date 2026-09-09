@@ -3,6 +3,10 @@ applyTo: "**"
 ---
 # Engineering Operating System — Global Rules
 
+## Where am I / what's next (ask the machine, not the manual)
+- Run `node .github/eos/eos.mjs next` (or the `eos-guide` agent) instead of guessing the phase.
+- Never claim a gate passed, approve a waiver, or edit `.eos/ledger/`, `.eos/evidence/`, `.eos/waivers/`.
+
 ## Source of Truth
 - Specs in `docs/` are the single source of truth. Never implement beyond the approved spec.
 - Sequence: discovery → requirements → PRD → UX → architecture → stories → code. Don't skip gates.

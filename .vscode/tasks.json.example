@@ -1,0 +1,52 @@
+{
+  "//": "EOS local tasks — INERT until you copy this to .vscode/tasks.json (which stays local and gitignored). `node .github/eos/eos.mjs init --write` creates it for you and NEVER overwrites an existing file.",
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "EOS: Next",
+      "type": "shell",
+      "command": "node .github/eos/eos.mjs next",
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated" }
+    },
+    {
+      "label": "EOS: Resume",
+      "type": "shell",
+      "command": "node .github/eos/eos.mjs resume",
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated" }
+    },
+    {
+      "label": "EOS: Verify Current Gate",
+      "type": "shell",
+      "command": "node .github/eos/eos.mjs check --gate ${input:eosGate} --scope ${input:eosScope}",
+      "problemMatcher": []
+    },
+    {
+      "label": "EOS: Release Status",
+      "type": "shell",
+      "command": "node .github/eos/eos.mjs release-status",
+      "problemMatcher": []
+    },
+    {
+      "label": "EOS: Doctor",
+      "type": "shell",
+      "command": "node .github/eos/eos.mjs doctor",
+      "problemMatcher": []
+    }
+  ],
+  "inputs": [
+    {
+      "id": "eosGate",
+      "type": "promptString",
+      "description": "Gate id (activation | prd-ready | story-ready | verified | release-ready)",
+      "default": "story-ready"
+    },
+    {
+      "id": "eosScope",
+      "type": "promptString",
+      "description": "Scope id (for example STORY-012)",
+      "default": "product"
+    }
+  ]
+}

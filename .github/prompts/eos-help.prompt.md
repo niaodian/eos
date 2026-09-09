@@ -6,10 +6,15 @@ tools: ['search']
 ---
 # EOS Help — "Where am I, what's next?"
 
-The developer is (re)orienting. Give a SHORT, friendly, accurate snapshot — no walls of text. Do the
-detection first (read-only), then print the four blocks below. Never invent state you didn't verify.
+The developer is (re)orienting. Give a SHORT, friendly, accurate snapshot — no walls of text.
 
-## 1. Detect the current phase (read-only — check which artifacts exist)
+> **Prefer the machine.** If `.github/eos/eos.mjs` exists, run `node .github/eos/eos.mjs status --json`
+> and `node .github/eos/eos.mjs next --json` and answer from THAT — it derives the phase from
+> artifacts, recorded evidence and the append-only ledger, which is strictly more accurate than the
+> heuristic table below. Use `/eos-next` for the working loop and `/eos-resume` in a new session.
+> The table below is the fallback for a repository where the guided workflow is not installed.
+
+## 1. Detect the current phase (fallback — check which artifacts exist)
 
 Scan the repo and report the FURTHEST phase reached, then the single next action. Mapping:
 
@@ -32,11 +37,11 @@ Report it as one line, e.g.: `You're at Phase 3 (Spec) — docs/prd.md exists. N
 ## 2. Memory card (always print)
 
 ```
-New feature:   /requirements "<feature>" → /spec → /ux-spec → (agent) eos-architecture
-                                          → (handoff) eos-plan → bmad-dev-story → bmad-code-review
+The loop:       eos resume → do the one recommended action → eos check → eos next
+Navigation:     agent eos-guide · /eos-next · /eos-resume · /eos-status
 One-time harden: /eos-init          (branch protection + CODEOWNERS + approval baseline)
-Before release: /release-gate
-Self-check:     node .github/hooks/validate-config.mjs
+Before release: node .github/eos/eos.mjs release-status  then /release-gate
+Self-check:     node .github/hooks/validate-config.mjs · node .github/eos/eos.mjs doctor
 Local CI:       act push -j verify   (needs Docker)
 ```
 

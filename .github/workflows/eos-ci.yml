@@ -33,7 +33,7 @@ jobs:
         with:
           node-version: '20'
 
-      - name: EOS config validation (S1–S12)
+      - name: EOS config validation (S1–S13)
         run: node .github/hooks/validate-config.mjs
 
       - name: EOS doc parity (zh ⇄ en lockstep — structure + factual codes)
@@ -71,8 +71,78 @@ jobs:
       - name: EOS doctor regression tests (G-EVAL detection + compliance data boundary)
         run: node --test .github/hooks/eos-doctor.test.mjs
 
+      - name: EOS config-validator regression tests (S13 workflow spine cross-references)
+        # Locks the guided-workflow spine: an absent .eos/workflow.json only WARNs (repos created
+        # before this contract keep working), but a corrupt one, a policy referencing an unknown
+        # gate, or an action mapped to a non-existent agent/prompt FAILS. [eos-1.12.0]
+        run: node --test .github/hooks/validate-config.test.mjs
+
+      - name: EOS state-model tests (transitions, evidence staleness, waivers, ledger chain)
+        run: node --test .github/eos/state-model.test.mjs
+
+      - name: EOS next-best-action routing matrix (table-driven fixtures via the CLI)
+        run: node --test .github/eos/router.test.mjs
+
+      - name: EOS CLI contract tests (JSON contract, exit codes, handoff, non-destructive init)
+        run: node --test .github/eos/cli.test.mjs
+
+      - name: EOS end-to-end journey (blocked story → repair → verify → stale → merge → release)
+        # The whole developer loop as a regression, executed through the real CLI, offline.
+        run: node --test .github/eos/journey.test.mjs
+
+      - name: EOS bypass regression tests (one per defect found by the adversarial review)
+        # Each case performs the reported exploit — relabelling, an outlived waiver, a tampered or
+        # truncated ledger, hand-written evidence, a story added after a release gate — and asserts
+        # it no longer works.
+        run: node --test .github/eos/bypass.test.mjs
+
+      - name: EOS ledger append-only verification
+        # The hash chain is the offline guarantee; comparing against the base ref additionally
+        # proves that no previously recorded line was rewritten in this change.
+        run: |
+          node .github/eos/eos.mjs ledger --verify
+          # Compare against whatever this build is built ON TOP OF: the PR base on a pull_request,
+          # the previous commit on a push. A push build used to skip this entirely, which is exactly
+          # where a rewritten ledger would land.
+          REF=""
+          if [ -n "${GITHUB_BASE_REF:-}" ]; then
+            git fetch --no-tags --depth=1 origin "$GITHUB_BASE_REF" || true
+            REF="origin/$GITHUB_BASE_REF"
+          elif [ -n "${GITHUB_EVENT_BEFORE:-}" ] && [ "${GITHUB_EVENT_BEFORE}" != "0000000000000000000000000000000000000000" ]; then
+            git fetch --no-tags --depth=2 origin "$GITHUB_EVENT_BEFORE" || true
+            REF="$GITHUB_EVENT_BEFORE"
+          fi
+          if [ -n "$REF" ]; then
+            node .github/eos/eos.mjs ledger --verify --against "$REF" || exit 1
+          else
+            echo "no base ref available (first push) — the hash chain + head record are the guarantee here"
+          fi
+        env:
+          GITHUB_EVENT_BEFORE: ${{ github.event.before }}
+
+      - name: EOS guided-workflow self-check (is EOS itself wired correctly?)
+        run: node .github/eos/eos.mjs doctor
+
       - name: Product quality gate + evals (declared in .eos/project.json — every stack)
         # Runs the PROJECT's own install/lint/typecheck/test/eval commands for whatever stack it
         # declares. Replaces the old `if [ -f package.json ]` branch, which silently skipped
         # Python/Go/Java/Rust/.NET projects so their failing tests could never fail CI. [audit EOS-002]
         run: node .github/hooks/project-gate.mjs
+
+      - name: EOS gate summary (published to the PR / run summary)
+        # Always runs, even when a step above failed, so the summary explains WHY the run is red
+        # and what the single next action is — instead of "see the logs".
+        if: always()
+        run: |
+          {
+            echo "## EOS gate summary"
+            echo ""
+            echo '```'
+            node .github/eos/eos.mjs status || true
+            echo '```'
+            echo ""
+            echo "### Recommended next action"
+            echo '```'
+            node .github/eos/eos.mjs next || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

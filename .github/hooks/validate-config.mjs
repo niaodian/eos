@@ -4,6 +4,7 @@
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { loadProjectConfig, detectStacks, PROJECT_CONFIG_PATH } from './lib/project-config.mjs';
+import { loadWorkflow, loadGates, loadAgentMap } from '../eos/lib/registry.mjs';
 
 const root = process.cwd();
 const errors = [];
@@ -177,6 +178,46 @@ if (!proj.present) {
     warns.push(`S12 no ${PROJECT_CONFIG_PATH} — falling back to the legacy Node defaults (npm scripts). Declare the project to pin your own commands (see docs/eos/stack-presets.md).`);
   } else {
     warns.push(`S12 no ${PROJECT_CONFIG_PATH} — add it when product code lands so tests/evals are gated for your stack.`);
+  }
+}
+
+// S13 the guided-workflow spine must load and cross-reference correctly. `.eos/workflow.json`,
+// `.eos/gates.json` and `.eos/agent-map.json` decide which gates run, what a transition requires
+// and which agent a developer is sent to — a typo in any of them would quietly change the process
+// itself. ABSENT is a WARN (a repo created before this contract keeps working, and the router
+// routes it to activation); PRESENT-BUT-BROKEN is always an ERROR. [eos-1.12.0]
+const wf = loadWorkflow(root);
+const gt = loadGates(root);
+const am = loadAgentMap(root);
+for (const [label, res] of [['workflow', wf], ['gates', gt], ['agent map', am]]) {
+  if (!res.present) { warns.push(`S13 no .eos/${label === 'agent map' ? 'agent-map' : label}.json — the guided workflow is inactive; run \`node .github/eos/eos.mjs init\``); continue; }
+  for (const e of res.errors) errors.push(`S13 ${e}`);
+}
+if (wf.workflow && gt.gates) {
+  const gateIds = new Set(gt.gates.gates.map((g) => g.id));
+  for (const [pname, profile] of Object.entries(wf.workflow.profiles)) {
+    for (const [ct, cfg] of Object.entries(profile.changeTypes)) {
+      for (const gid of Object.keys(cfg.gates || {})) {
+        if (!gateIds.has(gid)) errors.push(`S13 .eos/workflow.json: profile "${pname}" / ${ct} references unknown gate "${gid}"`);
+      }
+    }
+  }
+  for (const machine of Object.values(wf.workflow.stateMachines)) {
+    for (const t of machine.transitions) {
+      if (t.requiresGate && !gateIds.has(t.requiresGate)) errors.push(`S13 .eos/workflow.json: transition ${t.from} → ${t.to} requires unknown gate "${t.requiresGate}"`);
+      if (!machine.states.includes(t.from) || !machine.states.includes(t.to)) errors.push(`S13 .eos/workflow.json: transition ${t.from} → ${t.to} uses a state that is not declared`);
+    }
+  }
+}
+if (am.agentMap) {
+  for (const [actionId, entry] of Object.entries(am.agentMap.actions)) {
+    // The built-in VS Code agent is literally named "agent" and has no file.
+    if (entry.agent && entry.agent !== 'agent' && !existsSync(join(root, `.github/agents/${entry.agent}.agent.md`))) {
+      errors.push(`S13 .eos/agent-map.json: action "${actionId}" maps to agent "${entry.agent}" but .github/agents/${entry.agent}.agent.md does not exist`);
+    }
+    if (entry.prompt && !existsSync(join(root, `.github/prompts/${entry.prompt}.prompt.md`))) {
+      errors.push(`S13 .eos/agent-map.json: action "${actionId}" maps to prompt "/${entry.prompt}" but .github/prompts/${entry.prompt}.prompt.md does not exist`);
+    }
   }
 }
 

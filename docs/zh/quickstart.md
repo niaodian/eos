@@ -5,8 +5,9 @@
 
 # EOS 快速开始（Quickstart）
 
-> **任何时候迷路了？** 在 Copilot Chat 里跑 `/eos-help`——它会检测本仓库当前处于哪个阶段、
-> 打印记忆卡、并告诉你确切的下一步（以及任何待办的一次性硬化）。
+> **任何时候迷路了？** 跑 `node .github/eos/eos.mjs next`（或在 Copilot Chat 里用 **eos-guide**
+> agent / `/eos-next`）。它从仓库本身推导阶段，并给你一个动作、为什么是它、怎么开始、以及
+> 怎样算做完。你永远不需要背门禁顺序。
 
 ## 前置条件（local-first——无需任何企业设施）
 | 工具 | 用于 | 缺失时 |
@@ -45,17 +46,22 @@ EOS **原生在 Windows 上运行**（PowerShell 或 Command Prompt）——核�
 - **`build-pdf.sh`**（可选的 手册→PDF）是 Bash 脚本——用 **Git-Bash 或 WSL** 运行，或直接
   读 `docs/eos/user-manual.md`。
 
-## Day-1（从 clone 到第一份 spec）
-1. 在 VS Code 打开这个文件夹。
-2. 校验配置：`node .github/hooks/validate-config.mjs`（期望 PASS）。
-3. **一次性硬化**（把 CI 门从 advisory 变成合并阻断）：在 Copilot Chat 里跑 `/eos-init`——
-   它带你走 branch protection + CODEOWNERS + 审批基线，记录在 `docs/eos/activation.md`。
-   个人/一次性仓库？用理由豁免各项；`eos-doctor` 会持续记账。
-4. 在 Copilot Chat（Agent 模式）：
-   - 切到 **eos-discovery** agent → 产出 `docs/discovery.md`。
-   - 跑 `/requirements "<feature>"` → `docs/requirements.md` + 运营决策表（门 G2）。
-   - 跑 `/spec` → `docs/prd.md`（复用 bmad-create-prd，由 bmad-validate-prd 校验）。
-5. 提交。
+## Day-1（三步，然后照着推荐做）
+1. 在 VS Code 打开这个文件夹（就是它本身——不是它的上层目录）。
+2. `node .github/eos/eos.mjs init --write`——创建本地的 **EOS: Next / Resume / Verify Current
+   Gate / Release Status** 任务。它绝不覆盖你已有的文件。
+3. `node .github/eos/eos.mjs next`——照着它说的做。然后重复。
+
+这就是全部循环。下面的内容只在你想知道*为什么*时才需要。
+
+- Router 会带你走 discovery → requirements → PRD → UX → architecture → stories，然后按 Story：
+  readiness → implementation → verification → merge。每一步都会点名 Copilot agent（或 `/prompt`）
+  和最小 BMAD skill 链——你永远不用自己从 73 个已安装 skill 里挑。
+- **一次性硬化**（把 CI 门从 advisory 变成合并阻断）：在 Copilot Chat 里跑 `/eos-init`——
+  branch protection + CODEOWNERS + 审批基线，记录在 `docs/eos/activation.md`。
+  个人/一次性仓库？用理由豁免各项；`eos-doctor` 会持续记账。
+- 之后开了新对话？`node .github/eos/eos.mjs resume`（或 `/eos-resume`）会恢复你正在做的事、
+  最近一次通过的门禁和当前 Blocker——不需要重读任何文档。
 
 > 首次：在 `.github/instructions/00-workspace.instructions.md` 填项目事实——
 > 从 `docs/eos/stack-presets.md` 复制你的栈预设（Node/Python/Go/Java/Rust/.NET），并把同一套命令
@@ -64,17 +70,20 @@ EOS **原生在 Windows 上运行**（PowerShell 或 Command Prompt）——核�
 
 ## Happy Path（最短入口）
 ```
-/requirements "<one-line feature>"
+node .github/eos/eos.mjs next
 ```
-然后跟着 handoff 走：→ /spec → /ux-spec（面向用户）→（agent）eos-architecture →（handoff）eos-plan → bmad-dev-story → bmad-code-review。
+做完它点名的那一个动作，然后再跑一次。更喜欢用 Chat？**eos-guide** agent 跑的是同一条命令，
+并为 Router 选中的 agent 提供 handoff 按钮。
 
 ## 记忆卡
 ```
-新功能：       /requirements "<feature>" → /spec → /ux-spec → (agent) eos-architecture
-                                          → (handoff) eos-plan → bmad-dev-story → bmad-code-review
+唯一循环：     eos resume → 做那一个动作 → eos check --gate <id> --scope <id> → eos next
+我在哪：       node .github/eos/eos.mjs status         （加 --changed 看你的改动影响了什么）
+这条规则为啥： node .github/eos/eos.mjs explain <gate> (activation|prd-ready|story-ready|verified|release-ready)
+晋级工作：     node .github/eos/eos.mjs transition --scope story --id <id> --to <STATE>
 一次性硬化：   /eos-init   (branch protection + CODEOWNERS + 审批基线 → docs/eos/activation.md)
-发布前：       /release-gate
-自检：         node .github/hooks/validate-config.mjs
+发布前：       node .github/eos/eos.mjs release-status   然后 /release-gate
+自检：         node .github/hooks/validate-config.mjs · node .github/eos/eos.mjs doctor
 产品门禁：     node .github/hooks/project-gate.mjs   （跑 .eos/project.json 的命令——任意技术栈）
 本地 CI：      act push -j verify   (validate-config + eos-doctor + tests + evals；需 Docker)
 ```
