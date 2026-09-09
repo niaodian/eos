@@ -68,6 +68,9 @@ jobs:
       - name: EOS project-gate regression tests (cross-stack quality contract)
         run: node --test .github/hooks/project-gate.test.mjs
 
+      - name: EOS doctor regression tests (G-EVAL detection + compliance data boundary)
+        run: node --test .github/hooks/eos-doctor.test.mjs
+
       - name: Product quality gate + evals (declared in .eos/project.json — every stack)
         # Runs the PROJECT's own install/lint/typecheck/test/eval commands for whatever stack it
         # declares. Replaces the old `if [ -f package.json ]` branch, which silently skipped
