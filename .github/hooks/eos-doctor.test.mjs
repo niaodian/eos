@@ -12,6 +12,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { bmadReadiness } from './lib/bmad-runtime.mjs';
 
 const HOOK = join(dirname(fileURLToPath(import.meta.url)), 'eos-doctor.mjs');
 const sandboxes = [];
@@ -399,9 +400,29 @@ test('D6: the shipped agent map maps no deprecated skill', () => {
 });
 
 test('D6: the shallow run says it is shallow, and --deep says what it additionally checked', () => {
-  const dir = project({ '.eos/project.json': { projectType: 'config-only', stacks: [] }, '.eos/bmad.lock.json': LOCK, '.eos/schemas/bmad-lock.schema.json': LOCK_SCHEMA });
+  // A project-level skills directory makes this deterministic on ANY machine: without one the
+  // result depends on whether the developer happens to have skills in $HOME, which is exactly the
+  // kind of environment coupling that makes a test pass locally and fail in CI.
+  const dir = project({
+    '.eos/project.json': { projectType: 'config-only', stacks: [] },
+    '.eos/bmad.lock.json': LOCK,
+    '.eos/schemas/bmad-lock.schema.json': LOCK_SCHEMA,
+    '.github/skills/eos-local/SKILL.md': '---\nname: eos-local\n---\n# local\n',
+  });
   assert.match(run(dir).out, /shallow check only/);
   assert.doesNotMatch(run(dir, ['--deep']).out, /shallow check only/);
+});
+
+test('D6: with no skills directory anywhere, BMAD readiness is UNCHECKED rather than guessed', () => {
+  const dir = project({
+    '.eos/project.json': { projectType: 'config-only', stacks: [] },
+    '.eos/bmad.lock.json': LOCK,
+    '.eos/schemas/bmad-lock.schema.json': LOCK_SCHEMA,
+  });
+  const r = bmadReadiness(dir, { deep: true, roots: [] });
+  assert.equal(r.status, 'UNCHECKED');
+  assert.equal(r.problems.length, 0);
+  assert.match(r.notes.join(' '), /skill availability was not checked/);
 });
 
 test('D6: with no compatibility manifest the BMAD layer is silent rather than guessing', () => {
