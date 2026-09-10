@@ -1,7 +1,7 @@
 {
   "$schema": "./schemas/bmad-lock.schema.json",
   "schemaVersion": 1,
-  "eosCompatibility": "1.13.0",
+  "eosCompatibility": "1.13.1",
   "bmadGeneration": "v6-skills",
   "recordedAt": "2026-09-10",
   "note": "Machine-readable BMAD compatibility manifest. EOS delegates authoring work to BMAD skills; those skills resolve their customization and memory through a PROJECT-LOCAL runtime under `_bmad/`, which is NOT part of EOS and is NOT vendored here. `eos-doctor --deep` reads this file and reports BLOCKED when a mapped skill cannot activate at all, and DEGRADED when it activates only on shipped defaults — so a green doctor can no longer coexist with a failing skill activation, and a working-but-uncustomized setup is not mislabelled as broken. See docs/adr/003-bmad-runtime-boundary.md.",
