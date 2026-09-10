@@ -218,6 +218,10 @@ Agent 映射和项目声明都受 CODEOWNERS 保护，以及 CI 会针对本次�
 - **拓扑交叉校验。** `deployment-topology` 要求有已决策的 ADR，`ops-artifacts` 要求回滚、灰度与
   健康/就绪都被写下来。EOS 不验证 Runbook 里的机制就是该拓扑真正提供的机制——
   Runbook 可以描述一个平台根本做不到的回滚。这仍然是一个评审问题。
+- **离线承诺现在是被强制的，而不是被声明的。** 只要 EOS Core 里出现任何联网路径或第三方依赖，
+  `offline-boundary.test.mjs` 就会失败。这条测试是日后添加任何 provider adapter 的**前置条件**：
+  adapter 可以联网增强，但网络只能把一个诚实的非-PASS **升级**为 PASS——绝不能凭空造出 PASS，
+  它缺席时也绝不能被静默忽略。没有机械化的边界，"local-first" 会一个 PR 一个 PR 地被侵蚀。
 - **服务端强制。** 本地运行看不到分支保护。它被报告为 BLOCKED/UNVERIFIED，绝不是 PASS。
 
 ## 6. Change Type（分流流程，但不留未知路径）

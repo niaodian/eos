@@ -238,6 +238,11 @@ Naming a limit is cheaper than discovering it during an incident, so:
   requires rollback, gradual rollout and health/readiness to be documented. EOS does not verify that
   the mechanisms in the runbook are the ones that topology actually offers — a runbook can describe
   a rollback the platform cannot perform. That remains a review question.
+- **The offline claim is now enforced, not promised.** `offline-boundary.test.mjs` fails if anything
+  in EOS Core gains a network path or a third-party dependency. That test is the precondition for
+  ever adding a provider adapter: an adapter may be online-augmented, but network may only ever
+  upgrade an honest non-PASS into a PASS — never manufacture one, and never be silently ignored when
+  absent. Without a mechanical boundary, "local-first" erodes one pull request at a time.
 - **Server-side enforcement.** Branch protection cannot be seen from a local run. It is reported as
   BLOCKED/UNVERIFIED, never PASS.
 
