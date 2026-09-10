@@ -13,6 +13,20 @@ Produce the two peer design contracts using skill `bmad-ux`
 (or talk to `bmad-agent-ux-designer` / Sally for an opinionated pass;
 use `bmad-cis-design-thinking` / Maya when the problem is still fuzzy):
 
+**First decide whether this gate applies at all**, and record the decision in `docs/design.json`
+(schema `.eos/schemas/design.schema.json`):
+
+```json
+{ "schemaVersion": 1, "userInterface": false,
+  "skipReason": "Machine API consumed only by other services; no human interacts with it." }
+```
+
+A non-user-facing product stops here — but it must SAY so. Silence is not a skip, and neither is the
+word "SKIP" on its own. For a user-facing product set `"userInterface": true`, record `coverage` for
+flows / states / accessibility / designTokens / responsive (each `COVERED` + a `ref`, or
+`NOT_APPLICABLE` + a reason), and produce **both** contracts below — G-UX requires both files, not
+either one:
+
 - `docs/DESIGN.md` — visual identity (owns *how it looks*: design tokens, type, color, spacing).
 - `docs/EXPERIENCE.md` — information architecture, user flows, screen states, interactions,
   accessibility, journeys, **target device matrix (phone/tablet/desktop + breakpoints)** (owns

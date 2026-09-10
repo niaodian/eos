@@ -39,8 +39,36 @@ const TITLES = {
   'record-spike-outcome': 'Record the spike outcome',
   'prepare-release': 'Prepare the release',
   'repair-release': 'Close the release blockers',
+  'land-telemetry': 'Land the observability for what you shipped',
+  'repair-telemetry': 'Close the observability gaps',
+  'review-incident': 'Review the rollback before shipping again',
   'close-the-loop': 'Write the change back to the spec',
   'start-next-change': 'Start the next change',
+};
+
+/**
+ * What a release is waiting for AFTER it has shipped. Without this table `eos next` answers
+ * "prepare the release" to a release that already shipped — the loop the audit found open.
+ */
+const RELEASE_STAGE = {
+  RELEASED: {
+    gate: 'telemetry-ready',
+    to: 'OBSERVED',
+    repair: 'repair-telemetry',
+    reason: 'the change is live but cannot yet be observed',
+    promote: 'land-telemetry',
+    promoteReason: 'the shipped change is observable — record that the release is being watched.',
+    doneWhen: ['docs/telemetry.json emits the discovery success metric', 'dashboards, routed alerts and a rollback trigger exist', '`eos check --gate telemetry-ready --scope <release>` passes'],
+  },
+  OBSERVED: {
+    gate: 'iteration-ready',
+    to: 'ITERATED',
+    repair: 'close-the-loop',
+    reason: 'the release is being observed but nothing has been written back to the spec',
+    promote: 'close-the-loop',
+    promoteReason: 'what production taught is written back — close the loop.',
+    doneWhen: ['docs/iteration.json records the learnings and where each one landed', 'an owner recorded CONTINUE / CORRECT_COURSE / STOP', '`eos check --gate iteration-ready --scope <release>` passes'],
+  },
 };
 
 /** Which repair action a failed check maps to. One check → one action, so routing stays stable. */
@@ -49,10 +77,25 @@ const CHECK_ACTION = {
   'declaration-matches-repo': 'complete-local-activation',
   'workflow-profile': 'complete-local-activation',
   'activation-ledger': 'complete-local-activation',
+  'discovery-written': 'frame-the-problem',
+  'problem-falsifiable': 'frame-the-problem',
+  'metric-measurable': 'frame-the-problem',
+  'scope-bounded': 'frame-the-problem',
+  'requirements-written': 'expand-requirements',
+  'functional-requirements': 'expand-requirements',
+  'nfr-quantified': 'expand-requirements',
+  'operational-preflight': 'expand-requirements',
   'prd-present': 'write-prd',
   'ac-parseable': 'repair-prd',
   'ac-unique': 'repair-prd',
+  'ac-covers-requirements': 'repair-prd',
   'no-open-blockers': 'repair-prd',
+  'ux-applicability': 'design-ux',
+  'ux-documents': 'design-ux',
+  'ux-coverage': 'design-ux',
+  'architecture-written': 'design-architecture',
+  'architecture-decisions': 'design-architecture',
+  'nfr-landing-points': 'design-architecture',
   'story-present': 'plan-stories',
   'state-not-hand-edited': 'complete-story-readiness',
   'ac-references-resolve': 'complete-story-readiness',
@@ -60,19 +103,33 @@ const CHECK_ACTION = {
   'agentic-eval-case': 'design-eval-cases',
   'ops-tasks': 'complete-story-readiness',
   'waiver-rejected': 'complete-story-readiness',
+  'product-tree-bound': 'verify-story',
   'tests-executed': 'repair-verification',
   'trace-complete': 'build-trace-matrix',
   'eval-threshold': 'design-eval-cases',
   'evidence-current': 'refresh-stale-evidence',
+  'candidate-identity': 'repair-release',
+  'candidate-quality': 'repair-verification',
   'stories-verified': 'repair-release',
+  'story-evidence-current': 'refresh-stale-evidence',
   'spec-alignment': 'repair-release',
   'secret-scan': 'repair-release',
+  'dependency-audit': 'repair-release',
+  'nfr-evidence': 'repair-release',
   'compliance-boundary': 'repair-release',
   'no-expired-waivers': 'repair-release',
   'ops-artifacts': 'repair-release',
+  'deployment-topology': 'repair-release',
+  'activation-authority': 'complete-local-activation',
+  'telemetry-plan': 'repair-telemetry',
+  'signals-land': 'repair-telemetry',
+  'observability': 'repair-telemetry',
+  'spec-write-back': 'close-the-loop',
+  'agentic-feedback': 'close-the-loop',
+  'iteration-decision': 'close-the-loop',
 };
 
-const SEVERITY = { ERROR: 5, BLOCKED: 4, FAIL: 3, STALE: 2, PENDING: 1 };
+const SEVERITY = { ERROR: 6, BLOCKED: 5, FAIL: 4, STALE: 3, DEFERRED: 2, PENDING: 1 };
 
 const blockersOf = (gate) => (gate.checks || [])
   .filter((c) => isBlocking(c.status))
@@ -225,6 +282,69 @@ export function route(snapshot, { now = new Date() } = {}) {
 
   // --- release scope ----------------------------------------------------------------------------
   if (scope.type === 'release') {
+    // A release does not end at RELEASED. Observing the change and writing what it taught back into
+    // the spec are gates too, so "prepare another release" is the wrong answer here. (EOS-AUD-010)
+    const releaseState = scopeState(snapshot, 'release', scope.id);
+    const stage = RELEASE_STAGE[releaseState];
+    if (stage) {
+      const g = gate(stage.gate, 'release', scope.id);
+      if (isBlocking(g.status)) {
+        const driver = drivingCheck(g);
+        const repair = repairFor(g, driver, stage.repair, `${CLI} check --gate ${stage.gate} --scope ${scope.id}`);
+        take(action(snapshot, repair.id, {
+          reason: driver?.detail || stage.reason,
+          targetGate: stage.gate,
+          command: repair.command,
+          doneWhen: stage.doneWhen,
+        }));
+        blockers.push(...blockersOf(g));
+        exitCode = 2;
+      } else {
+        take(action(snapshot, stage.promote, {
+          reason: `${stage.gate} is ${g.status} for ${scope.id}; ${stage.promoteReason}`,
+          targetGate: stage.gate,
+          command: `${CLI} transition --scope release --id ${scope.id} --to ${stage.to}`,
+          doneWhen: [`the ledger records ${scope.id} as ${stage.to}`],
+        }));
+      }
+      addAlternatives(snapshot, alternatives, recommended, scope);
+      return finish();
+    }
+    if (releaseState === 'ROLLED_BACK') {
+      // Routing a rolled-back release straight back to "prepare the release" would send the team to
+      // re-ship the thing that just failed, before anyone asked why it failed. The loop still has to
+      // CLOSE, though, so the exit is the same write-back gate a healthy release goes through.
+      const g = gate('iteration-ready', 'release', scope.id);
+      if (isBlocking(g.status)) {
+        const driver = drivingCheck(g);
+        take(action(snapshot, 'review-incident', {
+          reason: `${scope.id} was ROLLED_BACK. ${driver?.detail || 'Before anything ships again the failure needs an incident review and a course correction — re-preparing the same candidate repeats it.'}`,
+          targetGate: 'iteration-ready',
+          command: `${CLI} check --gate iteration-ready --scope ${scope.id}`,
+          doneWhen: ['the rollback trigger and its root cause are recorded', `docs/iteration.json records release "${scope.id}" with CORRECT_COURSE and an owner`, 'the affected requirements / PRD / eval dataset are updated'],
+        }), { blocker: { gate: 'release', check: 'rolled-back', status: 'FAIL', detail: `${scope.id} is ROLLED_BACK — the loop is not closed until the failure is understood` } });
+        blockers.push(...blockersOf(g));
+        exitCode = 2;
+      } else {
+        take(action(snapshot, 'close-the-loop', {
+          reason: `${scope.id} was rolled back and the incident review is recorded; close the loop.`,
+          targetGate: 'iteration-ready',
+          command: `${CLI} transition --scope release --id ${scope.id} --to ITERATED`,
+          doneWhen: [`the ledger records ${scope.id} as ITERATED`],
+        }));
+      }
+      addAlternatives(snapshot, alternatives, recommended, scope);
+      return finish();
+    }
+    if (releaseState === 'ITERATED') {
+      take(action(snapshot, 'start-next-change', {
+        reason: `${scope.id} shipped, was observed, and what it taught is written back — the loop is closed.`,
+        command: `${CLI} status`,
+        doneWhen: ['the next change is described as a requirement before any code is written'],
+      }));
+      addAlternatives(snapshot, alternatives, recommended, scope);
+      return finish();
+    }
     const g = gate('release-ready', 'release', scope.id);
     if (isBlocking(g.status)) {
       const driver = drivingCheck(g);
@@ -233,7 +353,7 @@ export function route(snapshot, { now = new Date() } = {}) {
         reason: driver?.detail || 'the release is not ready',
         targetGate: 'release-ready',
         command: repair.command,
-        doneWhen: ['`eos check --gate release-ready` passes', 'every required story is VERIFIED with fresh evidence'],
+        doneWhen: ['`eos check --gate release-ready` passes', 'every required story was verified against THIS candidate tree'],
       }));
       blockers.push(...blockersOf(g));
     } else {
@@ -249,59 +369,35 @@ export function route(snapshot, { now = new Date() } = {}) {
     return finish();
   }
 
-  // --- product scope: the artifacts drive the baseline -------------------------------------------
+  // --- product scope: the baseline gates drive the phase ------------------------------------------
   if (scope.type === 'product') {
-    const steps = [
-      { key: 'discovery', id: 'frame-the-problem', file: 'docs/discovery.md', reason: 'there is no problem statement yet, and everything downstream is derived from it.', doneWhen: ['docs/discovery.md states one falsifiable problem and a measurable success metric'] },
-      { key: 'requirements', id: 'expand-requirements', file: 'docs/requirements.md', reason: 'the problem is framed but the requirements (functional + NFR + operational readiness) are not written.', doneWhen: ['docs/requirements.md exists with the operational decision table'] },
-      { key: 'prd', id: 'write-prd', file: 'docs/prd.md', reason: 'requirements exist but there is no PRD, so nothing downstream has addressable acceptance criteria.', doneWhen: ['docs/prd.md exists', '`eos check --gate prd-ready` passes'] },
+    const stages = [
+      { gate: 'discovery-ready', id: 'frame-the-problem', fallback: 'frame-the-problem', doneWhen: ['docs/discovery.md states one falsifiable problem', 'docs/discovery.json records a measurable metric and an explicit scope boundary'] },
+      { gate: 'requirements-ready', id: 'expand-requirements', fallback: 'expand-requirements', doneWhen: ['docs/requirements.json carries functional + quantified NFR requirements', 'every operational concern is ADOPT / SKIP+reason / DEFER+owner+trigger'] },
+      { gate: 'prd-ready', id: 'write-prd', fallback: 'repair-prd', doneWhen: ['`eos check --gate prd-ready` passes'] },
+      { gate: 'ux-ready', id: 'design-ux', fallback: 'design-ux', doneWhen: ['docs/design.json records whether there is a user-facing surface', 'a user-facing product has docs/DESIGN.md + docs/EXPERIENCE.md and full coverage'] },
+      { gate: 'architecture-ready', id: 'design-architecture', fallback: 'design-architecture', doneWhen: ['docs/architecture.json decides stack, topology, authz, security, audit, rollback and DR', 'every NFR lands on a named component'] },
     ];
-    for (const s of steps) {
-      if (!snapshot.artifacts[s.key]) {
-        take(artifactAction(snapshot, s.id, { file: s.file, reason: s.reason, doneWhen: s.doneWhen }));
-        exitCode = 2;
-        addAlternatives(snapshot, alternatives, recommended, scope);
-        return finish();
-      }
-    }
-    const prd = gate('prd-ready', 'product', 'product');
-    if (isBlocking(prd.status)) {
-      const driver = drivingCheck(prd);
-      const repair = repairFor(prd, driver, 'repair-prd', `${CLI} check --gate prd-ready`);
-      take(action(snapshot, repair.id, {
-        reason: driver?.detail || 'the PRD is not ready',
-        targetGate: 'prd-ready',
+    for (const stage of stages) {
+      if (gatePolicy(snapshot, changeType, stage.gate) === 'not_applicable') continue;
+      const g = gate(stage.gate, 'product', 'product');
+      if (!isBlocking(g.status)) continue;
+      const driver = drivingCheck(g);
+      const repair = repairFor(g, driver, CHECK_ACTION[driver?.id] || stage.fallback, `${CLI} check --gate ${stage.gate}`);
+      take(action(snapshot, repair.id === 'refresh-stale-evidence' ? repair.id : (CHECK_ACTION[driver?.id] || stage.id), {
+        reason: driver?.detail || `${stage.gate} is ${g.status}`,
+        targetGate: stage.gate,
         command: repair.command,
-        doneWhen: ['`eos check --gate prd-ready` passes'],
+        doneWhen: stage.doneWhen,
       }));
-      blockers.push(...blockersOf(prd));
-      exitCode = 2;
-      addAlternatives(snapshot, alternatives, recommended, scope);
-      return finish();
-    }
-    if (!snapshot.artifacts.experience) {
-      take(artifactAction(snapshot, 'design-ux', {
-        file: 'docs/EXPERIENCE.md',
-        reason: 'the PRD is ready but there is no UX contract; a story sliced without screens and states is what causes rework.',
-        doneWhen: ['docs/EXPERIENCE.md exists (or records "SKIP — no user-facing surface" with a reason)'],
-      }));
-      exitCode = 2;
-      addAlternatives(snapshot, alternatives, recommended, scope);
-      return finish();
-    }
-    if (!snapshot.artifacts.architecture) {
-      take(artifactAction(snapshot, 'design-architecture', {
-        file: 'docs/architecture.md',
-        reason: 'the UX contract is settled but the technical approach, tech-stack lock and deployment topology are not decided.',
-        doneWhen: ['docs/architecture.md exists', 'the tech stack and deployment topology each have an ADR'],
-      }));
+      blockers.push(...blockersOf(g));
       exitCode = 2;
       addAlternatives(snapshot, alternatives, recommended, scope);
       return finish();
     }
     take(artifactAction(snapshot, 'plan-stories', {
       file: 'docs/stories/',
-      reason: 'the baseline is approved but there is no story to work on.',
+      reason: 'the baseline is complete but there is no story to work on.',
       doneWhen: ['at least one story exists under docs/stories/', '`eos check --gate story-ready --scope <id>` passes for it'],
     }));
     exitCode = 2;

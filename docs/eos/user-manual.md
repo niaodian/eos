@@ -1,6 +1,6 @@
 # EOS User Manual (Engineering Operating System)
 
-> Version: synced with `docs/eos/VERSION` (current `eos-1.12.0`)
+> Version: synced with `docs/eos/VERSION` (current `eos-1.13.0`)
 > Applies to: recent VS Code + GitHub Copilot Chat (custom agent / hooks are recent-version capabilities; confirm the version in the "About VS Code" panel) + 73 installed `bmad-*` skills (user-level)
 > Positioning: this manual is an **operating guide (how to use it)**; for design rationale and trade-offs, see `blueprint.md` in the same directory (why it is designed this way).
 > Conventions: prose in English; file names / paths / commands / config keys kept verbatim.
@@ -147,18 +147,25 @@ If you want to promote some `eos-*.agent.md` files to "available in all projects
 **Method A — degit (recommended, fastest)**
 ```sh
 # Public template — plain degit works (no auth needed)
-npx degit niaodian/eos my-new-app
+npx degit niaodian/eos#eos-1.13.0 my-new-app
 cd my-new-app
 git init && git add -A && git commit -m "chore: scaffold from eos"
 ```
 
 **Method B — gh + GitHub template**
 ```sh
+# Requires the repository to be a GitHub template. Verify it yourself rather than trusting this
+# page — it is an owner-level setting that can be turned off again at any time:
+#   gh repo view niaodian/eos --json isTemplate   ->  {"isTemplate": true}
 gh repo create my-new-app --template niaodian/eos --private --clone
 cd my-new-app
 ```
 
 **Method C — VS Code directly New Repository from Template** (GitHub web page → Use this template).
+Uses the same template setting as Method B.
+
+> Method B/C give you the newest default branch; Method A pins a release tag. If you want everyone
+> on your team to start from the *same* EOS, prefer A.
 
 ## 3.2 First thing after landing: self-check
 
@@ -178,7 +185,7 @@ Open `.github/instructions/00-workspace.instructions.md` and change it to the re
 ## 3.4 Full Day-1 sequence (copy-ready)
 
 ```sh
-npx degit niaodian/eos my-new-app && cd my-new-app
+npx degit niaodian/eos#eos-1.13.0 my-new-app && cd my-new-app
 git init && git add -A && git commit -q -m "chore: scaffold from eos"
 node .github/hooks/validate-config.mjs
 # Key: run `code .` from inside the project directory so my-new-app becomes the workspace root (including .github/).
@@ -285,7 +292,7 @@ So EOS **never depends on "Rule A overriding Rule B"**. The only reliable contro
 | Item | Content |
 |---|---|
 | **Goal** | Get an empty project with healthy configuration from the template |
-| **How to start** | `npx degit niaodian/eos my-app && cd my-app` |
+| **How to start** | `npx degit niaodian/eos#eos-1.13.0 my-app && cd my-app` |
 | **Output** | Complete `.github/` + `docs/` skeleton |
 | **Gate** | `node .github/hooks/validate-config.mjs` → **PASS** |
 | **Must check** | PASS 0 errors. **If the stack is undecided, do not change** `00-workspace` yet--keep the Node placeholder; the stack is an irreversible decision, and the authority is locked in **Phase 4 (ADR)**. If the stack is known, copy `docs/eos/stack-presets.md` directly (fast path). |
@@ -319,7 +326,7 @@ So EOS **never depends on "Rule A overriding Rule B"**. The only reliable contro
 |---|---|
 | **Goal** | Expand functional requirements + NFR + **move operational requirements upfront** (telemetry/authz/rollback...), preventing "post-launch rework" |
 | **When to enter** | G1 passed and `docs/discovery.md` is ready |
-| **How to start** | Enter **`/requirements "<feature>"`** in Chat (wraps `bmad-create-prd` + skill `eos-operational-readiness`) |
+| **How to start** | Enter **`/requirements "<feature>"`** in Chat (wraps `bmad-agent-pm` / `bmad-prd` + skill `eos-operational-readiness`) |
 | **Input** | `docs/discovery.md` |
 | **Output** | `docs/requirements.md`, **with "Operational Pre-Flight Decision Table" at the top** |
 | **Decision gate G2 (hard gate)** | Walk through all five checklists A/B/C/D/E (**regulated industries add the sixth F-compliance**); **any unresolved item = BLOCKER; cannot enter Spec until cleared** |
@@ -348,7 +355,7 @@ So EOS **never depends on "Rule A overriding Rule B"**. The only reliable contro
 |---|---|
 | **Goal** | Solidify requirements into a PRD that becomes the only downstream recognized source of truth |
 | **When to enter** | G2 passed and `docs/requirements.md` has no BLOCKER |
-| **How to start** | Enter **`/spec`** in Chat (draft with `bmad-create-prd`, validate with `bmad-validate-prd`) |
+| **How to start** | Enter **`/spec`** in Chat (draft and validate with `bmad-prd`) |
 | **Input** | `docs/requirements.md` |
 | **Output** | `docs/prd.md`: every FR has acceptance criteria + NFR section (from C-nfr, no blanks) |
 | **Decision gate G3** | ☑ Every requirement has ≥1 measurable acceptance criterion |
@@ -547,7 +554,7 @@ So EOS **never depends on "Rule A overriding Rule B"**. The only reliable contro
 
 ### Step 0: Create project + choose stack (5 minutes)
 ```sh
-npx degit niaodian/eos todo-api && cd todo-api
+npx degit niaodian/eos#eos-1.13.0 todo-api && cd todo-api
 node .github/hooks/validate-config.mjs          # expect PASS
 ```
 **Stack already decided?** Open `.github/instructions/00-workspace.instructions.md` and copy `Local commands` from your stack block (`docs/eos/stack-presets.md`, fast path).
@@ -606,7 +613,7 @@ SaaS **G7** requires: every AC has ≥1 test, **API contract tests** (against op
 
 ### Step 0: Create project + create AI directories
 ```sh
-npx degit niaodian/eos cs-agent && cd cs-agent
+npx degit niaodian/eos#eos-1.13.0 cs-agent && cd cs-agent
 mkdir -p ai/prompts evals                       # AI code goes here; Agentic rules overlay automatically
 node .github/hooks/validate-config.mjs          # expect PASS
 ```
@@ -683,8 +690,8 @@ When writing AI code, Agentic rules take effect **automatically**: prompts saved
 
 | Command | Purpose | Parameter | Output |
 |---|---|---|---|
-| `/requirements` | Requirements analysis + operational pre-flight (wraps bmad-create-prd) | `<feature or docs/discovery.md path>` | `docs/requirements.md` |
-| `/spec` | Produce PRD source of truth (bmad-create-prd + bmad-validate-prd) | `<docs/requirements.md path>` | `docs/prd.md` |
+| `/requirements` | Requirements analysis + operational pre-flight (wraps bmad-agent-pm / bmad-prd) | `<feature or docs/discovery.md path>` | `docs/requirements.md` |
+| `/spec` | Produce PRD source of truth (bmad-prd) | `<docs/requirements.md path>` | `docs/prd.md` |
 | `/ux-spec` | Design UX/UI visual+experience contract (wraps bmad-ux) | `<docs/prd.md path>` | `docs/DESIGN.md` + `docs/EXPERIENCE.md` |
 | `/eval-spec` | Design LLM/agentic evaluation plan (conditional gate G-EVAL) | `<docs/prd.md path>` | `docs/eval-plan.md` |
 | `/spec-align` | Quantify spec alignment (AC coverage/first-pass rate/drift, G7 metric) | — | Alignment report (`spec-align.mjs`) |
@@ -932,18 +939,27 @@ Agent output does not match expectation
 ## 10.2 One-command new project initialization
 
 ```sh
-# Method A: degit (public template — no auth needed)
-npx degit niaodian/eos my-app
+# Method A: degit (public repository — no auth needed)
+# Pin the release tag: the default branch moves, a tag does not.
+npx degit niaodian/eos#eos-1.13.0 my-app
 
-# Method B: gh + template
-gh repo create my-app --template niaodian/eos --private --clone
+# Method B: git clone at the tag, into a fresh history
+git clone --depth 1 --branch eos-1.13.0 https://github.com/niaodian/eos.git my-app
+cd my-app && git checkout --orphan main && git commit -m "chore: start from eos-1.13.0"
 ```
 
 ## 10.3 Distribution to a team (purely local, no enterprise dependency)
 
-1. Set `eos` as a GitHub **template repo** (already set `isTemplate:true`).
-2. Team members initialize with `degit` or `gh ... --template` respectively.
-3. Shared `bmad-*` skills are installed by each person at user level (once).
+1. Everyone starts from the **same release tag** (`eos-1.13.0`). The default branch keeps moving, so
+   an unpinned copy is a slightly different EOS for every person who takes one.
+2. `【Needs org/GitHub settings】` The GitHub **template repository** setting is owner-level: EOS can
+   neither apply nor verify it locally, so do not take this page's word for it —
+   `gh repo view niaodian/eos --json isTemplate` answers in one line, and the answer can change
+   without anything in this repository changing. `gh repo create --template` works while it is
+   `true`; the pinned `degit` / `clone` above work regardless and are what pin a *version*.
+3. Shared `bmad-*` skills are installed by each person at user level (once). Verify with
+   `node .github/hooks/eos-doctor.mjs --deep`: it reports BLOCKED rather than PASS when a mapped
+   skill is installed but cannot activate in this project.
 4. **Do not** write any enterprise intranet/interface/SSO dependency into configuration--keep it offline-runnable.
 
 > `【Optional · needs enterprise env】`: org-level instructions distribution, private registry, cloud agents--
@@ -953,6 +969,34 @@ gh repo create my-app --template niaodian/eos --private --clone
 
 - Every EOS configuration change: update `docs/eos/VERSION` (e.g., `eos-1.4.1`→`eos-1.6.0`), run `validate-config.mjs`, commit with Conventional Commits.
 - Upgrading existing projects: diff `.github/` from the new template version, selectively merge; user-level `bmad-*` upgrades independently.
+
+### 10.4.1 Upgrading from `eos-1.12.0` to `eos-1.13.0`
+
+This release closes the findings of the `eos-1.12.0` audit. It is deliberately **fail-closed**: an
+existing repository will go red before it goes green, and each red line names exactly what to add.
+
+| What changed | What you will see | What to do |
+|---|---|---|
+| **Evidence is bound to the tested product tree** (EOS-AUD-001) | Every previously recorded gate result is `STALE` ("evaluator version changed", "predates tested-product-tree binding") | Re-run the gates: `eos check --gate story-ready --scope <id>` then `eos check --gate verified --scope <id>`. Nothing is lost — the old evidence is still readable, it is simply no longer *current*. |
+| **G1 / G2 / G-UX / G4 are real gates** (EOS-AUD-003) | The product state resets toward `UNINITIALIZED`, and `eos next` asks for `docs/discovery.json`, `docs/requirements.json`, `docs/design.json`, `docs/architecture.json` | Write the four structured records beside the documents you already have. The prompts (`/requirements`, `/ux-spec`) and agents produce them; the schemas are in `.eos/schemas/`. |
+| **Product states renamed** | `PRD_APPROVED` → `PRD_BASELINED`, `ARCHITECTURE_APPROVED` → `ARCHITECTURE_BASELINED`, plus a new `UX_BASELINED` | Nothing. Product state is *derived*, so no ledger rewrite is needed. The rename exists because a machine finding a document complete is not a human approving it. |
+| **Acceptance criteria must be defined, not mentioned** (EOS-AUD-004) | `prd-ready` reports "referenced but never defined: AC…" | State each criterion as a list item, table row or heading that opens with its id and carries the text. |
+| **Operational tasks need a decision** (EOS-AUD-005) | `story-ready` reports `Telemetry: "SKIP" with no reason` | Use `ADOPT — <task>; owner: <who>; verify: <how>`, `SKIP — <reason>`, or `DEFER — owner: <who>; trigger: <what ends it>`. |
+| **Trace rows need a machine result** (EOS-AUD-006) | `verified` reports "a hand-written PASS … is a claim, not a result" | Emit `docs/evidence/test-run.json` from your runner — see [examples/trace-evidence](examples/trace-evidence/README.md). It is a ~30-line mapping step, in your language. |
+| **The release gate checks what the prompt asks for** (EOS-AUD-007) | `release-ready` adds candidate quality, dependency audit, NFR evidence, canary, health/readiness, topology and enforcement authority | Declare `commands.audit`, record `docs/evidence/nfr-summary.json`, and extend `ops/runbook.md`. An offline audit is `DEFERRED`, never green. |
+| **RELEASED continues into G9 and G10** (EOS-AUD-010) | After `RELEASED`, `eos next` asks for telemetry rather than another release | Produce `docs/telemetry.json` (`/telemetry-plan`), then `docs/iteration.json` (`eos-review` agent). |
+| **BMAD runtime is verified** (EOS-AUD-002) | `eos-doctor --deep` may report BLOCKED: skills installed, `_bmad/` runtime absent | Install the BMAD project runtime with its own installer, or unmap those skills. EOS itself works without BMAD — see [ADR-003](../adr/003-bmad-runtime-boundary.md). |
+
+**Nothing about this upgrade is silent.** If a gate cannot be proven — no git repository, no
+toolchain, no network for the dependency audit — it reports BLOCKED or DEFERRED. It never reports
+PASS, and it never quietly skips.
+
+Fastest path for an existing repository:
+
+```sh
+node .github/eos/eos.mjs next        # tells you the ONE next thing, every time
+node .github/hooks/eos-doctor.mjs --deep
+```
 
 ---
 
@@ -1028,7 +1072,7 @@ EOS stack rules are **pluggable**. Adding a stack = add one `*.instructions.md` 
 
 ```
 # ── Terminal — the loop (this is all you need day to day) ──
-npx degit niaodian/eos my-app   # create new project
+npx degit niaodian/eos#eos-1.13.0 my-app   # create new project
 node .github/eos/eos.mjs init --write               # local VS Code tasks (never overwrites)
 node .github/eos/eos.mjs next                       # the ONE next action, why, how to start it
 node .github/eos/eos.mjs resume                     # new session? pick up where you stopped
@@ -1084,7 +1128,7 @@ A real dry-run that passed end to end (feature: user login), **12/12 gates passe
 
 **Reproduce** (terminal):
 ```sh
-npx degit niaodian/eos my-app && cd my-app
+npx degit niaodian/eos#eos-1.13.0 my-app && cd my-app
 node .github/hooks/validate-config.mjs        # PASS
 npm test                                      # 10/10 green
 echo '{"tool_input":{"command":"rm -rf /tmp/x"}}' | node .github/hooks/deny-dangerous.js  # deny

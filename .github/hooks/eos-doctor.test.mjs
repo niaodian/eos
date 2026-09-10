@@ -8,10 +8,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { bmadReadiness } from './lib/bmad-runtime.mjs';
 
 const HOOK = join(dirname(fileURLToPath(import.meta.url)), 'eos-doctor.mjs');
 const sandboxes = [];
@@ -26,8 +27,8 @@ function project(files) {
   }
   return dir;
 }
-const run = (dir) => {
-  const r = spawnSync(process.execPath, [HOOK], { cwd: dir, encoding: 'utf8' });
+const run = (dir, args = []) => {
+  const r = spawnSync(process.execPath, [HOOK, ...args], { cwd: dir, encoding: 'utf8' });
   return { code: r.status, out: (r.stdout || '') + (r.stderr || '') };
 };
 
@@ -362,4 +363,71 @@ test('an invalid compliance profile is an error even before the regime is known'
   }));
   assert.equal(code, 1);
   assert.match(out, /compliance-profile\.json/);
+});
+
+
+// ---------- D6: BMAD runtime compatibility [EOS-AUD-002] ----------
+// A directory named `bmad-<x>` used to count as an available skill. Every mapped BMAD skill in fact
+// resolves its customization through a PROJECT-LOCAL `_bmad/` runtime that EOS does not ship, so a
+// green doctor could sit next to a skill that fails on its first activation step.
+
+const REPO = join(dirname(HOOK), '..', '..');
+const LOCK = JSON.parse(readFileSync(join(REPO, '.eos/bmad.lock.json'), 'utf8'));
+// The lock is validated against its schema, and a missing schema is an ERROR rather than a silent
+// pass, so every sandbox that carries the lock must carry the schema too.
+const LOCK_SCHEMA = JSON.parse(readFileSync(join(REPO, '.eos/schemas/bmad-lock.schema.json'), 'utf8'));
+
+test('D6: a mapped skill that is DEPRECATED upstream is an error', () => {
+  const dir = project({
+    '.eos/project.json': { projectType: 'config-only', stacks: [] },
+    '.eos/bmad.lock.json': LOCK, '.eos/schemas/bmad-lock.schema.json': LOCK_SCHEMA,
+    '.eos/agent-map.json': {
+      schemaVersion: 1,
+      actions: { 'write-prd': { agent: null, prompt: 'spec', skills: ['bmad-create-prd'], handoff: 'x' } },
+    },
+  });
+  const { code, out } = run(dir);
+  assert.equal(code, 1, out);
+  assert.match(out, /D6 BMAD/);
+  assert.match(out, /DEPRECATED/);
+  assert.match(out, /bmad-prd/, 'the error must name the replacement');
+});
+
+test('D6: the shipped agent map maps no deprecated skill', () => {
+  const repoRoot = join(dirname(HOOK), '..', '..');
+  const r = spawnSync(process.execPath, [HOOK], { cwd: repoRoot, encoding: 'utf8' });
+  assert.doesNotMatch((r.stdout || '') + (r.stderr || ''), /D6 BMAD.*DEPRECATED/);
+});
+
+test('D6: the shallow run says it is shallow, and --deep says what it additionally checked', () => {
+  // A project-level skills directory makes this deterministic on ANY machine: without one the
+  // result depends on whether the developer happens to have skills in $HOME, which is exactly the
+  // kind of environment coupling that makes a test pass locally and fail in CI.
+  const dir = project({
+    '.eos/project.json': { projectType: 'config-only', stacks: [] },
+    '.eos/bmad.lock.json': LOCK,
+    '.eos/schemas/bmad-lock.schema.json': LOCK_SCHEMA,
+    '.github/skills/eos-local/SKILL.md': '---\nname: eos-local\n---\n# local\n',
+  });
+  assert.match(run(dir).out, /shallow check only/);
+  assert.doesNotMatch(run(dir, ['--deep']).out, /shallow check only/);
+});
+
+test('D6: with no skills directory anywhere, BMAD readiness is UNCHECKED rather than guessed', () => {
+  const dir = project({
+    '.eos/project.json': { projectType: 'config-only', stacks: [] },
+    '.eos/bmad.lock.json': LOCK,
+    '.eos/schemas/bmad-lock.schema.json': LOCK_SCHEMA,
+  });
+  const r = bmadReadiness(dir, { deep: true, roots: [] });
+  assert.equal(r.status, 'UNCHECKED');
+  assert.equal(r.problems.length, 0);
+  assert.match(r.notes.join(' '), /skill availability was not checked/);
+});
+
+test('D6: with no compatibility manifest the BMAD layer is silent rather than guessing', () => {
+  const dir = project({ '.eos/project.json': { projectType: 'config-only', stacks: [] } });
+  const { code, out } = run(dir, ['--deep']);
+  assert.equal(code, 0, out);
+  assert.doesNotMatch(out, /D6 BMAD/);
 });

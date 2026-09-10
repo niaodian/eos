@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eos.local/schemas/eval-summary.schema.json",
+  "title": "EOS machine eval summary",
+  "description": "Proof that an agentic product met its eval thresholds. `commands.eval` exiting 0 proves only that a process ended; it does not say which prompt, model, dataset or grader produced which score against which threshold. This file does, and EOS binds it to the product tree so a prompt or dataset edit invalidates it.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "generatedAt", "subject", "cases"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schemaVersion": { "const": 1 },
+    "generatedAt": { "type": "string", "minLength": 20 },
+    "runId": { "type": "string", "minLength": 1 },
+    "productTree": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["digest"],
+      "properties": {
+        "digest": { "type": "string", "minLength": 32 },
+        "algorithm": { "type": "string" },
+        "version": { "type": "string" }
+      }
+    },
+    "subject": {
+      "description": "WHAT was evaluated. Every field is load-bearing: change any of them and the previous score no longer describes the system.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["promptRef", "model", "datasetRef", "graderRef"],
+      "properties": {
+        "promptRef": { "type": "string", "minLength": 1 },
+        "promptVersion": { "type": "string" },
+        "model": { "type": "string", "minLength": 1 },
+        "modelVersion": { "type": "string" },
+        "parameters": { "type": "object" },
+        "datasetRef": { "type": "string", "minLength": 1 },
+        "datasetVersion": { "type": "string" },
+        "graderRef": { "type": "string", "minLength": 1 },
+        "graderVersion": { "type": "string" }
+      }
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "metric", "threshold", "observed", "status"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^EVAL-\\d+$" },
+          "ac": { "type": "string", "pattern": "^AC\\d+\\.\\d+$" },
+          "metric": { "type": "string", "minLength": 1 },
+          "comparator": { "enum": [">=", ">", "<=", "<", "=="] },
+          "threshold": { "type": "number" },
+          "observed": { "type": "number" },
+          "sampleSize": { "type": "integer", "minimum": 1 },
+          "status": { "enum": ["PASS", "FAIL", "ERROR"] },
+          "detail": { "type": "string" }
+        }
+      }
+    }
+  }
+}

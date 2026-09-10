@@ -81,11 +81,18 @@ Type，因为 Change Type 决定门禁策略，本身就是权威；Story 的分
 ### 4.1 Product Baseline
 
 ```
-UNINITIALIZED → DISCOVERY → REQUIREMENTS_BASELINED → PRD_APPROVED → ARCHITECTURE_APPROVED → ACTIVE
+UNINITIALIZED → DISCOVERY → REQUIREMENTS_BASELINED → PRD_BASELINED → UX_BASELINED
+              → ARCHITECTURE_BASELINED → ACTIVE
 ```
 
 Product 状态是**推导**出来的，从不由人声明：引擎从 `UNINITIALIZED` 出发沿这台状态机前进，只要下一条守卫
 成立就推进。因此 `eos transition --scope product` 拒绝手工设置它，转而告诉你还差哪一条守卫。
+
+这些状态叫 **BASELINED** 而不是 APPROVED，是刻意为之。它们由机器判定"文档结构完整"而达成——
+这与"有人批准过"不是一回事。唯一真正表示"人批准过"的状态是 Release 的 `APPROVED`，
+它要求一条由准备候选者之外的人记录的审批事件。
+*（自 eos-1.12.0 的迁移：`PRD_APPROVED` → `PRD_BASELINED`，`ARCHITECTURE_APPROVED` →
+`ARCHITECTURE_BASELINED`。Product 状态是推导出来的，因此 Ledger 无需改写。）*
 
 ### 4.2 Change / Story
 
@@ -100,8 +107,12 @@ DRAFT → IN_REVIEW → READY_FOR_DEV → IN_DEVELOPMENT → READY_FOR_TEST → 
 ### 4.3 Release
 
 ```
-PLANNED → CANDIDATE → VERIFIED → APPROVED → RELEASED       （以及 RELEASED → ROLLED_BACK）
+PLANNED → CANDIDATE → VERIFIED → APPROVED → RELEASED → OBSERVED → ITERATED
+                                                    ↘ ROLLED_BACK
 ```
+
+RELEASED 不是终点。无法被观测的变更就无法被判断；没有被写回的教训会让规格与运行中的系统持续漂移——
+因此 `telemetry-ready`（G9）与 `iteration-ready`（G10）是门禁，而不是良好意愿。
 
 ### 4.4 迁移表（守卫条件）
 
@@ -109,11 +120,12 @@ PLANNED → CANDIDATE → VERIFIED → APPROVED → RELEASED       （以及 REL
 
 | Scope | 从 | 到 | 守卫条件（必须成立） |
 |---|---|---|---|
-| product | UNINITIALIZED | DISCOVERY | 门禁 `activation` PASS 且 `docs/discovery.md` 存在 |
-| product | DISCOVERY | REQUIREMENTS_BASELINED | `docs/requirements.md` 存在 |
-| product | REQUIREMENTS_BASELINED | PRD_APPROVED | 门禁 `prd-ready` PASS |
-| product | PRD_APPROVED | ARCHITECTURE_APPROVED | `docs/architecture.md` 存在 |
-| product | ARCHITECTURE_APPROVED | ACTIVE | 至少存在一个 Story |
+| product | UNINITIALIZED | DISCOVERY | 门禁 `discovery-ready` PASS |
+| product | DISCOVERY | REQUIREMENTS_BASELINED | 门禁 `requirements-ready` PASS |
+| product | REQUIREMENTS_BASELINED | PRD_BASELINED | 门禁 `prd-ready` PASS |
+| product | PRD_BASELINED | UX_BASELINED | 门禁 `ux-ready` PASS（或结构化的非 UI SKIP） |
+| product | UX_BASELINED | ARCHITECTURE_BASELINED | 门禁 `architecture-ready` PASS |
+| product | ARCHITECTURE_BASELINED | ACTIVE | 至少存在一个 Story |
 | story | DRAFT | IN_REVIEW | — |
 | story | IN_REVIEW | READY_FOR_DEV | 门禁 `story-ready` PASS（按 Change Type 策略） |
 | story | READY_FOR_DEV | IN_DEVELOPMENT | — |
@@ -126,23 +138,32 @@ PLANNED → CANDIDATE → VERIFIED → APPROVED → RELEASED       （以及 REL
 | release | CANDIDATE | VERIFIED | 门禁 `release-ready` PASS |
 | release | VERIFIED | APPROVED | 存在审批事件，且审批人不是申请人 |
 | release | APPROVED | RELEASED | 证据绑定到候选 Commit |
-| release | RELEASED | ROLLED_BACK | — |
+| release | RELEASED | OBSERVED | 门禁 `telemetry-ready` PASS |
+| release | OBSERVED | ITERATED | 门禁 `iteration-ready` PASS |
+| release | RELEASED / OBSERVED | ROLLED_BACK | — |
 | release | CANDIDATE | PLANNED | —（回退） |
 
 状态**绝不**从 Markdown 字段读取。若 Story 文件声明了 `state:` 而 Ledger 不同意，这个漂移本身
 就是一条 Blocker：手工编辑的状态不是证据。
 
-## 5. 本轮机器化的门禁
+## 5. 机器化的门禁
 
-一次性机器化 G1–G10 只会产出肤浅的检查。第一轮覆盖"绿但空"危害最大的四个门禁，外加本地激活。
+G0 到 G10 现在全部是求值器，而不是阅读练习。每个阶段同时保留人读的文档**和**一份并列的结构化记录；
+门禁读记录——因为散文恰恰是门禁绝不能被说服绕过的东西。
 
 | Gate id | Blueprint 门禁 | Scope | 实际验证什么 |
 |---|---|---|---|
 | `activation` | G0 | product | `.eos/project.json` 有效、有代码后不再是未改动的模板、`workflowProfile` 可解析、激活账本存在 |
-| `prd-ready` | G3 | product | `docs/prd.md` 存在、验收标准 id 可解析且唯一、无未解决的 `BLOCKER` 标记 |
-| `story-ready` | G5 | story | Story 引用真实 PRD AC、每条 AC 有测试意图、LLM 支撑的 AC 有 Eval Case、遥测/授权/回滚任务齐备 |
-| `verified` | G7 | story | 产品门禁证据存在且新鲜、每条 Story AC 有通过的 trace 行、Agentic 时 Eval 达标 |
-| `release-ready` | G8 | release | 必需 Story 已 VERIFIED、密钥扫描干净、合规边界有效、无过期 Waiver、Runbook 与回滚齐备、证据绑定候选 Commit |
+| `discovery-ready` | G1 | product | `docs/discovery.md` 已写**且** `docs/discovery.json` 记录了可证伪的问题、带目标值与数据来源的指标、显式的范围边界、无未解决阻塞 |
+| `requirements-ready` | G2 | product | 功能需求、量化的 NFR，以及遥测/授权/审计/回滚/监控/灰度/配额/i18n/多租户/容量-SLO/DR（受监管时加合规）各自的决策：ADOPT、SKIP+理由，或 DEFER+负责人+触发条件 |
+| `prd-ready` | G3 | product | 验收标准是被**定义**的（列表项、表格行或标题并带陈述），而不仅是被提及；id 唯一；每条需求至少对应一条 |
+| `ux-ready` | G-UX | product | `docs/design.json` 声明是否存在面向用户的界面；若有，`docs/DESIGN.md` 与 `docs/EXPERIENCE.md` **两者**都存在且有内容，且流程/状态/无障碍/Token/响应式各自被覆盖或有理由 N/A；若无，则是带理由的结构化 SKIP |
+| `architecture-ready` | G4 | product | 技术栈与部署拓扑均已决策并有 ADR，授权/安全/审计/回滚/DR/数据/API/事件已决策或有理由 N/A，Agentic 与受监管场景的相应决策，且每条 NFR 都落在具名组件上 |
+| `story-ready` | G5 | story | Story 引用真实 PRD AC、每条 AC 有测试意图、LLM 支撑的 AC 有 Eval Case、遥测/授权/回滚均已决策（ADOPT+负责人+验证方式，SKIP+理由，DEFER+负责人+触发条件） |
+| `verified` | G7 | story | 记录**被测产品树**、已声明的质量命令确实执行、每条 AC 的 trace 行绑定到真实存在的测试文件**且**有机器执行结果、Eval 达标且记录了 prompt/模型/数据集/评分器 |
+| `release-ready` | G8 | release | 候选已提交、质量命令**在候选树上**重跑、每个 Story 的验证描述的就是**这棵树**、规格对齐、密钥扫描、依赖审计、NFR 证据、合规边界、Waiver、Runbook+回滚+灰度+健康、拓扑、执行权威 |
+| `telemetry-ready` | G9 | release | Discovery 的成功指标作为真实信号被发出、仪表盘与有接收人的告警存在、敏感操作被审计、定义了回滚触发条件、有具名负责人 |
+| `iteration-ready` | G10 | release | 学习被写回真实存在的文档、Agentic 产品把生产反馈送入 Eval 数据集并为变更后的 prompt/模型重建基线、具名负责人记录 CONTINUE / CORRECT_COURSE / STOP |
 
 `eos explain <gate>` 按需打印某一个门禁的完整规则 —— 这是详细规则唯一需要被阅读的地方。
 
@@ -156,6 +177,7 @@ PLANNED → CANDIDATE → VERIFIED → APPROVED → RELEASED       （以及 REL
 | `PENDING` | 门禁适用但从未运行过 | 否 |
 | `WAIVED` | 有未过期且已批准的 Waiver 覆盖 | 是（已记录） |
 | `NOT_APPLICABLE` | Change Type 策略判定该门禁不适用 | 是（已记录） |
+| `DEFERRED` | 某项检查无法完成且原因已记录（离线的依赖审计、带负责人与触发条件的 NFR 目标） | **否** —— 可见且有时限，但绝不算绿 |
 | `STALE` | 之前 PASS，但输入或定义已改变 | 否 |
 | `ERROR` | Evaluator 自身无法运行 | 否 |
 
@@ -182,6 +204,21 @@ Commit SHA · Gate 定义版本 · Evaluator 版本 · 每个输入文件的 SHA
 的账本推导任何东西。当某个性质确实无法被检查时，结论是 `UNVERIFIED`（非零退出）—— 绝不是 `PASS`。
 拥有写权限的人仍然可以在本地同时伪造多个受版本管理的文件 —— 这正是账本、门禁定义、工作流、
 Agent 映射和项目声明都受 CODEOWNERS 保护，以及 CI 会针对本次构建所基于的提交重新校验链的原因。
+
+### 5.3 这些门禁仍然**不能**证明什么
+
+把限制说清楚，比在事故中发现它便宜，所以：
+
+- **阈值的来源。** `docs/evidence/eval-summary.json` 同时携带观测值与阈值，EOS 会据此**重算**结论——
+  一份在"数字未达标"旁边报告 `PASS` 的摘要会失败。但它无法告诉你*阈值本身*是否被调低了。
+  该摘要是被记录的门禁输入，因此调低阈值会让已记录的 PASS 变成 `STALE` 并强制重跑；
+  评审者看到的是那段 diff。这一层控制在设计上就是人来做的。
+- **发布的成员集合。** 目前一次发布会针对 `docs/stories/` 下所有非 SPIKE、非 DOC_ONLY 的 Story 进行校验。
+  没有按发布划分的清单，因此历史 Story 会针对每个新候选重新验证。这是偏严，而不是错误，但它不是可选择的。
+- **拓扑交叉校验。** `deployment-topology` 要求有已决策的 ADR，`ops-artifacts` 要求回滚、灰度与
+  健康/就绪都被写下来。EOS 不验证 Runbook 里的机制就是该拓扑真正提供的机制——
+  Runbook 可以描述一个平台根本做不到的回滚。这仍然是一个评审问题。
+- **服务端强制。** 本地运行看不到分支保护。它被报告为 BLOCKED/UNVERIFIED，绝不是 PASS。
 
 ## 6. Change Type（分流流程，但不留未知路径）
 

@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eos.local/schemas/test-run.schema.json",
+  "title": "EOS machine test-run summary",
+  "description": "The RESULT half of traceability. docs/trace-matrix.md records the human decision \"AC1.1 is proven by this test\"; this file records that the test actually ran, against which tree, and what it returned. A hand-written ✅ in Markdown is a claim, not a result — EOS reads both and requires them to agree. Emit it from your runner (a reporter, a jq filter over the runner's own JSON, or a small script); it is deliberately framework-neutral.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "generatedAt", "results"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schemaVersion": { "const": 1 },
+    "generatedAt": { "type": "string", "minLength": 20 },
+    "runId": {
+      "description": "Identifier of the execution (CI run id, local timestamp+host, container id …).",
+      "type": "string",
+      "minLength": 1
+    },
+    "framework": { "type": "string", "minLength": 1 },
+    "command": {
+      "description": "The command that produced this file. Recorded so a reviewer can reproduce it.",
+      "type": "string",
+      "minLength": 1
+    },
+    "productTree": {
+      "description": "Digest of the tree the tests ran against (`eos product-tree --json`). When present EOS requires it to equal the current tree, so a summary produced before the source changed cannot certify it.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["digest"],
+      "properties": {
+        "digest": { "type": "string", "minLength": 32 },
+        "algorithm": { "type": "string" },
+        "version": { "type": "string" }
+      }
+    },
+    "results": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["ac", "testPath", "status"],
+        "properties": {
+          "ac": { "type": "string", "pattern": "^AC\\d+\\.\\d+$" },
+          "testPath": {
+            "description": "Repository-relative path of the test file. EOS checks that it exists.",
+            "type": "string",
+            "minLength": 1
+          },
+          "selector": {
+            "description": "Test name / node id / fully-qualified method inside the file. EOS checks that the file mentions it when it can.",
+            "type": "string"
+          },
+          "status": { "enum": ["PASS", "FAIL", "SKIP", "ERROR"] },
+          "durationMs": { "type": "number", "minimum": 0 },
+          "detail": { "type": "string" }
+        }
+      }
+    }
+  }
+}

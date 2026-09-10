@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eos.local/schemas/design.schema.json",
+  "title": "EOS UX/design record (G-UX)",
+  "description": "Whether this product has a user-facing surface, and — when it does — that the interaction contract is actually covered. A non-UI product records a structured SKIP with a reason; it can never simply omit the answer.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "userInterface"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schemaVersion": { "const": 1 },
+    "userInterface": {
+      "description": "Does a human interact with this product directly (GUI, CLI, chat, voice)? An API consumed only by other services is false.",
+      "type": "boolean"
+    },
+    "skipReason": {
+      "description": "Required when userInterface is false. 'SKIP' on its own is not a decision.",
+      "type": "string",
+      "minLength": 20
+    },
+    "surfaces": { "type": "array", "items": { "enum": ["web", "mobile", "desktop", "cli", "chat", "voice", "other"] } },
+    "coverage": {
+      "description": "Required when userInterface is true. Each dimension names WHERE it is specified, so the claim points at something a reviewer can open.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["flows", "states", "accessibility", "designTokens", "responsive"],
+      "properties": {
+        "flows": { "$ref": "#/$defs/covered" },
+        "states": { "$ref": "#/$defs/covered" },
+        "accessibility": { "$ref": "#/$defs/covered" },
+        "designTokens": { "$ref": "#/$defs/covered" },
+        "responsive": { "$ref": "#/$defs/covered" }
+      }
+    }
+  },
+  "$defs": {
+    "covered": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status"],
+      "properties": {
+        "status": { "enum": ["COVERED", "NOT_APPLICABLE"] },
+        "ref": { "description": "Document + section where it is specified.", "type": "string", "minLength": 5 },
+        "reason": { "description": "Required for NOT_APPLICABLE.", "type": "string", "minLength": 15 }
+      }
+    }
+  }
+}

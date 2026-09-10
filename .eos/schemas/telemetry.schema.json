@@ -1,0 +1,167 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eos.local/schemas/telemetry.schema.json",
+  "title": "EOS telemetry / observability record (G9)",
+  "description": "RELEASED is not the end of the loop. This record proves the shipped change can be observed: every discovery success metric maps to a real event or metric, dashboards and alerts exist, sensitive operations are audited, and someone owns the result.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "owner",
+    "signals",
+    "dashboards",
+    "alerts",
+    "sensitiveOperationAudit",
+    "rolloutMetrics"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": 1
+    },
+    "release": {
+      "description": "The release this observability record covers. When present EOS requires it to equal the release being gated, so one record cannot certify every future release.",
+      "type": "string",
+      "minLength": 1
+    },
+    "owner": {
+      "description": "The person or team who reads these signals.",
+      "type": "string",
+      "minLength": 2
+    },
+    "signals": {
+      "description": "Success metric → the event/metric that actually carries it.",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "metric",
+          "emittedAs",
+          "source"
+        ],
+        "properties": {
+          "metric": {
+            "type": "string",
+            "minLength": 3
+          },
+          "emittedAs": {
+            "description": "Event or metric name in the telemetry system.",
+            "type": "string",
+            "minLength": 3
+          },
+          "source": {
+            "description": "Where it is emitted from (component / file / service).",
+            "type": "string",
+            "minLength": 3
+          },
+          "verifiedAt": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "dashboards": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "ref"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 2
+          },
+          "ref": {
+            "type": "string",
+            "minLength": 4
+          }
+        }
+      }
+    },
+    "alerts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "condition",
+          "routesTo"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 2
+          },
+          "condition": {
+            "type": "string",
+            "minLength": 5
+          },
+          "routesTo": {
+            "description": "Who is paged / notified. An alert nobody receives is not an alert.",
+            "type": "string",
+            "minLength": 2
+          }
+        }
+      }
+    },
+    "sensitiveOperationAudit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "COVERED",
+            "NOT_APPLICABLE"
+          ]
+        },
+        "operations": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "sink": {
+          "type": "string"
+        },
+        "reason": {
+          "description": "Required for NOT_APPLICABLE.",
+          "type": "string",
+          "minLength": 15
+        }
+      }
+    },
+    "rolloutMetrics": {
+      "description": "The signals that decide whether to continue a canary or roll back.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rollbackTrigger"
+      ],
+      "properties": {
+        "canaryMetric": {
+          "type": "string"
+        },
+        "rollbackTrigger": {
+          "type": "string",
+          "minLength": 10
+        },
+        "observationWindow": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

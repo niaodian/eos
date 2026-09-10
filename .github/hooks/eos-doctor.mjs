@@ -9,8 +9,10 @@ import { join, relative } from 'node:path';
 import { execSync } from 'node:child_process';
 import { loadProjectConfig, PROJECT_CONFIG_PATH } from './lib/project-config.mjs';
 import { loadComplianceProfile, evaluateDataBoundary, COMPLIANCE_PROFILE_PATH } from './lib/compliance-profile.mjs';
+import { bmadReadiness, deprecatedMappings, BMAD_LOCK_PATH } from './lib/bmad-runtime.mjs';
 
 const root = process.cwd();
+const deep = process.argv.includes('--deep');
 const errors = [];
 const warns = [];
 // Vendored / installed / generated trees are third-party code: their dirs and manifests say nothing
@@ -308,10 +310,42 @@ if (!existsSync(ledgerPath)) {
   }
 }
 
+// --- D6 BMAD runtime compatibility (EOS-AUD-002) ---
+// A directory-name check used to report every mapped skill as available while each one would fail
+// on its first activation step, because BMAD skills resolve their customization through a PROJECT
+// runtime under `_bmad/` that EOS neither ships nor previously looked for. `--deep` also checks
+// that runtime and the executables those steps invoke; without it only the cheap layers run.
+const bmadOut = [];
+{
+  const agentMap = (() => { try { return JSON.parse(readFileSync(join(root, '.eos/agent-map.json'), 'utf8')); } catch { return null; } })();
+  for (const dead of deprecatedMappings(root, agentMap)) {
+    errors.push(`D6 BMAD: action "${dead.action}" maps the DEPRECATED skill "${dead.skill}" — use "${dead.replacement}" (see ${BMAD_LOCK_PATH}).`);
+  }
+  const report = bmadReadiness(root, { deep });
+  // BLOCKED means a mapped skill cannot activate at all. DEGRADED means it activates on its shipped
+  // defaults because no project runtime is installed — a legitimate, working setup, so failing CI on
+  // it would be a false red rather than a finding.
+  for (const p of report.problems) errors.push(`D6 BMAD (BLOCKED): ${p}`);
+  for (const d of report.degraded) warns.push(`D6 BMAD (DEGRADED, not a failure): ${d}`);
+  if (report.status === 'UNCHECKED' || report.notes.length) {
+    for (const n of report.notes.slice(0, 4)) bmadOut.push(`  BMAD        ${n}`);
+    if (report.notes.length > 4) bmadOut.push(`  BMAD        …and ${report.notes.length - 4} more not installed`);
+  }
+  if ((report.status === 'PASS' || report.status === 'DEGRADED') && deep) {
+    const installed = report.skills.filter((s) => s.installed).length;
+    bmadOut.push(`  BMAD        ${installed}/${report.skills.length} mapped skill(s) installed and activatable${report.runtime.present ? ` · runtime ${report.runtime.root}/ present` : ' · no project runtime, so they run on shipped defaults'}.`);
+  }
+  if (!deep && report.status !== 'UNCHECKED') {
+    bmadOut.push('  BMAD        shallow check only — run `node .github/hooks/eos-doctor.mjs --deep` to verify the project runtime and executables the skills invoke.');
+  }
+}
+
 // --- Report (same shape as validate-config.mjs) ---
 console.log('EOS SDLC gate doctor\n');
 for (const line of activationOut) console.log(line);
 if (activationOut.length) console.log('');
+for (const line of bmadOut) console.log(line);
+if (bmadOut.length) console.log('');
 for (const w of warns) console.log('  WARN  ' + w);
 for (const e of errors) console.log('  ERROR ' + e);
 console.log('');

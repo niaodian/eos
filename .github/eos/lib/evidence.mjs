@@ -10,6 +10,7 @@ import { join } from 'node:path';
 import { posix, EVALUATOR_VERSION, WORKFLOW_PATH, GATES_PATH } from './registry.mjs';
 import { validate } from './schema.mjs';
 import { waiverStatus } from './waivers.mjs';
+import { compareProductTree } from './product-tree.mjs';
 
 export const EVIDENCE_DIR = '.eos/evidence';
 export const GOVERNANCE_INPUTS = [GATES_PATH, WORKFLOW_PATH];
@@ -43,12 +44,13 @@ export function readEvidence(root, gateId, scopeType, scopeId) {
   try { parsed = JSON.parse(readFileSync(full, 'utf8')); } catch (e) {
     return { present: true, evidence: null, error: `${rel}: invalid JSON (${e.message})` };
   }
-  let schema = null;
-  try { schema = JSON.parse(readFileSync(join(root, '.eos/schemas/gate-evidence.schema.json'), 'utf8')); } catch { /* schema absent: fall through */ }
-  if (schema) {
-    const v = validate(schema, parsed, { label: rel });
-    if (!v.valid) return { present: true, evidence: null, error: `${rel}: not valid gate evidence — ${v.errors.slice(0, 3).join('; ')}. Evidence is machine-written; regenerate it with \`eos check\`.` };
+  let schema;
+  try { schema = JSON.parse(readFileSync(join(root, '.eos/schemas/gate-evidence.schema.json'), 'utf8')); } catch (e) {
+    // Without the schema this file cannot be validated, and unvalidatable evidence is not evidence.
+    return { present: true, evidence: null, error: `.eos/schemas/gate-evidence.schema.json is missing or unreadable (${e.message}) — ${rel} cannot be validated; restore the schema from version control` };
   }
+  const v = validate(schema, parsed, { label: rel });
+  if (!v.valid) return { present: true, evidence: null, error: `${rel}: not valid gate evidence — ${v.errors.slice(0, 3).join('; ')}. Evidence is machine-written; regenerate it with \`eos check\`.` };
   if (parsed.gate !== gateId || parsed.scope?.type !== scopeType || String(parsed.scope?.id) !== String(scopeId)) {
     return { present: true, evidence: null, error: `${rel}: records ${parsed.gate}/${parsed.scope?.type}/${parsed.scope?.id}, not ${gateId}/${scopeType}/${scopeId}` };
   }
@@ -103,6 +105,13 @@ export function evidenceFreshness(root, evidence, { gateDefinition = null, expec
   for (const input of evidence.governanceInputs || []) {
     const now = sha256File(root, input.path);
     if (now !== input.sha256) reasons.push(`governance file changed: ${input.path} (previous results are invalidated by design)`);
+  }
+  // The product tree itself. Input hashes only cover the files a gate READS; the thing a gate
+  // ASSERTS ABOUT — the source, the tests, the prompts, the eval data — is not among them, which is
+  // exactly how a verified story could be promoted after its implementation was rewritten.
+  if (gateDefinition?.bindsProductTree) {
+    const cmp = compareProductTree(root, evidence.productTree || null, { recordedCommit: evidence.commit || null });
+    if (cmp.status !== 'MATCH') reasons.push(...cmp.reasons);
   }
   return { status: reasons.length ? 'STALE' : 'FRESH', reasons };
 }

@@ -72,6 +72,22 @@
   - **Verify**: `node .github/hooks/project-gate.mjs` is PASS **and actually ran** your lint/typecheck/test;
     `node .github/hooks/validate-config.mjs` shows no S12 ERROR. **Never edit the declaration to turn a red gate green.**
 
+- [ ] (Optional — only if you want project-level BMAD customization) Install the BMAD project runtime
+  - **Why**: EOS delegates *authoring* to BMAD skills. Each one resolves its customization through a
+    **project-local** `_bmad/` runtime that EOS deliberately does not ship or download. Without it the
+    skills **still work** — every one documents a fallback to its own `customize.toml`, and "any missing
+    file is skipped" — so what you lose is project-level customization: `_bmad/custom/*.toml` team and
+    personal overrides, the module config, and session memory. `eos-doctor --deep` reports that as
+    **DEGRADED (a warning, exit 0)**, not as a blocker, because a working-but-uncustomized setup is not
+    broken. What IS an error is a skill that cannot activate at all, or a mapping to a skill that is
+    deprecated upstream. **EOS itself never needs any of this**: no gate, evaluator, transition or
+    routing decision calls a skill, and `eos next` names the action, the gate and the done-when either way.
+  - **Steps**: nothing, if you are happy with defaults — tick this `[~] waived — defaults are fine`.
+    Otherwise install the BMAD project runtime with **its own** installer (EOS will not guess the command
+    and will never pipe a remote script into a shell). Rationale: `docs/adr/003-bmad-runtime-boundary.md`.
+  - **Verify**: `node .github/hooks/eos-doctor.mjs --deep` shows no `D6 BMAD (BLOCKED)` line. A
+    `DEGRADED` warning is expected and fine when you have not installed the runtime.
+
 ## 2. Open the "org-compliance" axis (~+2 points) — only **regulated** projects need this
 
 - [ ] (If regulated) Compliance boundary: run `/compliance` to produce `docs/compliance-profile.md` **+ `docs/compliance-profile.json`**, and confirm org standards

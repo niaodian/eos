@@ -4,7 +4,9 @@
     {
       "name": "brand new repository — nothing is declared yet",
       "governance": false,
-      "files": { "README.md": "# app\n" },
+      "files": {
+        "README.md": "# app\n"
+      },
       "expectedAction": "complete-local-activation",
       "expectedPrompt": "eos-init",
       "expectedExitCode": 2,
@@ -13,7 +15,13 @@
     {
       "name": "untouched template declaration while product code exists",
       "files": {
-        "@project": { "projectType": "config-only", "stacks": [], "productParadigms": ["deterministic"] },
+        "@project": {
+          "projectType": "config-only",
+          "stacks": [],
+          "productParadigms": [
+            "deterministic"
+          ]
+        },
         "package.json": "{ \"name\": \"app\", \"scripts\": { \"test\": \"node --version\" } }\n"
       },
       "expectedAction": "complete-local-activation",
@@ -22,24 +30,98 @@
     },
     {
       "name": "activated, no discovery yet",
-      "files": { "@project": "@APP" },
+      "files": {
+        "@project": "@APP"
+      },
       "expectedAction": "frame-the-problem",
       "expectedAgent": "eos-discovery",
       "expectedExitCode": 2
     },
     {
+      "name": "discovery document exists but is empty — an empty file is not a framed problem",
+      "files": {
+        "@project": "@APP",
+        "docs/discovery.md": "# Discovery\n"
+      },
+      "expectedAction": "frame-the-problem",
+      "expectedAgent": "eos-discovery",
+      "expectedExitCode": 2,
+      "expectBlocker": "that is a placeholder, not a specification"
+    },
+    {
+      "name": "discovery narrative is written but the structured record is missing",
+      "files": {
+        "@project": "@APP",
+        "docs/discovery.md": "@DISCOVERY_MD"
+      },
+      "expectedAction": "frame-the-problem",
+      "expectedExitCode": 2,
+      "expectBlocker": "docs/discovery.json does not"
+    },
+    {
+      "name": "discovery records a metric with no data source — it can be quoted, not measured",
+      "files": {
+        "@project": "@APP",
+        "docs/discovery.md": "@DISCOVERY_MD",
+        "docs/discovery.json": {
+          "schemaVersion": 1,
+          "problem": {
+            "statement": "Users abandon the sign-in flow because reset is slow.",
+            "falsifiableBy": "Sign-in completion does not improve after the change."
+          },
+          "successMetric": {
+            "name": "sign-in completion rate",
+            "target": 0.8,
+            "dataSource": "     "
+          },
+          "scope": {
+            "in": [
+              "reset flow"
+            ],
+            "out": [
+              "single sign-on"
+            ]
+          }
+        }
+      },
+      "expectedAction": "frame-the-problem",
+      "expectedExitCode": 2,
+      "expectBlocker": "no data source"
+    },
+    {
       "name": "discovery done, requirements missing",
-      "files": { "@project": "@APP", "docs/discovery.md": "# Discovery\n\nProblem: users cannot log in.\n" },
+      "baseline": [
+        "discovery"
+      ],
+      "files": {
+        "@project": "@APP"
+      },
       "expectedAction": "expand-requirements",
       "expectedPrompt": "requirements",
       "expectedExitCode": 2
     },
     {
-      "name": "requirements done, PRD missing",
+      "name": "an operational concern says only SKIP — that is an omission, not a decision",
+      "baseline": [
+        "discovery"
+      ],
       "files": {
         "@project": "@APP",
-        "docs/discovery.md": "# Discovery\n",
-        "docs/requirements.md": "# Requirements\n"
+        "docs/requirements.md": "@REQUIREMENTS_MD",
+        "docs/requirements.json": "@REQUIREMENTS_SKIP"
+      },
+      "expectedAction": "expand-requirements",
+      "expectedExitCode": 2,
+      "expectBlocker": "SKIP / N/A without a reason"
+    },
+    {
+      "name": "requirements done, PRD missing",
+      "baseline": [
+        "discovery",
+        "requirements"
+      ],
+      "files": {
+        "@project": "@APP"
       },
       "expectedAction": "write-prd",
       "expectedPrompt": "spec",
@@ -47,62 +129,144 @@
     },
     {
       "name": "PRD exists but has duplicate acceptance-criterion ids",
+      "baseline": [
+        "discovery",
+        "requirements"
+      ],
       "files": {
         "@project": "@APP",
-        "docs/discovery.md": "# Discovery\n",
-        "docs/requirements.md": "# Requirements\n",
-        "docs/prd.md": "# PRD\n\n- AC1.1 log in\n- AC1.1 log in again\n"
+        "docs/prd.md": "# PRD\n\n## Login (FR1)\n\n- AC1.1 the user can log in\n- AC1.1 the user can log in again\n"
       },
       "expectedAction": "repair-prd",
       "expectedExitCode": 2,
       "expectBlocker": "ac-unique"
     },
     {
-      "name": "PRD exists but still carries an unresolved BLOCKER",
+      "name": "PRD only MENTIONS an acceptance criterion instead of defining it",
+      "baseline": [
+        "discovery",
+        "requirements"
+      ],
       "files": {
         "@project": "@APP",
-        "docs/discovery.md": "# Discovery\n",
-        "docs/requirements.md": "# Requirements\n",
-        "docs/prd.md": "# PRD\n\n- AC1.1 log in\n- BLOCKER: pricing model undecided\n"
+        "docs/prd.md": "# PRD\n\n## Login (FR1)\n\n- AC1.1 the user can log in with a valid password\n\nThis prose merely mentions AC9.9 later.\n"
+      },
+      "expectedAction": "repair-prd",
+      "expectedExitCode": 2,
+      "expectBlocker": "referenced but never defined"
+    },
+    {
+      "name": "PRD exists but still carries an unresolved BLOCKER",
+      "baseline": [
+        "discovery",
+        "requirements"
+      ],
+      "files": {
+        "@project": "@APP",
+        "docs/prd.md": "# PRD\n\n## Login (FR1)\n\n- AC1.1 the user can log in with a valid password\n- BLOCKER: pricing model undecided\n"
       },
       "expectedAction": "repair-prd",
       "expectedExitCode": 2,
       "expectBlocker": "no-open-blockers"
     },
     {
-      "name": "PRD ready, UX contract missing",
+      "name": "PRD ready, UX applicability undecided",
+      "baseline": [
+        "discovery",
+        "requirements",
+        "prd"
+      ],
       "files": {
-        "@project": "@APP",
-        "docs/discovery.md": "# Discovery\n",
-        "docs/requirements.md": "# Requirements\n",
-        "docs/prd.md": "@PRD"
+        "@project": "@APP"
       },
       "expectedAction": "design-ux",
       "expectedAgent": "eos-design",
-      "expectedExitCode": 2
+      "expectedExitCode": 2,
+      "expectBlocker": "docs/design.json does not exist"
+    },
+    {
+      "name": "a user-facing product with an EXPERIENCE contract but no DESIGN contract does not promote",
+      "baseline": [
+        "discovery",
+        "requirements",
+        "prd"
+      ],
+      "files": {
+        "@project": "@APP",
+        "docs/design.json": {
+          "schemaVersion": 1,
+          "userInterface": true,
+          "coverage": {
+            "flows": {
+              "status": "COVERED",
+              "ref": "docs/EXPERIENCE.md#flows"
+            },
+            "states": {
+              "status": "COVERED",
+              "ref": "docs/EXPERIENCE.md#states"
+            },
+            "accessibility": {
+              "status": "COVERED",
+              "ref": "docs/DESIGN.md#a11y"
+            },
+            "designTokens": {
+              "status": "COVERED",
+              "ref": "docs/DESIGN.md#tokens"
+            },
+            "responsive": {
+              "status": "COVERED",
+              "ref": "docs/DESIGN.md#responsive"
+            }
+          }
+        },
+        "docs/EXPERIENCE.md": "# Experience\n\nThe reset flow is one page with inline validation, and it reports every failure with a reason the user can act on, instead of a generic error that leaves them guessing what to change before trying again on their own.\n"
+      },
+      "expectedAction": "design-ux",
+      "expectedExitCode": 2,
+      "expectBlocker": "docs/DESIGN.md does not exist"
     },
     {
       "name": "UX explicitly skipped for a backend service, architecture missing",
+      "baseline": [
+        "discovery",
+        "requirements",
+        "prd",
+        "ux"
+      ],
       "files": {
-        "@project": "@APP",
-        "docs/discovery.md": "# Discovery\n",
-        "docs/requirements.md": "# Requirements\n",
-        "docs/prd.md": "@PRD",
-        "docs/EXPERIENCE.md": "# Experience\n\nSKIP — no user-facing surface (internal API only).\n"
+        "@project": "@APP"
       },
       "expectedAction": "design-architecture",
       "expectedAgent": "eos-architecture",
       "expectedExitCode": 2
     },
     {
-      "name": "architecture approved, no stories yet",
+      "name": "architecture narrative without the decision record does not promote",
+      "baseline": [
+        "discovery",
+        "requirements",
+        "prd",
+        "ux"
+      ],
       "files": {
         "@project": "@APP",
-        "docs/discovery.md": "# Discovery\n",
-        "docs/requirements.md": "# Requirements\n",
-        "docs/prd.md": "@PRD",
-        "docs/EXPERIENCE.md": "SKIP — no user-facing surface (internal API only).\n",
-        "docs/architecture.md": "# Architecture\n"
+        "docs/architecture.md": "@ARCHITECTURE_MD"
+      },
+      "expectedAction": "design-architecture",
+      "expectedExitCode": 2,
+      "expectBlocker": "docs/architecture.json does not"
+    },
+    {
+      "name": "architecture baselined, no stories yet",
+      "baseline": [
+        "discovery",
+        "requirements",
+        "prd",
+        "ux",
+        "architecture"
+      ],
+      "files": {
+        "@project": "@APP"
       },
       "expectedAction": "plan-stories",
       "expectedAgent": "eos-plan",
@@ -113,7 +277,25 @@
       "files": {
         "@project": "@APP",
         "docs/prd.md": "@PRD",
-        "docs/stories/STORY-012.md": { "_story": { "id": "STORY-012", "rows": [["AC1.1", "user can log in", "tests/login.test.mjs::valid", "—"], ["AC1.2", "user can log out", "—", "—"]] } }
+        "docs/stories/STORY-012.md": {
+          "_story": {
+            "id": "STORY-012",
+            "rows": [
+              [
+                "AC1.1",
+                "user can log in",
+                "tests/login.test.mjs::valid",
+                "—"
+              ],
+              [
+                "AC1.2",
+                "user can log out",
+                "—",
+                "—"
+              ]
+            ]
+          }
+        }
       },
       "expectedAction": "design-acceptance-tests",
       "expectedAgent": "eos-plan",
@@ -124,10 +306,34 @@
     {
       "name": "agentic story with no eval case for an acceptance criterion",
       "files": {
-        "@project": { "projectType": "application", "stacks": ["node"], "productParadigms": ["agentic"], "commands": { "test": "node --version", "eval": "node --version" } },
+        "@project": {
+          "projectType": "application",
+          "stacks": [
+            "node"
+          ],
+          "productParadigms": [
+            "agentic"
+          ],
+          "commands": {
+            "test": "node --version",
+            "eval": "node --version"
+          }
+        },
         "docs/prd.md": "@PRD",
         "docs/eval-plan.md": "# Eval plan\n",
-        "docs/stories/STORY-020.md": { "_story": { "id": "STORY-020", "rows": [["AC1.1", "assistant answers", "tests/a.test.mjs::x", "—"]] } }
+        "docs/stories/STORY-020.md": {
+          "_story": {
+            "id": "STORY-020",
+            "rows": [
+              [
+                "AC1.1",
+                "assistant answers",
+                "tests/a.test.mjs::x",
+                "—"
+              ]
+            ]
+          }
+        }
       },
       "expectedAction": "design-eval-cases",
       "expectedPrompt": "eval-spec",
@@ -139,7 +345,12 @@
       "files": {
         "@project": "@APP",
         "docs/prd.md": "@PRD",
-        "docs/stories/STORY-030.md": { "_story": { "id": "STORY-030", "ops": false } }
+        "docs/stories/STORY-030.md": {
+          "_story": {
+            "id": "STORY-030",
+            "ops": false
+          }
+        }
       },
       "expectedAction": "complete-story-readiness",
       "expectedAgent": "eos-plan",
@@ -151,7 +362,19 @@
       "files": {
         "@project": "@APP",
         "docs/prd.md": "@PRD",
-        "docs/stories/STORY-040.md": { "_story": { "id": "STORY-040", "rows": [["AC9.9", "invented criterion", "tests/x.test.mjs::y", "—"]] } }
+        "docs/stories/STORY-040.md": {
+          "_story": {
+            "id": "STORY-040",
+            "rows": [
+              [
+                "AC9.9",
+                "invented criterion",
+                "tests/x.test.mjs::y",
+                "—"
+              ]
+            ]
+          }
+        }
       },
       "expectedAction": "complete-story-readiness",
       "expectedExitCode": 2,
@@ -162,7 +385,12 @@
       "files": {
         "@project": "@APP",
         "docs/prd.md": "@PRD",
-        "docs/stories/STORY-050.md": { "_story": { "id": "STORY-050", "state": "VERIFIED" } }
+        "docs/stories/STORY-050.md": {
+          "_story": {
+            "id": "STORY-050",
+            "state": "VERIFIED"
+          }
+        }
       },
       "expectedAction": "complete-story-readiness",
       "expectedExitCode": 2,
@@ -173,9 +401,19 @@
       "files": {
         "@project": "@APP",
         "docs/prd.md": "@PRD",
-        "docs/stories/STORY-060.md": { "_story": { "id": "STORY-060" } }
+        "docs/stories/STORY-060.md": {
+          "_story": {
+            "id": "STORY-060"
+          }
+        }
       },
-      "transitions": [["story", "STORY-060", "IN_REVIEW"]],
+      "transitions": [
+        [
+          "story",
+          "STORY-060",
+          "IN_REVIEW"
+        ]
+      ],
       "expectedAction": "promote-story",
       "expectedExitCode": 0
     },
@@ -184,10 +422,30 @@
       "files": {
         "@project": "@APP",
         "docs/prd.md": "@PRD",
-        "docs/stories/STORY-070.md": { "_story": { "id": "STORY-070" } }
+        "docs/stories/STORY-070.md": {
+          "_story": {
+            "id": "STORY-070"
+          }
+        }
       },
-      "checks": [["story-ready", "STORY-070"]],
-      "transitions": [["story", "STORY-070", "IN_REVIEW"], ["story", "STORY-070", "READY_FOR_DEV"]],
+      "checks": [
+        [
+          "story-ready",
+          "STORY-070"
+        ]
+      ],
+      "transitions": [
+        [
+          "story",
+          "STORY-070",
+          "IN_REVIEW"
+        ],
+        [
+          "story",
+          "STORY-070",
+          "READY_FOR_DEV"
+        ]
+      ],
       "expectedAction": "implement-story",
       "expectedSkill": "bmad-dev-story",
       "expectedExitCode": 0
@@ -197,10 +455,35 @@
       "files": {
         "@project": "@APP",
         "docs/prd.md": "@PRD",
-        "docs/stories/STORY-080.md": { "_story": { "id": "STORY-080" } }
+        "docs/stories/STORY-080.md": {
+          "_story": {
+            "id": "STORY-080"
+          }
+        }
       },
-      "checks": [["story-ready", "STORY-080"]],
-      "transitions": [["story", "STORY-080", "IN_REVIEW"], ["story", "STORY-080", "READY_FOR_DEV"], ["story", "STORY-080", "IN_DEVELOPMENT"]],
+      "checks": [
+        [
+          "story-ready",
+          "STORY-080"
+        ]
+      ],
+      "transitions": [
+        [
+          "story",
+          "STORY-080",
+          "IN_REVIEW"
+        ],
+        [
+          "story",
+          "STORY-080",
+          "READY_FOR_DEV"
+        ],
+        [
+          "story",
+          "STORY-080",
+          "IN_DEVELOPMENT"
+        ]
+      ],
       "expectedAction": "verify-story",
       "expectedExitCode": 0
     },
@@ -210,10 +493,40 @@
       "files": {
         "@project": "@APP",
         "docs/prd.md": "@PRD",
-        "docs/stories/STORY-090.md": { "_story": { "id": "STORY-090" } }
+        "docs/stories/STORY-090.md": {
+          "_story": {
+            "id": "STORY-090"
+          }
+        }
       },
-      "checks": [["story-ready", "STORY-090"]],
-      "transitions": [["story", "STORY-090", "IN_REVIEW"], ["story", "STORY-090", "READY_FOR_DEV"], ["story", "STORY-090", "IN_DEVELOPMENT"], ["story", "STORY-090", "READY_FOR_TEST"]],
+      "checks": [
+        [
+          "story-ready",
+          "STORY-090"
+        ]
+      ],
+      "transitions": [
+        [
+          "story",
+          "STORY-090",
+          "IN_REVIEW"
+        ],
+        [
+          "story",
+          "STORY-090",
+          "READY_FOR_DEV"
+        ],
+        [
+          "story",
+          "STORY-090",
+          "IN_DEVELOPMENT"
+        ],
+        [
+          "story",
+          "STORY-090",
+          "READY_FOR_TEST"
+        ]
+      ],
       "expectedAction": "build-trace-matrix",
       "expectedExitCode": 2,
       "expectBlocker": "trace-complete"
@@ -222,13 +535,58 @@
       "name": "story is READY_FOR_TEST and the product test command is missing its toolchain — BLOCKED, never PASS",
       "hooks": true,
       "files": {
-        "@project": { "projectType": "application", "stacks": ["node"], "productParadigms": ["deterministic"], "commands": { "test": "definitely-not-installed-eos" } },
+        "@project": {
+          "projectType": "application",
+          "stacks": [
+            "node"
+          ],
+          "productParadigms": [
+            "deterministic"
+          ],
+          "commands": {
+            "test": "definitely-not-installed-eos"
+          }
+        },
         "docs/prd.md": "@PRD",
         "docs/trace-matrix.md": "| AC | Test | Result |\n| --- | --- | --- |\n| AC1.1 | login.test.mjs | ✅ |\n",
-        "docs/stories/STORY-100.md": { "_story": { "id": "STORY-100" } }
+        "docs/stories/STORY-100.md": {
+          "_story": {
+            "id": "STORY-100"
+          }
+        }
       },
-      "checks": [["story-ready", "STORY-100"], ["verified", "STORY-100"]],
-      "transitions": [["story", "STORY-100", "IN_REVIEW"], ["story", "STORY-100", "READY_FOR_DEV"], ["story", "STORY-100", "IN_DEVELOPMENT"], ["story", "STORY-100", "READY_FOR_TEST"]],
+      "checks": [
+        [
+          "story-ready",
+          "STORY-100"
+        ],
+        [
+          "verified",
+          "STORY-100"
+        ]
+      ],
+      "transitions": [
+        [
+          "story",
+          "STORY-100",
+          "IN_REVIEW"
+        ],
+        [
+          "story",
+          "STORY-100",
+          "READY_FOR_DEV"
+        ],
+        [
+          "story",
+          "STORY-100",
+          "IN_DEVELOPMENT"
+        ],
+        [
+          "story",
+          "STORY-100",
+          "READY_FOR_TEST"
+        ]
+      ],
       "expectedAction": "repair-verification",
       "expectedExitCode": 2,
       "expectBlocker": "tests-executed"
@@ -238,7 +596,12 @@
       "files": {
         "@project": "@APP",
         "docs/prd.md": "@PRD",
-        "docs/stories/STORY-110.md": { "_story": { "id": "STORY-110", "changeType": "DOC_ONLY" } }
+        "docs/stories/STORY-110.md": {
+          "_story": {
+            "id": "STORY-110",
+            "changeType": "DOC_ONLY"
+          }
+        }
       },
       "expectedAction": "justify-classification",
       "expectedExitCode": 2,
@@ -249,7 +612,13 @@
       "files": {
         "@project": "@APP",
         "docs/prd.md": "@PRD",
-        "docs/stories/STORY-111.md": { "_story": { "id": "STORY-111", "changeType": "DOC_ONLY", "classificationReason": "Only docs/eos/*.md prose changes; no product code is touched." } }
+        "docs/stories/STORY-111.md": {
+          "_story": {
+            "id": "STORY-111",
+            "changeType": "DOC_ONLY",
+            "classificationReason": "Only docs/eos/*.md prose changes; no product code is touched."
+          }
+        }
       },
       "expectedAction": "start-next-change",
       "expectedExitCode": 0
@@ -259,7 +628,13 @@
       "files": {
         "@project": "@APP",
         "docs/prd.md": "@PRD",
-        "docs/stories/SPIKE-001.md": { "_story": { "id": "SPIKE-001", "changeType": "SPIKE", "classificationReason": "Time-boxed 2-day investigation of the queue option; nothing ships from it." } }
+        "docs/stories/SPIKE-001.md": {
+          "_story": {
+            "id": "SPIKE-001",
+            "changeType": "SPIKE",
+            "classificationReason": "Time-boxed 2-day investigation of the queue option; nothing ships from it."
+          }
+        }
       },
       "expectedAction": "record-spike-outcome",
       "expectedPrompt": "adr",
@@ -269,7 +644,20 @@
       "name": "a bugfix does not re-require the PRD gate but still needs story readiness",
       "files": {
         "@project": "@APP",
-        "docs/stories/BUG-001.md": { "_story": { "id": "BUG-001", "changeType": "BUGFIX", "rows": [["AC1.1", "login stops rejecting valid passwords", "—", "—"]] } }
+        "docs/stories/BUG-001.md": {
+          "_story": {
+            "id": "BUG-001",
+            "changeType": "BUGFIX",
+            "rows": [
+              [
+                "AC1.1",
+                "login stops rejecting valid passwords",
+                "—",
+                "—"
+              ]
+            ]
+          }
+        }
       },
       "expectedAction": "design-acceptance-tests",
       "expectedExitCode": 2,
@@ -279,17 +667,36 @@
       "name": "a hotfix with an approved, unexpired waiver may proceed",
       "files": {
         "@project": "@APP",
-        "docs/stories/HOT-001.md": { "_story": { "id": "HOT-001", "changeType": "HOTFIX", "rows": [["AC1.1", "restore checkout", "—", "—"]] } },
+        "docs/stories/HOT-001.md": {
+          "_story": {
+            "id": "HOT-001",
+            "changeType": "HOTFIX",
+            "rows": [
+              [
+                "AC1.1",
+                "restore checkout",
+                "—",
+                "—"
+              ]
+            ]
+          }
+        },
         ".eos/waivers/hot-001.json": {
           "schemaVersion": 1,
           "gate": "story-ready",
-          "scope": { "type": "story", "id": "HOT-001" },
+          "scope": {
+            "type": "story",
+            "id": "HOT-001"
+          },
           "reason": "Checkout is down in production; the readiness review is deferred by 24 hours.",
           "riskOwner": "ops-lead",
           "requestedBy": "dev-a",
           "approver": "cto",
           "expiresOn": "2999-01-01",
-          "compensatingControls": ["staging smoke test", "follow-up story within 3 days"]
+          "compensatingControls": [
+            "staging smoke test",
+            "follow-up story within 3 days"
+          ]
         }
       },
       "expectedAction": "promote-story",
@@ -299,17 +706,35 @@
       "name": "a hotfix whose waiver has expired is blocked again",
       "files": {
         "@project": "@APP",
-        "docs/stories/HOT-002.md": { "_story": { "id": "HOT-002", "changeType": "HOTFIX", "rows": [["AC1.1", "restore checkout", "—", "—"]] } },
+        "docs/stories/HOT-002.md": {
+          "_story": {
+            "id": "HOT-002",
+            "changeType": "HOTFIX",
+            "rows": [
+              [
+                "AC1.1",
+                "restore checkout",
+                "—",
+                "—"
+              ]
+            ]
+          }
+        },
         ".eos/waivers/hot-002.json": {
           "schemaVersion": 1,
           "gate": "story-ready",
-          "scope": { "type": "story", "id": "HOT-002" },
+          "scope": {
+            "type": "story",
+            "id": "HOT-002"
+          },
           "reason": "Checkout is down in production; the readiness review is deferred by 24 hours.",
           "riskOwner": "ops-lead",
           "requestedBy": "dev-a",
           "approver": "cto",
           "expiresOn": "2000-01-01",
-          "compensatingControls": ["staging smoke test"]
+          "compensatingControls": [
+            "staging smoke test"
+          ]
         }
       },
       "expectedAction": "design-acceptance-tests",
@@ -321,8 +746,17 @@
       "files": {
         "@project": "@APP",
         "docs/prd.md": "@PRD",
-        "docs/stories/STORY-120.md": { "_story": { "id": "STORY-120" } },
-        ".eos/local/active-work.json": { "schemaVersion": 1, "scopeType": "release", "scopeId": "v0.2.0", "changeType": "RELEASE" }
+        "docs/stories/STORY-120.md": {
+          "_story": {
+            "id": "STORY-120"
+          }
+        },
+        ".eos/local/active-work.json": {
+          "schemaVersion": 1,
+          "scopeType": "release",
+          "scopeId": "v0.2.0",
+          "changeType": "RELEASE"
+        }
       },
       "expectedAction": "repair-release",
       "expectedPrompt": "release-gate",
@@ -334,8 +768,28 @@
       "files": {
         "@project": "@APP",
         "docs/prd.md": "@PRD",
-        ".eos/agent-map.json": { "schemaVersion": 1, "actions": { "frame-the-problem": { "agent": "does-not-exist", "skills": [] } } },
-        "docs/stories/STORY-130.md": { "_story": { "id": "STORY-130", "rows": [["AC1.1", "user can log in", "—", "—"]] } }
+        ".eos/agent-map.json": {
+          "schemaVersion": 1,
+          "actions": {
+            "frame-the-problem": {
+              "agent": "does-not-exist",
+              "skills": []
+            }
+          }
+        },
+        "docs/stories/STORY-130.md": {
+          "_story": {
+            "id": "STORY-130",
+            "rows": [
+              [
+                "AC1.1",
+                "user can log in",
+                "—",
+                "—"
+              ]
+            ]
+          }
+        }
       },
       "expectedAction": "design-acceptance-tests",
       "expectedExitCode": 2,
@@ -343,7 +797,10 @@
     },
     {
       "name": "an unparseable workflow file is an ERROR, and the recommendation is to fix EOS itself",
-      "files": { "@project": "@APP", ".eos/workflow.json": "{ broken" },
+      "files": {
+        "@project": "@APP",
+        ".eos/workflow.json": "{ broken"
+      },
       "expectedAction": "fix-eos-configuration",
       "expectedExitCode": 3
     }

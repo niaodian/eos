@@ -65,6 +65,20 @@
   - **验证**：`node .github/hooks/project-gate.mjs` 为 PASS 且**真的执行了**你的 lint/typecheck/test；
     `node .github/hooks/validate-config.mjs` 无 S12 ERROR。**不要靠改声明来把红灯改绿。**
 
+- [ ] （可选——仅当你想要项目级 BMAD 定制时）安装 BMAD 项目运行时
+  - **Why**：EOS 把*撰写*工作委托给 BMAD 技能。每个技能都通过**项目级**的 `_bmad/` 运行时解析自身定制，
+    而 EOS 刻意既不附带也不下载它。没有它时技能**仍然可用**——每个都写明了回退到自带 `customize.toml`，
+    且"缺失的文件直接跳过"——因此你失去的是项目级定制：`_bmad/custom/*.toml` 的团队与个人覆盖、
+    模块配置、会话记忆。`eos-doctor --deep` 会把这种情况报为 **DEGRADED（告警，exit 0）**，而不是阻塞项，
+    因为"能用但没定制"并不等于坏掉。真正算错误的是：技能**根本无法激活**，或映射到上游已废弃的技能。
+    **EOS 自身完全不需要它**：任何门禁、求值器、迁移或路由决策都不调用技能，`eos next` 无论如何都会
+    给出动作、门禁与完成判据。
+  - **Steps**：若你接受默认值，则无需任何操作——把本条勾成 `[~] waived — 默认值够用`。
+    否则用 BMAD **自己的**安装器安装项目运行时（EOS 不会猜命令，也绝不把远程脚本管道进 shell）。
+    依据：`docs/adr/003-bmad-runtime-boundary.md`。
+  - **Verify**：`node .github/hooks/eos-doctor.mjs --deep` 不再出现 `D6 BMAD (BLOCKED)` 行。
+    未安装运行时时出现 `DEGRADED` 告警是预期内的，没有问题。
+
 ## 二、打开"组织合规"轴（约 +2 分）——仅**受监管**项目需要
 
 - [ ] （若受监管）合规边界: 跑 `/compliance` 产出 `docs/compliance-profile.md` **+ `docs/compliance-profile.json`**，并确认组织标准

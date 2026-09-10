@@ -8,12 +8,26 @@ import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { project, write, run, runJson, cleanup, story } from './test-support.mjs';
+import { project, write, run, runJson, cleanup, story, commitAll, treeDigest,
+  baselineFiles, storyFiles, testRun, TEST_FILE, TRACE_MATRIX } from './test-support.mjs';
 
 after(cleanup);
 
-const PRD = '# PRD\n\n## Login\n\n- AC1.1 the user can log in with a valid password\n- AC1.2 the user can log out\n';
-const TRACE = '| AC | Test | Result |\n| --- | --- | --- |\n| AC1.1 | login.test.mjs | ✅ |\n| AC1.2 | logout.test.mjs | ✅ |\n';
+const PRD = '# PRD\n\n## Login (FR1)\n\n- AC1.1 the user can log in with a valid password\n- AC1.2 the user can log out and the session is destroyed\n';
+const TRACE = ['| AC | Test | Result |', '| --- | --- | --- |',
+  '| AC1.1 | tests/login.test.mjs::valid password | PASS |',
+  '| AC1.2 | tests/logout.test.mjs::clears the session | PASS |', ''].join('\n');
+const RUN = testRun({
+  acs: [], testPath: 'tests/login.test.mjs',
+});
+const TWO_AC_RUN = {
+  ...RUN,
+  results: [
+    { ac: 'AC1.1', testPath: 'tests/login.test.mjs', selector: 'valid password', status: 'PASS' },
+    { ac: 'AC1.2', testPath: 'tests/logout.test.mjs', selector: 'clears the session', status: 'PASS' },
+  ],
+};
+const LOGOUT_TEST = "import { test } from 'node:test';\ntest('clears the session', () => {});\n";
 const APP = {
   projectType: 'application', stacks: ['node'], productParadigms: ['deterministic'],
   workflowProfile: 'standard-product', commands: { test: 'node --version' },
@@ -39,15 +53,13 @@ test('journey: an untouched template with product code is routed to activation, 
 });
 
 test('journey: the full loop from a blocked story to a merged story and a release verdict', () => {
-  const dir = project({
+  const dir = project(baselineFiles({
     '.eos/project.json': APP,
-    'docs/discovery.md': '# Discovery\n\nUsers cannot log in. Success: login error rate < 0.5%.\n',
-    'docs/requirements.md': '# Requirements\n\nFR1 password login.\n',
     'docs/prd.md': PRD,
-    'docs/EXPERIENCE.md': 'SKIP — no user-facing surface (internal API only).\n',
-    'docs/architecture.md': '# Architecture\n',
     'docs/stories/STORY-012.md': halfDone(),
-  }, { withHooks: true });
+    'tests/login.test.mjs': TEST_FILE,
+    'tests/logout.test.mjs': LOGOUT_TEST,
+  }), { withHooks: true });
 
   // 1. the gate-failure experience: one concrete blocker, one action, one runnable command
   let r = runJson(dir, ['next']);
@@ -91,12 +103,13 @@ test('journey: the full loop from a blocked story to a merged story and a releas
   assert.match(JSON.stringify(r.json.blockers), /trace-matrix\.md does not exist/);
 
   write(dir, 'docs/trace-matrix.md', TRACE);
+  write(dir, 'docs/evidence/test-run.json', { ...TWO_AC_RUN, productTree: { digest: treeDigest(dir) } });
   const verified = runJson(dir, ['check', '--gate', 'verified', '--scope', 'STORY-012']);
   assert.equal(verified.code, 0, verified.out);
   assert.equal(run(dir, ['transition', '--scope', 'story', '--id', 'STORY-012', '--to', 'VERIFIED']).code, 0);
 
   // 7. an input moves: the recorded PASS becomes STALE and the merge is refused
-  write(dir, 'docs/prd.md', PRD + '- AC1.3 the user can reset a password\n');
+  write(dir, 'docs/prd.md', PRD + '- AC1.3 the user can reset a password from the sign-in page\n');
   const blockedMerge = run(dir, ['transition', '--scope', 'story', '--id', 'STORY-012', '--to', 'MERGED']);
   assert.equal(blockedMerge.code, 1);
   assert.match(blockedMerge.out, /STALE/);
@@ -106,6 +119,15 @@ test('journey: the full loop from a blocked story to a merged story and a releas
   assert.equal(stale.json.recommendedAction.id, 'refresh-stale-evidence');
   assert.match(stale.json.recommendedAction.command, /check --gate story-ready --scope STORY-012/);
   assert.equal(run(dir, ['check', '--gate', 'story-ready', '--scope', 'STORY-012']).code, 0);
+
+  // ...but re-running the GATE is not enough on its own: the recorded test results still describe
+  // the tree as it was, and EOS says so rather than re-blessing them.
+  const notYet = runJson(dir, ['check', '--gate', 'verified', '--scope', 'STORY-012']);
+  assert.notEqual(notYet.code, 0, notYet.out);
+  assert.match(JSON.stringify(notYet.json.checks.find((c) => c.id === 'trace-complete')), /does not describe this code/);
+
+  // The tests have to run again — which is what a real runner does when it rewrites the summary.
+  write(dir, 'docs/evidence/test-run.json', { ...TWO_AC_RUN, productTree: { digest: treeDigest(dir) } });
   assert.equal(run(dir, ['check', '--gate', 'verified', '--scope', 'STORY-012']).code, 0);
   assert.equal(run(dir, ['transition', '--scope', 'story', '--id', 'STORY-012', '--to', 'MERGED']).code, 0);
 
@@ -139,7 +161,10 @@ test('journey: a DOC_ONLY change is not dragged through the product gates', () =
   // The N/A decision is recorded rather than silently skipped.
   assert.equal(run(dir, ['transition', '--scope', 'story', '--id', 'DOC-001', '--to', 'IN_REVIEW']).code, 0);
   const event = readFileSync(join(dir, '.eos/ledger/events.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l)).at(-1);
-  assert.deepEqual(event.notApplicableGates.sort(), ['activation', 'prd-ready', 'release-ready', 'story-ready', 'verified']);
+  assert.deepEqual(event.notApplicableGates.sort(), [
+    'activation', 'architecture-ready', 'discovery-ready', 'iteration-ready', 'prd-ready',
+    'release-ready', 'requirements-ready', 'story-ready', 'telemetry-ready', 'ux-ready', 'verified',
+  ]);
 });
 
 test('journey: a SPIKE may explore freely but can never reach MERGED', () => {

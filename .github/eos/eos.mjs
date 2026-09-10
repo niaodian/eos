@@ -19,6 +19,7 @@ import { route, activeScope } from './lib/router.mjs';
 import { renderCard, renderGate, renderExplain } from './lib/render.mjs';
 import { buildHandoff, writeHandoff, readHandoff, verifyHandoff, handoffPath } from './lib/handoff.mjs';
 import { listEvidence, evidenceFreshness, validateEvidenceShape, sha256File } from './lib/evidence.mjs';
+import { currentProductTree, uncommittedProductChanges } from './lib/product-tree.mjs';
 import { loadWaivers, expiredWaivers } from './lib/waivers.mjs';
 import { resolveAction, ACTIVE_WORK_PATH } from './lib/registry.mjs';
 
@@ -38,6 +39,7 @@ usage: node .github/eos/eos.mjs <command> [flags]
   explain <gate>                          the full rule set for one gate
   release-status                          aggregate release readiness
   verify-release --release <id>           candidate-bound release verification
+  product-tree                            the identity of the tree a verification applies to
   waive --gate <id> --scope <id> --reason <text> --risk-owner <who> --expires <YYYY-MM-DD> --control <text>
   handoff --scope <type> --id <id> [--verify]
   ledger [--verify] [--against <git-ref>]
@@ -279,6 +281,29 @@ const commands = {
     return statusExit(g.status);
   },
 
+  /**
+   * The identity of the tree a verification applies to. Test runners embed this digest in their
+   * machine summary, which is how EOS can tell "these results describe this code" from "these
+   * results describe some code".
+   */
+  'product-tree'(snapshot, flags) {
+    const tree = currentProductTree(snapshot.root);
+    if (!tree.available) {
+      emit(flags, { available: false, reason: tree.reason }, `EOS product tree\n\n  BLOCKED  ${tree.reason}\n`);
+      return EXIT.BLOCKED;
+    }
+    const dirty = uncommittedProductChanges(snapshot.root) || [];
+    const json = { available: true, commit: snapshot.commit, productTree: tree.identity, uncommitted: dirty };
+    const lines = ['EOS product tree', '',
+      `  digest      ${tree.identity.digest}`,
+      `  algorithm   ${tree.identity.algorithm}@${tree.identity.version}`,
+      `  files       ${tree.identity.fileCount}`,
+      `  commit      ${snapshot.commit || '(none)'}`,
+      dirty.length ? `  uncommitted ${dirty.length} product file(s) — a release candidate must be committed` : '  uncommitted none', ''];
+    emit(flags, json, lines.join('\n'));
+    return EXIT.OK;
+  },
+
   'verify-release'(snapshot, flags) {
     const id = flags.release === true || !flags.release ? null : flags.release;
     if (!id) { console.log('verify-release requires --release <id>'); return EXIT.FAIL; }
@@ -287,6 +312,19 @@ const commands = {
     const boundToCandidate = !!snapshot.commit && recorded.evidence?.commit === snapshot.commit;
     const expired = expiredWaivers(snapshot.root);
     const status = result.status === 'PASS' && !boundToCandidate ? 'BLOCKED' : result.status;
+    // The SAME event shape `check` writes. Recording a different type here left the release
+    // evidence with no matching gate entry, so the very next transition rejected it as
+    // "evidence without a ledger entry" — verify-release could never promote anything.
+    appendEvent(snapshot.root, {
+      type: 'gate',
+      scope: { type: 'release', id: String(id) },
+      changeType: result.changeType,
+      gate: 'release-ready',
+      status,
+      evidenceSha256: evidenceFile ? sha256File(snapshot.root, evidenceFile) : null,
+      commit: snapshot.commit,
+      detail: evidenceFile || '',
+    });
     appendEvent(snapshot.root, { type: 'release', scope: { type: 'release', id }, gate: 'release-ready', status, commit: snapshot.commit, detail: evidenceFile || '' });
     const lines = [renderGate(result, { evidenceFile }),
       boundToCandidate ? `  evidence is bound to the candidate commit ${String(snapshot.commit).slice(0, 8)}` : '  BLOCKED: the evidence is not bound to a candidate commit (no git repository, or HEAD moved)',

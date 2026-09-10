@@ -84,12 +84,20 @@ therefore authority: a story's classification is read only from the tracked stor
 ### 4.1 Product baseline
 
 ```
-UNINITIALIZED → DISCOVERY → REQUIREMENTS_BASELINED → PRD_APPROVED → ARCHITECTURE_APPROVED → ACTIVE
+UNINITIALIZED → DISCOVERY → REQUIREMENTS_BASELINED → PRD_BASELINED → UX_BASELINED
+              → ARCHITECTURE_BASELINED → ACTIVE
 ```
 
 The product state is **derived**, never declared: the engine walks this machine from `UNINITIALIZED`
 and advances while the next guard holds. `eos transition --scope product` therefore refuses to set it
 by hand and instead names the guard that is still missing.
+
+These states say **BASELINED**, not APPROVED, on purpose. They are reached by a machine finding a
+document structurally complete — which is not the same thing as a person having approved it. The one
+state that does mean "a human approved this" is the release's `APPROVED`, and it demands an approval
+event recorded by someone other than the person who prepared the candidate.
+*(Migration from eos-1.12.0: `PRD_APPROVED` → `PRD_BASELINED`, `ARCHITECTURE_APPROVED` →
+`ARCHITECTURE_BASELINED`. Product state is derived, so nothing in the ledger needs rewriting.)*
 
 ### 4.2 Change / story
 
@@ -104,8 +112,13 @@ Explicit rollbacks are legal (finding a defect must not require lying about stat
 ### 4.3 Release
 
 ```
-PLANNED → CANDIDATE → VERIFIED → APPROVED → RELEASED       (and RELEASED → ROLLED_BACK)
+PLANNED → CANDIDATE → VERIFIED → APPROVED → RELEASED → OBSERVED → ITERATED
+                                                    ↘ ROLLED_BACK
 ```
+
+RELEASED is not the end. A change that cannot be observed cannot be judged, and a lesson that is not
+written back leaves the specs and the running system drifting apart — so `telemetry-ready` (G9) and
+`iteration-ready` (G10) are gates, not good intentions.
 
 ### 4.4 Transition table (guards)
 
@@ -114,11 +127,12 @@ ahead" to a later state whose prerequisite gate has not produced evidence.
 
 | Scope | From | To | Guard (must hold) |
 |---|---|---|---|
-| product | UNINITIALIZED | DISCOVERY | gate `activation` PASS and `docs/discovery.md` exists |
-| product | DISCOVERY | REQUIREMENTS_BASELINED | `docs/requirements.md` exists |
-| product | REQUIREMENTS_BASELINED | PRD_APPROVED | gate `prd-ready` PASS |
-| product | PRD_APPROVED | ARCHITECTURE_APPROVED | `docs/architecture.md` exists |
-| product | ARCHITECTURE_APPROVED | ACTIVE | at least one story exists |
+| product | UNINITIALIZED | DISCOVERY | gate `discovery-ready` PASS |
+| product | DISCOVERY | REQUIREMENTS_BASELINED | gate `requirements-ready` PASS |
+| product | REQUIREMENTS_BASELINED | PRD_BASELINED | gate `prd-ready` PASS |
+| product | PRD_BASELINED | UX_BASELINED | gate `ux-ready` PASS (or a structured non-UI SKIP) |
+| product | UX_BASELINED | ARCHITECTURE_BASELINED | gate `architecture-ready` PASS |
+| product | ARCHITECTURE_BASELINED | ACTIVE | at least one story exists |
 | story | DRAFT | IN_REVIEW | — |
 | story | IN_REVIEW | READY_FOR_DEV | gate `story-ready` PASS (per change-type policy) |
 | story | READY_FOR_DEV | IN_DEVELOPMENT | — |
@@ -131,24 +145,33 @@ ahead" to a later state whose prerequisite gate has not produced evidence.
 | release | CANDIDATE | VERIFIED | gate `release-ready` PASS |
 | release | VERIFIED | APPROVED | approval event whose approver is not the requester |
 | release | APPROVED | RELEASED | evidence bound to the candidate commit |
-| release | RELEASED | ROLLED_BACK | — |
+| release | RELEASED | OBSERVED | gate `telemetry-ready` PASS |
+| release | OBSERVED | ITERATED | gate `iteration-ready` PASS |
+| release | RELEASED / OBSERVED | ROLLED_BACK | — |
 | release | CANDIDATE | PLANNED | — (rollback) |
 
 A state is **never** read from a Markdown field. If a story file declares `state:` and the ledger
 disagrees, the drift itself is reported as a blocker: hand-edited state is not evidence.
 
-## 5. Gates that are machine-verified in this round
+## 5. Gates that are machine-verified
 
-Machine-verifying all of G1–G10 at once would produce shallow checks. Round one covers the four
-gates where "green but empty" hurts most, plus local activation.
+Every gate from G0 to G10 is now an evaluator, not a reading exercise. Each stage keeps its human
+document **and** a small structured record beside it; the gate reads the record, because prose is
+exactly what a gate must not be able to be talked past.
 
 | Gate id | Blueprint gate | Scope | What is actually verified |
 |---|---|---|---|
 | `activation` | G0 | product | `.eos/project.json` valid, not the untouched template once code exists, `workflowProfile` resolves, activation ledger present |
-| `prd-ready` | G3 | product | `docs/prd.md` exists, acceptance-criteria ids parse and are unique, no unresolved `BLOCKER` marker |
-| `story-ready` | G5 | story | story references real PRD ACs, every AC has a test intent, LLM-backed ACs have an eval case, telemetry/authz/rollback tasks present |
-| `verified` | G7 | story | product-gate evidence exists and is fresh, every story AC has a passing trace row, evals meet threshold when agentic |
-| `release-ready` | G8 | release | required stories VERIFIED, secret scan clean, compliance boundary valid, no expired waivers, runbook + rollback present, evidence bound to the candidate commit |
+| `discovery-ready` | G1 | product | `docs/discovery.md` is written **and** `docs/discovery.json` records a falsifiable problem, a metric with a target and a data source, an explicit scope boundary, no unresolved blocker |
+| `requirements-ready` | G2 | product | functional requirements, quantified NFRs, and a decision for each of telemetry / authz / audit / rollback / monitoring / canary / quota / i18n / multi-tenancy / capacity-SLO / DR (+ compliance when regulated): ADOPT, SKIP + reason, or DEFER + owner + trigger |
+| `prd-ready` | G3 | product | acceptance criteria are **defined** (list item, table row or heading with a statement) — not merely mentioned — unique, and every requirement carries at least one |
+| `ux-ready` | G-UX | product | `docs/design.json` says whether there is a user-facing surface; if yes, **both** `docs/DESIGN.md` and `docs/EXPERIENCE.md` exist with content and flows / states / a11y / tokens / responsive are each covered or reasoned N/A; if no, a structured SKIP with a reason |
+| `architecture-ready` | G4 | product | stack + topology decided with ADRs, authz / security / audit / rollback / DR / data / API / event decided or reasoned N/A, agentic and regulated concerns when they apply, and every NFR landing on a named component |
+| `story-ready` | G5 | story | story references real PRD ACs, every AC has a test intent, LLM-backed ACs have an eval case, telemetry / authz / rollback are decided (ADOPT + owner + verification, SKIP + reason, DEFER + owner + trigger) |
+| `verified` | G7 | story | the **tested product tree** is recorded, the declared quality commands ran, every AC has a trace row bound to an existing test file **and** a machine test-run result, evals meet their thresholds with prompt/model/dataset/grader recorded |
+| `release-ready` | G8 | release | the candidate is committed, the quality commands re-run **on it**, every story's verification describes **this** tree, spec alignment, secret scan, dependency audit, NFR evidence, compliance boundary, waivers, runbook + rollback + canary + health, topology, enforcement authority |
+| `telemetry-ready` | G9 | release | the discovery success metric is emitted as a real signal, dashboards + routed alerts exist, sensitive operations are audited, a rollback trigger is defined, an owner is named |
+| `iteration-ready` | G10 | release | learnings are written back into documents that exist, an agentic product feeds production into the eval dataset and re-baselines a changed prompt/model, a named owner records CONTINUE / CORRECT_COURSE / STOP |
 
 `eos explain <gate>` prints the full rule set for one gate on demand — that is the only place the
 detailed rules need to be read.
@@ -163,6 +186,7 @@ detailed rules need to be read.
 | `PENDING` | the gate applies but has never been run | no |
 | `WAIVED` | an unexpired, approved waiver covers it | yes (recorded) |
 | `NOT_APPLICABLE` | the change-type policy says this gate does not apply | yes (recorded) |
+| `DEFERRED` | a check could not be completed and the reason is recorded (an offline dependency audit, an NFR target with an owner and a trigger) | **no** — visible and time-bound, never green |
 | `STALE` | a previous PASS whose inputs or definitions changed | no |
 | `ERROR` | the evaluator itself could not run | no |
 
@@ -197,6 +221,25 @@ non-zero exit) — never `PASS`. Someone with write access can still forge sever
 once locally — which is why the ledger, the gate definitions, the workflow, the agent map and the
 project declaration are CODEOWNERS-protected, and why CI re-verifies the chain against the commit
 the build sits on.
+
+### 5.3 What these gates still do NOT prove
+
+Naming a limit is cheaper than discovering it during an incident, so:
+
+- **Threshold provenance.** `docs/evidence/eval-summary.json` carries both the observed value and
+  the threshold, and EOS recomputes the verdict from them — a summary reporting `PASS` beside
+  numbers that miss its threshold fails. It cannot tell you that the *threshold itself* was lowered.
+  The summary is a recorded gate input, so lowering it makes the recorded PASS `STALE` and forces a
+  re-run; the diff is what a reviewer sees. That control is human, by design.
+- **Release membership.** A release is currently gated against every story under `docs/stories/`
+  that is not a SPIKE or DOC_ONLY. There is no per-release manifest, so a historical story is
+  re-verified against each new candidate. That is strict rather than wrong, but it is not selective.
+- **Topology cross-checking.** `deployment-topology` requires a decided ADR and `ops-artifacts`
+  requires rollback, gradual rollout and health/readiness to be documented. EOS does not verify that
+  the mechanisms in the runbook are the ones that topology actually offers — a runbook can describe
+  a rollback the platform cannot perform. That remains a review question.
+- **Server-side enforcement.** Branch protection cannot be seen from a local run. It is reported as
+  BLOCKED/UNVERIFIED, never PASS.
 
 ## 6. Change types (branch the flow without unknown paths)
 

@@ -17,19 +17,46 @@ name: EOS CI
 # Python/Go/Java/Rust/.NET project's tests DO run and DO fail CI. Add your toolchain's setup step
 # (actions/setup-python, setup-go, setup-java, dtolnay/rust-toolchain, setup-dotnet…) before it —
 # a missing toolchain is reported as BLOCKED and fails, it is never silently skipped.
+#
+# SUPPLY CHAIN (EOS-AUD-009): every action is pinned to an immutable commit SHA with the
+# human-readable version in a trailing comment. A tag is a moving pointer its owner can repoint at
+# any commit; a SHA is the code that was reviewed. Update them deliberately:
+#   gh api repos/<owner>/<repo>/git/ref/tags/<tag> --jq .object.sha
+# Pinned at v7, which runs on the node24 runtime: the v4 pins still worked, but GitHub forced them
+# onto node24 anyway and warned on every run, so the pin no longer described what actually ran.
 
 on:
   push:
   pull_request:
   workflow_dispatch:
 
+# Least privilege by default; a job that needs more asks for it in its own `permissions:` block.
+# `pull_request` (not `pull_request_target`) is used deliberately: a fork PR runs WITHOUT repository
+# secrets and with a read-only token, so untrusted code never reaches a writable context.
+permissions:
+  contents: read
+
+# One run per ref: an older run for the same branch is superseded rather than left racing the new
+# one — except on the default branch, where every commit keeps its own verdict.
+concurrency:
+  group: eos-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 jobs:
   verify:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The ledger check below compares against the base/previous ref, so the shallow default
+          # would make it unverifiable on exactly the changes it exists to police.
+          fetch-depth: 0
+          persist-credentials: false
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '20'
 
@@ -42,8 +69,11 @@ jobs:
         # an en-only edit from silently drifting the Chinese tree out of parity.
         run: node .github/hooks/check-doc-parity.mjs
 
-      - name: EOS SDLC gate doctor (G-EVAL / G-UX wiring + secret hygiene)
-        run: node .github/hooks/eos-doctor.mjs
+      - name: EOS SDLC gate doctor (G-EVAL / G-UX wiring + BMAD runtime + secret hygiene)
+        # --deep also verifies that every MAPPED BMAD skill can actually activate here (project
+        # runtime + executables). Without it a directory-name check reports PASS for skills that
+        # fail on their first activation step. [EOS-AUD-002]
+        run: node .github/hooks/eos-doctor.mjs --deep
 
       - name: EOS secret scan (built-in patterns + gitleaks if available)
         run: node .github/hooks/secret-scan.mjs
@@ -68,7 +98,7 @@ jobs:
       - name: EOS project-gate regression tests (cross-stack quality contract)
         run: node --test .github/hooks/project-gate.test.mjs
 
-      - name: EOS doctor regression tests (G-EVAL detection + compliance data boundary)
+      - name: EOS doctor regression tests (G-EVAL detection + compliance + BMAD runtime)
         run: node --test .github/hooks/eos-doctor.test.mjs
 
       - name: EOS config-validator regression tests (S13 workflow spine cross-references)
@@ -95,6 +125,12 @@ jobs:
         # truncated ledger, hand-written evidence, a story added after a release gate — and asserts
         # it no longer works.
         run: node --test .github/eos/bypass.test.mjs
+
+      - name: EOS audit regressions (eos-1.12.0 findings EOS-AUD-001 … 011)
+        # One executable case per audit finding: the product-tree bypass, the BMAD false green, the
+        # existence-only stage gates, fake ACs, reasonless SKIPs, hand-written trace PASS, the
+        # release prompt ⇄ machine gate gap, and the RELEASED → telemetry → iteration loop.
+        run: node --test .github/eos/audit-regression.test.mjs
 
       - name: EOS ledger append-only verification
         # The hash chain is the offline guarantee; comparing against the base ref additionally
@@ -144,5 +180,71 @@ jobs:
             echo "### Recommended next action"
             echo '```'
             node .github/eos/eos.mjs next || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ---------------------------------------------------------------------------------------------
+  # Candidate-bound release verification. `verify` proves THE CHANGE is sound; this proves THE THING
+  # BEING SHIPPED is. It re-runs the declared quality commands on the tag's own tree and requires
+  # every included story's verification to describe THAT tree — story state is not evidence about
+  # code. [EOS-AUD-001 / EOS-AUD-007]
+  release-candidate:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '20'
+
+      - name: Candidate product-tree identity
+        run: node .github/eos/eos.mjs product-tree
+
+      - name: Does this repository release a product?
+        id: releasable
+        # EOS's own repository declares `config-only` — it ships governance, not a product — so the
+        # release gate has nothing to test and correctly reports BLOCKED. Running it anyway would
+        # make every tag red for a reason that is not a defect. Downstream product repositories
+        # declare `application`/`library` and DO run the gate below.
+        run: |
+          TYPE=$(node -e "try{process.stdout.write(require('./.eos/project.json').projectType||'')}catch{process.stdout.write('')}")
+          echo "projectType=$TYPE"
+          if [ "$TYPE" = "application" ] || [ "$TYPE" = "library" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::projectType is '${TYPE:-unset}' — there is no product to release-verify. Declare application/library in .eos/project.json to enable the candidate-bound release gate."
+          fi
+
+      - name: Install the declared toolchain for the candidate
+        if: steps.releasable.outputs.run == 'true'
+        # This is a FRESH job: it does not inherit the `verify` job's dependencies, so the declared
+        # install must run before the release gate executes the quality commands with --skip-install.
+        run: node .github/hooks/project-gate.mjs
+
+      - name: Candidate-bound release verification (G8)
+        if: steps.releasable.outputs.run == 'true'
+        # The FULL release gate on this tag: quality commands on the candidate tree, story evidence
+        # bound to it, spec alignment, secret scan, dependency audit, NFR evidence, compliance
+        # boundary, waivers, runbook/rollback/canary/health, topology, enforcement authority.
+        # A network-dependent step is DEFERRED, never PASS.
+        run: node .github/eos/eos.mjs verify-release --release "${GITHUB_REF_NAME}"
+
+      - name: Release gate summary
+        if: always() && steps.releasable.outputs.run == 'true'
+        run: |
+          {
+            echo "## EOS release gate — ${GITHUB_REF_NAME}"
+            echo ""
+            echo '```'
+            node .github/eos/eos.mjs release-status --release "${GITHUB_REF_NAME}" || true
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
