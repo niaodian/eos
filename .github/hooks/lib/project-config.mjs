@@ -21,7 +21,9 @@ export const STEPS = ['install', 'lint', 'typecheck', 'test', 'eval', 'audit'];
 const TOP_LEVEL_KEYS = new Set([
   '$schema', 'projectType', 'stacks', 'commands', 'productParadigms', 'evalRequired',
   'evalWaiver', 'rationale', 'workflowProfile', 'complianceProfile',
+  'evidencePolicy', 'evidencePolicyReason',
 ]);
+export const EVIDENCE_POLICIES = ['local', 'ci', 'attested'];
 export const COMPLIANCE_PROFILES = ['none', 'regulated'];
 
 // Manifests that prove a real code project exists, so "config-only" can't be used to hide one.
@@ -212,6 +214,19 @@ export function loadProjectConfig(root) {
     errors.push(`${PROJECT_CONFIG_PATH}: unknown complianceProfile "${parsed.complianceProfile}" (expected ${COMPLIANCE_PROFILES.join(' | ')}). The authoritative record stays docs/compliance-profile.json.`);
   }
 
+  if (parsed.evidencePolicy !== undefined && !EVIDENCE_POLICIES.includes(parsed.evidencePolicy)) {
+    errors.push(`${PROJECT_CONFIG_PATH}: unknown evidencePolicy "${parsed.evidencePolicy}" (expected ${EVIDENCE_POLICIES.join(' | ')})`);
+  }
+  // A regulated project must SAY how much provenance it requires. EOS refuses to choose for it:
+  // demanding CI would exclude air-gapped users, and assuming "local" would silently lower the bar.
+  if (parsed.complianceProfile === 'regulated' && parsed.evidencePolicy === undefined) {
+    errors.push(`${PROJECT_CONFIG_PATH}: a regulated project must declare "evidencePolicy" (${EVIDENCE_POLICIES.join(' | ')}). `
+      + 'Choosing "local" is legitimate — an air-gapped environment cannot reach an attestation authority — but it must be a stated decision, not a blank.');
+  }
+  if (parsed.complianceProfile === 'regulated' && parsed.evidencePolicy === 'local'
+      && (typeof parsed.evidencePolicyReason !== 'string' || parsed.evidencePolicyReason.trim().length < 20)) {
+    errors.push(`${PROJECT_CONFIG_PATH}: a regulated project choosing evidencePolicy "local" must record "evidencePolicyReason" (>= 20 characters) — e.g. an air-gapped network with no reachable attestation authority.`);
+  }
   if (parsed.evalRequired !== undefined && typeof parsed.evalRequired !== 'boolean') {
     errors.push(`${PROJECT_CONFIG_PATH}: "evalRequired" must be a boolean`);
   }
@@ -250,6 +265,8 @@ export function loadProjectConfig(root) {
     productParadigms,
     workflowProfile: typeof parsed.workflowProfile === 'string' ? parsed.workflowProfile : undefined,
     complianceProfile: COMPLIANCE_PROFILES.includes(parsed.complianceProfile) ? parsed.complianceProfile : undefined,
+    evidencePolicy: EVIDENCE_POLICIES.includes(parsed.evidencePolicy) ? parsed.evidencePolicy : undefined,
+    evidencePolicyReason: typeof parsed.evidencePolicyReason === 'string' ? parsed.evidencePolicyReason : undefined,
     evalRequired: parsed.evalRequired,
     evalWaiver,
     rationale: typeof parsed.rationale === 'string' ? parsed.rationale : '',

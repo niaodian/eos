@@ -1069,6 +1069,35 @@ manifest that leaves any story unaccounted for.
 Recorded evidence from 1.13.x becomes `STALE` (the gate versions moved) and is cleared by re-running
 the gates. Nothing needs hand-editing, and nothing is silently reinterpreted.
 
+
+### 10.4.3 `evidencePolicy` — how much provenance your release evidence needs
+
+`docs/evidence/*.json` is bytes on disk. A summary emitted by a verified CI run and one typed by a
+person are identical bytes, and `producer` is the only thing that separates them — a **claim**, not a
+proof. So the project states how much provenance it requires, and EOS enforces *that*:
+
+| `evidencePolicy` | Release evidence must be… |
+|---|---|
+| `local` (default) | anything, including produced on a laptop — honest, and fine for most projects |
+| `ci` | produced by a CI producer (`"producer": { "type": "ci", … }`) |
+| `attested` | carrying provenance an adapter can verify (Core verifies none itself) |
+
+**A regulated project must declare it.** Leaving it unset fails, because "nobody decided" is not a
+policy. It may legitimately choose `local` — an **air-gapped** environment cannot reach an
+attestation authority at all, and refusing to ship there would exclude exactly the users who need
+governance most — but the reason must be written down:
+
+```jsonc
+{
+  "complianceProfile": "regulated",
+  "evidencePolicy": "local",
+  "evidencePolicyReason": "Air-gapped network; no external attestation authority is reachable."
+}
+```
+
+This is the same shape as SKIP / DEFER everywhere else in EOS: **a blank is refused; a stated
+decision is respected.** See [ADR-005](../adr/005-external-authority-boundary.md).
+
 ---
 
 # Chapter 11 Adding a technology stack

@@ -788,6 +788,12 @@ const evaluators = {
    */
   releaseEvidenceTrust(ctx) {
     const required = readManifest(ctx.root, ctx.scopeId).manifest?.requiredEvidence || [];
+    // The project states how much provenance it needs; EOS enforces THAT, rather than choosing for
+    // it. Demanding CI of everyone would exclude air-gapped users — who are often the most
+    // regulated — and assuming `local` would silently lower the bar. (ADR-005 · D2)
+    const policy = ctx.snapshot.project?.evidencePolicy || 'local';
+    const MINIMUM = { local: 0, ci: 1, attested: 2 };
+    const LEVEL = { UNATTESTED_LOCAL: 0, SELF_REPORTED_CI: 1, ATTESTED: 2 };
     const kinds = [['testRun', 'test-run'], ['nfrSummary', 'nfr-summary'], ...(ctx.snapshot.agentic ? [['evalSummary', 'eval-summary']] : [])];
     const levels = [];
     for (const [kind, label] of kinds) {
@@ -795,19 +801,21 @@ const evaluators = {
       if (!s.data) continue;
       const trust = producerTrust(s.data);
       levels.push(`${label}: ${trust.level}`);
-      if (isRegulated(ctx) && trust.level === 'UNATTESTED_LOCAL') {
-        return blocked(`${s.path} ${trust.detail}. A regulated release may not rest on evidence that cannot be told apart from a hand-written file — produce it from CI, or record an attestation and enable the matching provider adapter.`);
+      if (LEVEL[trust.level] < MINIMUM[policy]) {
+        return fail(`this project declares evidencePolicy "${policy}" but ${s.path} ${trust.detail}`
+          + `${policy === 'attested' ? ' — and EOS Core verifies no attestation itself: enable the matching provider adapter' : ''}`);
       }
       if (required.includes(label) && trust.level === 'UNATTESTED_LOCAL') {
         return fail(`the manifest requires ${label} evidence, but ${s.path} ${trust.detail}`);
       }
     }
     if (!levels.length) return na('no machine summary is present for this release');
-    // Reported, not blocking, by default. EOS is local-first: a release gate that can never be green
-    // on a developer's machine would make the tool unusable for the people it is for, and would
-    // quietly turn a cloud service into a dependency. Strictness is opt-in — `complianceProfile:
-    // regulated` or `requiredEvidence` in the manifest — and both are checked above.
-    return ok(`${levels.join(', ')}${levels.some((l) => l.includes('UNATTESTED_LOCAL')) ? ' — local evidence is honest but unattested; require CI/attestation via the manifest or a regulated profile when that matters' : ''}`);
+    // Reported, not blocking, once the declared policy is met. EOS is local-first: a release gate
+    // that can never be green on a developer's machine would make the tool unusable for the people
+    // it is for, and would quietly turn a cloud service into a dependency.
+    const weak = levels.some((l) => l.includes('UNATTESTED_LOCAL'));
+    return ok(`policy "${policy}" satisfied — ${levels.join(', ')}`
+      + `${weak && policy === 'local' ? '. Local evidence is honest but unattested; raise evidencePolicy to "ci" or "attested" when that matters.' : ''}`);
   },
 
   releaseNfrEvidence(ctx) {

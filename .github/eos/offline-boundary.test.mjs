@@ -105,3 +105,51 @@ test('the network can only ever upgrade a verdict, never manufacture one', () =>
   assert.doesNotMatch(body.replace(/^\s*\/\/.*$/gm, ''),
     /offline[^\n]*\bok\(/i, 'being offline must never produce a PASS');
 });
+
+// --------------------------------------------------------------------- ADR-005 · D3 and D5
+// The two boundaries that are about authority rather than connectivity.
+
+test('ADR-005 D3: EOS never reads a credential, so it can never leak one', () => {
+  // Stronger than handling secrets carefully is never seeing one. Adapters delegate to an
+  // already-authenticated CLI (`gh`), whose token lives in that tool's own store.
+  const offenders = [];
+  for (const rel of coreFiles()) {
+    const text = readFileSync(join(REPO_ROOT, rel), 'utf8');
+    for (const line of text.split(/\r?\n/)) {
+      if (/^\s*(\/\/|\*|\/\*)/.test(line)) continue;
+      if (/process\.env\.[A-Z_]*(TOKEN|SECRET|PASSWORD|APIKEY|API_KEY|CREDENTIAL)/i.test(line)) {
+        offenders.push(`${rel}: reads a credential from the environment — ${line.trim().slice(0, 70)}`);
+      }
+      if (/flags\.(token|secret|password|apiKey)/i.test(line)) {
+        offenders.push(`${rel}: accepts a credential as a flag — ${line.trim().slice(0, 70)}`);
+      }
+    }
+  }
+  assert.deepEqual(offenders, [],
+    'EOS must be able to say it has never seen a credential. Delegate to an already-authenticated '
+    + 'CLI instead; if a CI-only path genuinely needs an environment token, it belongs in an adapter '
+    + 'that never persists or logs it. See docs/adr/005-external-authority-boundary.md.');
+});
+
+test('ADR-005 D5: EOS is read-only against every external system', () => {
+  // A tool that can grant itself enforcement authority can also remove it: if EOS could set branch
+  // protection, compromising EOS would disable the gates. EOS records and reports; humans and CI act.
+  const WRITE_SHAPES = [
+    { re: /-X\s*(PUT|POST|PATCH|DELETE)/i, what: 'a mutating API call' },
+    { re: /\bgh\s+(repo|api|release|pr)\s+(create|edit|delete|merge)/, what: 'a mutating gh command' },
+    { re: /method:\s*['"](PUT|POST|PATCH|DELETE)['"]/i, what: 'a mutating HTTP method' },
+  ];
+  const offenders = [];
+  for (const rel of coreFiles()) {
+    const text = readFileSync(join(REPO_ROOT, rel), 'utf8');
+    for (const line of text.split(/\r?\n/)) {
+      if (/^\s*(\/\/|\*|\/\*)/.test(line)) continue;
+      for (const { re, what } of WRITE_SHAPES) {
+        if (re.test(line)) offenders.push(`${rel}: ${what} — ${line.trim().slice(0, 70)}`);
+      }
+    }
+  }
+  assert.deepEqual(offenders, [],
+    'EOS does not configure the systems that hold it accountable. The convenience case is real — '
+    + '/eos-init could just set branch protection for you — and the door is closed deliberately.');
+});
