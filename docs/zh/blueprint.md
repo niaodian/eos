@@ -168,7 +168,7 @@ let s = ''; process.stdin.on('data', d => (s += d)); process.stdin.on('end', () 
 
 ```bash
 # A. degit，固定到 release tag（推荐——默认分支会持续变动）
-npx degit niaodian/eos#eos-1.15.0 my-app
+npx degit niaodian/eos#eos-1.15.1 my-app
 cd my-app && node .github/hooks/validate-config.mjs    # 期望 PASS
 
 # B. gh CLI（需要上面的 template 设置；拿到的是最新默认分支，而不是某个 tag）
@@ -179,7 +179,7 @@ mkdir -p ~/.git-templates/eos && cp -R <golden>/.github ~/.git-templates/eos/
 git config --global init.templateDir ~/.git-templates/eos
 ```
 
-版本化：`docs/eos/VERSION`（当前 `eos-1.15.0`）。升级用 `degit` 拉新版到 /tmp 后 `diff -ru` 合并，
+版本化：`docs/eos/VERSION`（当前 `eos-1.15.1`）。升级用 `degit` 拉新版到 /tmp 后 `diff -ru` 合并，
 再跑 `validate-config.mjs` + `bmad-code-review`。
 
 ---
@@ -523,6 +523,7 @@ Agent 输出不符预期
 | D23 | 引导式工作流的对抗性加固（eos-1.12.0） | 一次独立只读审查加上自我探测，把新层的九个绕过路径都做成了可运行的 exploit；每一个现在都由「复现该 exploit 并断言其失效」的回归测试锁死（`.github/eos/bypass.test.mjs`，12 例）。**分类** —— 把 Story 改标成 `SPIKE`/`DOC_ONLY`/`PRODUCT_BASELINE`/`RELEASE` 就能关掉全部门禁并一路走到 MERGED：现在 Change Type 只能给它自己声明的 Scope 分类，`mergeable: false` 让 SPIKE 永远到不了 MERGED，并且「必须给理由」这条规则改为**推导**得出（任何同时关掉 story-ready 与 verified 的类型都必须写 `classificationReason`），所以忘记加标志也无法打开缺口。**权威泄漏** —— 被 gitignore 的 `.eos/local/active-work.json` 能提供 `changeType`，即用一个未纳入版本管理的文件挑选门禁策略：该键现在读取时即被丢弃，`eos focus` 也直接拒绝。**Waiver** —— 记录下来的 `WAIVED` 永不过期，因为 Waiver 不是证据输入；现在生效的 Waiver 被绑进证据，并在每次读取时重新评估（有效期 / 审批人 / 是否存在）。**账本** —— 哈希链此前只被 `ledger`/`doctor` 校验，其它所有消费方都在信任伪造行；`readSnapshot` 现在会校验，`status` 拒绝渲染来自不可验证来源的状态，`.eos/ledger/head.json` 钉住长度与链尾使截断可检测，并且不可验证的账本报 `UNVERIFIED`（非零）而不是 `PASS`。**证据** —— 手写或手改的证据文件此前被逐字采信；现在证据读取时按 schema 校验，记录的输入**集合**必须与门禁今天实际读取的一致，集合摘要能抓到发布门禁跑完后新增的 Story，无法识别的状态聚合为 ERROR，并且——最关键的——状态必须等于它自己 checks 的聚合结果，且必须与哈希链账本一致。`.eos/project.json` 与 `.eos/ledger/` 加入 CODEOWNERS 保护集；CI 对 push 与 pull request 都会针对本次构建所基于的提交校验 append-only | 新建加固（对抗性审查驱动） |
 | D24 | 第六轮审计收口：验证绑定到它所验证的产品（eos-1.13.0） | `eos-1.12.0` 审计做到了：把实现重写后 story 仍能进 `MERGED`；四份空文档一路走到"架构已批准"；doctor 绿灯与"无法激活的 BMAD 技能"并存。**EOS-AUD-001（P0）** 证据记了 commit，却从不记产品的*内容*，因此重写之后所有已记录哈希依旧吻合：现在有了版本化的**被测产品树身份**，对全部 tracked + untracked-not-ignored 文件**连同其 git mode** 取摘要（源码、测试、prompt、eval 数据、manifest、lockfile、运行时/部署配置；增删、改名、`chmod`、symlink 改向全部可见），并**按构造**排除 EOS 自身的 evidence/ledger/handoff/local/machine-summary 输出，使"记录结果"不可能让证据失效；`VERIFIED → MERGED` 与 G8 都会重算比对，无 git 仓库时为 `BLOCKED` 而绝非 `PASS`。**EOS-AUD-002（P0）** 技能检查只看目录名：`.eos/bmad.lock.json` + `eos-doctor --deep` 现在校验项目级 `_bmad/` 运行时以及*已安装*技能真正调用的可执行文件，技能**根本无法激活**时报 **BLOCKED**，仅因跑在自带默认值上时报 **DEGRADED**（每个技能都写明了该回退，把它说成 BLOCKED 就是"假红"——正是所要消除的"假绿"的镜像）；已废弃的 `bmad-create-prd`/`bmad-validate-prd` 迁移到 `bmad-prd`；见 ADR-003。**EOS-AUD-003** G1/G2/G-UX/G4 变成读结构化阶段记录的求值器，`*_APPROVED` → `*_BASELINED`，因为"机器判定文档完整"不等于"人批准了它"。**EOS-AUD-004/005/006** AC 必须被*定义*才算数（先剥离注释与代码块），运营任务是 ADOPT+负责人+验证方式 / SKIP+理由 / DEFER+负责人+触发条件并带占位符检测，trace 行必须绑定到真实存在的测试文件、一致的 selector 以及绑定本树的机器执行结果。**EOS-AUD-007** 发布提示词要求的全部 13 项都成为求值器——包括**在候选上**重跑质量命令——并新增 `DEFERRED` 状态：可见、绝不算绿，且受监管产品无权使用。**EOS-AUD-008/009** 文档不再断言所有者级 GitHub 设置，而是把验证命令交给读者；Actions 锁定到 `node24` 上的不可变 SHA，最小权限、超时、并发，外加候选绑定的发布作业。**EOS-AUD-010** `RELEASED → OBSERVED → ITERATED`，且 `ROLLED_BACK` 经事故复盘收口而不是重新发布。**EOS-AUD-011** 供应商无关的受监管+agentic preset，并明确声明它不等于合规。对本次修复本身的对抗性复审又发现七处（发布接受最新验证为 `FAIL` 的 story、schema 缺失会关闭校验、`../` 证据逃逸、自报的 eval/NFR 结论、中文正文被当成占位符、`verify-release` 写入的 ledger 事件形状被它自己拒绝）。测试 181 → 256 | 新建补强（第六轮审计驱动） |
 | D25 | Round B：外部权威边界及其首批 adapter（eos-1.15.0） | 有两道门禁是笔记本上的程序永远关不上的：`activation-authority` 恒为 BLOCKED，因为 EOS 看不到服务端分支保护；`attestation` 则是一个无人验证的声明。**ADR-005** 先固定了五个决定，否则代码会默默替人做掉：网络是可选增强而非必需（D1）；受监管项目必须**声明**自己的证据策略而不是被强加一个——`eos-1.14.0` 对受监管项目的本地证据一律 BLOCKED，这把气隙用户排除在外，而他们往往正是最受监管的那批（D2）；EOS 从不接触凭据，改为委托已鉴权的 CLI，token 从不进入本进程（D3）；adapter 必须**单调**（D4）；EOS 对任何外部系统只读，因为能给自己授予强制权的工具也能撤销它（D5）。**ADR-006** 随后落地了契约与两个 adapter。整个设计可归结为一句话——**只有 `PASS` 能抬高结论**——此前一版按状态排序，结果让一个仅仅**没能给出答案**的 provider 改变了结论：不知道，不构成证据。因此缺席、不可达、未鉴权、超时或崩溃的 provider，都会让结论与任何 adapter 存在之前完全一致；且只有 `activation`/`release-ready` 会咨询 provider，故任何 provider 故障都无法阻断开发流。确定性 mock 在离线状态下复现每一种失败模式——因为一个只有联网才能看到失败的 adapter，就是一个失败从未被测试过的 adapter。289 个测试 | 新建补强（健壮性 Round B） |
+| D26 | 开局路径是唯一没人验证过的路径（eos-1.15.1） | 一位照着文档走的用户报告：quickstart 的 Day-1 与手册 §3.4 给出了两套不同的开局序列，而助手自己给的建议两边都不符。两条观察都成立。quickstart 漏掉了 `git init`——这不是无关紧要的遗漏，因为 `degit` 故意产出一个没有仓库的目录，而产品树身份是从 git 树推导的，于是这条被记录在案的路径会走向一个**看不出原因**的 `verified` BLOCKED。更深的缺陷是一处熬过了此前每一轮审计的命名撞车：`/eos-init`（Copilot Chat 的硬化引导——分支保护、CODEOWNERS、审批基线）与 `eos init --write`（只写 `.vscode/tasks.json`）是两个名字几乎相同、职责完全无关的东西，而助手把后者当成了前者的第一步来讲。名字予以保留——为一个文档问题去重命名一个已发布命令，会打断既有项目——但两处界面现在都明确声明了各自**不是**什么。§1.2 此前也以终端命令开头，而 EOS 的主场是 Copilot Chat；CLI 现在被定位为同一个引擎，供 CI 与脚本使用。这里的普遍教训正是本框架存在的理由：**除了新用户真正会走的第一条路，这里每一道门禁都被验证过**——因为维护者从不从一个空目录开始。289 个测试 | 文档一致性补丁 |
 | — | Agentic Engineering 扩展包（LLM/agent 产品） | `ai/10-ai-llm` 规则、`/eval-spec`(G-EVAL)、C-nfr/security/telemetry 扩展；产 `docs/eval-plan.md`；起步骨架 `docs/eos/examples/eval-starter/` | 新建补强（借鉴 bmad-eval-runner） |
 | — | BMAD reuse map（73 bmad-*） | `docs/eos/agent-map.md` | 复用BMAD |
 | — | 运营前置 skill | `.github/skills/eos-operational-readiness/SKILL.md` | 新建 |
