@@ -311,12 +311,18 @@
       "id": "release-ready",
       "code": "G8",
       "scope": "release",
-      "version": "2.0.0",
+      "version": "3.0.0",
       "waivable": false,
       "bindsProductTree": true,
       "title": "Release candidate is shippable",
-      "summary": "The candidate itself is re-tested here — not merely trusted because stories once passed. Every included story was verified against THIS tree, security, supply-chain, NFR, compliance and operational readiness hold, and the human/organisational items are recorded rather than assumed.",
+      "summary": "The manifest states exactly which stories this release ships, and the candidate itself is re-tested here — not merely trusted because stories once passed. Every included story was verified against THIS tree, security, supply-chain, NFR, compliance and operational readiness hold, and the human/organisational items are recorded rather than assumed.",
       "checks": [
+        {
+          "id": "release-manifest",
+          "title": "the release states which stories it ships",
+          "evaluator": "releaseManifest",
+          "fix": "Run `node .github/eos/eos.mjs release init --release <id>` to propose a manifest, then decide what is in it. Every story must be included or excluded with a reason."
+        },
         {
           "id": "candidate-identity",
           "title": "the candidate is a committed, identifiable tree",
@@ -358,6 +364,12 @@
           "title": "the dependency / supply-chain audit is clean",
           "evaluator": "releaseDependencyAudit",
           "fix": "Run the declared commands.audit (npm audit / pip-audit / cargo audit …) and resolve findings; offline it is DEFERRED, never PASS — and for a regulated product it BLOCKS."
+        },
+        {
+          "id": "evidence-trust",
+          "title": "the release states how trustworthy its evidence is",
+          "evaluator": "releaseEvidenceTrust",
+          "fix": "Evidence produced locally is honest but indistinguishable from a hand-written file. Produce it from CI (producer.type = ci), or record an attestation, or accept DEFERRED for a non-regulated release."
         },
         {
           "id": "nfr-evidence",
@@ -430,16 +442,16 @@
       "id": "iteration-ready",
       "code": "G10",
       "scope": "release",
-      "version": "1.0.0",
+      "version": "2.0.0",
       "waivable": false,
       "title": "Production learning is written back to the source of truth",
       "summary": "What the release taught lands in the specs, user feedback reaches the eval dataset for an agentic product, a changed prompt/model/tool surface gets a new baseline, and a named owner records CONTINUE / CORRECT_COURSE / STOP.",
       "checks": [
         {
           "id": "spec-write-back",
-          "title": "learnings are written back into documents that exist",
+          "title": "learnings are written back, bound to the content that was written",
           "evaluator": "iterationWriteBack",
-          "fix": "Create docs/iteration.json (eos-review agent: bmad-retrospective, bmad-correct-course) naming each spec you updated."
+          "fix": "Create docs/iteration.json naming each spec you updated AND its post-write-back SHA-256 (`targetDigest`), so a later revert is visible."
         },
         {
           "id": "agentic-feedback",

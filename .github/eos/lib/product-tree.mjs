@@ -34,6 +34,10 @@ export const SELF_REFERENCE_PREFIXES = [
   '.eos/handoffs/',
   '.eos/local/',
   '.git/',
+  // The release plan is EOS bookkeeping ABOUT a release, not product content: no test tests it, so
+  // writing it must not invalidate the test results the release depends on. It is bound as a gate
+  // INPUT instead, so editing what ships still makes the recorded result stale.
+  '.eos/releases/',
   // Machine summaries are written BY a verification run. If they counted, embedding the tree digest
   // in a summary would be impossible to satisfy: writing the file would change the very digest it
   // just recorded. They stay reviewable in git and are bound separately, as gate INPUTS, so editing

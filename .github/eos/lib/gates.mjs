@@ -14,8 +14,9 @@ import { EVALUATOR_VERSION, posix } from './registry.mjs';
 import { gatePolicy, changeTypeOf, scopeState, gateInputs, gateCollections, ARTIFACTS } from './state.mjs';
 import { hashInputs, GOVERNANCE_INPUTS, writeEvidence, readEvidence, evidenceFreshness, evidenceFile, sha256File } from './evidence.mjs';
 import { currentProductTree, compareProductTree, uncommittedProductChanges } from './product-tree.mjs';
-import { readSummary, summaryTreeMismatch, SUMMARY_PATHS } from './machine-summary.mjs';
+import { readSummary, summaryTreeMismatch, producerTrust, SUMMARY_PATHS } from './machine-summary.mjs';
 import { readStageRecord, emptyDocReason, decisionProblem, openBlockers, substantive, STAGE_RECORDS } from './stage-record.mjs';
+import { readManifest, manifestProblems, manifestPath } from './release.mjs';
 import { lastGateEvent } from './ledger.mjs';
 import { findWaiver, expiredWaivers } from './waivers.mjs';
 import { AC_ID, opsDecisionProblem } from './story.mjs';
@@ -556,7 +557,7 @@ const evaluators = {
     const f = evidenceFreshness(ctx.root, prior.evidence, {
       gateDefinition: def,
       expectedInputs: gateInputs(ctx.snapshot, 'story-ready', 'story', ctx.scopeId),
-      collections: gateCollections(ctx.snapshot, 'story-ready'),
+      collections: gateCollections(ctx.snapshot, 'story-ready', 'story', ctx.scopeId),
     });
     if (f.status === 'STALE') {
       // Name the command that actually clears this: re-running THIS gate cannot refresh the
@@ -609,8 +610,9 @@ const evaluators = {
    * ago carries a VERIFIED state that says nothing about the candidate.
    */
   releaseStoryEvidenceCurrent(ctx) {
-    const relevant = ctx.snapshot.stories.filter((s) => !['SPIKE', 'DOC_ONLY'].includes(s.changeType || 'FEATURE'));
-    if (!relevant.length) return blocked('there is no story in this release, so there is no verification to bind to the candidate');
+    const relevant = manifestStories(ctx);
+    if (relevant === null) return awaiting(manifestPath(ctx.scopeId));
+    if (!relevant.length) return blocked('the manifest includes no story, so there is no verification to bind to the candidate');
     const current = currentProductTree(ctx.root);
     if (!current.available) return blocked(`${current.reason} — a release cannot be bound to an unknown tree`);
     const problems = [];
@@ -644,15 +646,51 @@ const evaluators = {
       : ok(`candidate ${ctx.snapshot.commit.slice(0, 8)} has no uncommitted product change`);
   },
 
+  /**
+   * The manifest IS the release's membership. Without it EOS would have to infer membership from
+   * "every story that exists", which re-verifies finished work against every future candidate and
+   * makes two release trains impossible.
+   */
+  releaseManifest(ctx) {
+    const r = readManifest(ctx.root, ctx.scopeId);
+    if (r.errors.length) return { status: 'ERROR', detail: r.errors.join('; ') };
+    if (!r.present) {
+      return fail(`${manifestPath(ctx.scopeId)} does not exist — a release must state which stories it ships. `
+        + `Create it with \`node .github/eos/eos.mjs release init --release ${ctx.scopeId}\` (it proposes a manifest from the current stories; you decide what is in it).`);
+    }
+    const problems = manifestProblems(ctx.snapshot, r.manifest);
+    if (problems.length) return fail(`${r.path}: ${problems.join(' · ')}`);
+    ctx.manifest = r.manifest;
+    ctx.manifestDigest = r.digest;
+    // A manifest written for a different PRODUCT is a plan for a different candidate. The binding
+    // that decides is the product tree, not the commit: committing the manifest itself advances the
+    // commit while changing nothing about the product, and failing on that would be self-reference
+    // (the tree deliberately excludes `.eos/releases/` for exactly this reason).
+    if (r.manifest.productTreeDigest) {
+      const current = currentProductTree(ctx.root);
+      if (!current.available) return blocked(`${current.reason} — a manifest cannot be bound to an unknown tree`);
+      if (r.manifest.productTreeDigest !== current.identity.digest) {
+        return fail(`${r.path} was written for product tree ${String(r.manifest.productTreeDigest).slice(0, 12)}`
+          + ` but the tree is now ${current.identity.digest.slice(0, 12)}`
+          + `${r.manifest.candidateCommit && ctx.snapshot.commit ? ` (recorded candidate ${String(r.manifest.candidateCommit).slice(0, 8)}, HEAD ${ctx.snapshot.commit.slice(0, 8)})` : ''}`
+          + ` — review what changed, then re-bind with \`eos release bind --release ${ctx.scopeId}\``);
+      }
+    }
+    const inc = r.manifest.includedStories.length;
+    const exc = (r.manifest.excludedStories || []).length;
+    return ok(`${inc} story/stories included, ${exc} explicitly excluded`);
+  },
+
   releaseStoriesVerified(ctx) {
-    const relevant = ctx.snapshot.stories.filter((s) => !['SPIKE', 'DOC_ONLY'].includes(s.changeType || 'FEATURE'));
-    if (!relevant.length) return blocked('there is no story in this release — a release must carry verified content');
-    const unfinished = relevant
+    const included = manifestStories(ctx);
+    if (included === null) return awaiting(manifestPath(ctx.scopeId));
+    if (!included.length) return blocked('the manifest includes no story — a release must carry verified content, or state in `note` why it ships none');
+    const unfinished = included
       .map((s) => ({ id: s.id, state: scopeState(ctx.snapshot, 'story', s.id) }))
       .filter((s) => !['VERIFIED', 'MERGED'].includes(s.state));
     return unfinished.length
       ? fail(`not verified: ${unfinished.map((s) => `${s.id} (${s.state})`).join(', ')}`)
-      : ok(`${relevant.length} story/stories verified`);
+      : ok(`${included.length} story/stories verified`);
   },
   releaseSpecAlignment(ctx) {
     const r = runHook(ctx, '.github/hooks/spec-align.mjs', ['--strict']);
@@ -743,6 +781,35 @@ const evaluators = {
     return fail(`the dependency audit reported findings (exit ${r.exitCode}): ${r.detail}`);
   },
   /** Measured NFR results, not a checklist of intentions. */
+  /**
+   * How trustworthy is the evidence this release rests on? EOS reports the level honestly and lets
+   * the project decide: a regulated product may not ship on evidence that is indistinguishable from
+   * a hand-written file, while everyone else is not forced into a CI dependency they do not want.
+   */
+  releaseEvidenceTrust(ctx) {
+    const required = readManifest(ctx.root, ctx.scopeId).manifest?.requiredEvidence || [];
+    const kinds = [['testRun', 'test-run'], ['nfrSummary', 'nfr-summary'], ...(ctx.snapshot.agentic ? [['evalSummary', 'eval-summary']] : [])];
+    const levels = [];
+    for (const [kind, label] of kinds) {
+      const s = readSummary(ctx.root, kind);
+      if (!s.data) continue;
+      const trust = producerTrust(s.data);
+      levels.push(`${label}: ${trust.level}`);
+      if (isRegulated(ctx) && trust.level === 'UNATTESTED_LOCAL') {
+        return blocked(`${s.path} ${trust.detail}. A regulated release may not rest on evidence that cannot be told apart from a hand-written file — produce it from CI, or record an attestation and enable the matching provider adapter.`);
+      }
+      if (required.includes(label) && trust.level === 'UNATTESTED_LOCAL') {
+        return fail(`the manifest requires ${label} evidence, but ${s.path} ${trust.detail}`);
+      }
+    }
+    if (!levels.length) return na('no machine summary is present for this release');
+    // Reported, not blocking, by default. EOS is local-first: a release gate that can never be green
+    // on a developer's machine would make the tool unusable for the people it is for, and would
+    // quietly turn a cloud service into a dependency. Strictness is opt-in — `complianceProfile:
+    // regulated` or `requiredEvidence` in the manifest — and both are checked above.
+    return ok(`${levels.join(', ')}${levels.some((l) => l.includes('UNATTESTED_LOCAL')) ? ' — local evidence is honest but unattested; require CI/attestation via the manifest or a regulated profile when that matters' : ''}`);
+  },
+
   releaseNfrEvidence(ctx) {
     const summary = readSummary(ctx.root, 'nfrSummary');
     if (summary.errors.length) return { status: 'ERROR', detail: `${summary.path}: ${summary.errors.join('; ')}` };
@@ -858,9 +925,15 @@ const evaluators = {
       return fail(`${r.path} records the write-back for release "${r.data.release}", not "${ctx.scopeId}" — each release closes its own loop`);
     }
     const missing = r.data.specWriteBack.filter((w) => !repoFileExists(ctx.root, w.target)).map((w) => w.target);
-    return missing.length
-      ? fail(`the write-back cites document(s) that do not exist: ${missing.join(', ')}`)
-      : ok(`${r.data.learnings.length} learning(s) written back into ${r.data.specWriteBack.length} spec document(s)`);
+    if (missing.length) return fail(`the write-back cites document(s) that do not exist: ${missing.join(', ')}`);
+    // "We updated the PRD" is a claim about a file. Binding the content makes reverting it visible,
+    // instead of leaving a closed loop that quietly reopened.
+    const drifted = r.data.specWriteBack
+      .filter((w) => sha256File(ctx.root, w.target) !== w.targetDigest)
+      .map((w) => w.target);
+    return drifted.length
+      ? fail(`the write-back records a different version of ${drifted.join(', ')} than what is on disk — the learning was recorded and then changed or reverted; re-record it with the current digest`)
+      : ok(`${r.data.learnings.length} learning(s) written back into ${r.data.specWriteBack.length} spec document(s), each bound to its content`);
   },
   iterationAgenticFeedback(ctx) {
     if (!ctx.snapshot.agentic) return na('this product is not declared agentic');
@@ -900,6 +973,17 @@ function stageDocCheck(ctx, kind, minWords) {
 }
 
 const duplicates = (ids) => [...new Set(ids.filter((id, i) => ids.indexOf(id) !== i))];
+
+/**
+ * The stories THIS release ships, per its manifest. `null` means the manifest check above already
+ * reported why it could not be read — this check has not failed, it has not run.
+ */
+function manifestStories(ctx) {
+  const r = ctx.manifest ? { manifest: ctx.manifest } : readManifest(ctx.root, ctx.scopeId);
+  if (!r.manifest) return null;
+  const known = new Map(ctx.snapshot.stories.map((s) => [s.id, s]));
+  return r.manifest.includedStories.map((id) => known.get(id)).filter(Boolean);
+}
 
 /**
  * Recompute a reported verdict from its own numbers. A summary that says `"status": "PASS"` beside
@@ -1001,7 +1085,7 @@ export function evaluateGate(snapshot, gateId, scopeType, scopeId, { mode = 'all
       const fresh = prior.evidence ? evidenceFreshness(snapshot.root, prior.evidence, {
         gateDefinition: def,
         expectedInputs: gateInputs(snapshot, def.id, scopeType, scopeId),
-        collections: gateCollections(snapshot, def.id),
+        collections: gateCollections(snapshot, def.id, scopeType, scopeId),
         now,
       }) : { status: 'STALE', reasons: [] };
       if (stored && fresh.status === 'FRESH') result = { status: stored.status, detail: `${stored.detail || ''} (from recorded evidence)`.trim() };
@@ -1049,7 +1133,7 @@ export function runGate(snapshot, gateId, scopeType, scopeId, { now = new Date()
   // the recorded WAIVED stale instead of permanent.
   const inputPaths = gateInputs(snapshot, result.gate, scopeType, scopeId);
   if (result.waiver?.file) inputPaths.push(result.waiver.file);
-  const collections = Object.entries(gateCollections(snapshot, result.gate)).map(([key, digest]) => ({ key, digest }));
+  const collections = Object.entries(gateCollections(snapshot, result.gate, scopeType, scopeId)).map(([key, digest]) => ({ key, digest }));
   // The tested product tree is recorded only for gates that DECLARE they assert something about the
   // product. Recording it everywhere would make an activation PASS expire on an unrelated edit.
   const tree = def?.bindsProductTree ? currentProductTree(snapshot.root) : { available: false, identity: null };
@@ -1125,7 +1209,7 @@ export function recordedGateStatus(snapshot, gateId, scopeType, scopeId) {
   const f = evidenceFreshness(snapshot.root, evidence, {
     gateDefinition: def,
     expectedInputs: gateInputs(snapshot, def.id, scopeType, scopeId),
-    collections: gateCollections(snapshot, def.id),
+    collections: gateCollections(snapshot, def.id, scopeType, scopeId),
   });
   if (f.status === 'STALE') return { status: 'STALE', detail: `the recorded ${evidence.status} is STALE: ${f.reasons.join('; ')}`, evidence };
   if (!STATUSES.includes(evidence.status)) return { status: 'ERROR', detail: `evidence records an unknown status "${evidence.status}"` };

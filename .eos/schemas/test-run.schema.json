@@ -5,17 +5,89 @@
   "description": "The RESULT half of traceability. docs/trace-matrix.md records the human decision \"AC1.1 is proven by this test\"; this file records that the test actually ran, against which tree, and what it returned. A hand-written ✅ in Markdown is a claim, not a result — EOS reads both and requires them to agree. Emit it from your runner (a reporter, a jq filter over the runner's own JSON, or a small script); it is deliberately framework-neutral.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "generatedAt", "results"],
+  "required": [
+    "schemaVersion",
+    "generatedAt",
+    "results"
+  ],
   "properties": {
-    "$schema": { "type": "string" },
-    "schemaVersion": { "const": 1 },
-    "generatedAt": { "type": "string", "minLength": 20 },
+    "$schema": {
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": 1
+    },
+    "generatedAt": {
+      "type": "string",
+      "minLength": 20
+    },
     "runId": {
       "description": "Identifier of the execution (CI run id, local timestamp+host, container id …).",
       "type": "string",
       "minLength": 1
     },
-    "framework": { "type": "string", "minLength": 1 },
+    "producer": {
+      "description": "WHO produced this evidence. A summary written by hand and one emitted by a verified CI run are both JSON; only this field distinguishes them. `local` is honest and usable for development — a project policy may still refuse to RELEASE on it.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "name"
+      ],
+      "properties": {
+        "type": {
+          "enum": [
+            "local",
+            "ci"
+          ]
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "runRef": {
+          "description": "CI run id / URL, when type is ci.",
+          "type": "string"
+        }
+      }
+    },
+    "commandDigest": {
+      "description": "SHA-256 of the exact command line that produced this. Binds the result to how it was obtained, so swapping `npm test` for `true` is visible.",
+      "type": "string",
+      "minLength": 64,
+      "maxLength": 64
+    },
+    "toolchainDigest": {
+      "description": "SHA-256 over the resolved toolchain identity (runtime + versions). Optional; when present a toolchain change invalidates the result.",
+      "type": "string",
+      "minLength": 64,
+      "maxLength": 64
+    },
+    "attestation": {
+      "description": "Provenance from an external authority. EOS Core defines the shape and verifies nothing itself: `none` is the honest default, and a provider adapter (github/sigstore/slsa) is what turns a reference into a verified fact. An unavailable provider is BLOCKED, never PASS.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "enum": [
+            "none",
+            "github",
+            "sigstore",
+            "slsa"
+          ]
+        },
+        "reference": {
+          "type": "string"
+        }
+      }
+    },
+    "framework": {
+      "type": "string",
+      "minLength": 1
+    },
     "command": {
       "description": "The command that produced this file. Recorded so a reviewer can reproduce it.",
       "type": "string",
@@ -25,11 +97,20 @@
       "description": "Digest of the tree the tests ran against (`eos product-tree --json`). When present EOS requires it to equal the current tree, so a summary produced before the source changed cannot certify it.",
       "type": "object",
       "additionalProperties": false,
-      "required": ["digest"],
+      "required": [
+        "digest"
+      ],
       "properties": {
-        "digest": { "type": "string", "minLength": 32 },
-        "algorithm": { "type": "string" },
-        "version": { "type": "string" }
+        "digest": {
+          "type": "string",
+          "minLength": 32
+        },
+        "algorithm": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        }
       }
     },
     "results": {
@@ -38,9 +119,16 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["ac", "testPath", "status"],
+        "required": [
+          "ac",
+          "testPath",
+          "status"
+        ],
         "properties": {
-          "ac": { "type": "string", "pattern": "^AC\\d+\\.\\d+$" },
+          "ac": {
+            "type": "string",
+            "pattern": "^AC\\d+\\.\\d+$"
+          },
           "testPath": {
             "description": "Repository-relative path of the test file. EOS checks that it exists.",
             "type": "string",
@@ -50,9 +138,21 @@
             "description": "Test name / node id / fully-qualified method inside the file. EOS checks that the file mentions it when it can.",
             "type": "string"
           },
-          "status": { "enum": ["PASS", "FAIL", "SKIP", "ERROR"] },
-          "durationMs": { "type": "number", "minimum": 0 },
-          "detail": { "type": "string" }
+          "status": {
+            "enum": [
+              "PASS",
+              "FAIL",
+              "SKIP",
+              "ERROR"
+            ]
+          },
+          "durationMs": {
+            "type": "number",
+            "minimum": 0
+          },
+          "detail": {
+            "type": "string"
+          }
         }
       }
     }

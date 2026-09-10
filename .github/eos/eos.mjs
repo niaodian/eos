@@ -20,6 +20,7 @@ import { renderCard, renderGate, renderExplain } from './lib/render.mjs';
 import { buildHandoff, writeHandoff, readHandoff, verifyHandoff, handoffPath } from './lib/handoff.mjs';
 import { listEvidence, evidenceFreshness, validateEvidenceShape, sha256File } from './lib/evidence.mjs';
 import { currentProductTree, uncommittedProductChanges } from './lib/product-tree.mjs';
+import { readManifest, manifestPath, manifestDigest as computeManifestDigest, listManifests } from './lib/release.mjs';
 import { loadWaivers, expiredWaivers } from './lib/waivers.mjs';
 import { resolveAction, ACTIVE_WORK_PATH } from './lib/registry.mjs';
 
@@ -37,6 +38,7 @@ usage: node .github/eos/eos.mjs <command> [flags]
   transition --scope <type> --id <id> --to <STATE>
   approve --scope <type> --id <id>        record an approval (a second person, never the requester)
   explain <gate>                          the full rule set for one gate
+  release init|bind|list [--release <id>]  scaffold / re-bind / list release manifests
   release-status                          aggregate release readiness
   verify-release --release <id>           candidate-bound release verification
   product-tree                            the identity of the tree a verification applies to
@@ -250,8 +252,27 @@ const commands = {
       console.log(`EOS approve · REJECTED — "${actor}" prepared this candidate and cannot also approve it. A second person must run this command.`);
       return EXIT.FAIL;
     }
-    const event = appendEvent(snapshot.root, { type: 'approval', scope: { type: scopeType, id: String(scopeId) }, commit: snapshot.commit, detail: String(flags.note || '') });
-    emit(flags, { approved: true, event }, `EOS approve · ${scopeId} approved by ${event.actor} (seq ${event.seq})\n`);
+    // An approval is consent to ship a SPECIFIC set of changes. Binding it to the manifest digest is
+    // what stops that consent from silently transferring to a different set later.
+    let manifestDigest;
+    if (scopeType === 'release') {
+      const m = readManifest(snapshot.root, scopeId);
+      if (m.errors.length) { console.log(`EOS approve · REJECTED — ${m.errors.join('; ')}`); return EXIT.FAIL; }
+      if (!m.present) {
+        console.log(`EOS approve · REJECTED — ${manifestPath(scopeId)} does not exist. There is nothing to approve yet: a release states which stories it ships before anyone consents to shipping them.`);
+        return EXIT.FAIL;
+      }
+      manifestDigest = m.digest;
+    }
+    const event = appendEvent(snapshot.root, {
+      type: 'approval',
+      scope: { type: scopeType, id: String(scopeId) },
+      ...(manifestDigest ? { manifestDigest } : {}),
+      commit: snapshot.commit,
+      detail: String(flags.note || ''),
+    });
+    emit(flags, { approved: true, event, manifestDigest: manifestDigest || null },
+      `EOS approve · ${scopeId} approved by ${event.actor} (seq ${event.seq})${manifestDigest ? `\n  bound to manifest ${manifestDigest.slice(0, 12)} — editing what this release ships invalidates this approval` : ''}\n`);
     return EXIT.OK;
   },
 
@@ -279,6 +300,84 @@ const commands = {
     lines.push('Recommended next', `  ${decision.recommendedAction?.title || '—'}`, `  ${decision.recommendedAction?.command || ''}`, '');
     emit(flags, json, lines.join('\n'));
     return statusExit(g.status);
+  },
+
+  /**
+   * Scaffold or re-bind a release manifest. It PROPOSES; the human decides. EOS will not infer what
+   * a release ships — inferring it is exactly the behaviour the manifest replaces.
+   */
+  release(snapshot, flags) {
+    const sub = flags._[1];
+    const id = typeof flags.release === 'string' ? flags.release : (typeof flags.id === 'string' ? flags.id : null);
+    if (!['init', 'bind', 'list'].includes(sub)) {
+      console.log('usage: release init|bind|list [--release <id>]');
+      return EXIT.FAIL;
+    }
+    if (sub === 'list') {
+      const all = listManifests(snapshot.root);
+      const json = { releases: all.map((m) => ({ releaseId: m.releaseId, file: m.file, digest: m.digest, state: m.releaseId ? scopeState(snapshot, 'release', m.releaseId) : null, includedStories: m.manifest?.includedStories || [] })) };
+      const lines = ['EOS releases', ''];
+      if (!all.length) lines.push('  none — create one with `eos release init --release <id>`');
+      for (const m of json.releases) lines.push(`  ${String(m.releaseId).padEnd(14)} ${String(m.state).padEnd(12)} ${m.includedStories.length} story/stories  ${m.file}`);
+      lines.push('');
+      emit(flags, json, lines.join('\n'));
+      return EXIT.OK;
+    }
+    if (!id) { console.log(`release ${sub} requires --release <id>`); return EXIT.FAIL; }
+
+    const rel = manifestPath(id);
+    const full = join(snapshot.root, rel);
+    const existing = readManifest(snapshot.root, id);
+    if (sub === 'init' && existing.present) {
+      console.log(`EOS release init · ${rel} already exists — edit it, or use \`release bind\` to re-bind it to the current candidate.`);
+      return EXIT.FAIL;
+    }
+    if (sub === 'bind' && !existing.manifest) {
+      console.log(`EOS release bind · ${rel} ${existing.present ? `is not valid: ${existing.errors.join('; ')}` : 'does not exist — run `release init` first'}`);
+      return EXIT.FAIL;
+    }
+
+    const tree = currentProductTree(snapshot.root);
+    const shippable = snapshot.stories.filter((s) => !['SPIKE', 'DOC_ONLY'].includes(s.changeType || 'FEATURE'));
+    let manifest;
+    if (sub === 'init') {
+      // The proposal deliberately includes only stories that are ALREADY verified, and lists the
+      // rest as exclusions with a placeholder reason the author must replace. A manifest that
+      // silently swept in unfinished work would recreate the problem it exists to solve.
+      const verified = shippable.filter((s) => ['VERIFIED', 'MERGED'].includes(scopeState(snapshot, 'story', s.id)));
+      const rest = shippable.filter((s) => !verified.includes(s));
+      manifest = {
+        $schema: '../schemas/release-manifest.schema.json',
+        schemaVersion: 1,
+        releaseId: String(id),
+        candidateCommit: snapshot.commit,
+        productTreeDigest: tree.identity?.digest ?? null,
+        includedStories: verified.map((s) => s.id),
+        ...(rest.length ? { excludedStories: rest.map((s) => ({ id: s.id, reason: 'TODO: say why this is not in this release' })) } : {}),
+        targetEnvironments: ['production'],
+        requiredApprovals: { count: 1 },
+      };
+    } else {
+      manifest = { ...existing.manifest, candidateCommit: snapshot.commit, productTreeDigest: tree.identity?.digest ?? null };
+    }
+    mkdirSync(dirname(full), { recursive: true });
+    writeFileSync(full, JSON.stringify(manifest, null, 2) + '\n', 'utf8');
+    const digest = computeManifestDigest(manifest);
+    const lines = [`EOS release ${sub} · ${rel}`, '',
+      `  candidate   ${snapshot.commit ? snapshot.commit.slice(0, 8) : '(no git)'}`,
+      `  tree        ${tree.identity ? tree.identity.digest.slice(0, 12) : '(unavailable)'}`,
+      `  included    ${manifest.includedStories.length ? manifest.includedStories.join(', ') : '(none)'}`,
+      `  excluded    ${(manifest.excludedStories || []).length}`,
+      `  digest      ${digest.slice(0, 12)}`, ''];
+    if (sub === 'init') {
+      lines.push('  This is a PROPOSAL. Decide what belongs in the release: replace every TODO reason,',
+        '  and move stories between included/excluded. EOS records the decision; it does not make it.', '');
+    } else {
+      lines.push('  Re-bound to the current candidate. Any approval given for the previous manifest no',
+        '  longer applies — that is deliberate.', '');
+    }
+    emit(flags, { file: rel, manifest, digest }, lines.join('\n'));
+    return EXIT.OK;
   },
 
   /**
@@ -491,7 +590,7 @@ const commands = {
       const f = evidenceFreshness(snapshot.root, evidence, {
         gateDefinition: def,
         expectedInputs: gateInputs(snapshot, evidence.gate, evidence.scope.type, evidence.scope.id),
-        collections: gateCollections(snapshot, evidence.gate),
+        collections: gateCollections(snapshot, evidence.gate, evidence.scope.type, evidence.scope.id),
       });
       if (f.status === 'STALE') notes.push(`${file} is STALE: ${f.reasons[0]}`);
     }

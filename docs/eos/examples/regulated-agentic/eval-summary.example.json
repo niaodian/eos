@@ -5,7 +5,7 @@
   "runId": "ci-8821",
   "productTree": {
     "digest": "0000000000000000000000000000000000000000000000000000000000000000",
-    "algorithm": "sha256-path-content-v1",
+    "algorithm": "sha256-mode-path-content-v1",
     "version": "1.0.0"
   },
   "subject": {

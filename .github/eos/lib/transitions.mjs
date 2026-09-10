@@ -7,6 +7,7 @@ import { listStories } from './story.mjs';
 import { recordedGateStatus, evaluateGate } from './gates.mjs';
 import { readEvidence, evidenceFreshness } from './evidence.mjs';
 import { scopeState, changeTypeOf, gateInputs, gateCollections } from './state.mjs';
+import { readManifest } from './release.mjs';
 
 export const PROMOTABLE = new Set(['PASS', 'WAIVED', 'NOT_APPLICABLE']);
 
@@ -83,7 +84,7 @@ export function guardResult(snapshot, transition, scopeType, scopeId, { live = f
         const f = evidenceFreshness(snapshot.root, stored.evidence, {
           gateDefinition: def,
           expectedInputs: gateInputs(snapshot, transition.requiresGate, scopeType, scopeId),
-          collections: gateCollections(snapshot, transition.requiresGate),
+          collections: gateCollections(snapshot, transition.requiresGate, scopeType, scopeId),
         });
         if (f.status === 'STALE') {
           return { ok: false, reason: `gate "${transition.requiresGate}" evidence is STALE: ${f.reasons.join('; ')}`, kind: 'stale', gate: transition.requiresGate, status: 'STALE' };
@@ -94,8 +95,26 @@ export function guardResult(snapshot, transition, scopeType, scopeId, { live = f
   if (transition.requiresSeparateApprover) {
     const approvals = snapshot.events.filter((e) => e.type === 'approval' && e.scope?.type === scopeType && e.scope?.id === scopeId);
     const requesters = new Set(snapshot.events.filter((e) => e.type === 'transition' && e.scope?.id === scopeId).map((e) => e.actor));
-    const valid = approvals.find((a) => !requesters.has(a.actor));
-    if (!valid) {
+    let eligible = approvals.filter((a) => !requesters.has(a.actor));
+    if (scopeType === 'release') {
+      // The approval must have been given for the manifest that is on disk NOW. Without this, a
+      // candidate could be approved and then have its contents rewritten under the approval.
+      const m = readManifest(snapshot.root, scopeId);
+      if (!m.manifest) {
+        return { ok: false, reason: `the release manifest is missing or invalid, so no approval can be bound to it${m.errors.length ? `: ${m.errors[0]}` : ''}`, kind: 'manifest' };
+      }
+      const stale = eligible.filter((a) => a.manifestDigest !== m.digest);
+      eligible = eligible.filter((a) => a.manifestDigest === m.digest);
+      if (!eligible.length && stale.length) {
+        return { ok: false, reason: `what this release ships changed after it was approved (the approval was given for manifest ${String(stale.at(-1).manifestDigest || 'none').slice(0, 12)}, the manifest is now ${m.digest.slice(0, 12)}) — it must be approved again`, kind: 'approval' };
+      }
+      const required = m.manifest.requiredApprovals?.count ?? 1;
+      const distinct = new Set(eligible.map((a) => a.actor));
+      if (distinct.size < required) {
+        return { ok: false, reason: `this release requires ${required} separate approver(s) and has ${distinct.size} — record with \`eos approve --scope release --id ${scopeId}\``, kind: 'approval' };
+      }
+    }
+    if (!eligible.length) {
       return { ok: false, reason: 'no approval by someone other than the person who prepared the candidate — record it with `eos approve`', kind: 'approval' };
     }
   }

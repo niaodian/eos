@@ -5,37 +5,146 @@
   "description": "Proof that an agentic product met its eval thresholds. `commands.eval` exiting 0 proves only that a process ended; it does not say which prompt, model, dataset or grader produced which score against which threshold. This file does, and EOS binds it to the product tree so a prompt or dataset edit invalidates it.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "generatedAt", "subject", "cases"],
+  "required": [
+    "schemaVersion",
+    "generatedAt",
+    "subject",
+    "cases"
+  ],
   "properties": {
-    "$schema": { "type": "string" },
-    "schemaVersion": { "const": 1 },
-    "generatedAt": { "type": "string", "minLength": 20 },
-    "runId": { "type": "string", "minLength": 1 },
+    "$schema": {
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": 1
+    },
+    "generatedAt": {
+      "type": "string",
+      "minLength": 20
+    },
+    "runId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "producer": {
+      "description": "WHO produced this evidence. A summary written by hand and one emitted by a verified CI run are both JSON; only this field distinguishes them. `local` is honest and usable for development — a project policy may still refuse to RELEASE on it.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "name"
+      ],
+      "properties": {
+        "type": {
+          "enum": [
+            "local",
+            "ci"
+          ]
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "runRef": {
+          "description": "CI run id / URL, when type is ci.",
+          "type": "string"
+        }
+      }
+    },
+    "commandDigest": {
+      "description": "SHA-256 of the exact command line that produced this. Binds the result to how it was obtained, so swapping `npm test` for `true` is visible.",
+      "type": "string",
+      "minLength": 64,
+      "maxLength": 64
+    },
+    "toolchainDigest": {
+      "description": "SHA-256 over the resolved toolchain identity (runtime + versions). Optional; when present a toolchain change invalidates the result.",
+      "type": "string",
+      "minLength": 64,
+      "maxLength": 64
+    },
+    "attestation": {
+      "description": "Provenance from an external authority. EOS Core defines the shape and verifies nothing itself: `none` is the honest default, and a provider adapter (github/sigstore/slsa) is what turns a reference into a verified fact. An unavailable provider is BLOCKED, never PASS.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "enum": [
+            "none",
+            "github",
+            "sigstore",
+            "slsa"
+          ]
+        },
+        "reference": {
+          "type": "string"
+        }
+      }
+    },
     "productTree": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["digest"],
+      "required": [
+        "digest"
+      ],
       "properties": {
-        "digest": { "type": "string", "minLength": 32 },
-        "algorithm": { "type": "string" },
-        "version": { "type": "string" }
+        "digest": {
+          "type": "string",
+          "minLength": 32
+        },
+        "algorithm": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        }
       }
     },
     "subject": {
       "description": "WHAT was evaluated. Every field is load-bearing: change any of them and the previous score no longer describes the system.",
       "type": "object",
       "additionalProperties": false,
-      "required": ["promptRef", "model", "datasetRef", "graderRef"],
+      "required": [
+        "promptRef",
+        "model",
+        "datasetRef",
+        "graderRef"
+      ],
       "properties": {
-        "promptRef": { "type": "string", "minLength": 1 },
-        "promptVersion": { "type": "string" },
-        "model": { "type": "string", "minLength": 1 },
-        "modelVersion": { "type": "string" },
-        "parameters": { "type": "object" },
-        "datasetRef": { "type": "string", "minLength": 1 },
-        "datasetVersion": { "type": "string" },
-        "graderRef": { "type": "string", "minLength": 1 },
-        "graderVersion": { "type": "string" }
+        "promptRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "promptVersion": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string",
+          "minLength": 1
+        },
+        "modelVersion": {
+          "type": "string"
+        },
+        "parameters": {
+          "type": "object"
+        },
+        "datasetRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "datasetVersion": {
+          "type": "string"
+        },
+        "graderRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "graderVersion": {
+          "type": "string"
+        }
       }
     },
     "cases": {
@@ -44,17 +153,55 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["id", "metric", "threshold", "observed", "status"],
+        "required": [
+          "id",
+          "metric",
+          "threshold",
+          "observed",
+          "status"
+        ],
         "properties": {
-          "id": { "type": "string", "pattern": "^EVAL-\\d+$" },
-          "ac": { "type": "string", "pattern": "^AC\\d+\\.\\d+$" },
-          "metric": { "type": "string", "minLength": 1 },
-          "comparator": { "enum": [">=", ">", "<=", "<", "=="] },
-          "threshold": { "type": "number" },
-          "observed": { "type": "number" },
-          "sampleSize": { "type": "integer", "minimum": 1 },
-          "status": { "enum": ["PASS", "FAIL", "ERROR"] },
-          "detail": { "type": "string" }
+          "id": {
+            "type": "string",
+            "pattern": "^EVAL-\\d+$"
+          },
+          "ac": {
+            "type": "string",
+            "pattern": "^AC\\d+\\.\\d+$"
+          },
+          "metric": {
+            "type": "string",
+            "minLength": 1
+          },
+          "comparator": {
+            "enum": [
+              ">=",
+              ">",
+              "<=",
+              "<",
+              "=="
+            ]
+          },
+          "threshold": {
+            "type": "number"
+          },
+          "observed": {
+            "type": "number"
+          },
+          "sampleSize": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "status": {
+            "enum": [
+              "PASS",
+              "FAIL",
+              "ERROR"
+            ]
+          },
+          "detail": {
+            "type": "string"
+          }
         }
       }
     }

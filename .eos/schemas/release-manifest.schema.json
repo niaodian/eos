@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eos.local/schemas/release-manifest.schema.json",
+  "title": "EOS release manifest",
+  "description": "What a release actually contains. Without one, the release gate had to assume EVERY story under docs/stories/ belonged to EVERY release: a story finished a year ago was re-verified against each new candidate, two release trains could not exist at once, and a hotfix dragged unrelated work with it. This file makes membership explicit and reviewable, and binds it to the candidate it was decided for.\n\nIt records the PLAN. It never records outcomes: approvals live in the hash-chained ledger and are bound to this file's digest, so editing the manifest invalidates them rather than inheriting them.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "releaseId", "includedStories"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schemaVersion": { "const": 1 },
+    "releaseId": {
+      "description": "Must match the scope id the release gate is run for.",
+      "type": "string",
+      "minLength": 1
+    },
+    "candidateCommit": {
+      "description": "The commit this manifest was written for. When present EOS requires HEAD to match at verification time, so a manifest cannot silently follow the branch forward.",
+      "type": ["string", "null"]
+    },
+    "productTreeDigest": {
+      "description": "The product tree this manifest was written for (`eos product-tree --json`). Optional on first authoring; recorded by `eos release bind`.",
+      "type": ["string", "null"]
+    },
+    "includedStories": {
+      "description": "Exactly the stories this release ships. Each must exist, be verified, and its verification must describe the candidate tree. An empty list is legal only for a release that ships no story work (state why in `note`).",
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true
+    },
+    "excludedStories": {
+      "description": "Stories deliberately NOT in this release. A reason is required: 'not in this release' is a decision, and a decision that is not written down is indistinguishable from an oversight.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "reason"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "reason": { "type": "string", "minLength": 10 }
+        }
+      }
+    },
+    "targetEnvironments": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true
+    },
+    "artifactRefs": {
+      "description": "What is actually shipped — an image digest, a package version, a bundle checksum.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "ref"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "ref": { "type": "string", "minLength": 1 },
+          "digest": { "type": "string" }
+        }
+      }
+    },
+    "requiredEvidence": {
+      "description": "Evidence kinds this release requires beyond the gate defaults. A project raises its own bar here; EOS never lowers one.",
+      "type": "array",
+      "items": { "enum": ["test-run", "eval-summary", "nfr-summary"] },
+      "uniqueItems": true
+    },
+    "requiredApprovals": {
+      "description": "How many separate approvers this release needs. The approvals themselves are ledger events bound to this manifest's digest — they are never recorded in this file, which is hand-editable.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "count": { "type": "integer", "minimum": 1 },
+        "note": { "type": "string" }
+      }
+    },
+    "note": { "type": "string" },
+    "supersedes": {
+      "description": "For a hotfix or a re-cut candidate: the release id this one replaces.",
+      "type": "string"
+    }
+  }
+}

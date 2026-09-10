@@ -1,5 +1,6 @@
 // Shared test support for the EOS guided-workflow suites. NOT a test file itself
 // (CI runs the *.test.mjs files explicitly), just the sandbox builder + CLI runner they share.
+import { createHash } from 'node:crypto';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, rmSync, cpSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -270,6 +271,8 @@ export const RUNBOOK = ['# Runbook', '', '## Rollback', '',
 export const NFR_SUMMARY = {
   schemaVersion: 1,
   generatedAt: '2026-01-01T00:00:00.000Z',
+  runId: 'local-1',
+  producer: { type: 'local', name: 'eos-test-fixture' },
   productTree: '@tree',
   targets: [{ id: 'NFR1', category: 'performance', decision: 'ADOPT', metric: 'p95 latency', comparator: '<=', threshold: 800, observed: 410, unit: 'ms', status: 'PASS' }],
 };
@@ -298,9 +301,44 @@ export const ITERATION_RECORD = {
   schemaVersion: 1,
   release: 'R-1',
   learnings: [{ observation: 'Reset completion improved but mobile users still drop at the token step', source: 'telemetry', metric: 'sign-in completion rate' }],
-  specWriteBack: [{ target: 'docs/requirements.json', change: 'added a mobile-specific reset requirement' }],
+  specWriteBack: [{ target: 'docs/requirements.json', change: 'added a mobile-specific reset requirement', targetDigest: '@digest:docs/requirements.json' }],
   decision: { outcome: 'CONTINUE', owner: '@platform' },
 };
+
+/** Resolve `@digest:<path>` placeholders in a record against the sandbox's real file contents. */
+export function bindDigests(dir, record) {
+  const out = JSON.parse(JSON.stringify(record));
+  for (const w of out.specWriteBack || []) {
+    if (typeof w.targetDigest === 'string' && w.targetDigest.startsWith('@digest:')) {
+      const rel = w.targetDigest.slice('@digest:'.length);
+      w.targetDigest = createHash('sha256').update(readFileSync(join(dir, rel))).digest('hex');
+    }
+  }
+  return out;
+}
+
+/** A release manifest for the sandbox: everything verified is included, nothing is left unaccounted. */
+export function manifest(dir, { releaseId = 'R-1', includedStories = ['STORY-001'], extra = {} } = {}) {
+  const commit = git(dir, ['rev-parse', 'HEAD']).out.trim() || null;
+  return {
+    schemaVersion: 1,
+    releaseId,
+    candidateCommit: commit,
+    productTreeDigest: treeDigest(dir),
+    includedStories,
+    targetEnvironments: ['production'],
+    requiredApprovals: { count: 1 },
+    ...extra,
+  };
+}
+
+/** Write the manifest for a sandbox release, bound to the current candidate. */
+export function writeManifest(dir, opts = {}) {
+  const m = manifest(dir, opts);
+  write(dir, `.eos/releases/${m.releaseId}.json`, m);
+  commitAll(dir, `release manifest ${m.releaseId}`);
+  return m;
+}
 
 /**
  * A machine test-run summary matching the default story fixture.
@@ -312,6 +350,7 @@ export function testRun({ acs = ['AC1.1'], testPath = 'tests/login.test.mjs', se
     schemaVersion: 1,
     generatedAt: '2026-01-01T00:00:00.000Z',
     runId: 'local-1',
+    producer: { type: 'local', name: 'eos-test-fixture' },
     framework: 'node:test',
     command: 'node --test',
     ...(productTree ? { productTree } : {}),
