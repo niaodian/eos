@@ -22,6 +22,8 @@ name: EOS CI
 # human-readable version in a trailing comment. A tag is a moving pointer its owner can repoint at
 # any commit; a SHA is the code that was reviewed. Update them deliberately:
 #   gh api repos/<owner>/<repo>/git/ref/tags/<tag> --jq .object.sha
+# Pinned at v7, which runs on the node24 runtime: the v4 pins still worked, but GitHub forced them
+# onto node24 anyway and warned on every run, so the pin no longer described what actually ran.
 
 on:
   push:
@@ -47,14 +49,14 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # The ledger check below compares against the base/previous ref, so the shallow default
           # would make it unverifiable on exactly the changes it exists to police.
           fetch-depth: 0
           persist-credentials: false
 
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '20'
 
@@ -194,12 +196,12 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
 
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '20'
 
