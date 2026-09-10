@@ -165,7 +165,7 @@ it rather than trusting this page: `gh repo view niaodian/eos --json isTemplate`
 
 ```bash
 # A. degit, pinned to a release tag (recommended — the default branch keeps moving)
-npx degit niaodian/eos#eos-1.13.1 my-app
+npx degit niaodian/eos#eos-1.14.0 my-app
 cd my-app && node .github/hooks/validate-config.mjs    # expect PASS
 
 # B. gh CLI (needs the template setting above; gives you the newest default branch, not a tag)
@@ -176,7 +176,7 @@ mkdir -p ~/.git-templates/eos && cp -R <golden>/.github ~/.git-templates/eos/
 git config --global init.templateDir ~/.git-templates/eos
 ```
 
-Versioning: `docs/eos/VERSION` (current `eos-1.13.1`). For upgrades, use `degit` to pull the new version to /tmp, merge with `diff -ru`,
+Versioning: `docs/eos/VERSION` (current `eos-1.14.0`). For upgrades, use `degit` to pull the new version to /tmp, merge with `diff -ru`,
 then run `validate-config.mjs` + `bmad-code-review`.
 
 ---

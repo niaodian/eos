@@ -11,6 +11,7 @@ import { LEDGER_PATH } from './ledger.mjs';
 import { readEvents, stateOf, verifyChain } from './ledger.mjs';
 import { listStories, prdAcceptanceCriteria } from './story.mjs';
 import { SUMMARY_PATHS } from './machine-summary.mjs';
+import { manifestPath, readManifest } from './release.mjs';
 
 export const ARTIFACTS = {
   discovery: 'docs/discovery.md',
@@ -155,6 +156,8 @@ export function gateInputs(snapshot, gateId, scopeType, scopeId) {
   }
   if (gateId === 'release-ready') {
     inputs.push(ARTIFACTS.prd, ARTIFACTS.traceMatrix, SUMMARY_PATHS.nfrSummary, SUMMARY_PATHS.testRun);
+    // The manifest decides what ships, so editing it must invalidate the recorded result.
+    if (scopeType === 'release') inputs.push(manifestPath(scopeId));
     for (const s of snapshot.stories) inputs.push(s.path);
   }
   if (gateId === 'telemetry-ready') inputs.push(ARTIFACTS.telemetryRecord, ARTIFACTS.telemetry, ARTIFACTS.discoveryRecord);
@@ -167,9 +170,18 @@ export function gateInputs(snapshot, gateId, scopeType, scopeId) {
  * stories, so adding a story after the gate ran must invalidate it even though no recorded file
  * hash changed.
  */
-export function gateCollections(snapshot, gateId) {
+export function gateCollections(snapshot, gateId, scopeType = null, scopeId = null) {
   if (gateId !== 'release-ready') return {};
-  const ids = snapshot.stories.map((s) => `${s.id}:${s.path}`).sort().join('\n');
+  // Membership now comes from the manifest, so the digest covers the stories the release CLAIMS
+  // plus the files they resolve to. Adding an unrelated story no longer invalidates a release;
+  // changing one that IS in the release still does.
+  const included = scopeType === 'release' && scopeId !== null
+    ? (readManifest(snapshot.root, scopeId).manifest?.includedStories || null)
+    : null;
+  const stories = included
+    ? snapshot.stories.filter((s) => included.includes(s.id))
+    : snapshot.stories;
+  const ids = stories.map((s) => `${s.id}:${s.path}`).sort().join('\n');
   return { stories: createHash('sha256').update(ids).digest('hex') };
 }
 

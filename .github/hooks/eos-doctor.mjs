@@ -10,8 +10,10 @@ import { execSync } from 'node:child_process';
 import { loadProjectConfig, PROJECT_CONFIG_PATH } from './lib/project-config.mjs';
 import { loadComplianceProfile, evaluateDataBoundary, COMPLIANCE_PROFILE_PATH } from './lib/compliance-profile.mjs';
 import { bmadReadiness, deprecatedMappings, BMAD_LOCK_PATH } from './lib/bmad-runtime.mjs';
+import { resolveProjectRoot, projectRootFromArgv, RESOLUTION_ORDER } from '../eos/lib/project-context.mjs';
 
-const root = process.cwd();
+const resolution = resolveProjectRoot({ cliRoot: projectRootFromArgv(process.argv) });
+const root = resolution.root;
 const deep = process.argv.includes('--deep');
 const errors = [];
 const warns = [];
@@ -321,7 +323,21 @@ const bmadOut = [];
   for (const dead of deprecatedMappings(root, agentMap)) {
     errors.push(`D6 BMAD: action "${dead.action}" maps the DEPRECATED skill "${dead.skill}" — use "${dead.replacement}" (see ${BMAD_LOCK_PATH}).`);
   }
-  const report = bmadReadiness(root, { deep });
+  const regulated = proj.config?.complianceProfile === 'regulated';
+  const report = bmadReadiness(root, { deep, policy: regulated ? 'strict' : 'default' });
+  if (deep) {
+    bmadOut.push(`  PROJECT     root ${root}  (selected by ${resolution.source}; order: ${RESOLUTION_ORDER.join(' → ')})`);
+    for (const p of resolution.problems) warns.push(`D6 project root: ${p}`);
+    if (report.runtime?.checked) {
+      const cfg = (report.runtime.configSources || []).map((c) => `${c.path}${c.present ? '' : ' (absent)'}`).join(', ');
+      bmadOut.push(`  RUNTIME     ${report.runtime.root}/ ${report.runtime.present ? 'present' : 'absent'}${cfg ? ` · config: ${cfg}` : ''}`);
+      const resolved = report.skills.filter((s) => s.resolvedFrom);
+      if (resolved.length) {
+        const roots = [...new Set(resolved.map((s) => s.resolvedFrom.replace(/[\\/][^\\/]+$/, '')))];
+        bmadOut.push(`  SKILLS      resolved from: ${roots.join(', ')}`);
+      }
+    }
+  }
   // BLOCKED means a mapped skill cannot activate at all. DEGRADED means it activates on its shipped
   // defaults because no project runtime is installed — a legitimate, working setup, so failing CI on
   // it would be a false red rather than a finding.

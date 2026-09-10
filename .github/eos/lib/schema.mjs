@@ -4,13 +4,14 @@
 // lockfile, a supply-chain surface and an install step to a repo whose whole point is that it runs
 // offline with nothing but Node. The subset below is exactly what `.eos/schemas/*` use:
 // type · enum · const · required · properties · additionalProperties · patternProperties ·
-// minProperties · items · minItems · minLength · minimum/maximum · pattern · anyOf · $ref (#/$defs).
+// minProperties · items · minItems/maxItems · uniqueItems · minLength/maxLength · minimum/maximum ·
+// pattern · anyOf · $ref (#/$defs).
 // Anything a schema uses that is NOT implemented here is reported as an error rather than ignored,
 // so a schema can never silently stop validating.
 const KNOWN = new Set([
   '$schema', '$id', 'title', 'description', 'default', 'examples', '$defs',
   'type', 'enum', 'const', 'required', 'properties', 'additionalProperties', 'patternProperties',
-  'minProperties', 'items', 'minItems', 'minLength', 'minimum', 'maximum', 'pattern', 'anyOf', '$ref',
+  'minProperties', 'items', 'minItems', 'maxItems', 'uniqueItems', 'minLength', 'maxLength', 'minimum', 'maximum', 'pattern', 'anyOf', '$ref',
 ]);
 
 const typeOf = (v) => (v === null ? 'null' : Array.isArray(v) ? 'array' : typeof v);
@@ -58,6 +59,9 @@ function check(schema, data, path, rootSchema, errors) {
   }
 
   if (typeof data === 'string') {
+    if (schema.maxLength !== undefined && data.length > schema.maxLength) {
+      errors.push(`${path}: string longer than ${schema.maxLength}`);
+    }
     if (schema.minLength !== undefined && data.length < schema.minLength) {
       errors.push(`${path}: string shorter than ${schema.minLength}`);
     }
@@ -70,6 +74,19 @@ function check(schema, data, path, rootSchema, errors) {
     if (schema.maximum !== undefined && data > schema.maximum) errors.push(`${path}: > maximum ${schema.maximum}`);
   }
   if (Array.isArray(data)) {
+    if (schema.uniqueItems === true) {
+      // Duplicate membership is not a formatting nit: the same story listed twice in a release
+      // manifest would be counted twice and verified once.
+      const seen = new Set();
+      for (const item of data) {
+        const key = JSON.stringify(item);
+        if (seen.has(key)) { errors.push(`${path}: duplicate entry ${key.slice(0, 60)}`); break; }
+        seen.add(key);
+      }
+    }
+    if (schema.maxItems !== undefined && data.length > schema.maxItems) {
+      errors.push(`${path}: expected at most ${schema.maxItems} item(s), got ${data.length}`);
+    }
     if (schema.minItems !== undefined && data.length < schema.minItems) {
       errors.push(`${path}: needs at least ${schema.minItems} item(s)`);
     }

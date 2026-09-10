@@ -168,7 +168,7 @@ let s = ''; process.stdin.on('data', d => (s += d)); process.stdin.on('end', () 
 
 ```bash
 # A. degit，固定到 release tag（推荐——默认分支会持续变动）
-npx degit niaodian/eos#eos-1.13.1 my-app
+npx degit niaodian/eos#eos-1.14.0 my-app
 cd my-app && node .github/hooks/validate-config.mjs    # 期望 PASS
 
 # B. gh CLI（需要上面的 template 设置；拿到的是最新默认分支，而不是某个 tag）
@@ -179,7 +179,7 @@ mkdir -p ~/.git-templates/eos && cp -R <golden>/.github ~/.git-templates/eos/
 git config --global init.templateDir ~/.git-templates/eos
 ```
 
-版本化：`docs/eos/VERSION`（当前 `eos-1.13.1`）。升级用 `degit` 拉新版到 /tmp 后 `diff -ru` 合并，
+版本化：`docs/eos/VERSION`（当前 `eos-1.14.0`）。升级用 `degit` 拉新版到 /tmp 后 `diff -ru` 合并，
 再跑 `validate-config.mjs` + `bmad-code-review`。
 
 ---

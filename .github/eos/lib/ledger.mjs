@@ -13,7 +13,7 @@ export const LEDGER_PATH = '.eos/ledger/events.jsonl';
 // truncation now requires forging two tracked files instead of trimming one. [review]
 export const LEDGER_HEAD_PATH = '.eos/ledger/head.json';
 
-const HASHED_FIELDS = ['seq', 'ts', 'type', 'scope', 'changeType', 'from', 'to', 'gate', 'status', 'evidenceSha256', 'actor', 'commit', 'notApplicableGates', 'detail', 'prevHash'];
+const HASHED_FIELDS = ['seq', 'ts', 'type', 'scope', 'changeType', 'from', 'to', 'gate', 'status', 'evidenceSha256', 'manifestDigest', 'actor', 'commit', 'notApplicableGates', 'detail', 'prevHash'];
 
 /** Stable serialization: only the declared fields, in a fixed order, so the hash is reproducible. */
 function canonical(event) {

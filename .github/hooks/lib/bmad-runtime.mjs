@@ -14,20 +14,24 @@
 import { existsSync, readFileSync, statSync, accessSync, constants } from 'node:fs';
 import { join, delimiter } from 'node:path';
 import { validate } from '../../eos/lib/schema.mjs';
+import { foreignProjectReferences } from '../../eos/lib/project-context.mjs';
 
 export const BMAD_LOCK_PATH = '.eos/bmad.lock.json';
 
 /** Every directory a Copilot/Claude/agent skill can be installed into. */
 export function skillRoots(root = null) {
-  const homes = [process.env.HOME, process.env.USERPROFILE].filter(Boolean);
   const dirs = [];
+  // PROJECT FIRST. A skill that travels with the repository is this project's answer, and a
+  // user-level skill of the same name must not shadow it — that is how one project's work silently
+  // runs another project's version of a step.
+  if (root && existsSync(join(root, '.github/skills'))) dirs.push(join(root, '.github/skills'));
+  const homes = [process.env.HOME, process.env.USERPROFILE].filter(Boolean);
   for (const home of homes) {
     for (const rel of ['.agents/skills', '.claude/skills', '.copilot/skills']) {
       const d = join(home, rel);
       if (existsSync(d)) dirs.push(d);
     }
   }
-  if (root && existsSync(join(root, '.github/skills'))) dirs.push(join(root, '.github/skills'));
   return dirs;
 }
 
@@ -81,7 +85,7 @@ const onPath = (bin) => (process.env.PATH || '').split(delimiter).filter(Boolean
  * @param {boolean} opts.deep  also check the project runtime + executables the skills invoke
  * @returns {{status:'PASS'|'DEGRADED'|'BLOCKED'|'UNCHECKED', skills:object[], runtime:object, problems:string[], degraded:string[], notes:string[]}}
  */
-export function bmadReadiness(root, { deep = false, roots = null } = {}) {
+export function bmadReadiness(root, { deep = false, roots = null, policy = 'default' } = {}) {
   const { present, lock, errors } = loadBmadLock(root);
   if (!present) {
     return { status: 'UNCHECKED', skills: [], runtime: { checked: false }, problems: [], degraded: [], notes: [`${BMAD_LOCK_PATH} is not present — BMAD compatibility is not declared, so it is not checked`] };
@@ -103,7 +107,7 @@ export function bmadReadiness(root, { deep = false, roots = null } = {}) {
 
   for (const req of lock.requiredSkills) {
     const dir = findSkill(req.name, dirs);
-    const entry = { name: req.name, action: req.action, installed: !!dir, hasSkillMd: false, deprecated: null };
+    const entry = { name: req.name, action: req.action, installed: !!dir, resolvedFrom: dir || null, hasSkillMd: false, deprecated: null };
     if (!dir) {
       // Absence is a NOTE, not a BLOCK: EOS's own gates never call a skill. What must never happen
       // is claiming readiness for a skill that will fail — that is what the layers below catch.
@@ -148,6 +152,16 @@ export function bmadReadiness(root, { deep = false, roots = null } = {}) {
       }
     }
     runtime.present = existsSync(join(root, lock.runtime.root));
+    runtime.configSources = lock.runtime.configs.map((c) => ({ path: c.path, present: existsSync(join(root, c.path)) }));
+    // A shared runtime may provide capability. It must not provide another project's identity or
+    // output paths — that is invisible cross-project pollution.
+    const foreign = foreignProjectReferences(root, lock.runtime.configs.map((c) => c.path));
+    runtime.foreignReferences = foreign;
+    if (foreign.length) {
+      const detail = foreign.slice(0, 3).map((f) => `${f.file} ${f.key} ${f.reason}`).join(' · ');
+      if (policy === 'strict') problems.push(`the BMAD runtime configuration belongs to another project: ${detail}`);
+      else degraded.push(`the BMAD runtime configuration references another project: ${detail} — outputs may not land where you expect`);
+    }
     const missing = [];
     // The shared scripts are needed by every skill; the configs only by the ones that read them.
     if (installed.length) for (const s of lock.runtime.scripts) if (!existsSync(join(root, s.path))) missing.push(s.path);

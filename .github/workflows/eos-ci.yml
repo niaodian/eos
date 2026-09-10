@@ -126,7 +126,7 @@ jobs:
         # it no longer works.
         run: node --test .github/eos/bypass.test.mjs
 
-      - name: EOS audit regressions (eos-1.12.0 findings EOS-AUD-001 … 011)
+      - name: EOS audit + robustness regressions (EOS-AUD-001 … 011, release manifests, project context)
         # One executable case per audit finding: the product-tree bypass, the BMAD false green, the
         # existence-only stage gates, fake ACs, reasonless SKIPs, hand-written trace PASS, the
         # release prompt ⇄ machine gate gap, and the RELEASED → telemetry → iteration loop.

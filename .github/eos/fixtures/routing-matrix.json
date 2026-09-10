@@ -741,7 +741,7 @@
       "expectedExitCode": 2
     },
     {
-      "name": "release candidate with unverified stories is blocked",
+      "name": "a release with no manifest does not guess what it ships",
       "hooks": true,
       "files": {
         "@project": "@APP",
@@ -761,7 +761,7 @@
       "expectedAction": "repair-release",
       "expectedPrompt": "release-gate",
       "expectedExitCode": 2,
-      "expectBlocker": "stories-verified"
+      "expectBlocker": "release-manifest"
     },
     {
       "name": "a broken agent map blocks the recommendation instead of proposing an unusable agent",

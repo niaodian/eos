@@ -5,18 +5,20 @@
 //   node --test .github/eos/audit-regression.test.mjs
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, rmSync, existsSync, symlinkSync, chmodSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, rmSync, existsSync, symlinkSync, chmodSync, realpathSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { project, write, run, runJson, cleanup, git, commitAll, story, releaseFiles,
-  APP_PROJECT, PRD_2AC, baselineFiles, storyFiles, testRun, treeDigest, DISCOVERY_RECORD,
+  APP_PROJECT, PRD_2AC, baselineFiles, storyFiles, testRun, treeDigest, DISCOVERY_RECORD, writeManifest, bindDigests,
   ARCHITECTURE_RECORD, REQUIREMENTS_RECORD,
   TELEMETRY_MD, TELEMETRY_RECORD, ITERATION_RECORD, REPO_ROOT } from './test-support.mjs';
 import { computeProductTree, compareProductTree, clearProductTreeCache, isSelfReference } from './lib/product-tree.mjs';
 import { emptyDocReason } from './lib/stage-record.mjs';
 import { readEvidence, evidenceFreshness } from './lib/evidence.mjs';
-import { bmadReadiness, deprecatedMappings } from '../hooks/lib/bmad-runtime.mjs';
+import { bmadReadiness, deprecatedMappings, skillRoots } from '../hooks/lib/bmad-runtime.mjs';
+import { resolveProjectRoot, foreignProjectReferences, RESOLUTION_ORDER } from './lib/project-context.mjs';
+import { producerTrust } from './lib/machine-summary.mjs';
 import { parseTraceMatrix } from './lib/gates.mjs';
 import { prdAcceptanceCriteria, parseOpsDecision, opsDecisionProblem } from './lib/story.mjs';
 
@@ -151,6 +153,7 @@ test('EOS-AUD-001: the product-tree identity is path-based, so it is stable acro
 test('EOS-AUD-001: release-ready re-runs the quality commands on the CANDIDATE, not on story state', () => {
   const dir = verifiedStory(releaseFiles());
   assert.equal(run(dir, ['transition', '--scope', 'story', '--id', 'STORY-001', '--to', 'MERGED']).code, 0);
+  writeManifest(dir, { releaseId: 'v1.0.0' });
   // Break the product AFTER every story reached MERGED. Story state still says "verified".
   write(dir, '.eos/project.json', { ...APP_PROJECT, commands: { test: 'node --eval process.exit(1)' } });
   commitAll(dir, 'break the tests');
@@ -166,6 +169,7 @@ test('EOS-AUD-001: release-ready re-runs the quality commands on the CANDIDATE, 
 test('EOS-AUD-001: a release whose stories were verified against an older tree is refused', () => {
   const dir = verifiedStory(releaseFiles({ 'src/app.js': 'export const login = () => true;\n' }));
   assert.equal(run(dir, ['transition', '--scope', 'story', '--id', 'STORY-001', '--to', 'MERGED']).code, 0);
+  writeManifest(dir, { releaseId: 'v1.0.0' });
   write(dir, 'src/app.js', 'export const login = () => false;\n');
   commitAll(dir, 'change the product after the story merged');
   const r = runJson(dir, ['verify-release', '--release', 'v1.0.0']);
@@ -707,6 +711,7 @@ test('EOS-AUD-010: a RELEASED release routes to telemetry, then to the iteration
   const dir = verifiedStory(releaseFiles());
   assert.equal(run(dir, ['transition', '--scope', 'story', '--id', 'STORY-001', '--to', 'MERGED']).code, 0);
   write(dir, '.eos/local/active-work.json', { schemaVersion: 1, scopeType: 'release', scopeId: 'R-1' });
+  writeManifest(dir, { releaseId: 'R-1' });
 
   // Reach RELEASED through the machine: candidate → verified → approved (2nd person) → released.
   assert.equal(run(dir, ['transition', '--scope', 'release', '--id', 'R-1', '--to', 'CANDIDATE']).code, 0);
@@ -730,7 +735,7 @@ test('EOS-AUD-010: a RELEASED release routes to telemetry, then to the iteration
   // G10: what production taught must land in the specs before the loop closes.
   r = runJson(dir, ['next']);
   assert.equal(r.json.recommendedAction.id, 'close-the-loop', JSON.stringify(r.json.recommendedAction));
-  write(dir, 'docs/iteration.json', ITERATION_RECORD);
+  write(dir, 'docs/iteration.json', bindDigests(dir, ITERATION_RECORD));
   assert.equal(run(dir, ['check', '--gate', 'iteration-ready', '--scope', 'R-1']).code, 0);
   assert.equal(run(dir, ['transition', '--scope', 'release', '--id', 'R-1', '--to', 'ITERATED']).code, 0);
   assert.equal(runJson(dir, ['next']).json.recommendedAction.id, 'start-next-change');
@@ -740,6 +745,7 @@ test('EOS-AUD-010: a ROLLED_BACK release routes to an incident review, not to an
   const dir = verifiedStory(releaseFiles());
   assert.equal(run(dir, ['transition', '--scope', 'story', '--id', 'STORY-001', '--to', 'MERGED']).code, 0);
   write(dir, '.eos/local/active-work.json', { schemaVersion: 1, scopeType: 'release', scopeId: 'R-2' });
+  writeManifest(dir, { releaseId: 'R-2' });
   run(dir, ['transition', '--scope', 'release', '--id', 'R-2', '--to', 'CANDIDATE']);
   run(dir, ['verify-release', '--release', 'R-2']);
   run(dir, ['transition', '--scope', 'release', '--id', 'R-2', '--to', 'VERIFIED']);
@@ -825,6 +831,7 @@ test('migration: evidence written by the previous evaluator is STALE, not an unr
 test('review: a release refuses a story whose LATEST verification is a FAIL', () => {
   const dir = verifiedStory(releaseFiles());
   assert.equal(run(dir, ['transition', '--scope', 'story', '--id', 'STORY-001', '--to', 'MERGED']).code, 0);
+  writeManifest(dir, { releaseId: 'v1.0.0' });
   // Break a test, then re-verify: the story stays MERGED in the ledger, but its current evidence is FAIL.
   write(dir, 'tests/login.test.mjs', "import { test } from 'node:test';\ntest('valid password', () => { throw new Error('broken'); });\n");
   write(dir, 'docs/evidence/test-run.json', { ...testRun({ status: 'FAIL' }), productTree: { digest: null } });
@@ -935,8 +942,9 @@ test('review: G10 evidence for one release does not close another', () => {
   const dir = project(baselineFiles({
     'docs/telemetry-plan.md': TELEMETRY_MD,
     'docs/telemetry.json': TELEMETRY_RECORD,
-    'docs/iteration.json': ITERATION_RECORD, // records release "R-1"
   }));
+  // The record names release R-1; it is written after the sandbox exists so its digest is real.
+  write(dir, 'docs/iteration.json', bindDigests(dir, ITERATION_RECORD));
   const r = runJson(dir, ['check', '--gate', 'iteration-ready', '--scope', 'R-2']);
   assert.notEqual(r.code, 0, r.out);
   const detail = r.json.checks.find((c) => c.id === 'spec-write-back').detail;
@@ -947,6 +955,7 @@ test('review: a ROLLED_BACK release can close its loop through the incident revi
   const dir = verifiedStory(releaseFiles());
   assert.equal(run(dir, ['transition', '--scope', 'story', '--id', 'STORY-001', '--to', 'MERGED']).code, 0);
   write(dir, '.eos/local/active-work.json', { schemaVersion: 1, scopeType: 'release', scopeId: 'R-9' });
+  writeManifest(dir, { releaseId: 'R-9' });
   run(dir, ['transition', '--scope', 'release', '--id', 'R-9', '--to', 'CANDIDATE']);
   run(dir, ['verify-release', '--release', 'R-9']);
   run(dir, ['transition', '--scope', 'release', '--id', 'R-9', '--to', 'VERIFIED']);
@@ -958,7 +967,7 @@ test('review: a ROLLED_BACK release can close its loop through the incident revi
   assert.equal(runJson(dir, ['next']).json.recommendedAction.id, 'review-incident');
   // Re-shipping is not a legal move out of ROLLED_BACK; the write-back is.
   assert.equal(run(dir, ['transition', '--scope', 'release', '--id', 'R-9', '--to', 'RELEASED']).code, 1);
-  write(dir, 'docs/iteration.json', { ...ITERATION_RECORD, release: 'R-9', decision: { outcome: 'CORRECT_COURSE', owner: '@platform' } });
+  write(dir, 'docs/iteration.json', bindDigests(dir, { ...ITERATION_RECORD, release: 'R-9', decision: { outcome: 'CORRECT_COURSE', owner: '@platform' } }));
   assert.equal(run(dir, ['check', '--gate', 'iteration-ready', '--scope', 'R-9']).code, 0);
   assert.equal(run(dir, ['transition', '--scope', 'release', '--id', 'R-9', '--to', 'ITERATED']).code, 0);
 });
@@ -973,4 +982,198 @@ test('review: a Chinese-language specification is not mistaken for a placeholder
   const dir = project({ 'docs/discovery.md': zh, 'docs/discovery.json': DISCOVERY_RECORD });
   assert.equal(emptyDocReason(dir, 'docs/discovery.md', { minWords: 60 }), null,
     'CJK prose has no spaces, so whitespace word-counting would reject a perfectly good document');
+});
+
+// ===================================================================== round A: robustness
+// Each case fails on eos-1.13.1 and passes here.
+
+test('round-A: a release ships what its manifest says, not every story that ever existed', () => {
+  // Two releases, two trains. The old engine reasoned about "every story under docs/stories/", so
+  // R-A was blocked by work that belongs to R-B and vice versa — parallel trains were impossible.
+  const dir = verifiedStory(releaseFiles({
+    'docs/stories/STORY-002.md': story({ id: 'STORY-002', rows: [['AC1.2', 'user can log out', 'tests/logout.test.mjs::clears the session', '—']] }),
+  }));
+  assert.equal(run(dir, ['transition', '--scope', 'story', '--id', 'STORY-001', '--to', 'MERGED']).code, 0);
+
+  // STORY-002 is deliberately unfinished. R-A ships only STORY-001 and says so.
+  writeManifest(dir, { releaseId: 'R-A', includedStories: ['STORY-001'], extra: { excludedStories: [{ id: 'STORY-002', reason: 'still in development; ships in the next train' }] } });
+  const a = runJson(dir, ['release-status', '--release', 'R-A']);
+  const byId = Object.fromEntries(a.json.checks.map((c) => [c.id, c]));
+  assert.equal(byId['release-manifest'].status, 'PASS', JSON.stringify(byId['release-manifest']));
+  assert.equal(byId['stories-verified'].status, 'PASS', 'an unfinished story that is NOT in this release must not block it');
+
+  // The other train includes it, and is correctly blocked by it.
+  writeManifest(dir, { releaseId: 'R-B', includedStories: ['STORY-001', 'STORY-002'] });
+  const b = runJson(dir, ['release-status', '--release', 'R-B']);
+  const bById = Object.fromEntries(b.json.checks.map((c) => [c.id, c]));
+  assert.equal(bById['stories-verified'].status, 'FAIL', JSON.stringify(bById['stories-verified']));
+  assert.match(bById['stories-verified'].detail, /STORY-002/);
+});
+
+test('round-A: a manifest cannot include a story that does not exist, ships twice, or never ships', () => {
+  const dir = verifiedStory(releaseFiles({
+    'docs/stories/SPIKE-1.md': story({ id: 'SPIKE-1', changeType: 'SPIKE', rows: [], classificationReason: 'Time-boxed investigation of the queue option.' }),
+  }));
+  const check = (extra, pattern) => {
+    write(dir, '.eos/releases/R-X.json', { schemaVersion: 1, releaseId: 'R-X', includedStories: ['STORY-001'], ...extra });
+    const r = runJson(dir, ['release-status', '--release', 'R-X']);
+    assert.match(r.json.checks.find((c) => c.id === 'release-manifest').detail, pattern);
+  };
+  check({ includedStories: ['STORY-001', 'GHOST-9'] }, /do not exist/);
+  check({ includedStories: ['STORY-001'], excludedStories: [{ id: 'STORY-001', reason: 'contradicts the inclusion above' }] }, /BOTH included and excluded/);
+  check({ includedStories: ['STORY-001', 'SPIKE-1'] }, /never ships/);
+  // Silence about a story is the gap the manifest exists to close.
+  write(dir, 'docs/stories/STORY-777.md', story({ id: 'STORY-777', rows: [['AC1.2', 'log out', 'tests/logout.test.mjs::clears the session', '—']] }));
+  check({ includedStories: ['STORY-001'] }, /neither included nor excluded/);
+});
+
+test('round-A: an approval does not survive a change to what the release ships', () => {
+  const dir = verifiedStory(releaseFiles({
+    'docs/stories/STORY-002.md': story({ id: 'STORY-002', rows: [['AC1.2', 'user can log out', 'tests/logout.test.mjs::clears the session', '—']] }),
+  }));
+  run(dir, ['transition', '--scope', 'story', '--id', 'STORY-001', '--to', 'MERGED']);
+  writeManifest(dir, { releaseId: 'R-1', includedStories: ['STORY-001'], extra: { excludedStories: [{ id: 'STORY-002', reason: 'not ready for this train' }] } });
+  run(dir, ['transition', '--scope', 'release', '--id', 'R-1', '--to', 'CANDIDATE']);
+  assert.equal(run(dir, ['verify-release', '--release', 'R-1']).code, 0);
+  assert.equal(run(dir, ['transition', '--scope', 'release', '--id', 'R-1', '--to', 'VERIFIED']).code, 0);
+  assert.equal(run(dir, ['approve', '--scope', 'release', '--id', 'R-1'], { EOS_ACTOR: 'second-person' }).code, 0);
+
+  // Now quietly widen the release AFTER it was approved.
+  writeManifest(dir, { releaseId: 'R-1', includedStories: ['STORY-001', 'STORY-002'] });
+  const r = run(dir, ['transition', '--scope', 'release', '--id', 'R-1', '--to', 'APPROVED']);
+  assert.equal(r.code, 1, `an approval for one set of changes must not authorise another:\n${r.out}`);
+  assert.match(r.out, /changed after it was approved/);
+});
+
+test('round-A: an approval cannot be recorded before the release says what it ships', () => {
+  const dir = verifiedStory(releaseFiles());
+  const r = run(dir, ['approve', '--scope', 'release', '--id', 'R-NEW'], { EOS_ACTOR: 'second-person' });
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.out, /does not exist/);
+});
+
+test('round-A: `release init` proposes, it does not decide', () => {
+  const dir = verifiedStory(releaseFiles());
+  run(dir, ['transition', '--scope', 'story', '--id', 'STORY-001', '--to', 'MERGED']);
+  write(dir, 'docs/stories/STORY-003.md', story({ id: 'STORY-003', rows: [['AC1.2', 'log out', 'tests/logout.test.mjs::clears the session', '—']] }));
+  const r = runJson(dir, ['release', 'init', '--release', 'R-P']);
+  assert.equal(r.code, 0, r.out);
+  // Only VERIFIED/MERGED work is proposed for inclusion; everything else is an explicit exclusion
+  // carrying a TODO the author must answer.
+  assert.deepEqual(r.json.manifest.includedStories, ['STORY-001']);
+  assert.deepEqual(r.json.manifest.excludedStories.map((e) => e.id), ['STORY-003']);
+  assert.match(r.json.manifest.excludedStories[0].reason, /TODO/);
+  // The human output says plainly that this is not a decision yet.
+  assert.match(run(dir, ['release', 'init', '--release', 'R-Q']).out, /PROPOSAL/);
+  // ...and it never silently overwrites a manifest someone already decided on.
+  assert.equal(run(dir, ['release', 'init', '--release', 'R-P']).code, 1, 'init must not silently overwrite a manifest');
+});
+
+test('round-A: the project root is resolved deterministically and explicitly', () => {
+  const dir = project({ 'src/a.js': 'x\n' });
+  const explicit = resolveProjectRoot({ cliRoot: dir, env: {}, cwd: '/' });
+  assert.equal(explicit.source, 'cli:--project-root');
+  assert.equal(realpathSync(explicit.root), realpathSync(dir));
+
+  const viaEnv = resolveProjectRoot({ cliRoot: null, env: { EOS_PROJECT_ROOT: dir }, cwd: '/' });
+  assert.equal(viaEnv.source, 'env:EOS_PROJECT_ROOT');
+
+  // Explicit beats discovery, and discovery beats the shell's idea of "here".
+  const both = resolveProjectRoot({ cliRoot: dir, env: { EOS_PROJECT_ROOT: '/nonexistent-xyz' }, cwd: '/' });
+  assert.equal(both.source, 'cli:--project-root');
+  assert.equal(RESOLUTION_ORDER[0], 'cli:--project-root');
+  assert.ok(RESOLUTION_ORDER.indexOf('git:toplevel') < RESOLUTION_ORDER.indexOf('cwd'));
+
+  // A root that was named but does not exist is REPORTED, not silently skipped.
+  const bad = resolveProjectRoot({ cliRoot: null, env: { EOS_PROJECT_ROOT: '/nonexistent-xyz' }, cwd: dir });
+  assert.match(bad.problems.join(' '), /does not exist/);
+});
+
+test('round-A: a project-level skill is not shadowed by a user-level one of the same name', () => {
+  const dir = project({});
+  const projectSkills = join(dir, '.github/skills');
+  const homeSkills = join(dir, 'home-skills');
+  for (const d of [join(projectSkills, 'bmad-prd'), join(homeSkills, 'bmad-prd')]) mkdirSync(d, { recursive: true });
+  writeFileSync(join(projectSkills, 'bmad-prd/SKILL.md'), '---\nname: bmad-prd\n---\n# project copy\n');
+  writeFileSync(join(homeSkills, 'bmad-prd/SKILL.md'), '---\nname: bmad-prd\n---\n# user copy\n');
+  writeFileSync(join(dir, '.eos/bmad.lock.json'), readFileSync(join(REPO_ROOT, '.eos/bmad.lock.json')));
+  writeFileSync(join(dir, '.eos/schemas/bmad-lock.schema.json'), readFileSync(join(REPO_ROOT, '.eos/schemas/bmad-lock.schema.json')));
+
+  const r = bmadReadiness(dir, { deep: false, roots: skillRoots(dir).concat(homeSkills) });
+  const prd = r.skills.find((s) => s.name === 'bmad-prd');
+  assert.ok(prd.resolvedFrom.startsWith(projectSkills),
+    `the copy that travels with the repository must win, got ${prd.resolvedFrom}`);
+});
+
+test('round-A: a runtime config naming another project is reported, not silently obeyed', () => {
+  const dir = project({ '_bmad/bmm/config.yaml': 'projectName: some-other-product\noutput_folder: /tmp/some-other-product/docs\n' });
+  const foreign = foreignProjectReferences(dir, ['_bmad/bmm/config.yaml']);
+  assert.ok(foreign.length >= 2, JSON.stringify(foreign));
+  assert.match(foreign.map((f) => f.reason).join(' '), /names project "some-other-product"/);
+  assert.match(foreign.map((f) => f.reason).join(' '), /outside this project/);
+  // A config that belongs here produces no accusation.
+  const own = project({ '_bmad/bmm/config.yaml': 'output_folder: docs\n' });
+  assert.deepEqual(foreignProjectReferences(own, ['_bmad/bmm/config.yaml']), []);
+});
+
+test('round-A: a write-back that was later reverted no longer counts as closed', () => {
+  const dir = project(baselineFiles({ 'docs/telemetry-plan.md': TELEMETRY_MD, 'docs/telemetry.json': TELEMETRY_RECORD }));
+  write(dir, 'docs/iteration.json', bindDigests(dir, ITERATION_RECORD));
+  assert.equal(run(dir, ['check', '--gate', 'iteration-ready', '--scope', 'R-1']).code, 0);
+
+  // Revert the spec the learning was written into. The record still claims it landed.
+  const req = JSON.parse(readFileSync(join(dir, 'docs/requirements.json'), 'utf8'));
+  req.functional.push({ id: 'FR2', statement: 'A later edit that undoes what the learning recorded' });
+  write(dir, 'docs/requirements.json', req);
+  const r = runJson(dir, ['check', '--gate', 'iteration-ready', '--scope', 'R-1']);
+  assert.notEqual(r.code, 0, r.out);
+  assert.match(r.json.checks.find((c) => c.id === 'spec-write-back').detail, /different version of/);
+});
+
+test('round-A: evidence says how it was produced, and a regulated release will not rest on a local claim', () => {
+  const local = testRun();
+  assert.equal(producerTrust(local).level, 'UNATTESTED_LOCAL');
+  assert.equal(producerTrust({ ...local, producer: { type: 'ci', name: 'gh', runRef: 'r/1' } }).level, 'SELF_REPORTED_CI');
+  assert.equal(producerTrust({ ...local, attestation: { type: 'slsa', reference: 'x' } }).level, 'ATTESTED');
+  // No producer at all is indistinguishable from a hand-written file, and says so.
+  assert.match(producerTrust({}).detail, /cannot be distinguished from a hand-written file/);
+
+  // Local evidence is fine for development…
+  const dir = verifiedStory(releaseFiles());
+  run(dir, ['transition', '--scope', 'story', '--id', 'STORY-001', '--to', 'MERGED']);
+  writeManifest(dir, { releaseId: 'R-1' });
+  let r = runJson(dir, ['release-status', '--release', 'R-1']);
+  assert.equal(r.json.checks.find((c) => c.id === 'evidence-trust').status, 'PASS',
+    'a local-first tool whose release gate can never be green locally has failed its own premise');
+
+  // …and not enough for a regulated one.
+  write(dir, '.eos/project.json', { ...APP_PROJECT, complianceProfile: 'regulated', commands: { test: 'node --version', audit: 'node --version' } });
+  commitAll(dir, 'declare regulated');
+  writeManifest(dir, { releaseId: 'R-1' });
+  r = runJson(dir, ['release-status', '--release', 'R-1']);
+  const trust = r.json.checks.find((c) => c.id === 'evidence-trust');
+  assert.equal(trust.status, 'BLOCKED', JSON.stringify(trust));
+  assert.match(trust.detail, /cannot be told apart from a hand-written file/);
+});
+
+test('round-A: writing the release plan does not invalidate the evidence the release depends on', () => {
+  // The same self-reference trap as evidence and the ledger: `.eos/releases/` is EOS bookkeeping
+  // about a release, so it must not be part of the tree the release is verified against.
+  const dir = verifiedStory(releaseFiles());
+  clearProductTreeCache();
+  const before = computeProductTree(dir).identity.digest;
+  writeManifest(dir, { releaseId: 'R-1' });
+  clearProductTreeCache();
+  assert.equal(computeProductTree(dir).identity.digest, before,
+    'writing a release manifest changed the product tree, which would expire the very evidence the release needs');
+  assert.ok(isSelfReference('.eos/releases/R-1.json'));
+});
+
+test('round-A: the bundled validator enforces uniqueItems instead of ignoring it', () => {
+  // It used to refuse the keyword outright (fail-closed, but unusable). Silently ignoring it would
+  // have been worse: a story listed twice would be counted twice and verified once.
+  const dir = verifiedStory(releaseFiles());
+  write(dir, '.eos/releases/R-D.json', { schemaVersion: 1, releaseId: 'R-D', includedStories: ['STORY-001', 'STORY-001'] });
+  const r = runJson(dir, ['release-status', '--release', 'R-D']);
+  assert.match(r.json.checks.find((c) => c.id === 'release-manifest').detail, /duplicate entry/);
 });

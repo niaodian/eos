@@ -5,22 +5,52 @@
   "description": "What production taught, written back into the source of truth. Without this the loop ends at 'shipped' and the specs drift away from the running system — which is exactly the state EOS exists to prevent.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "release", "learnings", "specWriteBack", "decision"],
+  "required": [
+    "schemaVersion",
+    "release",
+    "learnings",
+    "specWriteBack",
+    "decision"
+  ],
   "properties": {
-    "$schema": { "type": "string" },
-    "schemaVersion": { "const": 1 },
-    "release": { "type": "string", "minLength": 1 },
+    "$schema": {
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": 1
+    },
+    "release": {
+      "type": "string",
+      "minLength": 1
+    },
     "learnings": {
       "type": "array",
       "minItems": 1,
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["observation", "source"],
+        "required": [
+          "observation",
+          "source"
+        ],
         "properties": {
-          "observation": { "type": "string", "minLength": 15 },
-          "source": { "enum": ["telemetry", "user-feedback", "incident", "support", "eval", "other"] },
-          "metric": { "type": "string" }
+          "observation": {
+            "type": "string",
+            "minLength": 15
+          },
+          "source": {
+            "enum": [
+              "telemetry",
+              "user-feedback",
+              "incident",
+              "support",
+              "eval",
+              "other"
+            ]
+          },
+          "metric": {
+            "type": "string"
+          }
         }
       }
     },
@@ -31,10 +61,27 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["target", "change"],
+        "required": [
+          "target",
+          "change",
+          "targetDigest"
+        ],
         "properties": {
-          "target": { "description": "Repository-relative path of the spec that was updated (docs/requirements.json, docs/prd.md, …). EOS checks that it exists.", "type": "string", "minLength": 4 },
-          "change": { "type": "string", "minLength": 10 }
+          "target": {
+            "description": "Repository-relative path of the spec that was updated (docs/requirements.json, docs/prd.md, …). EOS checks that it exists.",
+            "type": "string",
+            "minLength": 4
+          },
+          "targetDigest": {
+            "description": "SHA-256 of the target file AFTER the write-back. Without it, 'we updated the PRD' is a claim about a file nobody checked; with it, reverting the change is detectable. Get it from `eos digest <path>`.",
+            "type": "string",
+            "minLength": 64,
+            "maxLength": 64
+          },
+          "change": {
+            "type": "string",
+            "minLength": 10
+          }
         }
       }
     },
@@ -42,34 +89,76 @@
       "description": "Required for an agentic product: user feedback has to reach the eval dataset, or the model never learns from production.",
       "type": "object",
       "additionalProperties": false,
-      "required": ["status"],
+      "required": [
+        "status"
+      ],
       "properties": {
-        "status": { "enum": ["UPDATED", "NOT_APPLICABLE"] },
-        "datasetRef": { "type": "string" },
-        "casesAdded": { "type": "integer", "minimum": 0 },
-        "reason": { "type": "string", "minLength": 15 }
+        "status": {
+          "enum": [
+            "UPDATED",
+            "NOT_APPLICABLE"
+          ]
+        },
+        "datasetRef": {
+          "type": "string"
+        },
+        "casesAdded": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 15
+        }
       }
     },
     "baselineRebaselined": {
       "description": "Required for an agentic product when the prompt, model or tool surface changed: a new eval baseline, or an explicit statement that nothing changed.",
       "type": "object",
       "additionalProperties": false,
-      "required": ["status"],
+      "required": [
+        "status"
+      ],
       "properties": {
-        "status": { "enum": ["REBASELINED", "UNCHANGED"] },
-        "evidenceRef": { "type": "string" },
-        "note": { "type": "string" }
+        "status": {
+          "enum": [
+            "REBASELINED",
+            "UNCHANGED"
+          ]
+        },
+        "evidenceRef": {
+          "type": "string"
+        },
+        "note": {
+          "type": "string"
+        }
       }
     },
     "decision": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["outcome", "owner"],
+      "required": [
+        "outcome",
+        "owner"
+      ],
       "properties": {
-        "outcome": { "enum": ["CONTINUE", "CORRECT_COURSE", "STOP"] },
-        "owner": { "type": "string", "minLength": 2 },
-        "note": { "type": "string" },
-        "retrospectiveRef": { "type": "string" }
+        "outcome": {
+          "enum": [
+            "CONTINUE",
+            "CORRECT_COURSE",
+            "STOP"
+          ]
+        },
+        "owner": {
+          "type": "string",
+          "minLength": 2
+        },
+        "note": {
+          "type": "string"
+        },
+        "retrospectiveRef": {
+          "type": "string"
+        }
       }
     }
   }
