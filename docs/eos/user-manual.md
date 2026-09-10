@@ -58,16 +58,24 @@ It solves four persistent hard problems:
 
 ## 1.2 Three commands you will use every day
 
-In the **terminal** — this is the whole loop, and it is all you have to remember:
+In **Copilot Chat (Agent mode)** — this is the whole loop, and it is all you have to remember:
 
 ```
-node .github/eos/eos.mjs resume   # what was I doing, what is blocking it
-node .github/eos/eos.mjs next     # the ONE recommended next action, why, and how to start it
+/eos-resume    # what was I doing, what is blocking it
+/eos-next      # the ONE recommended next action, why, and how to start it
+```
+
+...or just talk to the **eos-guide** agent. This is the primary path in VS Code: it is where the
+router can also open the files, run the checks and name the right BMAD skill for you.
+
+In the **terminal** the same loop is the same engine — this is what CI runs, and what to use when
+you want a script or an exit code:
+
+```
+node .github/eos/eos.mjs resume
+node .github/eos/eos.mjs next
 node .github/eos/eos.mjs check --gate <id> --scope <id>   # prove the step, record the evidence
-```
-
-In **Copilot Chat (Agent mode)** the same loop is the **eos-guide** agent, or the prompts
-`/eos-next` · `/eos-resume` · `/eos-status`. The router names the agent, the prompt and the minimal
+``` The router names the agent, the prompt and the minimal
 BMAD skills for each step, so you never choose from the 73 installed skills yourself. The full
 contract (state model, gates, evidence, exit codes) is
 [developer-experience.md](developer-experience.md).

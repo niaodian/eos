@@ -65,16 +65,25 @@ EOS = 一套**纯本地、Git 化、可跨项目移植**的工程操作系统。
 
 ## 1.2 三条你每天都会用的命令
 
-在**终端**里——这就是全部循环，也是你唯一需要记住的东西：
+在 **Copilot Chat（Agent 模式）** 里——这就是全部循环，也是你唯一需要记住的东西：
 
 ```
-node .github/eos/eos.mjs resume   # 我刚才在做什么、什么卡住了
-node .github/eos/eos.mjs next     # 唯一的推荐下一步、为什么、怎么开始
+/eos-resume    # 我刚才在做什么、什么卡住了
+/eos-next      # 唯一的推荐下一步、为什么、怎么开始
+```
+
+……或者直接跟 **eos-guide** agent 说话。这是 VS Code 里的**主路径**：在这里 router 还能顺手替你
+打开文件、跑检查、点名该用哪个 BMAD skill。
+
+在**终端**里，同一循环是同一个引擎——这是 CI 实际运行的那条，也是你需要脚本或退出码时用的那条：
+
+```
+node .github/eos/eos.mjs resume
+node .github/eos/eos.mjs next
 node .github/eos/eos.mjs check --gate <id> --scope <id>   # 证明这一步，并写入证据
 ```
 
-在 **Copilot Chat（Agent 模式）** 里，同一循环是 **eos-guide** agent，或者 prompts
-`/eos-next` · `/eos-resume` · `/eos-status`。Router 会为每一步点名 agent、prompt 和最小
+Router 会为每一步点名 agent、prompt 和最小
 BMAD skill 链，所以你永远不用自己从 73 个已安装 skill 里挑。完整契约（状态模型、门禁、证据、
 退出码）见 [developer-experience.md](developer-experience.md)。
 
