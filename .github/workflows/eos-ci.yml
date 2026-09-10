@@ -132,6 +132,11 @@ jobs:
         # release prompt ⇄ machine gate gap, and the RELEASED → telemetry → iteration loop.
         run: node --test .github/eos/audit-regression.test.mjs
 
+      - name: EOS offline boundary (the local-first claim is an assertion, not a promise)
+        # EOS Core must reach every decision with no network and no third-party dependency. This
+        # turns that claim into a test that fails, so it cannot erode one pull request at a time.
+        run: node --test .github/eos/offline-boundary.test.mjs
+
       - name: EOS ledger append-only verification
         # The hash chain is the offline guarantee; comparing against the base ref additionally
         # proves that no previously recorded line was rewritten in this change.
