@@ -1113,6 +1113,33 @@ node .github/eos/eos.mjs check --gate release-ready --scope <id>
 来自 1.13.x 的已记录证据会变成 `STALE`（门禁版本已变），重跑门禁即可清除。没有任何东西需要手工编辑，
 也没有任何东西被静默重新解释。
 
+
+### 10.4.3 `evidencePolicy` —— 你的发布证据需要多强的来源证明
+
+`docs/evidence/*.json` 只是磁盘上的字节。CI 产出的摘要和人手敲的摘要**字节完全一样**，唯一区别是
+`producer` 字段 —— 那是一个**声明**，不是证明。因此由项目声明它需要多强的来源证明，EOS 执行*它*：
+
+| `evidencePolicy` | 发布证据必须…… |
+|---|---|
+| `local`（默认） | 任意来源，包括在笔记本上产生 —— 诚实，且对多数项目足够 |
+| `ci` | 由 CI 产出（`"producer": { "type": "ci", … }`） |
+| `attested` | 携带可被 adapter 验证的来源证明（Core 自身不验证任何 attestation） |
+
+**受监管项目必须声明它。** 留空即失败，因为"没人决定"不是一种策略。它**可以**合法地选择 `local` ——
+**气隙**环境根本无法访问任何 attestation 权威，若因此拒绝发布，就等于把最需要治理的那批用户排除在外 ——
+但必须写下理由：
+
+```jsonc
+{
+  "complianceProfile": "regulated",
+  "evidencePolicy": "local",
+  "evidencePolicyReason": "气隙网络；不存在可访问的外部 attestation 权威。"
+}
+```
+
+这与 EOS 各处的 SKIP / DEFER 是同一个形状：**留空会被拒绝；写明决定就被尊重。**
+见 [ADR-005](../adr/005-external-authority-boundary.md)。
+
 ---
 
 # 第 11 章 新增技术栈

@@ -1,17 +1,40 @@
 {
   "$schema": "../../../../.eos/schemas/project.schema.json",
   "projectType": "application",
-  "stacks": ["node", "python"],
-  "productParadigms": ["deterministic", "agentic"],
+  "stacks": [
+    "node",
+    "python"
+  ],
+  "productParadigms": [
+    "deterministic",
+    "agentic"
+  ],
   "complianceProfile": "regulated",
+  "evidencePolicy": "ci",
+  "evidencePolicyReason": "This deployment reaches a CI system, so release evidence must come from one: a summary produced on a laptop is indistinguishable from one typed by hand. An air-gapped deployment of the same product would legitimately declare \"local\" with that reason instead — EOS forces the decision, it does not make it.",
   "workflowProfile": "standard-product",
   "commands": {
-    "install": ["npm ci --prefer-offline --no-audit --no-fund", "uv sync --frozen"],
-    "lint": ["npm run --silent lint", "uv run ruff check ."],
-    "typecheck": ["npm run --silent typecheck", "uv run mypy src"],
-    "test": ["npm run --silent test", "uv run pytest -q"],
+    "install": [
+      "npm ci --prefer-offline --no-audit --no-fund",
+      "uv sync --frozen"
+    ],
+    "lint": [
+      "npm run --silent lint",
+      "uv run ruff check ."
+    ],
+    "typecheck": [
+      "npm run --silent typecheck",
+      "uv run mypy src"
+    ],
+    "test": [
+      "npm run --silent test",
+      "uv run pytest -q"
+    ],
     "eval": "uv run python -m evals.run --report docs/evidence/eval-summary.json",
-    "audit": ["npm audit --audit-level=high", "uv run pip-audit"]
+    "audit": [
+      "npm audit --audit-level=high",
+      "uv run pip-audit"
+    ]
   },
-  "rationale": "Hybrid control plane (deterministic, Node) + worker plane (agentic, Python) under a named regulatory regime. `commands.eval` WRITES docs/evidence/eval-summary.json: an eval command that merely exits 0 proves a process ended, not that a threshold was met. `commands.audit` is run by the release gate, where — because complianceProfile is \"regulated\" — an unrunnable audit BLOCKS instead of being deferred. The authoritative data-boundary record stays docs/compliance-profile.json."
+  "rationale": "Hybrid control plane (deterministic, Node) + worker plane (agentic, Python) under a named regulatory regime. `commands.eval` WRITES docs/evidence/eval-summary.json: an eval command that merely exits 0 proves a process ended, not that a threshold was met. `commands.audit` is run by the release gate, where — because complianceProfile is \"regulated\" — an unrunnable audit BLOCKS instead of being deferred. `evidencePolicy` states how much provenance release evidence must carry — a regulated project must declare it, and \"local\" is a legitimate answer for an air-gapped environment. The authoritative data-boundary record stays docs/compliance-profile.json."
 }

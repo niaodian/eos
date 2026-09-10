@@ -600,7 +600,7 @@ test('EOS-AUD-007: an undeclared dependency audit is a failure, and offline is D
 
 test('EOS-AUD-007: a REGULATED product may not defer the dependency audit — it BLOCKS', () => {
   const dir = verifiedStory(releaseFiles({
-    '.eos/project.json': { ...APP_PROJECT, complianceProfile: 'regulated', commands: { test: 'node --version', audit: 'definitely-not-a-real-binary audit' } },
+    '.eos/project.json': { ...APP_PROJECT, complianceProfile: 'regulated', evidencePolicy: 'local', evidencePolicyReason: 'Air-gapped fixture; no external attestation authority is reachable.', commands: { test: 'node --version', audit: 'definitely-not-a-real-binary audit' } },
   }));
   const r = runJson(dir, ['verify-release', '--release', 'v1.0.0']);
   const check = r.json.result.checks.find((c) => c.id === 'dependency-audit');
@@ -1146,14 +1146,63 @@ test('round-A: evidence says how it was produced, and a regulated release will n
   assert.equal(r.json.checks.find((c) => c.id === 'evidence-trust').status, 'PASS',
     'a local-first tool whose release gate can never be green locally has failed its own premise');
 
-  // …and not enough for a regulated one.
-  write(dir, '.eos/project.json', { ...APP_PROJECT, complianceProfile: 'regulated', commands: { test: 'node --version', audit: 'node --version' } });
-  commitAll(dir, 'declare regulated');
+  // …and a project that declares it needs more says so, and is held to it.
+  write(dir, '.eos/project.json', { ...APP_PROJECT, evidencePolicy: 'ci', commands: { test: 'node --version', audit: 'node --version' } });
+  commitAll(dir, 'require CI-produced evidence');
   writeManifest(dir, { releaseId: 'R-1' });
   r = runJson(dir, ['release-status', '--release', 'R-1']);
   const trust = r.json.checks.find((c) => c.id === 'evidence-trust');
-  assert.equal(trust.status, 'BLOCKED', JSON.stringify(trust));
-  assert.match(trust.detail, /cannot be told apart from a hand-written file/);
+  assert.equal(trust.status, 'FAIL', JSON.stringify(trust));
+  assert.match(trust.detail, /evidencePolicy "ci"/);
+});
+
+test('ADR-005 D2: a regulated project must STATE its evidence policy — and air-gapped is a valid answer', () => {
+  // eos-1.14.0 blocked a regulated release on local evidence. That excluded air-gapped users, who
+  // are often the MOST regulated — defence, parts of healthcare — and who cannot reach an
+  // attestation authority at all. EOS forces the decision instead of making it.
+  const dir = project({});
+  const declare = (extra) => {
+    write(dir, '.eos/project.json', { ...APP_PROJECT, complianceProfile: 'regulated', ...extra });
+    return runJson(dir, ['status']);
+  };
+  // A blank is refused: "nobody decided" is not a policy.
+  let r = declare({});
+  assert.match((r.json.errors || []).join(" "), /must declare "evidencePolicy"/);
+
+  // Choosing `local` is legitimate — but it must be justified.
+  r = declare({ evidencePolicy: 'local' });
+  assert.match((r.json.errors || []).join(" "), /evidencePolicyReason/);
+
+  r = declare({ evidencePolicy: 'local', evidencePolicyReason: 'Air-gapped network; no external attestation authority is reachable.' });
+  assert.deepEqual(r.json.errors || [], [], 'an air-gapped regulated project must remain able to ship');
+
+  // And a stricter policy is equally available.
+  r = declare({ evidencePolicy: 'attested' });
+  assert.deepEqual(r.json.errors || [], []);
+});
+
+test('ADR-005 D4: an adapter is monotonic — its absence never creates a NEW blocker', () => {
+  // The invariant every future provider adapter must satisfy: with no adapter present, each check
+  // that WOULD consult one must already have an honest verdict, and that verdict is the floor.
+  const dir = verifiedStory(releaseFiles());
+  run(dir, ['transition', '--scope', 'story', '--id', 'STORY-001', '--to', 'MERGED']);
+  writeManifest(dir, { releaseId: 'R-1' });
+  const r = runJson(dir, ['release-status', '--release', 'R-1']);
+  const authority = r.json.checks.find((c) => c.id === 'activation-authority');
+  // Today, with no adapter, this is a decided verdict rather than a crash or a silent pass.
+  assert.ok(['PASS', 'BLOCKED'].includes(authority.status), JSON.stringify(authority));
+
+  // And the development loop never consults an external authority at all: every gate before the
+  // release gate reaches a verdict with nothing but this repository.
+  const gates = JSON.parse(readFileSync(join(REPO_ROOT, '.eos/gates.json'), 'utf8'));
+  const preRelease = gates.gates.filter((g) => g.scope !== 'release');
+  assert.ok(preRelease.length >= 7);
+  for (const g of preRelease) {
+    for (const c of g.checks) {
+      assert.doesNotMatch(c.evaluator, /provider|attest|github/i,
+        `${g.id}/${c.id} would consult an external authority in the development loop`);
+    }
+  }
 });
 
 test('round-A: writing the release plan does not invalidate the evidence the release depends on', () => {

@@ -5,28 +5,63 @@
   "description": "What this project IS and how it is verified. Authoritative for the product-quality gate (project-gate.mjs), the G-EVAL paradigm signal (eos-doctor.mjs) and the workflow profile (.github/eos/eos.mjs).",
   "type": "object",
   "additionalProperties": false,
-  "required": ["projectType"],
+  "required": [
+    "projectType"
+  ],
   "properties": {
-    "$schema": { "type": "string" },
-    "projectType": { "enum": ["application", "library", "config-only"] },
+    "$schema": {
+      "type": "string"
+    },
+    "projectType": {
+      "enum": [
+        "application",
+        "library",
+        "config-only"
+      ]
+    },
     "stacks": {
       "type": "array",
-      "items": { "enum": ["node", "python", "go", "java", "rust", "dotnet", "other"] }
+      "items": {
+        "enum": [
+          "node",
+          "python",
+          "go",
+          "java",
+          "rust",
+          "dotnet",
+          "other"
+        ]
+      }
     },
     "productParadigms": {
       "type": "array",
       "minItems": 1,
-      "items": { "enum": ["deterministic", "agentic"] }
+      "items": {
+        "enum": [
+          "deterministic",
+          "agentic"
+        ]
+      }
     },
     "commands": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "install": { "$ref": "#/$defs/command" },
-        "lint": { "$ref": "#/$defs/command" },
-        "typecheck": { "$ref": "#/$defs/command" },
-        "test": { "$ref": "#/$defs/command" },
-        "eval": { "$ref": "#/$defs/command" },
+        "install": {
+          "$ref": "#/$defs/command"
+        },
+        "lint": {
+          "$ref": "#/$defs/command"
+        },
+        "typecheck": {
+          "$ref": "#/$defs/command"
+        },
+        "test": {
+          "$ref": "#/$defs/command"
+        },
+        "eval": {
+          "$ref": "#/$defs/command"
+        },
         "audit": {
           "description": "Dependency / supply-chain audit (npm audit, pip-audit, cargo audit, govulncheck …). Not part of the per-push quality gate: it is executed by the release gate, where a network failure is DEFERRED and never a PASS.",
           "$ref": "#/$defs/command"
@@ -39,28 +74,68 @@
       "description": "Key into .eos/workflow.json profiles. Defaults to standard-product."
     },
     "complianceProfile": {
-      "enum": ["none", "regulated"],
+      "enum": [
+        "none",
+        "regulated"
+      ],
       "description": "Advisory declaration only, and it can only TIGHTEN: docs/compliance-profile.json stays the authoritative record of the data-boundary decision (audit EOS-004). Declaring \"regulated\" here turns the compliance checks on even before that file exists; declaring \"none\" never turns them off."
     },
-    "evalRequired": { "type": "boolean" },
+    "evidencePolicy": {
+      "description": "How much provenance this project's release evidence must carry. A regulated project MUST state it — leaving it unset fails, because 'nobody decided' is not a policy. It may legitimately choose \"local\": an air-gapped environment cannot reach an attestation authority at all, and refusing to ship there would exclude exactly the users who need governance most. State the reason in evidencePolicyReason.",
+      "enum": [
+        "local",
+        "ci",
+        "attested"
+      ]
+    },
+    "evidencePolicyReason": {
+      "description": "Why this policy is the right one for this project — required when a regulated project chooses \"local\".",
+      "type": "string",
+      "minLength": 20
+    },
+    "evalRequired": {
+      "type": "boolean"
+    },
     "evalWaiver": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["reason", "approvedBy"],
+      "required": [
+        "reason",
+        "approvedBy"
+      ],
       "properties": {
-        "reason": { "type": "string", "minLength": 10 },
-        "approvedBy": { "type": "string", "minLength": 1 }
+        "reason": {
+          "type": "string",
+          "minLength": 10
+        },
+        "approvedBy": {
+          "type": "string",
+          "minLength": 1
+        }
       }
     },
-    "rationale": { "type": "string" }
+    "rationale": {
+      "type": "string"
+    }
   },
   "$defs": {
     "command": {
       "description": "A command string, an argv array, or an array of command strings to chain. Null means explicitly not applicable.",
       "anyOf": [
-        { "type": "string", "minLength": 1 },
-        { "type": "array", "items": { "type": "string", "minLength": 1 } },
-        { "type": "null" }
+        {
+          "type": "string",
+          "minLength": 1
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        {
+          "type": "null"
+        }
       ]
     }
   }
