@@ -263,24 +263,33 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 
 ## 5.2 决策门十关（G1–G10）
 
-| 门 | 阶段 | 通过标准（不过则不进下一阶段） |
-|---|---|---|
-| G1 | Discovery | 问题是一句可证伪陈述 + 成功指标可度量 |
-| **G2** | Requirements | **五张清单无未决 BLOCKER（必过硬门）** |
-| G3 | Spec | 每条需求有 ≥1 可度量验收标准 |
-| G-UX | UX & Design（条件） | 面向用户：每条需求有屏幕/流程/四态/a11y/视觉token；纯后端 SKIP+理由 |
-| G-EVAL | Eval（条件·LLM/agentic） | 每条 LLM 支撑的 AC 有 eval 用例+grader+阈值；含注入/成本用例；纯确定性功能 SKIP+理由 |
-| G4 | Architecture | 不可逆决策有 ADR；NFR/扩展/容灾各有显式设计 |
-| G5 | Planning | 每个 story 上下文自包含、可独立实现、含 AC |
-| G6 | Development | lint/typecheck/单测全绿（hook 质量门）+ 代码审查无阻断项 |
-| G7 | Testing | 每条 AC ≥1 测试且全绿；trace 矩阵完整 |
-| **G8** | Release | **质量+审计+回滚+灰度+NFR 五项门禁全过（必过硬门）** |
-| G9 | Observability | 关键路径埋点在产、指标可见 |
-| G10 | Iteration | 每个变更回写 Spec 真相源 |
+| 门 | 阶段 | 机器门禁 id | 通过标准（不过则不进下一阶段） |
+|---|---|---|---|
+| G0 | Activation | `activation` | 项目声明了自己是什么、如何被验证 |
+| G1 | Discovery | `discovery-ready` | 可证伪的问题 + 带目标值**与数据来源**的指标 + 显式的范围内/外 |
+| **G2** | Requirements | `requirements-ready` | **每个运营关注点都是 ADOPT / SKIP+理由 / DEFER+负责人+触发条件（硬门）** |
+| G3 | Spec | `prd-ready` | 每条需求有 ≥1 条被**定义**（而不仅是被提及）的验收标准 |
+| G-UX | UX & Design（条件） | `ux-ready` | 面向用户：DESIGN.md **与** EXPERIENCE.md 都在，且流程/状态/a11y/token/响应式各自被覆盖；非 UI：结构化 SKIP + 理由 |
+| G-EVAL | Eval（条件·LLM/agentic） | 属于 `verified` | 每条 LLM 支撑的 AC 的**实测分数达到阈值**，并绑定 prompt/模型/数据集/grader |
+| G4 | Architecture | `architecture-ready` | 不可逆决策有 ADR；每条 NFR 落在具名组件上 |
+| G5 | Planning | `story-ready` | 每个 story 上下文自包含、可独立实现、含 AC 与已决策的运营任务 |
+| G6 | Development | `project-gate.mjs` | lint/typecheck/单测全绿 + 代码审查无阻断项 |
+| G7 | Testing | `verified` | 每条 AC 都追溯到一个**真正跑过**、且跑在**这棵**产品树上的测试 |
+| **G8** | Release | `release-ready` | **候选本身被重新测试；质量+供应链+NFR+回滚/灰度/健康全部成立（硬门）** |
+| G9 | Observability | `telemetry-ready` | 成功指标作为真实信号发出；有接收人的告警 + 回滚触发条件 + 具名负责人 |
+| G10 | Iteration | `iteration-ready` | 每个变更回写 Spec 真相源，且有负责人 |
 
 **G2 和 G8 是两道硬门**：前者堵"上线后返工"，后者堵"带病上线"。
 
-> **哪些门可机器强制**：配置合规（`validate-config.mjs`，S1–S11）、G-EVAL（`eos-doctor.mjs`：有 `ai/llm/rag` 代码却无 `docs/eval-plan.md` → 报错）、G6 质量与 G7 测试/评估（`npm test`/evals）——这些都由本地 CI `.github/workflows/eos-ci.yml`（`act push`，需 Docker）在合并/发布前批量跑。其余偏内容/判断的门（G1/G3/G4/G5/G-UX/G10）靠 prompt+清单+人审。
+> **哪些门可机器强制**：自 `eos-1.13.0` 起——**全部**。用
+> `node .github/eos/eos.mjs check --gate <id>` 单跑一道，`eos next` 会替你跑。每个阶段同时保留人读的
+> 文档**和**并列的一份结构化记录（`docs/discovery.json`、`docs/requirements.json`、`docs/design.json`、
+> `docs/architecture.json`、`docs/telemetry.json`、`docs/iteration.json`）；门禁读记录——因为散文恰恰是
+> 门禁绝不能被说服绕过的东西。在 1.13.0 之前，G1/G2/G-UX/G4 只检查文件是否存在，所以四个空文档就能把
+> 产品一路带到"架构已批准"。
+>
+> 机器仍然无法替你决定的是**判断**：这是不是那个该解的问题、阈值定得是否诚实、设计是否够好。
+> EOS 记录这些决定，并拒绝替你编造——一次发布仍然需要一位**不是候选准备者本人**的批准。
 
 ---
 
@@ -329,7 +338,7 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 | **怎么启动** | Chat 切到 **`（agent）eos-discovery`**；它会调用 `bmad-brainstorming` + `bmad-agent-analyst`（Mary），可选用 `bmad-forge-idea` 压力测试 |
 | **输入** | 原始想法（口述即可） |
 | **产出** | `docs/discovery.md`：问题陈述、证伪条件、成功指标表、scope-in/out |
-| **决策门 G1** | ☑ 问题是一句可证伪陈述 ☑ 成功指标可度量 |
+| **决策门 G1** | `node .github/eos/eos.mjs check --gate discovery-ready` —— ☑ 问题写明了什么现象能证明它不成立 ☑ 指标有目标值**与数据来源** ☑ 范围内/外都写了 ☑ 无未决的阻塞性问题 |
 | **必查项** | 写得出"失败长什么样"吗？指标有数值和数据来源吗？范围外（不做什么）写了吗？ |
 | **防返工** | 这是最廉价的纠错点。问题没锁定就往下做，后面每一步都在放大偏差。 |
 | **样例** | `my-app/docs/discovery.md`（登录成功率≥98%、p95≤300ms 等 4 个可度量指标） |
@@ -345,10 +354,10 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 | **目标** | 展开功能需求 + NFR + **把运营需求前置**（埋点/权限/回滚…），堵死"上线后返工" |
 | **何时进入** | G1 通过、`docs/discovery.md` 就绪 |
 | **怎么启动** | Chat 输入 **`/requirements "<feature>"`**（包裹 `bmad-agent-pm` / `bmad-prd` + skill `eos-operational-readiness`） |
-| **输入** | `docs/discovery.md` |
+| **输入** | `docs/discovery.md` + `docs/discovery.json` |
 | **产出** | `docs/requirements.md`，**顶部带"Operational Pre-Flight Decision Table"** |
-| **决策门 G2（硬门）** | 五张清单 A/B/C/D/E 全部走查（**受监管行业再加第六张 F-compliance**），**任何未决项 = BLOCKER，不清零不得进 Spec** |
-| **必查项** | 运营前置 11 项（telemetry/authz/audit/rollback/monitoring/canary/quota/i18n/multi-tenancy/capacity-SLO/DR）每项三选一：**ADOPT / SKIP+理由 / DEFER+触发条件**，禁止留空 |
+| **决策门 G2（硬门）** | `node .github/eos/eos.mjs check --gate requirements-ready`，外加五张清单 A/B/C/D/E 全部走查（**受监管行业再加第六张 F-compliance**），**任何未决项 = BLOCKER，不清零不得进 Spec** |
+| **必查项** | 运营前置 11 项（telemetry/authz/audit/rollback/monitoring/canary/quota/i18n/multi-tenancy/capacity-SLO/DR）每项三选一：**`ADOPT`+要建什么 / `SKIP`+理由 / `DEFER`+负责人+触发条件**。禁止留空，也禁止只写 `SKIP`——自 1.13.0 起门禁会拒绝它，连 `-`、`...` 这类占位“理由”也一并拒绝。每条 NFR 都要有目标值，否则 G8 无法验证 |
 | **防返工** | 用"反向提问法"逼出隐性需求：谁**无权**做？做错怎么**回滚**？怎么**知道**线上有没有用？×100 用户会怎样？ |
 | **样例** | `my-app/docs/requirements.md`（11 项决策表 + authz 矩阵 + A/B/C/D 走查结论无 BLOCKER） |
 
@@ -374,9 +383,9 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 | **目标** | 把需求固化成 PRD，成为下游唯一认可的真相源 |
 | **何时进入** | G2 通过、`docs/requirements.md` 无 BLOCKER |
 | **怎么启动** | Chat 输入 **`/spec`**（用 `bmad-prd` 起草与校验） |
-| **输入** | `docs/requirements.md` |
+| **输入** | `docs/requirements.md` + `docs/requirements.json` |
 | **产出** | `docs/prd.md`：每条 FR 带验收标准 + NFR 段（来自 C-nfr，不留空） |
-| **决策门 G3** | ☑ 每条需求有 ≥1 可度量验收标准 |
+| **决策门 G3** | `node .github/eos/eos.mjs check --gate prd-ready` —— ☑ 每条需求有 ≥1 条被**定义**的验收标准（其 `AC<n>.<n>` 编号位于列表项、表格行或标题的开头，**且**带有标准正文）。仅在句子里提到某个编号只算引用：自 1.13.0 起 story 不能再声称实现它 |
 | **必查项** | 验收标准能写成测试吗？NFR 段有没有照搬 C-nfr 的目标值？scope-out 写了吗？ |
 | **防返工** | PRD 即契约。从此下游只认 `docs/prd.md`；任何"我以为"都要回来改 PRD。 |
 | **样例** | `my-app/docs/prd.md`（FR1–FR5，每条配 AC1.1…AC5.3） |
@@ -392,10 +401,10 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 | **怎么启动** | Chat 输入 **`/ux-spec`**（包裹 `bmad-ux`）或切到 **`（agent）eos-design`**；问题仍模糊用 `bmad-cis-design-thinking`(Maya)，要强主张用 `bmad-agent-ux-designer`(Sally) |
 | **输入** | `docs/prd.md` |
 | **产出** | `docs/DESIGN.md`（视觉身份：token/字体/色彩/间距）+ `docs/EXPERIENCE.md`（信息架构/用户流/屏幕状态/交互/a11y/旅程） |
-| **决策门 G-UX** | ☑ 每条面向用户需求有屏幕/流程 ☑ loading/empty/error/success 四态齐全 ☑ a11y 基线（键盘/焦点/标签/对比度）☑ 用 DESIGN.md 命名 token、不硬编码；纯后端 → 在 `EXPERIENCE.md` 写 `SKIP — 无用户界面（理由）` |
+| **决策门 G-UX** | `node .github/eos/eos.mjs check --gate ux-ready` —— 面向用户的产品需要**两份文档都在**且有实质内容，且 coverage 的每个维度是 `COVERED`+出处 或 `NOT_APPLICABLE`+理由。1.13.0 之前只检查其中一个文件是否*存在*，所以一个连 `DESIGN.md` 都没有的 UI 产品也能走过去 |
 | **必查项** | 每个屏幕的空/错/载入态都定义了吗？关键操作可纯键盘完成吗？颜色/间距是引用 token 还是写死？ |
 | **防返工** | UX 契约**先于**架构与实现：架构据此定 API/数据、story 据此引用屏幕、前端规则与埋点据此落地。两份契约对任何后来的 mock/import 有最终解释权。 |
-| **可跳过** | 纯后端/CLI：一行 `SKIP + 理由` 即过门，不阻塞。 |
+| **可跳过** | 纯后端/CLI：在 `docs/design.json` 记录 `{ "userInterface": false, "skipReason": "…" }`。它必须被**说出来**——沉默不算跳过，光写 SKIP 两个字也不算。 |
 
 > 复用说明【BMAD + 补强】：能力来自 `bmad-ux` / `bmad-agent-ux-designer`(Sally) / `bmad-cis-design-thinking`(Maya)，
 > EOS 只新增编排（`/ux-spec` prompt + `eos-design` agent + G-UX 门），**不重建设计能力**。
@@ -409,9 +418,9 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 | **目标** | 技术方案、数据模型、API 契约、NFR 落点、关键决策留痕（ADR） |
 | **何时进入** | G3 通过、`docs/prd.md` 就绪 |
 | **怎么启动** | Chat 切到 **`（agent）eos-architecture`**（调用 `bmad-architecture`/Winston）；对每个不可逆决策跑 **`/adr`**；跑 **`/deploy-topology`** 选部署拓扑 |
-| **输入** | `docs/prd.md`、`docs/EXPERIENCE.md`+`docs/DESIGN.md`（若做了 UX 阶段）、`docs/checklists/C-nfr.md`、`docs/checklists/G-deployment.md` |
+| **输入** | `docs/prd.md`、`docs/requirements.json`（取 NFR 集合）、`docs/EXPERIENCE.md`+`docs/DESIGN.md`（若做了 UX 阶段）、`docs/checklists/C-nfr.md`、`docs/checklists/G-deployment.md` |
 | **产出** | `docs/architecture.md`（含 Deployment 段）、`docs/data-model.md`、`api/openapi.yaml`、`docs/adr/NNN-*.md`（含 tech-stack + deployment-topology 两条 ADR）、填好的 `G-deployment.md` |
-| **决策门 G4** | ☑ 扩展性/弹性/容灾/安全各有显式设计（不是"以后再说"）☑ 每个不可逆决策有 ADR ☑ **技术栈已锁** ☑ **部署拓扑已选**（NFR 依据 + deployment-topology ADR） |
+| **决策门 G4** | `node .github/eos/eos.mjs check --gate architecture-ready` —— ☑ 每个关注点是 `DECIDED`+摘要 或 `NOT_APPLICABLE`+理由 ☑ 技术栈与部署拓扑各自引用一个**真实存在**的 ADR ☑ **`docs/requirements.json` 里的每条 NFR 都落在具名组件与机制上** |
 | **必查项** | API 契约**先于**实现写好了吗？ADR 有没有列备选方案和 trade-off？NFR 每项有落点吗？**部署拓扑是不是选了"满足 NFR 的最简项"（而不是跟风上 K8s）**？ |
 | **防返工** | "API 先于实现"让前后端可并行、契约可被测试锚定；ADR 防团队失忆。 |
 | **样例** | `my-app/docs/adr/0001-session-strategy.md`（3 方案对比 + trade-off）、`my-app/api/openapi.yaml`（先于 src/auth.js 写） |
@@ -474,9 +483,9 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 | **何时进入** | G6 通过 |
 | **怎么启动** | Chat 输入 **`bmad-tea`**（Murat）/ `bmad-testarch-test-design` / `bmad-testarch-automate` / `bmad-testarch-trace` / **`bmad-testarch-nfr`** / `bmad-qa-generate-e2e-tests`；**面向用户流程用 `/e2e`**（编排 Playwright 框架+E2E 生成+trace，开发期可用 Playwright MCP 驱动浏览器自查，见 7.7）；**LLM 功能:按 `docs/eval-plan.md` 跑 eval 集 + 回归基线** |
 | **输入** | `docs/prd.md`（AC 清单）、**`docs/checklists/C-nfr.md`（NFR 目标值）**、**`docs/eval-plan.md`（LLM 功能）**、`src/` 代码 |
-| **产出** | 测试套件 + `docs/trace-matrix.md`（AC ↔ 测试映射）+ **NFR 验证结果** + **eval 结果（LLM 功能）** |
+| **产出** | 测试套件 + `docs/trace-matrix.md`（AC ↔ 测试映射，是*人*的判断）**+ `docs/evidence/test-run.json`**（*机器*的结果：哪个测试跑了、跑在哪棵产品树上、返回了什么）+ **`docs/evidence/nfr-summary.json`** + **`docs/evidence/eval-summary.json`**（LLM 功能）。见 [examples/trace-evidence](../eos/examples/trace-evidence/README.md)——那是你自己测试运行器里约 30 行的映射步骤，不是 EOS 插件 |
 | **生效规则 R6** | 金字塔结构；**每条 AC ≥1 测试**；`describe(<criterion id>)` 命名；无真实计时器/无顺序依赖；改动行覆盖率 ≥80%；**NFR 目标用 `bmad-testarch-nfr` 验证**；**LLM 输出用 eval 集+grader 验(非 exact-match),见 `ai/10-ai-llm` 规则** |
-| **决策门 G7** | ☑ 每条 AC ≥1 测试 ☑ 全绿 ☑ trace 矩阵完整 ☑ **面向用户流程 E2E 全绿（Playwright，`/e2e`）** ☑ **NFR 目标已验证或显式标 deferred+trigger** ☑ **LLM 功能:eval 达基线阈值、无回归(G-EVAL)** ☑ **spec-alignment 量化（`/spec-align`：AC 覆盖率/一次过率/无漂移）** |
+| **决策门 G7** | `node .github/eos/eos.mjs check --gate verified --scope <STORY-ID>` —— ☑ 每条 AC 追溯到一个**存在且真正跑过**的测试 ☑ 该次运行描述的是**这棵**产品树 ☑ **NFR 目标已验证，或延后且带负责人+触发条件** ☑ **LLM 功能：实测分数达阈值，且由 EOS 依据摘要自身的数字重算** ☑ **spec-alignment 量化（`/spec-align`）**。1.13.0 之前，矩阵里手写一个 `PASS` 就够了 |
 | **必查项** | 有没有"没被任何测试覆盖的 AC"？**C-nfr 里定的 P95/吞吐/SLO 有没有被验证**（而不是定了就忘）？延后的有没有显式标 trigger？**LLM 的 eval 分达阈值了吗?prompt/模型改动有没有跑回归?** |
 | **防返工** | trace 矩阵让"漏测的验收标准"无所遁形；**NFR 验证让"定了目标却没人验"无所遁形**；**eval 回归让"改 prompt 改崩了别处"无所遁形**。 |
 | **样例** | `my-app/test/auth.test.js`（10 个 AC-traced 测试全绿）、`my-app/docs/trace-matrix.md`（11/12 AC 有测试，1 个性能项显式 deferred） |
@@ -492,41 +501,41 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 | **怎么启动** | Chat 输入 **`/release-gate`**；缺 runbook 就先 **`/runbook <service>`** |
 | **输入** | 测试结果、NFR 验证结果、`ops/runbook-*.md` |
 | **产出** | 发布门禁报告（逐项 PASS/FAIL）、`ops/runbook-<service>.md` |
-| **决策门 G8（硬门）** | 逐项核验：① 质量门绿（lint+typecheck+test）② 依赖审计干净（`npm audit`/`pip-audit`）③ **NFR 目标已验证（G7 的 `bmad-testarch-nfr`，延后项带 trigger）** ④ 回滚预案可执行 ⑤ 灰度策略有文档 ⑥ health/readiness 端点 ⑦ `validate-config.mjs` PASS。**任一 FAIL 阻断发布** |
-| **必查项** | 回滚步骤是"可执行的精确步骤"还是空话？灰度延后的有没有写 trigger？审计 0 漏洞吗？**NFR 目标验了没**？ |
+| **决策门 G8（硬门）** | `node .github/eos/eos.mjs verify-release --release <id>` 会跑完提示词列出的全部 13 项：① 候选已提交 ② **质量命令在这个候选上重跑** ③ story 已 VERIFIED ④ **每个 story 的验证描述的就是这棵树** ⑤ 规格对齐 ⑥ 密钥扫描 ⑦ 依赖审计 ⑧ NFR 证据 ⑨ 合规边界 ⑩ Waiver ⑪ Runbook：回滚**+灰度+健康/就绪** ⑫ 部署拓扑 ADR ⑬ 执行权威。**任一 FAIL 阻断发布**；`DEFERRED`（离线审计、带负责人+触发条件的 NFR）可见且绝不算绿 |
+| **必查项** | 回滚步骤是"可执行的精确步骤"还是空话？灰度延后的有没有写 trigger？审计 0 漏洞吗？**NFR 目标验了没**？另外 `VERIFIED → APPROVED` 需要一位**不是候选准备者本人**记录的批准——任何模型、任何自动化都无法代劳 |
 | **防返工** | 无回滚/无灰度/NFR 未验不得上线——堵"带病上线"。 |
 | **样例** | `my-app/docs/release-gate.md`（适用项全过、`npm audit` 0 vulns）、`my-app/docs/trace-matrix.md`（性能 NFR 项显式 deferred+trigger）、`my-app/ops/runbook-auth.md`（`FEATURE_LOGIN=off` 回滚） |
 
 ---
 
-## 阶段 9 — Observability（埋点落地 + 运营闭环）
+## 阶段 9 — Observability（埋点落地 + 运营闭环）★ 自 1.13.0 起为机器门禁
 
 | 项 | 内容 |
 |---|---|
 | **目标** | 埋点上线、指标可见、形成运营闭环 |
 | **何时进入** | G8 通过 / 发布后 |
 | **怎么启动** | Chat 输入 **`/telemetry-plan`** |
-| **输入** | `docs/discovery.md`（成功指标）、代码中的事件 |
+| **输入** | `docs/discovery.json`（成功指标）、代码中的事件 |
 | **产出** | `docs/telemetry-plan.md`：事件清单（名/触发/属性）、事件↔指标映射、告警阈值、审计覆盖 |
-| **决策门 G9** | ☑ 关键路径埋点在产 ☑ **每个成功指标 ≥1 backing event** |
+| **决策门 G9** | `node .github/eos/eos.mjs check --gate telemetry-ready --scope <release>` —— ☑ **Discovery 的成功指标**作为具名信号发出 ☑ 有仪表盘 ☑ 每条告警都有 `routesTo`（没人接收的告警不是告警）☑ 定义了回滚触发条件 ☑ 有具名负责人。随后 `transition --to OBSERVED` |
 | **必查项** | 阶段 1 定的每个成功指标，都有对应埋点事件吗？敏感操作有审计吗？告警阈值定了吗？ |
 | **防返工** | 埋点在**需求阶段**就设计（D-ops），这里只做落实校验——避免上线后才发现"没法量化效果"。 |
 | **样例** | `my-app/src/auth.js` 发出 5 个 `auth.*` 事件（attempted/succeeded/failed/session.created/destroyed） |
 
 ---
 
-## 阶段 10 — Iteration（迭代 / 扩展 / 演进）
+## 阶段 10 — Iteration（迭代 / 扩展 / 演进）★ 自 1.13.0 起为机器门禁
 
 | 项 | 内容 |
 |---|---|
 | **目标** | 指标回流驱动下一轮需求；管理变更与架构演进 |
 | **何时进入** | 上线运营后、有数据/反馈 |
 | **怎么启动** | Chat 切到 **`（agent）eos-review`**（`bmad-correct-course` 变更管理、`bmad-retrospective` 复盘、`bmad-document-project` 棕地文档、`bmad-sprint-status`） |
-| **输入** | `docs/telemetry-plan.md` 的指标、用户反馈 |
+| **输入** | `docs/telemetry.json` 的信号、用户反馈 |
 | **产出** | 变更提案、下轮 backlog、retro 笔记、更新的 ADR |
-| **决策门 G10** | ☑ 每个变更经影响分析 ☑ **回写 Spec 真相源**（改 `docs/prd.md` 等） |
+| **决策门 G10** | `node .github/eos/eos.mjs check --gate iteration-ready --scope <release>` —— ☑ 每条学习都回写到**真实存在**的文档 ☑ 记录里写的是**这一次**发布（一份写回不能关闭此后所有发布）☑ Agentic 产品把生产反馈送入 eval 数据集，并为变更后的 prompt/模型重建基线 ☑ 决策有负责人。随后 `transition --to ITERATED` |
 | **必查项** | 变更只改了代码、忘了回写 PRD 吗？（那就是 spec/code 漂移，反模式 P10） |
-| **防返工** | `eos-review` 的 handoff 直接把你带回 `/requirements`，闭环成下一轮 [2]。 |
+| **防返工** | `eos-review` 的 handoff 直接把你带回 `/requirements`，闭环成下一轮 [2]。**被回滚**的发布也走这里：`ROLLED_BACK` 会路由到事故复盘，并经由同一条写回收口——它永远无法重新发布那个刚刚失败的候选。 |
 | **样例** | `my-app/docs/prd.md §6 Iteration Log`：由埋点观察触发 CR-001，回写进 PRD |
 
 ---
@@ -535,17 +544,17 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 
 | 阶段 | 启动方式 | 产物 | 门 | → 下一步 |
 |---|---|---|---|---|
-| 1 Discovery | `（agent）eos-discovery` | `docs/discovery.md` | G1 | `/requirements "<f>"` |
-| 2 Requirements | `/requirements "<f>"` | `docs/requirements.md` | **G2★** | `/spec` |
-| 3 Spec | `/spec` | `docs/prd.md` | G3 | `/ux-spec`（后端可跳→ `eos-architecture`） |
-| 3.5 UX & Design | `/ux-spec`（或 `（agent）eos-design`） | `DESIGN.md`+`EXPERIENCE.md` | G-UX（条件） | `（agent）eos-architecture` |
-| 4 Architecture | `（agent）eos-architecture` + `/adr` + `/deploy-topology` | `architecture.md`+`openapi.yaml`+`adr/*`+`G-deployment.md` | G4 | `（agent）eos-plan`（先锁栈+ADR+拓扑） |
-| 5 Planning | `（agent）eos-plan` | `docs/stories/*` | G5 | `bmad-dev-story` |
-| 6 Development | `bmad-dev-story` → `bmad-code-review` | `src/*` + 审查结论 | G6 | `/e2e`（或 `bmad-tea`/`bmad-testarch-*`） |
-| 7 Testing | `/e2e`（或 `bmad-tea`/`bmad-testarch-*`） | tests + `trace-matrix.md` | G7 | `/release-gate` |
-| 8 Release | `/release-gate`（+`/runbook`） | 门禁报告 + runbook | **G8★** | `/telemetry-plan` |
-| 9 Observability | `/telemetry-plan` | `docs/telemetry-plan.md` | G9 | `（agent）eos-review` |
-| 10 Iteration | `（agent）eos-review` | 变更提案 + 回写 PRD | G10 | ⟲ `/requirements`（下一轮） |
+| 1 Discovery | `（agent）eos-discovery` | `discovery.md` **+ `discovery.json`** | `discovery-ready` | `/requirements "<f>"` |
+| 2 Requirements | `/requirements "<f>"` | `requirements.md` **+ `requirements.json`** | **`requirements-ready`★** | `/spec` |
+| 3 Spec | `/spec` | `docs/prd.md` | `prd-ready` | `/ux-spec`（后端可跳→ `eos-architecture`） |
+| 3.5 UX & Design | `/ux-spec`（或 `（agent）eos-design`） | `DESIGN.md`+`EXPERIENCE.md` **+ `design.json`** | `ux-ready`（条件） | `（agent）eos-architecture` |
+| 4 Architecture | `（agent）eos-architecture` + `/adr` + `/deploy-topology` | `architecture.md` **+ `architecture.json`**+`openapi.yaml`+`adr/*` | `architecture-ready` | `（agent）eos-plan`（先锁栈+ADR+拓扑） |
+| 5 Planning | `（agent）eos-plan` | `docs/stories/*` | `story-ready` | `bmad-dev-story` |
+| 6 Development | `bmad-dev-story` → `bmad-code-review` | `src/*` + 审查结论 | `project-gate.mjs` | `/e2e`（或 `bmad-tea`/`bmad-testarch-*`） |
+| 7 Testing | `/e2e`（或 `bmad-tea`/`bmad-testarch-*`） | 测试 + `trace-matrix.md` **+ `evidence/test-run.json`** | `verified` | `/release-gate` |
+| 8 Release | `/release-gate`（+`/runbook`） | 门禁报告 + runbook **+ `evidence/nfr-summary.json`** | **`release-ready`★** | `/telemetry-plan` |
+| 9 Observability | `/telemetry-plan` | `telemetry-plan.md` **+ `telemetry.json`** | `telemetry-ready` | `（agent）eos-review` |
+| 10 Iteration | `（agent）eos-review` | **`iteration.json`** + PRD 回写 | `iteration-ready` | ⟲ `/requirements`（下一轮） |
 
 > **不跳阶段**：每个 EOS 命令/agent 跑完都会提示"→ 下一步"（prompt 末尾的 **Next** 面包屑 + agent 的 **handoff** 按钮）。阶段 6/7 是纯 BMAD skill，`eos-plan` 的 "Start Development" handoff 已把下游尾链（dev→review G6→test G7→release G8）一次性交代给 agent，跑完不断线。
 
@@ -741,7 +750,33 @@ LLM tracing（token/成本/context/tool-span）。
 | `/runbook` | 生成运维 runbook（含回滚步骤） | `<service 名>` | `ops/runbook-<service>.md` |
 | `/validate-config` | EOS 配置静态+语义体检 | — | 问题表（不改代码） |
 
-## 7.2 编排 Agents（`.github/agents/`）
+## 7.2 EOS CLI（`node .github/eos/eos.mjs <command>`）
+
+以下全部离线、零依赖、跨平台。退出码：`0` 通过 · `1` 失败或迁移被拒 · `2` 阻塞/待执行/失效 · `3` EOS 自身无法求值。
+
+| 命令 | 用途 |
+|---|---|
+| `next` | 唯一推荐的下一步动作、为什么、以及怎么开始（`--why`、`--all`） |
+| `resume` | 在新会话里恢复本机的关注点 |
+| `status` | 产品与当前 scope 处在哪里（`--changed`） |
+| `check --gate <id> [--scope <id>]` | 真正跑一道门禁并记录证据 |
+| `explain <gate>` | 按需打印某一道门禁的完整规则 |
+| `transition --scope <type> --id <id> --to <STATE>` | 迁移一个 scope，由已记录的证据把守 |
+| `approve --scope <type> --id <id>` | 记录一次批准——必须是与申请人**不同**的人 |
+| `release-status` / `verify-release --release <id>` | 汇总就绪度 / 候选绑定的发布验证（G8） |
+| **`product-tree`** | 一次验证所对应的产品树身份。`--json` 打印摘要，供你的测试运行器写进 `docs/evidence/test-run.json` |
+| `waive --gate … --reason … --risk-owner … --expires …` | 记录一份有期限、有归属的豁免（不可豁免的门禁永远拿不到） |
+| `handoff --scope <type> --id <id>` | 把当前步骤交接给另一个 agent/会话 |
+| `ledger [--verify] [--against <ref>]` | 校验只追加的哈希链 |
+| `focus --scope <type> --id <id>` | 设置本机的本地关注点（不携带任何权威） |
+| `init [--write]` | 报告或创建本地的、非破坏性的集成文件 |
+| `doctor` | EOS 自身接线是否正确 |
+
+**门禁 id**（`check --gate <id>`）：`activation` · `discovery-ready` · `requirements-ready` ·
+`prd-ready` · `ux-ready` · `architecture-ready` · `story-ready` · `verified` · `release-ready` ·
+`telemetry-ready` · `iteration-ready`。
+
+## 7.3 编排 Agents（`.github/agents/`）
 
 | Agent | 阶段 | 复用的 BMAD | handoff 去向 |
 |---|---|---|---|
@@ -782,7 +817,7 @@ LLM tracing（token/成本/context/tool-span）。
 > `/release-gate` 等 prompt 文件不依赖 agent 选择器，输入 `/` 即可看到。agent 只是"编排 persona"，
 > 其能力都能用对应 prompt/skill 手动触发（见 7.1 与 `docs/eos/agent-map.md`）。
 
-## 7.3 规则文件（`.github/instructions/`）
+## 7.4 规则文件（`.github/instructions/`）
 
 | 文件 | `applyTo` | 管什么 |
 |---|---|---|
@@ -802,7 +837,7 @@ LLM tracing（token/成本/context/tool-span）。
 
 > R1 全局信念在 `.github/copilot-instructions.md`（不在上表，因为它是 always-on 顶层文件）。
 
-## 7.4 项目级 Skill（`.github/skills/`）
+## 7.5 项目级 Skill（`.github/skills/`）
 
 | Skill | 何时用 | 作用 |
 |---|---|---|
@@ -811,7 +846,7 @@ LLM tracing（token/成本/context/tool-span）。
 
 > 73 个用户级 `bmad-*` skill 见 `docs/eos/agent-map.md` 的阶段映射表。
 
-## 7.5 Hooks（`.github/hooks/`）
+## 7.6 Hooks（`.github/hooks/`）
 
 | 文件 | 事件 | 作用 |
 |---|---|---|
@@ -840,7 +875,7 @@ act push --pull=false --action-offline-mode   # 首次拉过镜像后可完全�
 ```
 > 三道强制层各司其职：**Hook（逐编辑实时）**=`config-check.json` 每次编辑跑 `validate-config.mjs`+`eos-doctor.mjs`（配置合规 + G-EVAL 连线）、`quality.json` 跑质量门、`guardrails.json` 拦危险操作 · **静态校验（手动/按需）**=同两个脚本可随时手跑 · **act CI（合并/发布前全仓批量）**=`eos-ci.yml` 跑 validate-config+eos-doctor+tests+evals。同一门（如 G-EVAL）在逐编辑与 CI 两处都强制，早发现也防漏网。
 
-## 7.6 六张需求清单（`docs/checklists/`；第六张仅受监管行业）
+## 7.7 六张需求清单（`docs/checklists/`；第六张仅受监管行业）
 
 | 文件 | 名称 | 用途 | 在哪个门用 |
 |---|---|---|---|
@@ -856,7 +891,7 @@ act push --pull=false --action-offline-mode   # 首次拉过镜像后可完全�
 
 ---
 
-## 7.7 浏览器自动化测试（Playwright MCP）【新建补强·映射 VS Code MCP 原生机制】
+## 7.8 浏览器自动化测试（Playwright MCP）【新建补强·映射 VS Code MCP 原生机制】
 
 想要"agent 亲自开浏览器点一点、截图自查"（类似 Antigravity 的 Chrome 集成）？VS Code + Copilot
 的原生做法是 **MCP server + agent 模式**。模板把它做成**纯本地、沙箱化、默认关闭（opt-in）**的

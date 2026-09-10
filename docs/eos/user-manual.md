@@ -247,24 +247,36 @@ So EOS **never depends on "Rule A overriding Rule B"**. The only reliable contro
 
 ## 5.2 Ten decision gates (G1–G10)
 
-| Gate | Phase | Pass criteria (do not enter the next phase if not passed) |
-|---|---|---|
-| G1 | Discovery | Problem is a falsifiable one-sentence statement + success metrics are measurable |
-| **G2** | Requirements | **Five checklists have no unresolved BLOCKER (mandatory hard gate)** |
-| G3 | Spec | Every requirement has ≥1 measurable acceptance criterion |
-| G-UX | UX & Design (conditional) | User-facing: every requirement has screen/flow/four states/a11y/visual tokens; pure backend SKIP+reason |
-| G-EVAL | Eval (conditional · LLM/agentic) | Every LLM-backed AC has eval case+grader+threshold; includes injection/cost cases; pure deterministic feature SKIP+reason |
-| G4 | Architecture | Irreversible decisions have ADRs; NFR/scale/DR each have explicit design |
-| G5 | Planning | Every story is self-contained, independently implementable, and includes AC |
-| G6 | Development | lint/typecheck/unit tests all green (hook quality gate) + code review has no blockers |
-| G7 | Testing | Every AC has ≥1 test and all are green; trace matrix is complete |
-| **G8** | Release | **Quality + audit + rollback + canary + NFR gates all pass (mandatory hard gate)** |
-| G9 | Observability | Key-path telemetry is in production and metrics are visible |
-| G10 | Iteration | Every change is written back to the Spec source of truth |
+| Gate | Phase | Machine gate id | Pass criteria (do not enter the next phase if not passed) |
+|---|---|---|---|
+| G0 | Activation | `activation` | The project declares what it is and how it is verified |
+| G1 | Discovery | `discovery-ready` | Falsifiable problem + a metric with a target **and a data source** + explicit scope in/out |
+| **G2** | Requirements | `requirements-ready` | **Every operational concern is ADOPT / SKIP+reason / DEFER+owner+trigger (hard gate)** |
+| G3 | Spec | `prd-ready` | Every requirement has ≥1 acceptance criterion that is **defined**, not merely mentioned |
+| G-UX | UX & Design (conditional) | `ux-ready` | User-facing: DESIGN.md **and** EXPERIENCE.md, with flows/states/a11y/tokens/responsive each covered; non-UI: structured SKIP + reason |
+| G-EVAL | Eval (conditional · LLM/agentic) | part of `verified` | Every LLM-backed AC has an eval case whose **measured score meets its threshold**, bound to prompt/model/dataset/grader |
+| G4 | Architecture | `architecture-ready` | Irreversible decisions have ADRs; every NFR lands on a named component |
+| G5 | Planning | `story-ready` | Every story is self-contained, independently implementable, with AC and decided ops tasks |
+| G6 | Development | `project-gate.mjs` | lint/typecheck/unit tests all green + code review has no blockers |
+| G7 | Testing | `verified` | Every AC traces to a test that **actually ran** against **this** product tree |
+| **G8** | Release | `release-ready` | **The candidate itself is re-tested; quality + supply chain + NFR + rollback/canary/health all hold (hard gate)** |
+| G9 | Observability | `telemetry-ready` | The success metric is emitted as a real signal; routed alerts + rollback trigger + a named owner |
+| G10 | Iteration | `iteration-ready` | Every change is written back to the Spec source of truth, with an owner |
 
 **G2 and G8 are the two hard gates**: the former blocks "post-launch rework"; the latter blocks "launching while sick".
 
-> **Which gates can be machine-enforced**: configuration compliance (`validate-config.mjs`, S1–S11), G-EVAL (`eos-doctor.mjs`: code under `ai/llm/rag` but no `docs/eval-plan.md` → error), G6 quality and G7 tests/evals (`npm test`/evals)--all of these are batch-run by local CI `.github/workflows/eos-ci.yml` (`act push`, requires Docker) before merge/release. The remaining gates that lean toward content/judgment (G1/G3/G4/G5/G-UX/G10) rely on prompts + checklists + human review.
+> **Which gates are machine-enforced**: since `eos-1.13.0`, **all of them** — run one with
+> `node .github/eos/eos.mjs check --gate <id>`, and `eos next` runs them for you. Each stage keeps its
+> human document **and** a small structured record beside it (`docs/discovery.json`,
+> `docs/requirements.json`, `docs/design.json`, `docs/architecture.json`, `docs/telemetry.json`,
+> `docs/iteration.json`); the gate reads the record, because prose is exactly what a gate must not be
+> able to be talked past. Before 1.13.0, G1/G2/G-UX/G4 only checked that a file existed, so four empty
+> documents could carry a product to "architecture approved".
+>
+> What a machine still cannot decide is **judgement**: whether the problem is the right problem,
+> whether a threshold was set honestly, whether a design is good. EOS records those decisions and
+> refuses to invent them — a release still requires an approval from someone other than whoever
+> prepared the candidate.
 
 ---
 
@@ -310,8 +322,8 @@ So EOS **never depends on "Rule A overriding Rule B"**. The only reliable contro
 | **When to enter** | You have an idea but cannot yet say "what success looks like" |
 | **How to start** | Switch Chat to **`(agent) eos-discovery`**; it will call `bmad-brainstorming` + `bmad-agent-analyst` (Mary), optionally using `bmad-forge-idea` for pressure testing |
 | **Input** | Raw idea (spoken description is fine) |
-| **Output** | `docs/discovery.md`: problem statement, falsification conditions, success metrics table, scope-in/out |
-| **Decision gate G1** | ☑ Problem is a falsifiable one-sentence statement ☑ Success metrics are measurable |
+| **Output** | `docs/discovery.md` (the narrative) **+ `docs/discovery.json`** (the record G1 reads: `problem.falsifiableBy`, `successMetric.target` + `dataSource`, `scope.in`/`scope.out`) |
+| **Decision gate G1** | `node .github/eos/eos.mjs check --gate discovery-ready` — ☑ the problem states what would prove it wrong ☑ the metric has a target **and a data source** ☑ scope has both sides ☑ no unresolved blocking question |
 | **Must-check items** | Can you write "what failure looks like"? Do metrics have numeric values and data sources? Did you write out-of-scope (what not to do)? |
 | **Anti-rework** | This is the cheapest correction point. If the problem is not locked and you move on, every later step amplifies the deviation. |
 | **Example** | `my-app/docs/discovery.md` (4 measurable metrics such as login success rate ≥98%, p95≤300ms) |
@@ -327,10 +339,10 @@ So EOS **never depends on "Rule A overriding Rule B"**. The only reliable contro
 | **Goal** | Expand functional requirements + NFR + **move operational requirements upfront** (telemetry/authz/rollback...), preventing "post-launch rework" |
 | **When to enter** | G1 passed and `docs/discovery.md` is ready |
 | **How to start** | Enter **`/requirements "<feature>"`** in Chat (wraps `bmad-agent-pm` / `bmad-prd` + skill `eos-operational-readiness`) |
-| **Input** | `docs/discovery.md` |
-| **Output** | `docs/requirements.md`, **with "Operational Pre-Flight Decision Table" at the top** |
-| **Decision gate G2 (hard gate)** | Walk through all five checklists A/B/C/D/E (**regulated industries add the sixth F-compliance**); **any unresolved item = BLOCKER; cannot enter Spec until cleared** |
-| **Must-check items** | For the 11 operational pre-flight items (telemetry/authz/audit/rollback/monitoring/canary/quota/i18n/multi-tenancy/capacity-SLO/DR), every item must choose one of three: **ADOPT / SKIP+reason / DEFER+trigger**; blanks are forbidden |
+| **Input** | `docs/discovery.md` + `docs/discovery.json` |
+| **Output** | `docs/requirements.md` (the narrative) **+ `docs/requirements.json`** (the record G2 reads: `FR<n>`, quantified `NFR<n>`, and the 11-item `operationalPreFlight`) |
+| **Decision gate G2 (hard gate)** | `node .github/eos/eos.mjs check --gate requirements-ready` — plus the five checklists A/B/C/D/E (**regulated industries add the sixth F-compliance**); **any unresolved item = BLOCKER; cannot enter Spec until cleared** |
+| **Must-check items** | For the 11 operational pre-flight items (telemetry/authz/audit/rollback/monitoring/canary/quota/i18n/multi-tenancy/capacity-SLO/DR), every item must choose one of three: **`ADOPT` + what will be built / `SKIP` + reason / `DEFER` + owner + trigger**. Blanks are forbidden, and so is a bare `SKIP` — since 1.13.0 the gate rejects it, along with placeholder "reasons" like `-` or `...`. Every NFR needs a target, or it cannot be verified at G8. |
 | **Anti-rework** | Use the "reverse questioning method" to force out hidden requirements: who is **not authorized** to do this? How do we **roll back** if it goes wrong? How do we **know** whether it is used in production? What happens at ×100 users? |
 | **Example** | `my-app/docs/requirements.md` (11-item decision table + authz matrix + A/B/C/D walkthrough conclusions with no BLOCKER) |
 
@@ -356,9 +368,9 @@ So EOS **never depends on "Rule A overriding Rule B"**. The only reliable contro
 | **Goal** | Solidify requirements into a PRD that becomes the only downstream recognized source of truth |
 | **When to enter** | G2 passed and `docs/requirements.md` has no BLOCKER |
 | **How to start** | Enter **`/spec`** in Chat (draft and validate with `bmad-prd`) |
-| **Input** | `docs/requirements.md` |
+| **Input** | `docs/requirements.md` + `docs/requirements.json` |
 | **Output** | `docs/prd.md`: every FR has acceptance criteria + NFR section (from C-nfr, no blanks) |
-| **Decision gate G3** | ☑ Every requirement has ≥1 measurable acceptance criterion |
+| **Decision gate G3** | `node .github/eos/eos.mjs check --gate prd-ready` — ☑ every requirement has ≥1 acceptance criterion that is **defined** (its `AC<n>.<n>` id opens a list item, table row or heading **and** carries the criterion text). A sentence that merely names an id is a reference: since 1.13.0 a story can no longer claim to implement it |
 | **Must-check items** | Can the acceptance criteria be written as tests? Did the NFR section copy the target values from C-nfr? Is scope-out written? |
 | **Anti-rework** | The PRD is the contract. From here on, downstream only recognizes `docs/prd.md`; any "I assumed" must come back to update the PRD. |
 | **Example** | `my-app/docs/prd.md` (FR1–FR5, each with AC1.1...AC5.3) |
@@ -373,11 +385,11 @@ So EOS **never depends on "Rule A overriding Rule B"**. The only reliable contro
 | **When to enter** | G3 passed and `docs/prd.md` is ready. **Required for user-facing products**; pure backend/API/CLI projects may SKIP |
 | **How to start** | Enter **`/ux-spec`** in Chat (wraps `bmad-ux`) or switch to **`(agent) eos-design`**; if the problem is still vague use `bmad-cis-design-thinking` (Maya), and for strong opinionated design use `bmad-agent-ux-designer` (Sally) |
 | **Input** | `docs/prd.md` |
-| **Output** | `docs/DESIGN.md` (visual identity: tokens/fonts/colors/spacing) + `docs/EXPERIENCE.md` (information architecture/user flows/screen states/interactions/a11y/journey) |
-| **Decision gate G-UX** | ☑ Every user-facing requirement has screen/flow ☑ loading/empty/error/success four states are complete ☑ a11y baseline (keyboard/focus/labels/contrast) ☑ use named tokens from DESIGN.md, no hard-coding; pure backend → write `SKIP — no user interface (reason)` in `EXPERIENCE.md` |
+| **Output** | `docs/DESIGN.md` (visual identity: tokens/fonts/colors/spacing) + `docs/EXPERIENCE.md` (information architecture/user flows/screen states/interactions/a11y/journey) **+ `docs/design.json`** (the record G-UX reads: `userInterface` true/false, and `coverage` for flows/states/accessibility/designTokens/responsive) |
+| **Decision gate G-UX** | `node .github/eos/eos.mjs check --gate ux-ready` — a user-facing product needs **BOTH** documents with real content and every coverage dimension `COVERED` + a ref or `NOT_APPLICABLE` + a reason. Before 1.13.0 only one file's *existence* was checked, so a UI product with no `DESIGN.md` at all walked through |
 | **Must-check items** | Are empty/error/loading states defined for every screen? Can key actions be completed with keyboard only? Are colors/spacing referencing tokens or hard-coded? |
 | **Anti-rework** | The UX contract comes **before** architecture and implementation: architecture uses it to decide APIs/data, stories reference screens from it, and frontend rules and telemetry land from it. The two contracts are authoritative for any later mock/import. |
-| **Skippable** | Pure backend/CLI: one line `SKIP + reason` passes the gate and does not block. |
+| **Skippable** | Pure backend/CLI: record `{ "userInterface": false, "skipReason": "…" }` in `docs/design.json`. It must be **stated** — silence is not a skip, and neither is the bare word "SKIP". |
 
 > Reuse note 【BMAD + augmentation】: capabilities come from `bmad-ux` / `bmad-agent-ux-designer` (Sally) / `bmad-cis-design-thinking` (Maya).
 > EOS only adds orchestration (`/ux-spec` prompt + `eos-design` agent + G-UX gate) and **does not rebuild design capability**.
@@ -391,9 +403,9 @@ So EOS **never depends on "Rule A overriding Rule B"**. The only reliable contro
 | **Goal** | Technical solution, data model, API contract, NFR landing points, and trace for key decisions (ADR) |
 | **When to enter** | G3 passed and `docs/prd.md` is ready |
 | **How to start** | Switch Chat to **`(agent) eos-architecture`** (calls `bmad-architecture`/Winston); run **`/adr`** for every irreversible decision; run **`/deploy-topology`** to choose deployment topology |
-| **Input** | `docs/prd.md`, `docs/EXPERIENCE.md`+`docs/DESIGN.md` (if UX phase was done), `docs/checklists/C-nfr.md`, `docs/checklists/G-deployment.md` |
-| **Output** | `docs/architecture.md` (including Deployment section), `docs/data-model.md`, `api/openapi.yaml`, `docs/adr/NNN-*.md` (including tech-stack + deployment-topology ADRs), filled `G-deployment.md` |
-| **Decision gate G4** | ☑ Scalability/resilience/DR/security each have explicit design (not "later") ☑ Every irreversible decision has an ADR ☑ **Tech stack is locked** ☑ **Deployment topology is selected** (NFR basis + deployment-topology ADR) |
+| **Input** | `docs/prd.md`, `docs/requirements.json` (for the NFR set), `docs/EXPERIENCE.md`+`docs/DESIGN.md` (if UX phase was done), `docs/checklists/C-nfr.md`, `docs/checklists/G-deployment.md` |
+| **Output** | `docs/architecture.md` (including Deployment section) **+ `docs/architecture.json`** (the record G4 reads: a decision for stack/topology/authz/security/audit/rollback/DR/data/API/event — plus tool allow-list, bounded orchestration, memory layering, async boundary and eval architecture for an agentic product, and the data/approval boundary for a regulated one — and an `nfrLandingPoints` entry per NFR), `docs/data-model.md`, `api/openapi.yaml`, `docs/adr/NNN-*.md`, filled `G-deployment.md` |
+| **Decision gate G4** | `node .github/eos/eos.mjs check --gate architecture-ready` — ☑ every concern is `DECIDED` + summary or `NOT_APPLICABLE` + reason ☑ stack and topology each cite an ADR that **exists** ☑ **every NFR in `docs/requirements.json` lands on a named component and mechanism** |
 | **Must-check items** | Was the API contract written **before** implementation? Does each ADR list alternatives and trade-offs? Does every NFR have a landing point? **Did the deployment topology choose "the simplest option that satisfies NFR" (rather than following the K8s trend)**? |
 | **Anti-rework** | "API before implementation" lets frontend and backend proceed in parallel and anchors the contract in tests; ADRs prevent team amnesia. |
 | **Example** | `my-app/docs/adr/0001-session-strategy.md` (3-solution comparison + trade-off), `my-app/api/openapi.yaml` (written before `src/auth.js`) |
@@ -452,10 +464,10 @@ So EOS **never depends on "Rule A overriding Rule B"**. The only reliable contro
 | **When to enter** | G6 passed |
 | **How to start** | Enter **`bmad-tea`** (Murat) / `bmad-testarch-test-design` / `bmad-testarch-automate` / `bmad-testarch-trace` / **`bmad-testarch-nfr`** / `bmad-qa-generate-e2e-tests`; **use `/e2e` for user-facing flows** (orchestrates Playwright framework + E2E generation + trace; during development Playwright MCP can drive browser self-checks, see 7.7); **LLM features: run the eval set + regression baseline according to `docs/eval-plan.md`** |
 | **Input** | `docs/prd.md` (AC list), **`docs/checklists/C-nfr.md` (NFR targets)**, **`docs/eval-plan.md` (LLM features)**, `src/` code |
-| **Output** | Test suite + `docs/trace-matrix.md` (AC ↔ test mapping) + **NFR verification results** + **eval results (LLM features)** |
+| **Output** | Test suite + `docs/trace-matrix.md` (AC ↔ test mapping — the *human* decision) **+ `docs/evidence/test-run.json`** (the *machine* result: which test ran, against which product tree, and what it returned) + **`docs/evidence/nfr-summary.json`** + **`docs/evidence/eval-summary.json`** (LLM features). See [examples/trace-evidence](examples/trace-evidence/README.md) — it is a ~30-line mapping step in your own runner, not an EOS plugin |
 | **Effective rule R6** | Test pyramid; **every AC has ≥1 test**; `describe(<criterion id>)` naming; no real timers/no order dependency; changed-line coverage ≥80%; **verify NFR targets with `bmad-testarch-nfr`**; **verify LLM output with eval set+grader (not exact-match), see `ai/10-ai-llm` rule** |
-| **Decision gate G7** | ☑ Every AC has ≥1 test ☑ all green ☑ trace matrix complete ☑ **user-facing flow E2E all green (Playwright, `/e2e`)** ☑ **NFR targets verified or explicitly marked deferred+trigger** ☑ **LLM features: eval reaches baseline threshold, no regression (G-EVAL)** ☑ **spec-alignment quantified (`/spec-align`: AC coverage/first-pass rate/no drift)** |
-| **Must-check items** | Are there ACs not covered by any test? **Were the P95/throughput/SLO targets defined in C-nfr verified** (instead of set and forgotten)? Are deferred items explicitly marked with triggers? **Did the LLM eval score reach the threshold? Were regressions run after prompt/model changes?** |
+| **Decision gate G7** | `node .github/eos/eos.mjs check --gate verified --scope <STORY-ID>` — ☑ every AC traces to a test that **exists and actually ran** ☑ the run describes **this** product tree ☑ **NFR targets verified or deferred with an owner+trigger** ☑ **LLM features: the measured score meets its threshold, recomputed by EOS from the summary's own numbers** ☑ **spec-alignment quantified (`/spec-align`)**. Before 1.13.0 a hand-written `PASS` in the matrix was enough |
+| **Must-check items** | Are there ACs not covered by any test? **Were the P95/throughput/SLO targets defined in C-nfr verified** (instead of set and forgotten)? Are deferred items explicitly marked with triggers? **Did the LLM eval score reach the threshold? Were regressions run after prompt/model changes?** Since 1.13.0, editing the source, tests, prompts or eval data **after** verifying makes the recorded PASS `STALE` and blocks the merge — re-run, do not re-assert |
 | **Anti-rework** | The trace matrix exposes "untested acceptance criteria"; **NFR verification exposes "targets set but never verified"**; **eval regression exposes "prompt changes broke something else"**. |
 | **Example** | `my-app/test/auth.test.js` (10 AC-traced tests all green), `my-app/docs/trace-matrix.md` (11/12 ACs have tests, 1 performance item explicitly deferred) |
 
@@ -470,41 +482,41 @@ So EOS **never depends on "Rule A overriding Rule B"**. The only reliable contro
 | **How to start** | Enter **`/release-gate`** in Chat; if runbook is missing, run **`/runbook <service>`** first |
 | **Input** | Test results, NFR verification results, `ops/runbook-*.md` |
 | **Output** | Release-gate report (PASS/FAIL item by item), `ops/runbook-<service>.md` |
-| **Decision gate G8 (hard gate)** | Verify item by item: ① quality gate green (lint+typecheck+test) ② dependency audit clean (`npm audit`/`pip-audit`) ③ **NFR targets verified (G7's `bmad-testarch-nfr`; deferred items have triggers)** ④ rollback plan executable ⑤ canary strategy documented ⑥ health/readiness endpoints ⑦ `validate-config.mjs` PASS. **Any FAIL blocks release** |
-| **Must-check items** | Are rollback steps "exact executable steps" or empty words? Do deferred canary items have triggers? Does audit show 0 vulnerabilities? **Were NFR targets verified**? |
+| **Decision gate G8 (hard gate)** | `node .github/eos/eos.mjs verify-release --release <id>` runs all 13 checks the prompt lists: ① the candidate is committed ② **the quality commands re-run ON THIS candidate** ③ stories VERIFIED ④ **each story's verification describes THIS tree** ⑤ spec alignment ⑥ secret scan ⑦ dependency audit ⑧ NFR evidence ⑨ compliance boundary ⑩ waivers ⑪ runbook: rollback **+ canary + health/readiness** ⑫ deployment-topology ADR ⑬ enforcement authority. **Any FAIL blocks release**; `DEFERRED` (an offline audit, an NFR with owner+trigger) is visible and never green |
+| **Must-check items** | Are rollback steps "exact executable steps" or empty words? Do deferred canary items have triggers? Does audit show 0 vulnerabilities? **Were NFR targets verified**? Note that `VERIFIED → APPROVED` needs an approval recorded by **someone other than whoever prepared the candidate** — no model, and no automation, can supply it |
 | **Anti-rework** | No rollback/no canary/unverified NFR means no launch--blocks "launching while sick". |
 | **Example** | `my-app/docs/release-gate.md` (all applicable items pass, `npm audit` 0 vulns), `my-app/docs/trace-matrix.md` (performance NFR item explicitly deferred+trigger), `my-app/ops/runbook-auth.md` (`FEATURE_LOGIN=off` rollback) |
 
 ---
 
-## Phase 9 — Observability (telemetry landing + ops loop)
+## Phase 9 — Observability (telemetry landing + ops loop) ★ machine gate since 1.13.0
 
 | Item | Content |
 |---|---|
 | **Goal** | Telemetry is live, metrics are visible, and an operational loop exists |
 | **When to enter** | G8 passed / after release |
 | **How to start** | Enter **`/telemetry-plan`** in Chat |
-| **Input** | `docs/discovery.md` (success metrics), events in code |
-| **Output** | `docs/telemetry-plan.md`: event list (name/trigger/properties), event↔metric mapping, alert thresholds, audit coverage |
-| **Decision gate G9** | ☑ Key-path telemetry is in production ☑ **every success metric has ≥1 backing event** |
+| **Input** | `docs/discovery.json` (the success metric), events in code |
+| **Output** | `docs/telemetry-plan.md` (the narrative) **+ `docs/telemetry.json`** (the record G9 reads: signals, dashboards, routed alerts, sensitive-operation audit, `rolloutMetrics.rollbackTrigger`, owner) |
+| **Decision gate G9** | `node .github/eos/eos.mjs check --gate telemetry-ready --scope <release>` — ☑ the **discovery success metric** is emitted as a named signal ☑ dashboards exist ☑ every alert has a `routesTo` (an alert nobody receives is not an alert) ☑ a rollback trigger is defined ☑ a named owner reads it. Then `transition --to OBSERVED` |
 | **Must-check items** | Does every success metric defined in Phase 1 have a corresponding telemetry event? Are sensitive operations audited? Are alert thresholds defined? |
 | **Anti-rework** | Telemetry is designed in the **requirements phase** (D-ops); here we only verify implementation--avoiding the post-launch discovery that "we cannot quantify impact". |
 | **Example** | `my-app/src/auth.js` emits 5 `auth.*` events (attempted/succeeded/failed/session.created/destroyed) |
 
 ---
 
-## Phase 10 — Iteration (iterate / extend / evolve)
+## Phase 10 — Iteration (iterate / extend / evolve) ★ machine gate since 1.13.0
 
 | Item | Content |
 |---|---|
 | **Goal** | Metrics feed back into the next round of requirements; manage change and architecture evolution |
 | **When to enter** | After launch operations, with data/feedback |
 | **How to start** | Switch Chat to **`(agent) eos-review`** (`bmad-correct-course` change management, `bmad-retrospective` retrospective, `bmad-document-project` brownfield docs, `bmad-sprint-status`) |
-| **Input** | Metrics from `docs/telemetry-plan.md`, user feedback |
-| **Output** | Change proposal, next-round backlog, retro notes, updated ADRs |
-| **Decision gate G10** | ☑ Every change has impact analysis ☑ **write back to the Spec source of truth** (update `docs/prd.md`, etc.) |
+| **Input** | Signals from `docs/telemetry.json`, user feedback |
+| **Output** | **`docs/iteration.json`** (the record G10 reads: the learnings, **where each one landed**, the eval-dataset update and baseline decision for an agentic product, and a named owner recording CONTINUE / CORRECT_COURSE / STOP) + change proposal, next-round backlog, retro notes, updated ADRs |
+| **Decision gate G10** | `node .github/eos/eos.mjs check --gate iteration-ready --scope <release>` — ☑ every learning is written back to a document that **exists** ☑ the record names **this** release (one write-back cannot close every future release) ☑ an agentic product feeds production into its eval dataset and re-baselines a changed prompt/model ☑ the decision has an owner. Then `transition --to ITERATED` |
 | **Must-check items** | Did the change modify code only and forget to update the PRD? (that is spec/code drift, anti-pattern P10) |
-| **Anti-rework** | `eos-review`'s handoff takes you directly back to `/requirements`, closing the loop into the next round [2]. |
+| **Anti-rework** | `eos-review`'s handoff takes you directly back to `/requirements`, closing the loop into the next round [2]. A **rolled-back** release comes here too: `ROLLED_BACK` routes to an incident review and closes through this same write-back — it can never reship the candidate that just failed. |
 | **Example** | `my-app/docs/prd.md §6 Iteration Log`: telemetry observation triggers CR-001, written back into PRD |
 
 ---
@@ -513,17 +525,17 @@ So EOS **never depends on "Rule A overriding Rule B"**. The only reliable contro
 
 | Phase | How to start | Artifact | Gate | → Next step |
 |---|---|---|---|---|
-| 1 Discovery | `(agent) eos-discovery` | `docs/discovery.md` | G1 | `/requirements "<f>"` |
-| 2 Requirements | `/requirements "<f>"` | `docs/requirements.md` | **G2★** | `/spec` |
-| 3 Spec | `/spec` | `docs/prd.md` | G3 | `/ux-spec` (backend may skip → `eos-architecture`) |
-| 3.5 UX & Design | `/ux-spec` (or `(agent) eos-design`) | `DESIGN.md`+`EXPERIENCE.md` | G-UX (conditional) | `(agent) eos-architecture` |
-| 4 Architecture | `(agent) eos-architecture` + `/adr` + `/deploy-topology` | `architecture.md`+`openapi.yaml`+`adr/*`+`G-deployment.md` | G4 | `(agent) eos-plan` (lock stack+ADR+topology first) |
-| 5 Planning | `(agent) eos-plan` | `docs/stories/*` | G5 | `bmad-dev-story` |
-| 6 Development | `bmad-dev-story` → `bmad-code-review` | `src/*` + review conclusion | G6 | `/e2e` (or `bmad-tea`/`bmad-testarch-*`) |
-| 7 Testing | `/e2e` (or `bmad-tea`/`bmad-testarch-*`) | tests + `trace-matrix.md` | G7 | `/release-gate` |
-| 8 Release | `/release-gate` (+`/runbook`) | gate report + runbook | **G8★** | `/telemetry-plan` |
-| 9 Observability | `/telemetry-plan` | `docs/telemetry-plan.md` | G9 | `(agent) eos-review` |
-| 10 Iteration | `(agent) eos-review` | change proposal + PRD write-back | G10 | ⟲ `/requirements` (next round) |
+| 1 Discovery | `(agent) eos-discovery` | `discovery.md` **+ `discovery.json`** | `discovery-ready` | `/requirements "<f>"` |
+| 2 Requirements | `/requirements "<f>"` | `requirements.md` **+ `requirements.json`** | **`requirements-ready`★** | `/spec` |
+| 3 Spec | `/spec` | `docs/prd.md` | `prd-ready` | `/ux-spec` (backend may skip → `eos-architecture`) |
+| 3.5 UX & Design | `/ux-spec` (or `(agent) eos-design`) | `DESIGN.md`+`EXPERIENCE.md` **+ `design.json`** | `ux-ready` (conditional) | `(agent) eos-architecture` |
+| 4 Architecture | `(agent) eos-architecture` + `/adr` + `/deploy-topology` | `architecture.md` **+ `architecture.json`**+`openapi.yaml`+`adr/*` | `architecture-ready` | `(agent) eos-plan` (lock stack+ADR+topology first) |
+| 5 Planning | `(agent) eos-plan` | `docs/stories/*` | `story-ready` | `bmad-dev-story` |
+| 6 Development | `bmad-dev-story` → `bmad-code-review` | `src/*` + review conclusion | `project-gate.mjs` | `/e2e` (or `bmad-tea`/`bmad-testarch-*`) |
+| 7 Testing | `/e2e` (or `bmad-tea`/`bmad-testarch-*`) | tests + `trace-matrix.md` **+ `evidence/test-run.json`** | `verified` | `/release-gate` |
+| 8 Release | `/release-gate` (+`/runbook`) | gate report + runbook **+ `evidence/nfr-summary.json`** | **`release-ready`★** | `/telemetry-plan` |
+| 9 Observability | `/telemetry-plan` | `telemetry-plan.md` **+ `telemetry.json`** | `telemetry-ready` | `(agent) eos-review` |
+| 10 Iteration | `(agent) eos-review` | **`iteration.json`** + PRD write-back | `iteration-ready` | ⟲ `/requirements` (next round) |
 
 > **Do not skip phases**: every EOS command/agent prints "→ Next step" when it finishes (the **Next** breadcrumb at the end of prompts + the agent **handoff** button). Phases 6/7 are pure BMAD skills; `eos-plan`'s "Start Development" handoff already gives the agent the entire downstream tail chain (dev→review G6→test G7→release G8), so the flow does not break after it runs.
 
@@ -705,7 +717,34 @@ When writing AI code, Agentic rules take effect **automatically**: prompts saved
 | `/runbook` | Generate operations runbook (including rollback steps) | `<service name>` | `ops/runbook-<service>.md` |
 | `/validate-config` | EOS configuration static+semantic health check | — | Issue table (does not change code) |
 
-## 7.2 Orchestrator Agents (`.github/agents/`)
+## 7.2 EOS CLI (`node .github/eos/eos.mjs <command>`)
+
+Everything below is offline, zero-dependency and cross-platform. Exit codes: `0` pass · `1` fail or
+rejected transition · `2` blocked/pending/stale · `3` EOS itself cannot be evaluated.
+
+| Command | Purpose |
+|---|---|
+| `next` | The ONE recommended next action, why, and how to start it (`--why`, `--all`) |
+| `resume` | Restore this machine's focus in a new session |
+| `status` | Where the product and the active scope are (`--changed`) |
+| `check --gate <id> [--scope <id>]` | Run one gate for real and record the evidence |
+| `explain <gate>` | The full rule set for one gate, on demand |
+| `transition --scope <type> --id <id> --to <STATE>` | Move a scope, guarded by recorded evidence |
+| `approve --scope <type> --id <id>` | Record an approval — must be a **different** person from the requester |
+| `release-status` / `verify-release --release <id>` | Aggregate readiness / candidate-bound verification (G8) |
+| **`product-tree`** | The identity of the tree a verification applies to. `--json` prints the digest your test runner embeds in `docs/evidence/test-run.json` |
+| `waive --gate … --reason … --risk-owner … --expires …` | Record an expiring, owned waiver (never available for a non-waivable gate) |
+| `handoff --scope <type> --id <id>` | Hand the current step to another agent/session |
+| `ledger [--verify] [--against <ref>]` | Verify the append-only hash chain |
+| `focus --scope <type> --id <id>` | Set this machine's local focus (carries no authority) |
+| `init [--write]` | Report or create local, non-destructive integration files |
+| `doctor` | Is EOS itself wired correctly? |
+
+**Gate ids** (`check --gate <id>`): `activation` · `discovery-ready` · `requirements-ready` ·
+`prd-ready` · `ux-ready` · `architecture-ready` · `story-ready` · `verified` · `release-ready` ·
+`telemetry-ready` · `iteration-ready`.
+
+## 7.3 Orchestrator Agents (`.github/agents/`)
 
 | Agent | Phase | Reused BMAD | handoff to |
 |---|---|---|---|
@@ -739,7 +778,7 @@ When writing AI code, Agentic rules take effect **automatically**: prompts saved
 >
 > **Alternative path** if they still do not appear: run the flow directly with slash commands--prompt files such as `/requirements`, `/compliance`, `/spec`, `/ux-spec`, `/eval-spec`, `/release-gate` do not depend on the agent selector; type `/` to see them. Agents are only "orchestration personas", and their capabilities can all be manually triggered with corresponding prompts/skills (see 7.1 and `docs/eos/agent-map.md`).
 
-## 7.3 Rule files (`.github/instructions/`)
+## 7.4 Rule files (`.github/instructions/`)
 
 | File | `applyTo` | Governs |
 |---|---|---|
@@ -759,7 +798,7 @@ When writing AI code, Agentic rules take effect **automatically**: prompts saved
 
 > R1 global beliefs are in `.github/copilot-instructions.md` (not in the table because it is the always-on top-level file).
 
-## 7.4 Project-level Skill (`.github/skills/`)
+## 7.5 Project-level Skill (`.github/skills/`)
 
 | Skill | When to use | Purpose |
 |---|---|---|
@@ -768,7 +807,7 @@ When writing AI code, Agentic rules take effect **automatically**: prompts saved
 
 > See the phase mapping table in `docs/eos/agent-map.md` for the 73 user-level `bmad-*` skills.
 
-## 7.5 Hooks (`.github/hooks/`)
+## 7.6 Hooks (`.github/hooks/`)
 
 | File | Event | Purpose |
 |---|---|---|
@@ -797,7 +836,7 @@ act push --pull=false --action-offline-mode   # fully offline after images have 
 ```
 > The three enforcement layers divide responsibilities: **Hook (real-time per edit)**=`config-check.json` runs `validate-config.mjs`+`eos-doctor.mjs` after every edit (configuration compliance + G-EVAL wiring), `quality.json` runs quality gates, `guardrails.json` blocks dangerous operations · **static validation (manual/on demand)**=the same two scripts can be run anytime · **act CI (whole-repo batch before merge/release)**=`eos-ci.yml` runs validate-config+eos-doctor+tests+evals. The same gate (such as G-EVAL) is enforced both per-edit and in CI, so issues are found early and cannot slip through.
 
-## 7.6 Six requirement checklists (`docs/checklists/`; sixth only for regulated industries)
+## 7.7 Six requirement checklists (`docs/checklists/`; sixth only for regulated industries)
 
 | File | Name | Use | Used at which gate |
 |---|---|---|---|
@@ -813,7 +852,7 @@ act push --pull=false --action-offline-mode   # fully offline after images have 
 
 ---
 
-## 7.7 Browser automation testing (Playwright MCP)【New-build · maps to VS Code MCP native mechanism】
+## 7.8 Browser automation testing (Playwright MCP)【New-build · maps to VS Code MCP native mechanism】
 
 Want the "agent to personally open the browser, click around, and screenshot self-check" (similar to Antigravity's Chrome integration)? The native VS Code + Copilot approach is **MCP server + agent mode**. The template packages it as a **purely local, sandboxed, default-off (opt-in)** Playwright MCP:
 
