@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eos.local/schemas/providers.schema.json",
+  "title": "EOS provider adapters (opt-in)",
+  "description": "Which external authorities this project lets EOS consult, and about what. Absent by default: with no providers, every gate still reaches a verdict offline. A provider can only ever raise a verdict EOS already reached on its own — an unavailable, unauthorised or broken provider leaves that verdict untouched, so adding one can never make a project worse off (ADR-005 D4).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "providers"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schemaVersion": { "const": 1 },
+    "providers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["adapter", "subjects"],
+        "properties": {
+          "adapter": {
+            "description": "`github-governance` verifies branch protection; `github-attestation` verifies artifact provenance; `mock` is deterministic and offline, for tests.",
+            "enum": ["github-governance", "github-attestation", "mock"]
+          },
+          "subjects": {
+            "description": "What this provider is authoritative about. `enforcement-authority` answers 'does the server enforce the gates'; `evidence-provenance' answers 'did this artifact come from the build it claims'.",
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": { "enum": ["enforcement-authority", "evidence-provenance"] }
+          },
+          "enabled": { "type": "boolean" },
+          "options": {
+            "description": "Adapter-specific settings. A credential is never one of them: adapters delegate authentication to an already-authenticated CLI, so no token is read, stored or logged (ADR-005 D3).",
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "repo": { "type": "string" },
+              "branch": { "type": "string" },
+              "requiredChecks": { "type": "array", "items": { "type": "string" } },
+              "requireCodeOwnerReview": { "type": "boolean" },
+              "minApprovals": { "type": "integer", "minimum": 0 },
+              "artifact": { "type": "string" },
+              "owner": { "type": "string" },
+              "timeoutMs": { "type": "integer", "minimum": 100 },
+              "status": { "description": "mock only", "enum": ["ERROR", "FAIL", "BLOCKED", "DEFERRED", "UNVERIFIED", "PASS"] },
+              "detail": { "description": "mock only", "type": "string" },
+              "evidenceRef": { "description": "mock only", "type": "string" },
+              "expiry": { "description": "mock only", "type": "string" },
+              "throw": { "description": "mock only — simulates an adapter that crashes", "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  }
+}

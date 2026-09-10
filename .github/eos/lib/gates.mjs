@@ -17,6 +17,7 @@ import { currentProductTree, compareProductTree, uncommittedProductChanges } fro
 import { readSummary, summaryTreeMismatch, producerTrust, SUMMARY_PATHS } from './machine-summary.mjs';
 import { readStageRecord, emptyDocReason, decisionProblem, openBlockers, substantive, STAGE_RECORDS } from './stage-record.mjs';
 import { readManifest, manifestProblems, manifestPath } from './release.mjs';
+import { resolve as applyProviderVerdict } from '../adapters/contract.mjs';
 import { lastGateEvent } from './ledger.mjs';
 import { findWaiver, expiredWaivers } from './waivers.mjs';
 import { AC_ID, opsDecisionProblem } from './story.mjs';
@@ -801,6 +802,17 @@ const evaluators = {
       if (!s.data) continue;
       const trust = producerTrust(s.data);
       levels.push(`${label}: ${trust.level}`);
+      // `attested` is a claim until an authority confirms it. Without a provider the honest answer
+      // is that it is unverified — which under D4 is exactly what EOS said before adapters existed.
+      if (trust.level === 'ATTESTED' && policy === 'attested') {
+        const verdict = ctx.providerVerdicts['evidence-provenance'] || null;
+        const applied = applyProviderVerdict({ status: 'UNVERIFIED', detail: `${s.path} claims ${trust.attestation} provenance, and no provider is configured to verify it` }, verdict);
+        if (applied.status !== 'PASS') {
+          return { status: applied.status === 'UNVERIFIED' ? 'BLOCKED' : applied.status, detail: applied.detail };
+        }
+        levels[levels.length - 1] = `${label}: ATTESTED (${applied.provider})`;
+        continue;
+      }
       if (LEVEL[trust.level] < MINIMUM[policy]) {
         return fail(`this project declares evidencePolicy "${policy}" but ${s.path} ${trust.detail}`
           + `${policy === 'attested' ? ' — and EOS Core verifies no attestation itself: enable the matching provider adapter' : ''}`);
@@ -872,9 +884,13 @@ const evaluators = {
       return fail(`${unexplained.length} activation item(s) are marked waived with no reason — \`[~] <item> — waived: <why>\` is the contract`);
     }
     const open = items.filter((l) => /\[ \]/.test(l)).map((l) => l.replace(/^\s*-\s*\[ \]\s*/, '').trim());
-    if (!open.length) return ok(`all ${items.length} activation item(s) are closed or explicitly waived-with-reason`);
-    return blocked(`${open.length} enforcement item(s) are still open, and EOS cannot verify server-side settings from here: ${open.slice(0, 3).map((l) => l.slice(0, 80)).join(' · ')} — close them, or mark each `
-      + '`[~] waived — <reason>` in docs/eos/activation.md. UNVERIFIED is not PASS.');
+    // What EOS can conclude on its own. This is the FLOOR: a provider may raise it, never lower it,
+    // so configuring one can never make a project worse off than it is today. (ADR-005 · D4)
+    const fallback = open.length
+      ? { status: 'BLOCKED', detail: `${open.length} enforcement item(s) are still open, and EOS cannot verify server-side settings from here: ${open.slice(0, 3).map((l) => l.slice(0, 80)).join(' · ')} — close them, or mark each \`[~] waived — <reason>\` in docs/eos/activation.md. UNVERIFIED is not PASS.` }
+      : { status: 'PASS', detail: `all ${items.length} activation item(s) are closed or explicitly waived-with-reason` };
+    const applied = applyProviderVerdict(fallback, ctx.providerVerdicts['enforcement-authority'] || null);
+    return { status: applied.status, detail: applied.detail };
   },
 
   // ---------------------------------------------------------------- telemetry-ready (G9)
@@ -1068,7 +1084,7 @@ function aggregate(results) {
  * @param {'all'|'cheap'} mode  'cheap' never spawns a process: expensive checks fall back to the
  *   stored evidence, or PENDING. That is what makes `eos next` instant while `eos check` is proof.
  */
-export function evaluateGate(snapshot, gateId, scopeType, scopeId, { mode = 'all', now = new Date() } = {}) {
+export function evaluateGate(snapshot, gateId, scopeType, scopeId, { mode = 'all', now = new Date(), providerVerdicts = null } = {}) {
   const def = snapshot.gates?.gates.find((g) => g.id === gateId || g.code === gateId);
   if (!def) return { gate: gateId, status: 'ERROR', policy: 'required', checks: [], detail: `unknown gate "${gateId}"`, commands: [] };
 
@@ -1084,7 +1100,7 @@ export function evaluateGate(snapshot, gateId, scopeType, scopeId, { mode = 'all
 
   const story = scopeType === 'story' ? snapshot.stories.find((s) => s.id === scopeId) || null : null;
   const prior = readEvidence(snapshot.root, def.id, scopeType, scopeId);
-  const ctx = { root: snapshot.root, snapshot, scopeType, scopeId, story, changeType, commands: [], results: [] };
+  const ctx = { root: snapshot.root, snapshot, scopeType, scopeId, story, changeType, commands: [], results: [], providerVerdicts: providerVerdicts || {} };
 
   for (const check of def.checks) {
     let result;
@@ -1133,8 +1149,8 @@ export function evaluateGate(snapshot, gateId, scopeType, scopeId, { mode = 'all
 }
 
 /** Run a gate for real and persist the evidence. */
-export function runGate(snapshot, gateId, scopeType, scopeId, { now = new Date() } = {}) {
-  const result = evaluateGate(snapshot, gateId, scopeType, scopeId, { mode: 'all', now });
+export function runGate(snapshot, gateId, scopeType, scopeId, { now = new Date(), providerVerdicts = null } = {}) {
+  const result = evaluateGate(snapshot, gateId, scopeType, scopeId, { mode: 'all', now, providerVerdicts });
   if (result.status === 'ERROR' && !result.checks.length) return { result, evidenceFile: null };
   const def = snapshot.gates?.gates.find((g) => g.id === result.gate);
   // The honoring waiver becomes an INPUT, so deleting it, editing it, or letting it expire makes
@@ -1158,6 +1174,7 @@ export function runGate(snapshot, gateId, scopeType, scopeId, { now = new Date()
     governanceInputs: hashInputs(snapshot.root, GOVERNANCE_INPUTS),
     ...(collections.length ? { collections } : {}),
     ...(tree.identity ? { productTree: tree.identity } : {}),
+    ...(Object.keys(providerVerdicts || {}).length ? { providerVerdicts: Object.values(providerVerdicts) } : {}),
     commands: result.commands,
     checks: result.checks.map((c) => ({ id: c.id, status: c.status, ...(c.detail ? { detail: String(c.detail).slice(0, 600) } : {}), ...(c.fix ? { fix: c.fix } : {}) })),
     generatedAt: now.toISOString(),
