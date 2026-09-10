@@ -46,11 +46,34 @@ EOS **原生在 Windows 上运行**（PowerShell 或 Command Prompt）——核�
 - **`build-pdf.sh`**（可选的 手册→PDF）是 Bash 脚本——用 **Git-Bash 或 WSL** 运行，或直接
   读 `docs/eos/user-manual.md`。
 
-## Day-1（三步，然后照着推荐做）
-1. 在 VS Code 打开这个文件夹（就是它本身——不是它的上层目录）。
-2. `node .github/eos/eos.mjs init --write`——创建本地的 **EOS: Next / Resume / Verify Current
-   Gate / Release Status** 任务。它绝不覆盖你已有的文件。
-3. `node .github/eos/eos.mjs next`——照着它说的做。然后重复。
+## Day-1（可直接复制——与用户手册 §3.4 完全一致的序列）
+
+```sh
+npx degit niaodian/eos#eos-1.15.0 my-new-app && cd my-new-app
+git init && git add -A && git commit -q -m "chore: scaffold from eos"
+node .github/hooks/validate-config.mjs        # 期望 PASS
+code .                                        # 必须在项目目录*内部*执行——见下方警告
+```
+
+**`git init` 不是可选步骤。** `degit` 给你的是一个没有仓库的目录，而 EOS 会把每一次验证都绑定到它
+所运行的那棵 git 树上。缺了它，`verified` 门禁会报 BLOCKED——行为本身是正确的，但这是个令人困惑的开局。
+
+**打开项目文件夹本身，绝不要打开它的上层目录。** VS Code 是相对于工作区根去发现 `.github/` 的；
+打开上层目录，自定义 agent、instructions 和 hooks 都会被静默地找不到。
+
+然后，在 **Copilot Chat** 里：
+
+1. **`/eos-init`**——一次性硬化引导：分支保护、CODEOWNERS、审批基线，记录在 `docs/eos/activation.md`。
+2. **`/eos-next`**（或 `eos-guide` agent）——照着它说的做。然后重复。
+
+> **两个名字很像、但做的事完全不同。**
+> `/eos-init`（Copilot Chat）是上面那个**硬化引导**——这才是你 Day-1 需要的那个。
+> `node .github/eos/eos.mjs init --write`（终端）只写 `.vscode/tasks.json`，让
+> **EOS: Next / Resume / Verify Current Gate / Release Status** 出现在 Run Task 菜单里。
+> 它是便利设施，不是必经步骤。
+
+更喜欢终端？每个 prompt 都有等价的 CLI——`eos next`、`eos resume`、`eos status`——两者是同一个引擎。
+在 VS Code 里 Chat 是更短的路径；CLI 是 CI 实际运行的那条。
 
 这就是全部循环。下面的内容只在你想知道*为什么*时才需要。
 

@@ -41,11 +41,36 @@ core flow (hooks, validators, tests are all Node, and paths are normalized cross
 - **`build-pdf.sh`** (optional manual→PDF) is a Bash script — run it from **Git-Bash or WSL**, or just
   read `docs/eos/user-manual.md` directly.
 
-## Day-1 (three steps, then follow the recommendation)
-1. Open this folder in VS Code (the folder itself — not a parent).
-2. `node .github/eos/eos.mjs init --write` — creates the local **EOS: Next / Resume / Verify Current
-   Gate / Release Status** tasks. It never overwrites a file you already have.
-3. `node .github/eos/eos.mjs next` — and do what it says. Repeat.
+## Day-1 (copy-ready — the same sequence as the manual, §3.4)
+
+```sh
+npx degit niaodian/eos#eos-1.15.0 my-new-app && cd my-new-app
+git init && git add -A && git commit -q -m "chore: scaffold from eos"
+node .github/hooks/validate-config.mjs        # expect PASS
+code .                                        # from INSIDE the project — see the warning below
+```
+
+**`git init` is not optional.** `degit` gives you a directory with no repository, and EOS binds every
+verification to the git tree it ran against. Without it, the `verified` gate reports BLOCKED — which
+is correct behaviour, but a confusing way to start.
+
+**Open the project folder itself, never its parent.** VS Code discovers `.github/` relative to the
+workspace root; open a parent and the custom agents, instructions and hooks are silently not found.
+
+Then, in **Copilot Chat**:
+
+1. **`/eos-init`** — the one-time hardening walkthrough: branch protection, CODEOWNERS, approval
+   baseline, tracked in `docs/eos/activation.md`.
+2. **`/eos-next`** (or the `eos-guide` agent) — and do what it says. Repeat.
+
+> **Two similarly-named things, doing different jobs.**
+> `/eos-init` (Copilot Chat) is the **hardening walkthrough** above — the one you want on day one.
+> `node .github/eos/eos.mjs init --write` (terminal) only writes `.vscode/tasks.json` so the
+> **EOS: Next / Resume / Verify Current Gate / Release Status** tasks appear in the Run Task menu.
+> It is a convenience, not a step you have to take.
+
+Prefer the terminal? Every prompt has a CLI equivalent — `eos next`, `eos resume`, `eos status` —
+and the two are the same engine. Chat is the shorter path in VS Code; the CLI is what CI runs.
 
 That is the whole loop. Everything below is reference material for when you want to know *why*.
 

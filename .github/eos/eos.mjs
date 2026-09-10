@@ -48,7 +48,7 @@ usage: node .github/eos/eos.mjs <command> [flags]
   handoff --scope <type> --id <id> [--verify]
   ledger [--verify] [--against <git-ref>]
   focus --scope <type> --id <id>          set this machine's local focus (no authority)
-  init [--write]                          report or create local, non-destructive integration files
+  init [--write]                          write .vscode/tasks.json only (NOT the /eos-init hardening walkthrough)
   doctor                                  is EOS itself wired correctly?
 
   global: --json  --why  --all  --no-color
