@@ -212,7 +212,8 @@ Agent 映射和项目声明都受 CODEOWNERS 保护，以及 CI 会针对本次�
 - **阈值的来源。** `docs/evidence/eval-summary.json` 同时携带观测值与阈值，EOS 会据此**重算**结论——
   一份在"数字未达标"旁边报告 `PASS` 的摘要会失败。但它无法告诉你*阈值本身*是否被调低了。
   该摘要是被记录的门禁输入，因此调低阈值会让已记录的 PASS 变成 `STALE` 并强制重跑；
-  评审者看到的是那段 diff。这一层控制在设计上就是人来做的。
+  评审者看到的是那段 diff。这一层控制在设计上就是人来做的。机器*现在能*查的是摘要的来源：
+  `evidencePolicy: "attested"` 要求由 provider 验证来源声明，而不是照单全收那个字符串（ADR-006）。
 - **发布的成员集合。** 目前一次发布会针对 `docs/stories/` 下所有非 SPIKE、非 DOC_ONLY 的 Story 进行校验。
   没有按发布划分的清单，因此历史 Story 会针对每个新候选重新验证。这是偏严，而不是错误，但它不是可选择的。
 - **拓扑交叉校验。** `deployment-topology` 要求有已决策的 ADR，`ops-artifacts` 要求回滚、灰度与
@@ -222,7 +223,9 @@ Agent 映射和项目声明都受 CODEOWNERS 保护，以及 CI 会针对本次�
   `offline-boundary.test.mjs` 就会失败。这条测试是日后添加任何 provider adapter 的**前置条件**：
   adapter 可以联网增强，但网络只能把一个诚实的非-PASS **升级**为 PASS——绝不能凭空造出 PASS，
   它缺席时也绝不能被静默忽略。没有机械化的边界，"local-first" 会一个 PR 一个 PR 地被侵蚀。
-- **服务端强制。** 本地运行看不到分支保护。它被报告为 BLOCKED/UNVERIFIED，绝不是 PASS。
+- **服务端强制现在可以被回答了——只要你愿意。** 本地运行仍然看不到分支保护，它依旧被报告为
+  BLOCKED/UNVERIFIED 而绝不是 PASS。配置了 `github-governance` provider 的项目则能拿到真实裁决。
+  只有 `PASS` 能抬高结论，因此 provider 不可用时你的处境与之前完全一致（ADR-006）。
 
 ## 6. Change Type（分流流程，但不留未知路径）
 

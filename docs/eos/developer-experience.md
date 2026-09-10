@@ -230,7 +230,9 @@ Naming a limit is cheaper than discovering it during an incident, so:
   the threshold, and EOS recomputes the verdict from them — a summary reporting `PASS` beside
   numbers that miss its threshold fails. It cannot tell you that the *threshold itself* was lowered.
   The summary is a recorded gate input, so lowering it makes the recorded PASS `STALE` and forces a
-  re-run; the diff is what a reviewer sees. That control is human, by design.
+  re-run; the diff is what a reviewer sees. That control is human, by design. What a machine *can*
+  now check is where the summary came from: `evidencePolicy: "attested"` requires a provider to
+  verify the provenance claim rather than accepting the string (ADR-006).
 - **Release membership.** A release is currently gated against every story under `docs/stories/`
   that is not a SPIKE or DOC_ONLY. There is no per-release manifest, so a historical story is
   re-verified against each new candidate. That is strict rather than wrong, but it is not selective.
@@ -243,8 +245,10 @@ Naming a limit is cheaper than discovering it during an incident, so:
   ever adding a provider adapter: an adapter may be online-augmented, but network may only ever
   upgrade an honest non-PASS into a PASS — never manufacture one, and never be silently ignored when
   absent. Without a mechanical boundary, "local-first" erodes one pull request at a time.
-- **Server-side enforcement.** Branch protection cannot be seen from a local run. It is reported as
-  BLOCKED/UNVERIFIED, never PASS.
+- **Server-side enforcement is now answerable, if you let it be.** A local run still cannot see
+  branch protection — it is reported BLOCKED/UNVERIFIED, never PASS. A project that configures the
+  `github-governance` provider gets a real verdict instead. Only a `PASS` may raise the outcome, so
+  an unavailable provider leaves you exactly where you were (ADR-006).
 
 ## 6. Change types (branch the flow without unknown paths)
 

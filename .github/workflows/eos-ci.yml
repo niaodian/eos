@@ -132,6 +132,11 @@ jobs:
         # release prompt ⇄ machine gate gap, and the RELEASED → telemetry → iteration loop.
         run: node --test .github/eos/audit-regression.test.mjs
 
+      - name: EOS provider adapters (the external-authority contract, exercised offline)
+        # Every adapter failure mode — unreachable, unauthorised, timed out, crashed, disagreeing —
+        # is reproduced through a deterministic mock, so an integration cannot ship untested.
+        run: node --test .github/eos/adapters.test.mjs
+
       - name: EOS offline boundary (the local-first claim is an assertion, not a promise)
         # EOS Core must reach every decision with no network and no third-party dependency. This
         # turns that claim into a test that fails, so it cannot erode one pull request at a time.

@@ -21,6 +21,7 @@ import { buildHandoff, writeHandoff, readHandoff, verifyHandoff, handoffPath } f
 import { listEvidence, evidenceFreshness, validateEvidenceShape, sha256File } from './lib/evidence.mjs';
 import { currentProductTree, uncommittedProductChanges } from './lib/product-tree.mjs';
 import { readManifest, manifestPath, manifestDigest as computeManifestDigest, listManifests } from './lib/release.mjs';
+import { loadProviders, consult } from './adapters/contract.mjs';
 import { loadWaivers, expiredWaivers } from './lib/waivers.mjs';
 import { resolveAction, ACTIVE_WORK_PATH } from './lib/registry.mjs';
 
@@ -39,6 +40,7 @@ usage: node .github/eos/eos.mjs <command> [flags]
   approve --scope <type> --id <id>        record an approval (a second person, never the requester)
   explain <gate>                          the full rule set for one gate
   release init|bind|list [--release <id>]  scaffold / re-bind / list release manifests
+  providers                               what external authorities this project consults
   release-status                          aggregate release readiness
   verify-release --release <id>           candidate-bound release verification
   product-tree                            the identity of the tree a verification applies to
@@ -94,6 +96,26 @@ function resolveScope(snapshot, flags, defaultType = 'story') {
     else type = defaultType;
   }
   return { type, id };
+}
+
+/**
+ * Ask the configured external authorities, once, before a gate runs.
+ *
+ * Only the gates that ASSERT something about the outside world consult a provider; the whole
+ * development loop (G1–G7) never does, so no provider problem can ever block day-to-day work.
+ * A provider that is absent, unreachable or broken yields nothing here, and the gate falls back to
+ * the verdict EOS reaches on its own. (ADR-005 · D4)
+ */
+async function consultProviders(snapshot, gateId) {
+  if (gateId !== 'release-ready' && gateId !== 'activation') return {};
+  const { providers, errors } = loadProviders(snapshot.root);
+  if (errors.length || !providers.length) return {};
+  const out = {};
+  for (const subject of ['enforcement-authority', 'evidence-provenance']) {
+    const verdict = await consult(snapshot.root, subject, { providers });
+    if (verdict) out[subject] = verdict;
+  }
+  return out;
 }
 
 // --------------------------------------------------------------------------------- commands
@@ -187,7 +209,7 @@ const commands = {
     return decision.exitCode;
   },
 
-  check(snapshot, flags) {
+  async check(snapshot, flags) {
     const gateId = flags.gate;
     if (!gateId || gateId === true) { console.log('check requires --gate <id> (see `explain`)'); return EXIT.FAIL; }
     const def = snapshot.gates?.gates.find((g) => g.id === gateId || g.code === gateId);
@@ -195,7 +217,8 @@ const commands = {
     const scope = def.scope === 'product'
       ? { type: 'product', id: 'product' }
       : { type: def.scope, id: resolveScope(snapshot, flags, def.scope).id };
-    const { result, evidenceFile } = runGate(snapshot, def.id, scope.type, scope.id);
+    const providerVerdicts = await consultProviders(snapshot, def.id);
+    const { result, evidenceFile } = runGate(snapshot, def.id, scope.type, scope.id, { providerVerdicts });
     appendEvent(snapshot.root, {
       type: 'gate',
       scope: { type: scope.type, id: String(scope.id) },
@@ -302,6 +325,34 @@ const commands = {
     return statusExit(g.status);
   },
 
+  /** What external authorities this project consults, and what they say right now. */
+  async providers(snapshot, flags) {
+    const { present, providers, errors } = loadProviders(snapshot.root);
+    if (errors.length) {
+      emit(flags, { errors }, `EOS providers\n\n${errors.map((e) => `  ERROR ${e}`).join('\n')}\n`);
+      return EXIT.ERROR;
+    }
+    const verdicts = [];
+    for (const subject of ['enforcement-authority', 'evidence-provenance']) {
+      const v = await consult(snapshot.root, subject, { providers });
+      if (v) verdicts.push(v);
+    }
+    const lines = ['EOS providers', ''];
+    if (!present) {
+      lines.push('  none configured — every gate still reaches a verdict offline.',
+        '  A provider can only ever RAISE a verdict EOS already reached on its own; it can never',
+        '  create a new blocker. See .eos/schemas/providers.schema.json and ADR-005.', '');
+    } else if (!verdicts.length) {
+      lines.push('  configured, but no provider covers a known subject.', '');
+    } else {
+      for (const v of verdicts) {
+        lines.push(`  ${v.subject.padEnd(22)} ${v.status.padEnd(11)} ${v.provider}`, `    ${v.detail}`, '');
+      }
+    }
+    emit(flags, { configured: present, providers, verdicts }, lines.join('\n'));
+    return EXIT.OK;
+  },
+
   /**
    * Scaffold or re-bind a release manifest. It PROPOSES; the human decides. EOS will not infer what
    * a release ships — inferring it is exactly the behaviour the manifest replaces.
@@ -403,10 +454,11 @@ const commands = {
     return EXIT.OK;
   },
 
-  'verify-release'(snapshot, flags) {
+  async 'verify-release'(snapshot, flags) {
     const id = flags.release === true || !flags.release ? null : flags.release;
     if (!id) { console.log('verify-release requires --release <id>'); return EXIT.FAIL; }
-    const { result, evidenceFile } = runGate(snapshot, 'release-ready', 'release', id);
+    const providerVerdicts = await consultProviders(snapshot, 'release-ready');
+    const { result, evidenceFile } = runGate(snapshot, 'release-ready', 'release', id, { providerVerdicts });
     const recorded = recordedGateStatus(snapshot, 'release-ready', 'release', id);
     const boundToCandidate = !!snapshot.commit && recorded.evidence?.commit === snapshot.commit;
     const expired = expiredWaivers(snapshot.root);
@@ -625,7 +677,7 @@ const VSCODE_TASKS = JSON.stringify({
 }, null, 2) + '\n';
 
 // --------------------------------------------------------------------------------- entry
-function main() {
+async function main() {
   const flags = parseArgs(process.argv.slice(2));
   const command = flags._[0];
   if (!command || flags.help || command === 'help') { console.log(USAGE); return command ? EXIT.OK : EXIT.ERROR; }
@@ -647,11 +699,13 @@ function main() {
     return EXIT.ERROR;
   }
   try {
-    return fn(snapshot, flags);
+    // Some commands consult an external authority and are therefore async. Awaiting uniformly keeps
+    // one dispatch path rather than two.
+    return await fn(snapshot, flags);
   } catch (e) {
     console.log(`EOS ERROR — ${command} failed: ${e.message}`);
     return EXIT.ERROR;
   }
 }
 
-process.exit(main());
+process.exit(await main());
