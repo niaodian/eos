@@ -5,28 +5,73 @@
   "description": "What EOS assumes about the BMAD skills it delegates authoring work to, and what those skills assume about the project. Machine-readable so `eos-doctor --deep` can report BLOCKED instead of a doctor PASS that coexists with a failing skill activation.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "eosCompatibility", "bmadGeneration", "runtime", "requiredSkills"],
+  "required": [
+    "schemaVersion",
+    "eosCompatibility",
+    "bmadGeneration",
+    "runtime",
+    "requiredSkills"
+  ],
   "properties": {
-    "$schema": { "type": "string" },
-    "schemaVersion": { "const": 1 },
-    "eosCompatibility": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
-    "bmadGeneration": { "type": "string", "minLength": 1 },
-    "recordedAt": { "type": "string" },
-    "note": { "type": "string" },
+    "$schema": {
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": 1
+    },
+    "eosCompatibility": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "bmadGeneration": {
+      "type": "string",
+      "minLength": 1
+    },
+    "recordedAt": {
+      "type": "string"
+    },
+    "note": {
+      "type": "string"
+    },
     "runtime": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["root", "scripts", "configs", "executables"],
+      "required": [
+        "root",
+        "scripts",
+        "configs",
+        "executables"
+      ],
       "properties": {
-        "root": { "type": "string", "minLength": 1 },
-        "provider": { "type": "string" },
+        "root": {
+          "type": "string",
+          "minLength": 1
+        },
+        "provider": {
+          "type": "string"
+        },
+        "absenceBehaviour": {
+          "description": "What actually happens when this runtime is absent. Recorded so the severity EOS reports is a stated assumption rather than a guess.",
+          "type": "string",
+          "minLength": 20
+        },
         "scripts": {
           "type": "array",
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["path", "purpose"],
-            "properties": { "path": { "type": "string" }, "purpose": { "type": "string" } }
+            "required": [
+              "path",
+              "purpose"
+            ],
+            "properties": {
+              "path": {
+                "type": "string"
+              },
+              "purpose": {
+                "type": "string"
+              }
+            }
           }
         },
         "configs": {
@@ -34,8 +79,17 @@
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["path"],
-            "properties": { "path": { "type": "string" }, "module": { "type": "string" } }
+            "required": [
+              "path"
+            ],
+            "properties": {
+              "path": {
+                "type": "string"
+              },
+              "module": {
+                "type": "string"
+              }
+            }
           }
         },
         "executables": {
@@ -43,8 +97,21 @@
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["name", "required"],
-            "properties": { "name": { "type": "string" }, "purpose": { "type": "string" }, "required": { "type": "boolean" } }
+            "required": [
+              "name",
+              "required"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "purpose": {
+                "type": "string"
+              },
+              "required": {
+                "type": "boolean"
+              }
+            }
           }
         }
       }
@@ -52,7 +119,10 @@
     "deprecatedSkills": {
       "description": "skill name → its replacement. EOS refuses to map a skill listed here.",
       "type": "object",
-      "additionalProperties": { "type": "string", "minLength": 1 }
+      "additionalProperties": {
+        "type": "string",
+        "minLength": 1
+      }
     },
     "requiredSkills": {
       "type": "array",
@@ -60,12 +130,31 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["name", "action"],
+        "required": [
+          "name",
+          "action"
+        ],
         "properties": {
-          "name": { "type": "string", "minLength": 1 },
-          "action": { "type": "string", "minLength": 1 },
-          "configs": { "type": "array", "items": { "type": "string" } },
-          "executables": { "type": "array", "items": { "type": "string" } }
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "action": {
+            "type": "string",
+            "minLength": 1
+          },
+          "configs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "executables": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
         }
       }
     },
@@ -74,15 +163,34 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["name"],
-        "properties": { "name": { "type": "string" }, "purpose": { "type": "string" } }
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "purpose": {
+            "type": "string"
+          }
+        }
       }
     },
     "fallback": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["policy"],
-      "properties": { "policy": { "type": "string", "minLength": 20 }, "verifiedBy": { "type": "string" } }
+      "required": [
+        "policy"
+      ],
+      "properties": {
+        "policy": {
+          "type": "string",
+          "minLength": 20
+        },
+        "verifiedBy": {
+          "type": "string"
+        }
+      }
     }
   }
 }

@@ -36,8 +36,10 @@ to report PASS for skills that would fail on their first activation step (audit 
 
 - `.eos/bmad.lock.json` declares what EOS assumes: required skills, runtime scripts and configs,
   executables, and the deprecated skills EOS refuses to map.
-- `node .github/hooks/eos-doctor.mjs --deep` checks it and reports **BLOCKED**, never PASS, when a
-  mapped skill is installed but cannot activate here. CI runs `--deep`.
+- `node .github/hooks/eos-doctor.mjs --deep` checks it and separates two answers: **BLOCKED** when a
+  mapped skill cannot activate at all (and it fails), **DEGRADED** when it activates only on its
+  shipped defaults because no project runtime is installed (it warns — that is a working setup, and
+  calling it broken would be a false red). CI runs `--deep`.
 - **EOS is complete without BMAD.** No gate, evaluator, transition or routing decision calls a
   skill; a missing skill is a NOTE and `eos next` still names the action, the gate and the done-when.
 - Design rationale: [ADR-003 — the BMAD runtime boundary](../adr/003-bmad-runtime-boundary.md).

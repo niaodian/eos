@@ -168,17 +168,19 @@ cd my-new-app
 git init && git add -A && git commit -m "chore: scaffold from eos"
 ```
 
-**方式 B — gh + GitHub template** `【需组织/GitHub 设置】`
+**方式 B — gh + GitHub template**
 ```sh
-# 目前不可用：niaodian/eos 尚未设为 GitHub template repository。
-#   gh repo view niaodian/eos --json isTemplate   ->  {"isTemplate": false}
-# 启用它属于所有者级设置；在此之前请使用方式 A。
+# 需要该仓库是 GitHub template。请自己验证，而不是相信本页面——这是所有者级设置，随时可能被关掉：
+#   gh repo view niaodian/eos --json isTemplate   ->  {"isTemplate": true}
 gh repo create my-new-app --template niaodian/eos --private --clone
 cd my-new-app
 ```
 
 **方式 C — VS Code 直接 New Repository from Template**（GitHub 网页 → Use this template）。
-同样依赖上面的 template 设置，因此目前不可用。
+与方式 B 依赖同一个 template 设置。
+
+> 方式 B/C 拿到的是最新的默认分支；方式 A 固定在某个 release tag。若希望团队所有人从**同一个**
+> EOS 出发，优先用 A。
 
 ## 3.2 落地后第一件事：自检
 
@@ -1001,10 +1003,11 @@ cd my-app && git checkout --orphan main && git commit -m "chore: start from eos-
 
 1. 所有人从**同一个 release tag**（`eos-1.13.0`）开始。默认分支会持续变动，
    不固定版本就意味着每个人拿到的都是略有差异的 EOS。
-2. `【需组织/GitHub 设置】` 把 `niaodian/eos` 设为 GitHub **template repository** 属于所有者级设置，
-   EOS 既无法替你设置，也无法在本地验证。目前**尚未启用**——
-   `gh repo view niaodian/eos --json isTemplate` 返回 `false`——因此在所有者启用之前
-   `gh repo create --template` 不可用，请先使用上面固定版本的 `degit` / `clone`。
+2. `【需组织/GitHub 设置】` GitHub **template repository** 属于所有者级设置：EOS 既无法替你设置，
+   也无法在本地验证，所以别信本页面的说法——
+   `gh repo view niaodian/eos --json isTemplate` 一行就能得到答案，而且这个答案可能在本仓库
+   毫无变化的情况下改变。它为 `true` 时 `gh repo create --template` 可用；
+   上面固定版本的 `degit` / `clone` 则始终可用，并且它们才是固定**版本**的手段。
 3. 共享的 `bmad-*` 各自在本机用户级安装（一次）。用
    `node .github/hooks/eos-doctor.mjs --deep` 验证：当已映射的技能虽已安装但无法在本项目激活时，
    它报告 BLOCKED 而不是 PASS。

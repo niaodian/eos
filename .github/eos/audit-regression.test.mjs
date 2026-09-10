@@ -5,8 +5,10 @@
 //   node --test .github/eos/audit-regression.test.mjs
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync, mkdirSync, rmSync, existsSync, symlinkSync, chmodSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, rmSync, existsSync, symlinkSync, chmodSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { project, write, run, runJson, cleanup, git, commitAll, story, releaseFiles,
   APP_PROJECT, PRD_2AC, baselineFiles, storyFiles, testRun, treeDigest, DISCOVERY_RECORD,
   ARCHITECTURE_RECORD, REQUIREMENTS_RECORD,
@@ -184,7 +186,7 @@ test('EOS-AUD-001: a release candidate with uncommitted product changes is refus
 // ===================================================================== EOS-AUD-002 (P0)
 // "BMAD runtime is not closed": skill directories exist, doctor PASSes, activation fails.
 
-test('EOS-AUD-002: an installed skill whose runtime is absent is BLOCKED, not PASS', () => {
+test('EOS-AUD-002: an installed skill whose runtime is absent is DEGRADED — reported, not hidden, not faked', () => {
   const dir = project({});
   const skills = join(dir, 'skills');
   mkdirSync(join(skills, 'bmad-prd'), { recursive: true });
@@ -192,12 +194,49 @@ test('EOS-AUD-002: an installed skill whose runtime is absent is BLOCKED, not PA
   writeFileSync(join(dir, '.eos/bmad.lock.json'), readFileSync(join(REPO_ROOT, '.eos/bmad.lock.json')));
 
   const shallow = bmadReadiness(dir, { deep: false, roots: [skills] });
-  assert.equal(shallow.status, 'PASS', 'the cheap layers alone cannot see the runtime problem');
+  assert.equal(shallow.status, 'PASS', 'the cheap layers alone cannot see the runtime situation');
 
+  // Every mapped skill documents a fallback to its own customize.toml, so an absent runtime costs
+  // project-level CUSTOMIZATION, not function. Reporting it as BLOCKED would be a false red — the
+  // mirror image of the false green this check was written to remove.
   const deep = bmadReadiness(dir, { deep: true, roots: [skills] });
-  assert.equal(deep.status, 'BLOCKED', JSON.stringify(deep, null, 2));
-  assert.match(deep.problems.join(' '), /_bmad\/scripts\/resolve_customization\.py/);
-  assert.match(deep.problems.join(' '), /will fail at step 1/);
+  assert.equal(deep.status, 'DEGRADED', JSON.stringify(deep, null, 2));
+  assert.equal(deep.problems.length, 0, 'a working-but-uncustomized setup is not a blocker');
+  assert.match(deep.degraded.join(' '), /_bmad\/scripts\/resolve_customization\.py/);
+  assert.match(deep.degraded.join(' '), /still activate/);
+  assert.match(deep.degraded.join(' '), /PROJECT-LEVEL customization is unavailable/);
+});
+
+test('EOS-AUD-002: DEGRADED warns but does not fail; only a skill that cannot activate is an error', () => {
+  const base = {
+    '.eos/project.json': { projectType: 'config-only', stacks: [] },
+    '.eos/bmad.lock.json': JSON.parse(readFileSync(join(REPO_ROOT, '.eos/bmad.lock.json'), 'utf8')),
+    '.eos/schemas/bmad-lock.schema.json': JSON.parse(readFileSync(join(REPO_ROOT, '.eos/schemas/bmad-lock.schema.json'), 'utf8')),
+    'docs/eos/activation.md': '# Activation\n\n- [x] done\n',
+  };
+  // $HOME is isolated so this measures the CODE, not whether the developer running the suite
+  // happens to have skills installed — the coupling that turned a green tree red in CI once already.
+  const doctor = (dir) => {
+    const home = mkdtempSync(join(tmpdir(), 'eos-nohome-'));
+    const r = spawnSync(process.execPath, [join(REPO_ROOT, '.github/hooks/eos-doctor.mjs'), '--deep'], {
+      cwd: dir, encoding: 'utf8', env: { ...process.env, HOME: home, USERPROFILE: home },
+    });
+    rmSync(home, { recursive: true, force: true });
+    return r;
+  };
+
+  // Installed + no runtime  -> warning, exit 0.
+  const ok = project({ ...base, '.github/skills/bmad-prd/SKILL.md': '---\nname: bmad-prd\n---\n# BMad PRD\n' });
+  const okRun = doctor(ok);
+  assert.equal(okRun.status, 0, okRun.stdout);
+  assert.match(okRun.stdout, /DEGRADED, not a failure/);
+
+  // A directory that is not a skill at all -> error, exit 1.
+  const bad = project(base);
+  mkdirSync(join(bad, '.github/skills/bmad-prd'), { recursive: true });
+  const badRun = doctor(bad);
+  assert.equal(badRun.status, 1, badRun.stdout);
+  assert.match(badRun.stdout, /D6 BMAD \(BLOCKED\)/);
 });
 
 test('EOS-AUD-002: a skill directory with no SKILL.md is BLOCKED — a directory name is not a skill', () => {
@@ -238,6 +277,7 @@ test('EOS-AUD-002: with no BMAD installed at all, EOS still routes — absence i
   const r = bmadReadiness(dir, { deep: true, roots: [empty] });
   assert.equal(r.status, 'PASS');
   assert.equal(r.problems.length, 0);
+  assert.equal(r.degraded.length, 0, 'nothing is degraded when nothing is installed to degrade');
   assert.ok(r.notes.length, 'a missing skill must still be reported as a fact');
 });
 
@@ -606,14 +646,23 @@ test('EOS-AUD-007: unverifiable enforcement authority is BLOCKED, never a self-i
 // ===================================================================== EOS-AUD-008 (P1)
 // "the documentation claimed isTemplate:true; the GitHub API says false".
 
-test('EOS-AUD-008: no document claims the repository is already a GitHub template', () => {
+test('EOS-AUD-008: a claim about the template setting always ships with the way to check it', () => {
+  // The finding was NOT "never say the template is enabled" — it was that the docs asserted an
+  // owner-level GitHub setting as settled fact, and the API disagreed. The setting can flip at any
+  // time without a single byte of this repository changing, so the durable rule is: wherever a
+  // document mentions it, the reader is handed the one-line command that answers it for real.
   const docs = ['docs/eos/user-manual.md', 'docs/zh/user-manual.md', 'docs/eos/blueprint.md', 'docs/zh/blueprint.md', 'README.md', 'README.zh.md'];
   for (const rel of docs) {
     const full = join(REPO_ROOT, rel);
     if (!existsSync(full)) continue;
     const text = readFileSync(full, 'utf8');
-    assert.doesNotMatch(text, /isTemplate\s*[:=]\s*true/i, `${rel} still asserts an unverified isTemplate:true`);
-    assert.doesNotMatch(text, /已设\s*`?isTemplate/i, `${rel} still asserts the template flag is already set`);
+    const mentions = text.includes('isTemplate') || /--template\s+niaodian\/eos/.test(text);
+    if (!mentions) continue;
+    assert.match(text, /gh repo view niaodian\/eos --json isTemplate/,
+      `${rel} discusses the template setting but never shows how to verify it`);
+    // ...and it must not be presented as a permanent property of the project.
+    assert.doesNotMatch(text, /(?:already|已)\s*(?:set|设)[^\n]{0,20}isTemplate/i,
+      `${rel} asserts the template flag as an established fact`);
   }
 });
 

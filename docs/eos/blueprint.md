@@ -158,9 +158,9 @@ The decision principle is unchanged: **general and stable → user level; projec
 
 ## 10.3.2 One-command initialization (public repository)
 
-`niaodian/eos` is a public repository. It is **not** a GitHub *template repository* today —
-`gh repo view niaodian/eos --json isTemplate` returns `false` — so the `--template` path below is
-listed for completeness and only works once an owner enables that setting.
+`niaodian/eos` is a public repository, and the GitHub *template repository* setting is currently on.
+That setting is owner-level and can change without anything in this repository changing, so verify
+it rather than trusting this page: `gh repo view niaodian/eos --json isTemplate`.
 `【Needs org/GitHub settings】`
 
 ```bash
@@ -168,7 +168,7 @@ listed for completeness and only works once an owner enables that setting.
 npx degit niaodian/eos#eos-1.13.0 my-app
 cd my-app && node .github/hooks/validate-config.mjs    # expect PASS
 
-# B. gh CLI  [unavailable until the template setting is enabled]
+# B. gh CLI (needs the template setting above; gives you the newest default branch, not a tag)
 gh repo create my-app --template niaodian/eos --private --clone
 
 # C. git template directory (offline local)

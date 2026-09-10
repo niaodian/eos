@@ -68,25 +68,35 @@ const onPath = (bin) => (process.env.PATH || '').split(delimiter).filter(Boolean
  * Headless readiness report. Deliberately does NOT start an interactive skill session: activating a
  * facilitation skill would open a conversation, which is not something a doctor may do.
  *
+ * Three outcomes, and the distinction between the last two is the whole point:
+ *   - BLOCKED  the skill cannot activate at all (no SKILL.md), or the map points at a dead skill.
+ *   - DEGRADED it activates, but on its shipped defaults. Every mapped skill documents a fallback
+ *              ("if the script fails, resolve the block yourself from {skill-root}/customize.toml …
+ *              any missing file is skipped"), so an absent `_bmad/` runtime costs project-level
+ *              CUSTOMIZATION, not function. Calling that BLOCKED would be a false red — the mirror
+ *              image of the false green this check exists to remove, and just as dishonest.
+ *   - PASS     everything a mapped, installed skill needs is present.
+ *
  * @param {object} opts
  * @param {boolean} opts.deep  also check the project runtime + executables the skills invoke
- * @returns {{status:'PASS'|'BLOCKED'|'UNCHECKED', skills:object[], runtime:object, problems:string[], notes:string[]}}
+ * @returns {{status:'PASS'|'DEGRADED'|'BLOCKED'|'UNCHECKED', skills:object[], runtime:object, problems:string[], degraded:string[], notes:string[]}}
  */
 export function bmadReadiness(root, { deep = false, roots = null } = {}) {
   const { present, lock, errors } = loadBmadLock(root);
   if (!present) {
-    return { status: 'UNCHECKED', skills: [], runtime: { checked: false }, problems: [], notes: [`${BMAD_LOCK_PATH} is not present — BMAD compatibility is not declared, so it is not checked`] };
+    return { status: 'UNCHECKED', skills: [], runtime: { checked: false }, problems: [], degraded: [], notes: [`${BMAD_LOCK_PATH} is not present — BMAD compatibility is not declared, so it is not checked`] };
   }
-  if (!lock) return { status: 'BLOCKED', skills: [], runtime: { checked: false }, problems: errors, notes: [] };
+  if (!lock) return { status: 'BLOCKED', skills: [], runtime: { checked: false }, problems: errors, degraded: [], notes: [] };
 
   const dirs = roots || skillRoots(root);
   const problems = [];
+  const degraded = [];
   const notes = [];
   const skills = [];
 
   if (!dirs.length) {
     return {
-      status: 'UNCHECKED', skills: [], runtime: { checked: false }, problems: [],
+      status: 'UNCHECKED', skills: [], runtime: { checked: false }, problems: [], degraded: [],
       notes: ['no skills directory found (~/.agents/skills, ~/.claude/skills, ~/.copilot/skills) — skill availability was not checked. EOS works without BMAD; `eos next` still names every step.'],
     };
   }
@@ -149,19 +159,21 @@ export function bmadReadiness(root, { deep = false, roots = null } = {}) {
       const neededBy = neededExecutables.get(exe.name) || [];
       runtime.executables.push({ name: exe.name, found, requiredBy: neededBy });
       if (!found && neededBy.length) {
-        problems.push(`${exe.name} is not executable on PATH, but ${neededBy.length} installed mapped skill(s) invoke it on activation: ${neededBy.slice(0, 4).join(', ')}`);
+        degraded.push(`${exe.name} is not executable on PATH, so ${neededBy.length} installed skill(s) take their documented fallback and run on shipped defaults: ${neededBy.slice(0, 4).join(', ')}`);
       }
     }
     if (installed.length && missing.length) {
-      problems.push(
-        `the BMAD project runtime is missing (${missing.slice(0, 3).join(', ')}${missing.length > 3 ? `, +${missing.length - 3} more` : ''}). `
-        + `${installed.length} mapped skill(s) ARE installed and each one resolves its customization through \`${lock.runtime.root}/\` on activation, so they will fail at step 1. `
-        + 'Install the BMAD project runtime with its own installer (EOS does not vendor or download it), or unmap those skills — see docs/adr/003-bmad-runtime-boundary.md.',
+      degraded.push(
+        `no BMAD project runtime here (${missing.slice(0, 3).join(', ')}${missing.length > 3 ? `, +${missing.length - 3} more` : ''}). `
+        + `${installed.length} installed skill(s) still activate — each documents a fallback to its own \`customize.toml\` — but PROJECT-LEVEL customization is unavailable: `
+        + `\`${lock.runtime.root}/custom/*.toml\` overrides, the module config, and session memory are all skipped. `
+        + 'Install the BMAD project runtime with its own installer to get them (EOS does not vendor or download it) — see docs/adr/003-bmad-runtime-boundary.md.',
       );
     }
   }
 
-  return { status: problems.length ? 'BLOCKED' : 'PASS', skills, runtime, problems, notes };
+  const status = problems.length ? 'BLOCKED' : degraded.length ? 'DEGRADED' : 'PASS';
+  return { status, skills, runtime, problems, degraded, notes };
 }
 
 /** Deprecated skills that are still referenced by the agent map — a dead-skill mapping. */

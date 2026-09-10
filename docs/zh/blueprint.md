@@ -162,16 +162,16 @@ let s = ''; process.stdin.on('data', d => (s += d)); process.stdin.on('end', () 
 
 ## 10.3.2 一键初始化（public 仓库）
 
-`niaodian/eos` 是 public 仓库，但目前**不是** GitHub *template repository*——
-`gh repo view niaodian/eos --json isTemplate` 返回 `false`——因此下面的 `--template` 路径仅为完整性列出，
-需所有者启用该设置后才可用。`【需组织/GitHub 设置】`
+`niaodian/eos` 是 public 仓库，且 GitHub *template repository* 设置目前是开启的。
+该设置属于所有者级，可能在本仓库毫无变化的情况下被改动，所以请自行验证而不是相信本页面：
+`gh repo view niaodian/eos --json isTemplate`。`【需组织/GitHub 设置】`
 
 ```bash
 # A. degit，固定到 release tag（推荐——默认分支会持续变动）
 npx degit niaodian/eos#eos-1.13.0 my-app
 cd my-app && node .github/hooks/validate-config.mjs    # 期望 PASS
 
-# B. gh CLI  [在启用 template 设置前不可用]
+# B. gh CLI（需要上面的 template 设置；拿到的是最新默认分支，而不是某个 tag）
 gh repo create my-app --template niaodian/eos --private --clone
 
 # C. git template directory（离线本地）

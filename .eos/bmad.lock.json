@@ -4,23 +4,47 @@
   "eosCompatibility": "1.13.0",
   "bmadGeneration": "v6-skills",
   "recordedAt": "2026-09-10",
-  "note": "Machine-readable BMAD compatibility manifest. EOS delegates authoring work to BMAD skills; those skills resolve their customization and memory through a PROJECT-LOCAL runtime under `_bmad/`, which is NOT part of EOS and is NOT vendored here. `eos-doctor --deep` reads this file and reports BLOCKED — never PASS — when a mapped skill's runtime is absent, so a green doctor can no longer coexist with a failing skill activation. See docs/adr/003-bmad-runtime-boundary.md.",
+  "note": "Machine-readable BMAD compatibility manifest. EOS delegates authoring work to BMAD skills; those skills resolve their customization and memory through a PROJECT-LOCAL runtime under `_bmad/`, which is NOT part of EOS and is NOT vendored here. `eos-doctor --deep` reads this file and reports BLOCKED when a mapped skill cannot activate at all, and DEGRADED when it activates only on shipped defaults — so a green doctor can no longer coexist with a failing skill activation, and a working-but-uncustomized setup is not mislabelled as broken. See docs/adr/003-bmad-runtime-boundary.md.",
   "runtime": {
     "root": "_bmad",
     "provider": "BMAD Method (installed separately by its own installer, into the project)",
     "scripts": [
-      { "path": "_bmad/scripts/resolve_customization.py", "purpose": "resolves per-skill customize.toml overrides; every mapped skill calls it on activation" },
-      { "path": "_bmad/scripts/memlog.py", "purpose": "session memory log used by the facilitation skills" }
+      {
+        "path": "_bmad/scripts/resolve_customization.py",
+        "purpose": "resolves per-skill customize.toml overrides; every mapped skill calls it on activation"
+      },
+      {
+        "path": "_bmad/scripts/memlog.py",
+        "purpose": "session memory log used by the facilitation skills"
+      }
     ],
     "configs": [
-      { "path": "_bmad/core/config.yaml", "module": "core" },
-      { "path": "_bmad/bmm/config.yaml", "module": "bmm (method: analyst / pm / architect / dev)" },
-      { "path": "_bmad/tea/config.yaml", "module": "tea (test architecture)" }
+      {
+        "path": "_bmad/core/config.yaml",
+        "module": "core"
+      },
+      {
+        "path": "_bmad/bmm/config.yaml",
+        "module": "bmm (method: analyst / pm / architect / dev)"
+      },
+      {
+        "path": "_bmad/tea/config.yaml",
+        "module": "tea (test architecture)"
+      }
     ],
     "executables": [
-      { "name": "python3", "purpose": "runs resolve_customization.py", "required": true },
-      { "name": "uv", "purpose": "runs memlog.py and some skill-local scripts", "required": false }
-    ]
+      {
+        "name": "python3",
+        "purpose": "runs resolve_customization.py",
+        "required": true
+      },
+      {
+        "name": "uv",
+        "purpose": "runs memlog.py and some skill-local scripts",
+        "required": false
+      }
+    ],
+    "absenceBehaviour": "DEGRADED, not BLOCKED. Every mapped skill documents a fallback: if `resolve_customization.py` cannot run it resolves the block itself from `{skill-root}/customize.toml`, and \"any missing file is skipped\". Without this runtime the skills therefore still activate on their shipped defaults; what is lost is PROJECT-LEVEL customization (`_bmad/custom/*.toml` overrides, the module config, session memory). eos-doctor reports that as a warning — calling it BLOCKED would be a false red, the mirror image of the false green this manifest exists to remove."
   },
   "deprecatedSkills": {
     "bmad-create-prd": "bmad-prd",
@@ -29,27 +53,180 @@
     "bmad-edit-prd": "bmad-prd"
   },
   "requiredSkills": [
-    { "name": "bmad-brainstorming", "action": "frame-the-problem", "configs": ["_bmad/core/config.yaml"], "executables": ["uv"] },
-    { "name": "bmad-agent-analyst", "action": "frame-the-problem", "configs": ["_bmad/bmm/config.yaml"], "executables": ["python3"] },
-    { "name": "bmad-agent-pm", "action": "expand-requirements", "configs": ["_bmad/bmm/config.yaml"], "executables": ["python3"] },
-    { "name": "bmad-prd", "action": "write-prd", "configs": ["_bmad/bmm/config.yaml"], "executables": ["python3"] },
-    { "name": "bmad-ux", "action": "design-ux", "configs": ["_bmad/bmm/config.yaml"], "executables": ["python3"] },
-    { "name": "bmad-architecture", "action": "design-architecture", "configs": ["_bmad/bmm/config.yaml"], "executables": ["uv"] },
-    { "name": "bmad-create-epics-and-stories", "action": "plan-stories", "configs": ["_bmad/bmm/config.yaml"], "executables": ["python3"] },
-    { "name": "bmad-create-story", "action": "plan-stories", "configs": ["_bmad/bmm/config.yaml"], "executables": ["python3"] },
-    { "name": "bmad-testarch-atdd", "action": "design-acceptance-tests", "configs": ["_bmad/tea/config.yaml"], "executables": ["python3"] },
-    { "name": "bmad-check-implementation-readiness", "action": "complete-story-readiness", "configs": ["_bmad/bmm/config.yaml"], "executables": ["python3"] },
-    { "name": "bmad-dev-story", "action": "implement-story", "configs": ["_bmad/bmm/config.yaml"], "executables": ["python3"] },
-    { "name": "bmad-tea", "action": "verify-story", "configs": ["_bmad/tea/config.yaml"], "executables": ["python3"] },
-    { "name": "bmad-testarch-trace", "action": "build-trace-matrix", "configs": ["_bmad/tea/config.yaml"], "executables": ["python3"] },
-    { "name": "bmad-code-review", "action": "repair-verification", "configs": ["_bmad/bmm/config.yaml"], "executables": ["python3"] },
-    { "name": "bmad-correct-course", "action": "close-the-loop", "configs": ["_bmad/bmm/config.yaml"], "executables": ["python3"] },
-    { "name": "bmad-retrospective", "action": "close-the-loop", "configs": ["_bmad/bmm/config.yaml"], "executables": ["python3"] }
+    {
+      "name": "bmad-brainstorming",
+      "action": "frame-the-problem",
+      "configs": [
+        "_bmad/core/config.yaml"
+      ],
+      "executables": [
+        "uv"
+      ]
+    },
+    {
+      "name": "bmad-agent-analyst",
+      "action": "frame-the-problem",
+      "configs": [
+        "_bmad/bmm/config.yaml"
+      ],
+      "executables": [
+        "python3"
+      ]
+    },
+    {
+      "name": "bmad-agent-pm",
+      "action": "expand-requirements",
+      "configs": [
+        "_bmad/bmm/config.yaml"
+      ],
+      "executables": [
+        "python3"
+      ]
+    },
+    {
+      "name": "bmad-prd",
+      "action": "write-prd",
+      "configs": [
+        "_bmad/bmm/config.yaml"
+      ],
+      "executables": [
+        "python3"
+      ]
+    },
+    {
+      "name": "bmad-ux",
+      "action": "design-ux",
+      "configs": [
+        "_bmad/bmm/config.yaml"
+      ],
+      "executables": [
+        "python3"
+      ]
+    },
+    {
+      "name": "bmad-architecture",
+      "action": "design-architecture",
+      "configs": [
+        "_bmad/bmm/config.yaml"
+      ],
+      "executables": [
+        "uv"
+      ]
+    },
+    {
+      "name": "bmad-create-epics-and-stories",
+      "action": "plan-stories",
+      "configs": [
+        "_bmad/bmm/config.yaml"
+      ],
+      "executables": [
+        "python3"
+      ]
+    },
+    {
+      "name": "bmad-create-story",
+      "action": "plan-stories",
+      "configs": [
+        "_bmad/bmm/config.yaml"
+      ],
+      "executables": [
+        "python3"
+      ]
+    },
+    {
+      "name": "bmad-testarch-atdd",
+      "action": "design-acceptance-tests",
+      "configs": [
+        "_bmad/tea/config.yaml"
+      ],
+      "executables": [
+        "python3"
+      ]
+    },
+    {
+      "name": "bmad-check-implementation-readiness",
+      "action": "complete-story-readiness",
+      "configs": [
+        "_bmad/bmm/config.yaml"
+      ],
+      "executables": [
+        "python3"
+      ]
+    },
+    {
+      "name": "bmad-dev-story",
+      "action": "implement-story",
+      "configs": [
+        "_bmad/bmm/config.yaml"
+      ],
+      "executables": [
+        "python3"
+      ]
+    },
+    {
+      "name": "bmad-tea",
+      "action": "verify-story",
+      "configs": [
+        "_bmad/tea/config.yaml"
+      ],
+      "executables": [
+        "python3"
+      ]
+    },
+    {
+      "name": "bmad-testarch-trace",
+      "action": "build-trace-matrix",
+      "configs": [
+        "_bmad/tea/config.yaml"
+      ],
+      "executables": [
+        "python3"
+      ]
+    },
+    {
+      "name": "bmad-code-review",
+      "action": "repair-verification",
+      "configs": [
+        "_bmad/bmm/config.yaml"
+      ],
+      "executables": [
+        "python3"
+      ]
+    },
+    {
+      "name": "bmad-correct-course",
+      "action": "close-the-loop",
+      "configs": [
+        "_bmad/bmm/config.yaml"
+      ],
+      "executables": [
+        "python3"
+      ]
+    },
+    {
+      "name": "bmad-retrospective",
+      "action": "close-the-loop",
+      "configs": [
+        "_bmad/bmm/config.yaml"
+      ],
+      "executables": [
+        "python3"
+      ]
+    }
   ],
   "optionalSkills": [
-    { "name": "bmad-testarch-nfr", "purpose": "measured NFR evidence for the release gate" },
-    { "name": "bmad-testarch-test-design", "purpose": "test design before implementation" },
-    { "name": "bmad-advanced-elicitation", "purpose": "deeper critique of any EOS artifact" }
+    {
+      "name": "bmad-testarch-nfr",
+      "purpose": "measured NFR evidence for the release gate"
+    },
+    {
+      "name": "bmad-testarch-test-design",
+      "purpose": "test design before implementation"
+    },
+    {
+      "name": "bmad-advanced-elicitation",
+      "purpose": "deeper critique of any EOS artifact"
+    }
   ],
   "fallback": {
     "policy": "EOS never depends on BMAD to make a decision. Every gate, evaluator, transition and router decision in EOS runs with no BMAD installed at all; the skills only make the AUTHORING faster. When a skill is unavailable, `eos next` still names the action, the target gate and the done-when — do the step manually.",

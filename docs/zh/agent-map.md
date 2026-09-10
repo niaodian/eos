@@ -39,8 +39,9 @@
 
 - `.eos/bmad.lock.json` 声明 EOS 的全部假设：必需技能、运行时脚本与配置、可执行文件，
   以及 EOS 拒绝映射的已废弃技能。
-- `node .github/hooks/eos-doctor.mjs --deep` 检查它；当已映射的技能虽已安装却无法在此处激活时，
-  报告 **BLOCKED** 而绝不是 PASS。CI 运行 `--deep`。
+- `node .github/hooks/eos-doctor.mjs --deep` 检查它，并区分两种回答：技能**根本无法激活**时报
+  **BLOCKED**（判失败）；技能能激活、只是因为没装项目运行时而跑在自带默认值上时报 **DEGRADED**
+  （仅告警——那是可用状态，把它说成坏掉就是"假红"）。CI 运行 `--deep`。
 - **没有 BMAD，EOS 也是完整的。** 任何门禁、求值器、迁移或路由决策都不调用技能；
   缺失技能只是一条 NOTE，`eos next` 仍会给出动作、目标门禁与完成判据。
 - 设计依据：[ADR-003 —— BMAD 运行时边界](../adr/003-bmad-runtime-boundary.md)。

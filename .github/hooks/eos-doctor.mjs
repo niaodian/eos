@@ -322,16 +322,18 @@ const bmadOut = [];
     errors.push(`D6 BMAD: action "${dead.action}" maps the DEPRECATED skill "${dead.skill}" — use "${dead.replacement}" (see ${BMAD_LOCK_PATH}).`);
   }
   const report = bmadReadiness(root, { deep });
-  if (report.status === 'BLOCKED') {
-    for (const p of report.problems) errors.push(`D6 BMAD (BLOCKED): ${p}`);
-  }
+  // BLOCKED means a mapped skill cannot activate at all. DEGRADED means it activates on its shipped
+  // defaults because no project runtime is installed — a legitimate, working setup, so failing CI on
+  // it would be a false red rather than a finding.
+  for (const p of report.problems) errors.push(`D6 BMAD (BLOCKED): ${p}`);
+  for (const d of report.degraded) warns.push(`D6 BMAD (DEGRADED, not a failure): ${d}`);
   if (report.status === 'UNCHECKED' || report.notes.length) {
     for (const n of report.notes.slice(0, 4)) bmadOut.push(`  BMAD        ${n}`);
     if (report.notes.length > 4) bmadOut.push(`  BMAD        …and ${report.notes.length - 4} more not installed`);
   }
-  if (report.status === 'PASS' && deep) {
+  if ((report.status === 'PASS' || report.status === 'DEGRADED') && deep) {
     const installed = report.skills.filter((s) => s.installed).length;
-    bmadOut.push(`  BMAD        ${installed}/${report.skills.length} mapped skill(s) installed and activatable${report.runtime.present ? ` · runtime ${report.runtime.root}/ present` : ''}.`);
+    bmadOut.push(`  BMAD        ${installed}/${report.skills.length} mapped skill(s) installed and activatable${report.runtime.present ? ` · runtime ${report.runtime.root}/ present` : ' · no project runtime, so they run on shipped defaults'}.`);
   }
   if (!deep && report.status !== 'UNCHECKED') {
     bmadOut.push('  BMAD        shallow check only — run `node .github/hooks/eos-doctor.mjs --deep` to verify the project runtime and executables the skills invoke.');

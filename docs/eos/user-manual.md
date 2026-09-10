@@ -152,17 +152,20 @@ cd my-new-app
 git init && git add -A && git commit -m "chore: scaffold from eos"
 ```
 
-**Method B — gh + GitHub template** `【Needs org/GitHub settings】`
+**Method B — gh + GitHub template**
 ```sh
-# NOT AVAILABLE YET: niaodian/eos is not a GitHub template repository.
-#   gh repo view niaodian/eos --json isTemplate   ->  {"isTemplate": false}
-# Enabling it is an owner-level setting; until then use Method A.
+# Requires the repository to be a GitHub template. Verify it yourself rather than trusting this
+# page — it is an owner-level setting that can be turned off again at any time:
+#   gh repo view niaodian/eos --json isTemplate   ->  {"isTemplate": true}
 gh repo create my-new-app --template niaodian/eos --private --clone
 cd my-new-app
 ```
 
 **Method C — VS Code directly New Repository from Template** (GitHub web page → Use this template).
-Also requires the template setting above, so it is unavailable for the same reason.
+Uses the same template setting as Method B.
+
+> Method B/C give you the newest default branch; Method A pins a release tag. If you want everyone
+> on your team to start from the *same* EOS, prefer A.
 
 ## 3.2 First thing after landing: self-check
 
@@ -949,10 +952,11 @@ cd my-app && git checkout --orphan main && git commit -m "chore: start from eos-
 
 1. Everyone starts from the **same release tag** (`eos-1.13.0`). The default branch keeps moving, so
    an unpinned copy is a slightly different EOS for every person who takes one.
-2. `【Needs org/GitHub settings】` Turning `niaodian/eos` into a GitHub **template repository** is an
-   owner-level setting that EOS can neither apply nor verify locally. It is **not** enabled today —
-   `gh repo view niaodian/eos --json isTemplate` returns `false` — so `gh repo create --template`
-   does not work until an owner enables it. Use the pinned `degit` / `clone` above meanwhile.
+2. `【Needs org/GitHub settings】` The GitHub **template repository** setting is owner-level: EOS can
+   neither apply nor verify it locally, so do not take this page's word for it —
+   `gh repo view niaodian/eos --json isTemplate` answers in one line, and the answer can change
+   without anything in this repository changing. `gh repo create --template` works while it is
+   `true`; the pinned `degit` / `clone` above work regardless and are what pin a *version*.
 3. Shared `bmad-*` skills are installed by each person at user level (once). Verify with
    `node .github/hooks/eos-doctor.mjs --deep`: it reports BLOCKED rather than PASS when a mapped
    skill is installed but cannot activate in this project.
