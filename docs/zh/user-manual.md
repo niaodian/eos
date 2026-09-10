@@ -5,7 +5,7 @@
 
 # EOS 用户手册（Engineering Operating System User Manual）
 
-> 版本：与 `docs/eos/VERSION` 同步（当前 `eos-1.12.0`）
+> 版本：与 `docs/eos/VERSION` 同步（当前 `eos-1.13.0`）
 > 适用：较新版本的 VS Code + GitHub Copilot Chat（自定义 agent / hooks 属近版能力，用「关于 VS Code」面板确认版本）+ 已安装 73 个 `bmad-*` skill（用户级）
 > 定位：本手册是**操作指南（怎么用）**；设计原理与取舍见同目录 `blueprint.md`（为什么这么设计）。
 > 约定：正文中文；文件名/路径/命令/配置键保留英文原文。
@@ -163,18 +163,22 @@ bmad-code-review                   → 审查无阻断项           (Gate G6)
 **方式 A — degit（推荐，最快）**
 ```sh
 # public 模板 —— 直接 degit（无需鉴权）
-npx degit niaodian/eos my-new-app
+npx degit niaodian/eos#eos-1.13.0 my-new-app
 cd my-new-app
 git init && git add -A && git commit -m "chore: scaffold from eos"
 ```
 
-**方式 B — gh + GitHub template**
+**方式 B — gh + GitHub template** `【需组织/GitHub 设置】`
 ```sh
+# 目前不可用：niaodian/eos 尚未设为 GitHub template repository。
+#   gh repo view niaodian/eos --json isTemplate   ->  {"isTemplate": false}
+# 启用它属于所有者级设置；在此之前请使用方式 A。
 gh repo create my-new-app --template niaodian/eos --private --clone
 cd my-new-app
 ```
 
 **方式 C — VS Code 直接 New Repository from Template**（GitHub 网页 → Use this template）。
+同样依赖上面的 template 设置，因此目前不可用。
 
 ## 3.2 落地后第一件事：自检
 
@@ -194,7 +198,7 @@ node .github/hooks/validate-config.mjs      # 期望：PASS
 ## 3.4 Day-1 完整序列（复制即用）
 
 ```sh
-npx degit niaodian/eos my-new-app && cd my-new-app
+npx degit niaodian/eos#eos-1.13.0 my-new-app && cd my-new-app
 git init && git add -A && git commit -q -m "chore: scaffold from eos"
 node .github/hooks/validate-config.mjs
 # 关键：从项目目录内执行 `code .`，让 my-new-app 成为工作区根（含 .github/）。
@@ -304,7 +308,7 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 | 项 | 内容 |
 |---|---|
 | **目标** | 从模板得到一个配置健康的空项目 |
-| **怎么启动** | `npx degit niaodian/eos my-app && cd my-app` |
+| **怎么启动** | `npx degit niaodian/eos#eos-1.13.0 my-app && cd my-app` |
 | **产出** | 完整 `.github/` + `docs/` 骨架 |
 | **门** | `node .github/hooks/validate-config.mjs` → **PASS** |
 | **必查** | PASS 0 errors。**栈未定则先别改** `00-workspace`——保留 Node 占位即可；栈是不可逆决策，权威锁定在**阶段 4（ADR）**。已知栈可即抄 `docs/eos/stack-presets.md`（快路径）。 |
@@ -338,7 +342,7 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 |---|---|
 | **目标** | 展开功能需求 + NFR + **把运营需求前置**（埋点/权限/回滚…），堵死"上线后返工" |
 | **何时进入** | G1 通过、`docs/discovery.md` 就绪 |
-| **怎么启动** | Chat 输入 **`/requirements "<feature>"`**（包裹 `bmad-create-prd` + skill `eos-operational-readiness`） |
+| **怎么启动** | Chat 输入 **`/requirements "<feature>"`**（包裹 `bmad-agent-pm` / `bmad-prd` + skill `eos-operational-readiness`） |
 | **输入** | `docs/discovery.md` |
 | **产出** | `docs/requirements.md`，**顶部带"Operational Pre-Flight Decision Table"** |
 | **决策门 G2（硬门）** | 五张清单 A/B/C/D/E 全部走查（**受监管行业再加第六张 F-compliance**），**任何未决项 = BLOCKER，不清零不得进 Spec** |
@@ -367,7 +371,7 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 |---|---|
 | **目标** | 把需求固化成 PRD，成为下游唯一认可的真相源 |
 | **何时进入** | G2 通过、`docs/requirements.md` 无 BLOCKER |
-| **怎么启动** | Chat 输入 **`/spec`**（用 `bmad-create-prd` 起草，用 `bmad-validate-prd` 校验） |
+| **怎么启动** | Chat 输入 **`/spec`**（用 `bmad-prd` 起草与校验） |
 | **输入** | `docs/requirements.md` |
 | **产出** | `docs/prd.md`：每条 FR 带验收标准 + NFR 段（来自 C-nfr，不留空） |
 | **决策门 G3** | ☑ 每条需求有 ≥1 可度量验收标准 |
@@ -574,7 +578,7 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 
 ### 第 0 步：建项目 + 选栈（5 分钟）
 ```sh
-npx degit niaodian/eos todo-api && cd todo-api
+npx degit niaodian/eos#eos-1.13.0 todo-api && cd todo-api
 node .github/hooks/validate-config.mjs          # 期望 PASS
 ```
 **已定栈**？打开 `.github/instructions/00-workspace.instructions.md` 把 `Local commands` 抄成你的栈块（`docs/eos/stack-presets.md`，快路径）。
@@ -637,7 +641,7 @@ SaaS 的 **G7** 要求：每条 AC ≥1 测试、**API 契约测试**（对 open
 
 ### 第 0 步：建项目 + 建 AI 目录
 ```sh
-npx degit niaodian/eos cs-agent && cd cs-agent
+npx degit niaodian/eos#eos-1.13.0 cs-agent && cd cs-agent
 mkdir -p ai/prompts evals                       # AI 代码放这里，自动叠加 Agentic 规则
 node .github/hooks/validate-config.mjs          # 期望 PASS
 ```
@@ -720,8 +724,8 @@ LLM tracing（token/成本/context/tool-span）。
 
 | 命令 | 作用 | 参数 | 产出 |
 |---|---|---|---|
-| `/requirements` | 需求分析 + 运营前置（包裹 bmad-create-prd） | `<feature 或 docs/discovery.md 路径>` | `docs/requirements.md` |
-| `/spec` | 产出 PRD 真相源（bmad-create-prd + bmad-validate-prd） | `<docs/requirements.md 路径>` | `docs/prd.md` |
+| `/requirements` | 需求分析 + 运营前置（包裹 bmad-agent-pm / bmad-prd） | `<feature 或 docs/discovery.md 路径>` | `docs/requirements.md` |
+| `/spec` | 产出 PRD 真相源（bmad-prd） | `<docs/requirements.md 路径>` | `docs/prd.md` |
 | `/ux-spec` | 设计 UX/UI 视觉+体验契约（包裹 bmad-ux） | `<docs/prd.md 路径>` | `docs/DESIGN.md` + `docs/EXPERIENCE.md` |
 | `/eval-spec` | 设计 LLM/agentic 评估计划（条件门 G-EVAL） | `<docs/prd.md 路径>` | `docs/eval-plan.md` |
 | `/spec-align` | 量化规范对齐度（AC 覆盖率/一次过率/漂移，G7 度量） | — | 对齐度报告（`spec-align.mjs`） |
@@ -984,18 +988,26 @@ Agent 输出不符预期
 ## 10.2 一键初始化新项目
 
 ```sh
-# 方式 A：degit（public 模板，无需鉴权）
-npx degit niaodian/eos my-app
+# 方式 A：degit（public 仓库，无需鉴权）
+# 固定到 release tag：默认分支会移动，tag 不会。
+npx degit niaodian/eos#eos-1.13.0 my-app
 
-# 方式 B：gh + template
-gh repo create my-app --template niaodian/eos --private --clone
+# 方式 B：在 tag 上 clone，并开一段全新历史
+git clone --depth 1 --branch eos-1.13.0 https://github.com/niaodian/eos.git my-app
+cd my-app && git checkout --orphan main && git commit -m "chore: start from eos-1.13.0"
 ```
 
 ## 10.3 分发给团队（纯本地、无企业依赖）
 
-1. 把 `eos` 设为 GitHub **template repo**（已设 `isTemplate:true`）。
-2. 团队成员各自 `degit` 或 `gh ... --template` 初始化。
-3. 共享的 `bmad-*` 各自在本机用户级安装（一次）。
+1. 所有人从**同一个 release tag**（`eos-1.13.0`）开始。默认分支会持续变动，
+   不固定版本就意味着每个人拿到的都是略有差异的 EOS。
+2. `【需组织/GitHub 设置】` 把 `niaodian/eos` 设为 GitHub **template repository** 属于所有者级设置，
+   EOS 既无法替你设置，也无法在本地验证。目前**尚未启用**——
+   `gh repo view niaodian/eos --json isTemplate` 返回 `false`——因此在所有者启用之前
+   `gh repo create --template` 不可用，请先使用上面固定版本的 `degit` / `clone`。
+3. 共享的 `bmad-*` 各自在本机用户级安装（一次）。用
+   `node .github/hooks/eos-doctor.mjs --deep` 验证：当已映射的技能虽已安装但无法在本项目激活时，
+   它报告 BLOCKED 而不是 PASS。
 4. **不要**在配置里写任何企业内网/接口/SSO 依赖——保持离线可运行。
 
 > `【可选扩展·需企业/网络环境】`：组织级 instructions 分发、私有 registry、cloud agents——
@@ -1005,6 +1017,33 @@ gh repo create my-app --template niaodian/eos --private --clone
 
 - 每次改 EOS 配置：改 `docs/eos/VERSION`（如 `eos-1.4.1`→`eos-1.6.0`），跑 `validate-config.mjs`，Conventional Commits 提交。
 - 升级既有项目：从新版模板 diff `.github/`，挑选合并；用户级 `bmad-*` 独立升级。
+
+### 10.4.1 从 `eos-1.12.0` 升级到 `eos-1.13.0`
+
+本次发布关闭了 `eos-1.12.0` 审计的全部发现。它刻意**失败即关闭**：既有仓库会先变红再变绿，
+而每一条红色都明确指出要补什么。
+
+| 变了什么 | 你会看到什么 | 该做什么 |
+|---|---|---|
+| **证据绑定到被测产品树**（EOS-AUD-001） | 此前记录的门禁结果全部 `STALE`（"evaluator version changed"、"predates tested-product-tree binding"） | 重跑门禁：`eos check --gate story-ready --scope <id>`，然后 `eos check --gate verified --scope <id>`。没有任何东西丢失——旧证据仍可读，只是不再*当前*。 |
+| **G1 / G2 / G-UX / G4 成为真正的门禁**（EOS-AUD-003） | Product 状态回落到 `UNINITIALIZED` 方向，`eos next` 要求 `docs/discovery.json`、`docs/requirements.json`、`docs/design.json`、`docs/architecture.json` | 在你已有的文档旁写出这四份结构化记录。提示词（`/requirements`、`/ux-spec`）与 Agent 会生成它们；Schema 在 `.eos/schemas/`。 |
+| **Product 状态改名** | `PRD_APPROVED` → `PRD_BASELINED`，`ARCHITECTURE_APPROVED` → `ARCHITECTURE_BASELINED`，并新增 `UX_BASELINED` | 无需操作。Product 状态是*推导*出来的，Ledger 不必改写。改名的原因是：机器判定文档完整 ≠ 人批准了它。 |
+| **验收标准必须被定义，而不只是被提及**（EOS-AUD-004） | `prd-ready` 报告 "referenced but never defined: AC…" | 把每条标准写成以其 id 开头并带正文的列表项、表格行或标题。 |
+| **运营任务必须是决策**（EOS-AUD-005） | `story-ready` 报告 `Telemetry: "SKIP" with no reason` | 使用 `ADOPT — <任务>; owner: <谁>; verify: <如何验证>`、`SKIP — <理由>`，或 `DEFER — owner: <谁>; trigger: <什么条件结束它>`。 |
+| **Trace 行需要机器结果**（EOS-AUD-006） | `verified` 报告 "a hand-written PASS … is a claim, not a result" | 从你的测试运行器输出 `docs/evidence/test-run.json`——见 [examples/trace-evidence](../eos/examples/trace-evidence/README.md)。这是一个约 30 行的映射步骤，用你自己的语言写。 |
+| **发布门禁检查提示词所要求的一切**（EOS-AUD-007） | `release-ready` 新增候选质量、依赖审计、NFR 证据、灰度、健康/就绪、拓扑与执行权威 | 声明 `commands.audit`，记录 `docs/evidence/nfr-summary.json`，并扩展 `ops/runbook.md`。离线的审计是 `DEFERRED`，绝不是绿。 |
+| **RELEASED 继续走向 G9 与 G10**（EOS-AUD-010） | `RELEASED` 之后，`eos next` 要求遥测而不是再发一次版 | 产出 `docs/telemetry.json`（`/telemetry-plan`），再产出 `docs/iteration.json`（`eos-review` Agent）。 |
+| **BMAD 运行时会被验证**（EOS-AUD-002） | `eos-doctor --deep` 可能报告 BLOCKED：技能已安装，但 `_bmad/` 运行时缺失 | 用 BMAD 自己的安装器安装项目运行时，或取消这些技能的映射。EOS 本身没有 BMAD 也能工作——见 [ADR-003](../adr/003-bmad-runtime-boundary.md)。 |
+
+**这次升级没有任何一步是静默的。** 若某项无法被证明——没有 git 仓库、没有工具链、依赖审计没有网络——
+它报告 BLOCKED 或 DEFERRED。它绝不报告 PASS，也绝不悄悄跳过。
+
+既有仓库的最快路径：
+
+```sh
+node .github/eos/eos.mjs next        # 每一次都只告诉你下一件事
+node .github/hooks/eos-doctor.mjs --deep
+```
 
 ---
 
@@ -1080,7 +1119,7 @@ EOS 的栈规则是**可插拔**的。新增一个栈 = 加一个 `*.instruction
 
 ```
 # ── 终端 —— 唯一循环（日常只需要这些）──
-npx degit niaodian/eos my-app   # 新建项目
+npx degit niaodian/eos#eos-1.13.0 my-app   # 新建项目
 node .github/eos/eos.mjs init --write               # 本地 VS Code 任务（绝不覆盖已有文件）
 node .github/eos/eos.mjs next                       # 唯一的下一步、为什么、怎么开始
 node .github/eos/eos.mjs resume                     # 新会话？接着上次继续
@@ -1136,7 +1175,7 @@ bmad-tea / bmad-testarch-*   # 阶段7：测试+追溯        → G7
 
 **复现**（终端）：
 ```sh
-npx degit niaodian/eos my-app && cd my-app
+npx degit niaodian/eos#eos-1.13.0 my-app && cd my-app
 node .github/hooks/validate-config.mjs        # PASS
 npm test                                       # 10/10 green
 echo '{"tool_input":{"command":"rm -rf /tmp/x"}}' | node .github/hooks/deny-dangerous.js  # deny

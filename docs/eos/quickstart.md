@@ -50,8 +50,14 @@ core flow (hooks, validators, tests are all Node, and paths are normalized cross
 That is the whole loop. Everything below is reference material for when you want to know *why*.
 
 - The router walks you through discovery → requirements → PRD → UX → architecture → stories, then
-  per story: readiness → implementation → verification → merge. Each step names the Copilot agent (or
-  `/prompt`) and the minimal BMAD skills — you never pick from the 73 installed skills yourself.
+  per story: readiness → implementation → verification → merge, and after shipping:
+  telemetry → write-back. Each step names the Copilot agent (or `/prompt`) and the minimal BMAD
+  skills — you never pick from the 73 installed skills yourself.
+- Each stage produces a document for people **and** a small structured record for the machine
+  (`docs/discovery.json`, `docs/requirements.json`, `docs/design.json`, `docs/architecture.json`).
+  The gate reads the record: an empty document does not advance the product, and a verification is
+  bound to the exact source, tests, prompts and eval data it ran against — so changing them makes
+  the recorded PASS `STALE` instead of leaving it standing.
 - **One-time harden** (turns the CI gates from advisory into merge-blocking): run `/eos-init` in
   Copilot Chat — branch protection + CODEOWNERS + approval baseline, tracked in
   `docs/eos/activation.md`. Personal/throwaway repo? Waive items with a reason; `eos-doctor` keeps score.

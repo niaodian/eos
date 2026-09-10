@@ -8,7 +8,10 @@
   "required": ["schemaVersion", "gate", "gateVersion", "evaluatorVersion", "scope", "status", "checks", "inputs", "generatedAt"],
   "properties": {
     "$schema": { "type": "string" },
-    "schemaVersion": { "const": 1 },
+    "schemaVersion": {
+      "description": "1 = pre-product-tree evidence. It still PARSES so it can be reported as STALE (the evaluatorVersion bump invalidates it) rather than as an unreadable ERROR.",
+      "enum": [1, 2]
+    },
     "gate": { "type": "string", "pattern": "^[a-z0-9-]+$" },
     "gateVersion": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
     "evaluatorVersion": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
@@ -22,8 +25,33 @@
       }
     },
     "changeType": { "type": "string", "pattern": "^[A-Z_]+$" },
-    "status": { "enum": ["PASS", "FAIL", "BLOCKED", "PENDING", "WAIVED", "NOT_APPLICABLE", "STALE", "ERROR"] },
+    "status": { "enum": ["PASS", "FAIL", "BLOCKED", "PENDING", "WAIVED", "NOT_APPLICABLE", "STALE", "DEFERRED", "ERROR"] },
     "commit": { "type": ["string", "null"] },
+    "productTree": {
+      "description": "Identity of the product tree this gate ran against — source, tests, prompts, eval data, manifests, lockfiles, runtime and deployment config. EOS's own evidence/ledger/handoff/local output is excluded by construction so recording a result cannot invalidate it.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "algorithm", "digest", "fileCount"],
+      "properties": {
+        "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+        "algorithm": { "type": "string", "minLength": 1 },
+        "digest": { "type": "string", "minLength": 32 },
+        "fileCount": { "type": "integer", "minimum": 0 },
+        "segments": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["path", "digest", "fileCount"],
+            "properties": {
+              "path": { "type": "string", "minLength": 1 },
+              "digest": { "type": "string", "minLength": 32 },
+              "fileCount": { "type": "integer", "minimum": 0 }
+            }
+          }
+        }
+      }
+    },
     "inputs": {
       "type": "array",
       "items": {
@@ -83,7 +111,7 @@
         "required": ["id", "status"],
         "properties": {
           "id": { "type": "string", "pattern": "^[a-z0-9-]+$" },
-          "status": { "enum": ["PASS", "FAIL", "BLOCKED", "PENDING", "WAIVED", "NOT_APPLICABLE", "STALE", "ERROR"] },
+          "status": { "enum": ["PASS", "FAIL", "BLOCKED", "PENDING", "WAIVED", "NOT_APPLICABLE", "STALE", "DEFERRED", "ERROR"] },
           "detail": { "type": "string" },
           "fix": { "type": "string" }
         }

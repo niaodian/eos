@@ -1,0 +1,29 @@
+{
+  "$schema": "../../../../.eos/schemas/requirements.schema.json",
+  "schemaVersion": 1,
+  "functional": [
+    { "id": "FR1", "statement": "A reviewer receives a drafted summary of a case file with every claim linked to its source passage", "priority": "MUST" },
+    { "id": "FR2", "statement": "A reviewer approves, edits or rejects a draft; nothing is published without that decision", "priority": "MUST" },
+    { "id": "FR3", "statement": "A draft the worker is not confident about is escalated to a named human queue", "priority": "MUST" }
+  ],
+  "nfr": [
+    { "id": "NFR1", "category": "performance", "statement": "A draft is produced while the reviewer waits", "target": "p95 < 12s end to end" },
+    { "id": "NFR2", "category": "availability", "statement": "The control plane stays available when the model provider does not", "target": "99.9% monthly; degraded mode returns the queue position, never a fabricated draft" },
+    { "id": "NFR3", "category": "security", "statement": "Regulated data never leaves the boundary recorded in the compliance profile", "target": "0 unredacted regulated fields in any third-party request, asserted by a test" },
+    { "id": "NFR4", "category": "cost", "statement": "A single task cannot consume an unbounded budget", "target": "<= 40k tokens and <= 8 tool calls per task, enforced in code" }
+  ],
+  "operationalPreFlight": {
+    "telemetry": { "decision": "ADOPT", "note": "emit draft.requested / draft.produced / draft.escalated with tenant, latency, token count and grader scores" },
+    "authz": { "decision": "ADOPT", "note": "every read and write is scoped by tenant from the authenticated context; the worker plane holds no publish credential" },
+    "audit": { "decision": "ADOPT", "note": "every approval, edit, rejection and escalation is written to an append-only audit sink with actor, time and diff" },
+    "rollback": { "decision": "ADOPT", "note": "prompt, model pin and worker image are versioned together and roll back as one artifact" },
+    "monitoring": { "decision": "ADOPT", "note": "groundedness score, escalation rate, refusal rate and queue depth alert to the on-call rota" },
+    "canary": { "decision": "ADOPT", "note": "a prompt or model change reaches 5% of tenants for 24h with automatic abort on groundedness regression" },
+    "quota": { "decision": "ADOPT", "note": "per-tenant token and task budgets, enforced in the control plane before the queue" },
+    "i18n": { "decision": "DEFER", "owner": "@product", "trigger": "when the first non-English regulated market is contracted", "dueBy": "2027-01-01" },
+    "multiTenancy": { "decision": "ADOPT", "note": "row-level tenant scoping; retrieval indexes are per tenant so no prompt can cross the boundary" },
+    "capacitySlo": { "decision": "ADOPT", "note": "sized for 4x peak review volume; the queue sheds to human review rather than dropping tasks" },
+    "dr": { "decision": "ADOPT", "note": "control-plane database RPO 5 minutes / RTO 1 hour; the worker plane is stateless and rebuilt from the image" },
+    "compliance": { "decision": "ADOPT", "note": "named regime recorded in docs/compliance-profile.json with an implemented data-boundary control and a non-expired approval" }
+  }
+}

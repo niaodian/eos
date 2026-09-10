@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eos.local/schemas/architecture.schema.json",
+  "title": "EOS architecture record (G4)",
+  "description": "The decisions that must exist before work is sliced into stories. Every concern is DECIDED (with the ADR that decided it) or NOT_APPLICABLE (with a reason). Agentic concerns are required for an agentic product; regulated concerns for a regulated one — an empty section is never a pass.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "decisions", "nfrLandingPoints"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schemaVersion": { "const": 1 },
+    "decisions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["techStack", "deploymentTopology", "authz", "security", "audit", "rollback", "disasterRecovery", "dataModel", "apiContract", "eventContract"],
+      "properties": {
+        "techStack": { "$ref": "#/$defs/decision" },
+        "deploymentTopology": { "$ref": "#/$defs/decision" },
+        "authz": { "$ref": "#/$defs/decision" },
+        "security": { "$ref": "#/$defs/decision" },
+        "audit": { "$ref": "#/$defs/decision" },
+        "rollback": { "$ref": "#/$defs/decision" },
+        "disasterRecovery": { "$ref": "#/$defs/decision" },
+        "dataModel": { "$ref": "#/$defs/decision" },
+        "apiContract": { "$ref": "#/$defs/decision" },
+        "eventContract": { "$ref": "#/$defs/decision" },
+        "toolAllowList": { "$ref": "#/$defs/decision" },
+        "boundedOrchestration": { "$ref": "#/$defs/decision" },
+        "memoryLayering": { "$ref": "#/$defs/decision" },
+        "asyncBoundary": { "$ref": "#/$defs/decision" },
+        "evalArchitecture": { "$ref": "#/$defs/decision" },
+        "regulatedDataBoundary": { "$ref": "#/$defs/decision" },
+        "approvalBoundary": { "$ref": "#/$defs/decision" }
+      }
+    },
+    "nfrLandingPoints": {
+      "description": "Where each NFR from docs/requirements.json is actually satisfied. An NFR with no landing point is a wish.",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["nfr", "component", "mechanism"],
+        "properties": {
+          "nfr": { "type": "string", "pattern": "^NFR\\d+$" },
+          "component": { "type": "string", "minLength": 2 },
+          "mechanism": { "type": "string", "minLength": 10 }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status"],
+      "properties": {
+        "status": { "enum": ["DECIDED", "NOT_APPLICABLE"] },
+        "summary": { "description": "Required for DECIDED: what was decided, in one sentence.", "type": "string" },
+        "adr": { "description": "Repository-relative path of the decision record. EOS checks that it exists.", "type": "string" },
+        "reason": { "description": "Required for NOT_APPLICABLE.", "type": "string" }
+      }
+    }
+  }
+}

@@ -1,7 +1,7 @@
 {
   "$schema": "./schemas/workflow.schema.json",
   "schemaVersion": 1,
-  "version": "1.0.0",
+  "version": "2.0.0",
   "defaultProfile": "standard-product",
   "profiles": {
     "standard-product": {
@@ -11,46 +11,142 @@
         "PRODUCT_BASELINE": {
           "scope": "product",
           "description": "Establish or re-baseline the product itself (discovery, requirements, PRD, architecture).",
-          "gates": { "activation": "required", "prd-ready": "required", "story-ready": "not_applicable", "verified": "not_applicable", "release-ready": "not_applicable" }
+          "gates": {
+            "activation": "required",
+            "discovery-ready": "required",
+            "requirements-ready": "required",
+            "prd-ready": "required",
+            "ux-ready": "required",
+            "architecture-ready": "required",
+            "story-ready": "not_applicable",
+            "verified": "not_applicable",
+            "release-ready": "not_applicable",
+            "telemetry-ready": "not_applicable",
+            "iteration-ready": "not_applicable"
+          }
         },
         "FEATURE": {
           "scope": "story",
           "description": "New user-visible capability traced to approved PRD acceptance criteria.",
-          "gates": { "activation": "required", "prd-ready": "required", "story-ready": "required", "verified": "required", "release-ready": "not_applicable" }
+          "gates": {
+            "activation": "required",
+            "discovery-ready": "not_applicable",
+            "requirements-ready": "not_applicable",
+            "prd-ready": "required",
+            "ux-ready": "not_applicable",
+            "architecture-ready": "not_applicable",
+            "story-ready": "required",
+            "verified": "required",
+            "release-ready": "not_applicable",
+            "telemetry-ready": "not_applicable",
+            "iteration-ready": "not_applicable"
+          }
         },
         "BUGFIX": {
           "scope": "story",
           "description": "Restore behaviour the PRD already specifies. No new acceptance criteria, so prd-ready does not re-apply.",
-          "gates": { "activation": "required", "prd-ready": "not_applicable", "story-ready": "required", "verified": "required", "release-ready": "not_applicable" }
+          "gates": {
+            "activation": "required",
+            "discovery-ready": "not_applicable",
+            "requirements-ready": "not_applicable",
+            "prd-ready": "not_applicable",
+            "ux-ready": "not_applicable",
+            "architecture-ready": "not_applicable",
+            "story-ready": "required",
+            "verified": "required",
+            "release-ready": "not_applicable",
+            "telemetry-ready": "not_applicable",
+            "iteration-ready": "not_applicable"
+          }
         },
         "SPIKE": {
           "scope": "story",
           "description": "Time-boxed investigation. Nothing here may merge into the product path; the output is a decision record.",
           "mergeable": false,
           "requiresClassificationReason": true,
-          "gates": { "activation": "required", "prd-ready": "not_applicable", "story-ready": "not_applicable", "verified": "not_applicable", "release-ready": "not_applicable" }
+          "gates": {
+            "activation": "required",
+            "discovery-ready": "not_applicable",
+            "requirements-ready": "not_applicable",
+            "prd-ready": "not_applicable",
+            "ux-ready": "not_applicable",
+            "architecture-ready": "not_applicable",
+            "story-ready": "not_applicable",
+            "verified": "not_applicable",
+            "release-ready": "not_applicable",
+            "telemetry-ready": "not_applicable",
+            "iteration-ready": "not_applicable"
+          }
         },
         "HOTFIX": {
           "scope": "story",
           "description": "Emergency production repair. story-ready is waivable under a recorded, expiring waiver; verification is never waivable.",
-          "gates": { "activation": "required", "prd-ready": "not_applicable", "story-ready": "waivable", "verified": "required", "release-ready": "not_applicable" }
+          "gates": {
+            "activation": "required",
+            "discovery-ready": "not_applicable",
+            "requirements-ready": "not_applicable",
+            "prd-ready": "not_applicable",
+            "ux-ready": "not_applicable",
+            "architecture-ready": "not_applicable",
+            "story-ready": "waivable",
+            "verified": "required",
+            "release-ready": "not_applicable",
+            "telemetry-ready": "not_applicable",
+            "iteration-ready": "not_applicable"
+          }
         },
         "DOC_ONLY": {
           "scope": "story",
           "description": "Documentation-only change with no product-code or behaviour impact.",
           "requiresClassificationReason": true,
-          "gates": { "activation": "not_applicable", "prd-ready": "not_applicable", "story-ready": "not_applicable", "verified": "not_applicable", "release-ready": "not_applicable" }
+          "gates": {
+            "activation": "not_applicable",
+            "discovery-ready": "not_applicable",
+            "requirements-ready": "not_applicable",
+            "prd-ready": "not_applicable",
+            "ux-ready": "not_applicable",
+            "architecture-ready": "not_applicable",
+            "story-ready": "not_applicable",
+            "verified": "not_applicable",
+            "release-ready": "not_applicable",
+            "telemetry-ready": "not_applicable",
+            "iteration-ready": "not_applicable"
+          }
         },
         "GOVERNANCE": {
           "scope": "product",
           "description": "Change to EOS itself (gates, workflow, agent map, instructions). Invalidates prior evidence by design.",
           "requiresClassificationReason": true,
-          "gates": { "activation": "required", "prd-ready": "not_applicable", "story-ready": "not_applicable", "verified": "not_applicable", "release-ready": "not_applicable" }
+          "gates": {
+            "activation": "required",
+            "discovery-ready": "not_applicable",
+            "requirements-ready": "not_applicable",
+            "prd-ready": "not_applicable",
+            "ux-ready": "not_applicable",
+            "architecture-ready": "not_applicable",
+            "story-ready": "not_applicable",
+            "verified": "not_applicable",
+            "release-ready": "not_applicable",
+            "telemetry-ready": "not_applicable",
+            "iteration-ready": "not_applicable"
+          }
         },
         "RELEASE": {
           "scope": "release",
           "description": "Promote a candidate to production.",
-          "gates": { "activation": "required", "prd-ready": "not_applicable", "story-ready": "not_applicable", "verified": "not_applicable", "release-ready": "required" }
+          "gates": {
+            "activation": "required",
+            "discovery-ready": "not_applicable",
+            "requirements-ready": "not_applicable",
+            "prd-ready": "not_applicable",
+            "ux-ready": "not_applicable",
+            "architecture-ready": "not_applicable",
+            "story-ready": "not_applicable",
+            "verified": "not_applicable",
+            "release-ready": "required",
+            "telemetry-ready": "required",
+            "iteration-ready": "required"
+          }
         }
       }
     },
@@ -63,13 +159,37 @@
           "description": "Everything is a spike.",
           "mergeable": false,
           "requiresClassificationReason": true,
-          "gates": { "activation": "required", "prd-ready": "not_applicable", "story-ready": "not_applicable", "verified": "not_applicable", "release-ready": "not_applicable" }
+          "gates": {
+            "activation": "required",
+            "discovery-ready": "not_applicable",
+            "requirements-ready": "not_applicable",
+            "prd-ready": "not_applicable",
+            "ux-ready": "not_applicable",
+            "architecture-ready": "not_applicable",
+            "story-ready": "not_applicable",
+            "verified": "not_applicable",
+            "release-ready": "not_applicable",
+            "telemetry-ready": "not_applicable",
+            "iteration-ready": "not_applicable"
+          }
         },
         "DOC_ONLY": {
           "scope": "story",
           "description": "Documentation-only change.",
           "requiresClassificationReason": true,
-          "gates": { "activation": "not_applicable", "prd-ready": "not_applicable", "story-ready": "not_applicable", "verified": "not_applicable", "release-ready": "not_applicable" }
+          "gates": {
+            "activation": "not_applicable",
+            "discovery-ready": "not_applicable",
+            "requirements-ready": "not_applicable",
+            "prd-ready": "not_applicable",
+            "ux-ready": "not_applicable",
+            "architecture-ready": "not_applicable",
+            "story-ready": "not_applicable",
+            "verified": "not_applicable",
+            "release-ready": "not_applicable",
+            "telemetry-ready": "not_applicable",
+            "iteration-ready": "not_applicable"
+          }
         }
       }
     }
@@ -77,42 +197,176 @@
   "stateMachines": {
     "product": {
       "initial": "UNINITIALIZED",
-      "states": ["UNINITIALIZED", "DISCOVERY", "REQUIREMENTS_BASELINED", "PRD_APPROVED", "ARCHITECTURE_APPROVED", "ACTIVE"],
+      "states": [
+        "UNINITIALIZED",
+        "DISCOVERY",
+        "REQUIREMENTS_BASELINED",
+        "PRD_BASELINED",
+        "UX_BASELINED",
+        "ARCHITECTURE_BASELINED",
+        "ACTIVE"
+      ],
       "transitions": [
-        { "from": "UNINITIALIZED", "to": "DISCOVERY", "requiresGate": "activation", "requiresFile": "docs/discovery.md" },
-        { "from": "DISCOVERY", "to": "REQUIREMENTS_BASELINED", "requiresFile": "docs/requirements.md" },
-        { "from": "REQUIREMENTS_BASELINED", "to": "PRD_APPROVED", "requiresGate": "prd-ready" },
-        { "from": "PRD_APPROVED", "to": "ARCHITECTURE_APPROVED", "requiresFile": "docs/architecture.md" },
-        { "from": "ARCHITECTURE_APPROVED", "to": "ACTIVE", "requiresStories": true }
+        {
+          "from": "UNINITIALIZED",
+          "to": "DISCOVERY",
+          "requiresGate": "discovery-ready"
+        },
+        {
+          "from": "DISCOVERY",
+          "to": "REQUIREMENTS_BASELINED",
+          "requiresGate": "requirements-ready"
+        },
+        {
+          "from": "REQUIREMENTS_BASELINED",
+          "to": "PRD_BASELINED",
+          "requiresGate": "prd-ready"
+        },
+        {
+          "from": "PRD_BASELINED",
+          "to": "UX_BASELINED",
+          "requiresGate": "ux-ready"
+        },
+        {
+          "from": "UX_BASELINED",
+          "to": "ARCHITECTURE_BASELINED",
+          "requiresGate": "architecture-ready"
+        },
+        {
+          "from": "ARCHITECTURE_BASELINED",
+          "to": "ACTIVE",
+          "requiresStories": true
+        }
       ]
     },
     "story": {
       "initial": "DRAFT",
-      "states": ["DRAFT", "IN_REVIEW", "READY_FOR_DEV", "IN_DEVELOPMENT", "READY_FOR_TEST", "VERIFIED", "MERGED"],
+      "states": [
+        "DRAFT",
+        "IN_REVIEW",
+        "READY_FOR_DEV",
+        "IN_DEVELOPMENT",
+        "READY_FOR_TEST",
+        "VERIFIED",
+        "MERGED"
+      ],
       "transitions": [
-        { "from": "DRAFT", "to": "IN_REVIEW" },
-        { "from": "IN_REVIEW", "to": "READY_FOR_DEV", "requiresGate": "story-ready" },
-        { "from": "READY_FOR_DEV", "to": "IN_DEVELOPMENT" },
-        { "from": "IN_DEVELOPMENT", "to": "READY_FOR_TEST" },
-        { "from": "READY_FOR_TEST", "to": "VERIFIED", "requiresGate": "verified" },
-        { "from": "VERIFIED", "to": "MERGED", "requiresGate": "verified", "requiresFresh": true },
-        { "from": "IN_REVIEW", "to": "DRAFT", "rollback": true },
-        { "from": "READY_FOR_DEV", "to": "DRAFT", "rollback": true },
-        { "from": "READY_FOR_TEST", "to": "IN_DEVELOPMENT", "rollback": true },
-        { "from": "VERIFIED", "to": "IN_DEVELOPMENT", "rollback": true }
+        {
+          "from": "DRAFT",
+          "to": "IN_REVIEW"
+        },
+        {
+          "from": "IN_REVIEW",
+          "to": "READY_FOR_DEV",
+          "requiresGate": "story-ready"
+        },
+        {
+          "from": "READY_FOR_DEV",
+          "to": "IN_DEVELOPMENT"
+        },
+        {
+          "from": "IN_DEVELOPMENT",
+          "to": "READY_FOR_TEST"
+        },
+        {
+          "from": "READY_FOR_TEST",
+          "to": "VERIFIED",
+          "requiresGate": "verified"
+        },
+        {
+          "from": "VERIFIED",
+          "to": "MERGED",
+          "requiresGate": "verified",
+          "requiresFresh": true
+        },
+        {
+          "from": "IN_REVIEW",
+          "to": "DRAFT",
+          "rollback": true
+        },
+        {
+          "from": "READY_FOR_DEV",
+          "to": "DRAFT",
+          "rollback": true
+        },
+        {
+          "from": "READY_FOR_TEST",
+          "to": "IN_DEVELOPMENT",
+          "rollback": true
+        },
+        {
+          "from": "VERIFIED",
+          "to": "IN_DEVELOPMENT",
+          "rollback": true
+        }
       ]
     },
     "release": {
       "initial": "PLANNED",
-      "states": ["PLANNED", "CANDIDATE", "VERIFIED", "APPROVED", "RELEASED", "ROLLED_BACK"],
+      "states": [
+        "PLANNED",
+        "CANDIDATE",
+        "VERIFIED",
+        "APPROVED",
+        "RELEASED",
+        "OBSERVED",
+        "ITERATED",
+        "ROLLED_BACK"
+      ],
       "transitions": [
-        { "from": "PLANNED", "to": "CANDIDATE" },
-        { "from": "CANDIDATE", "to": "VERIFIED", "requiresGate": "release-ready" },
-        { "from": "VERIFIED", "to": "APPROVED", "requiresSeparateApprover": true },
-        { "from": "APPROVED", "to": "RELEASED", "requiresGate": "release-ready", "requiresCandidateCommit": true },
-        { "from": "RELEASED", "to": "ROLLED_BACK" },
-        { "from": "CANDIDATE", "to": "PLANNED", "rollback": true },
-        { "from": "VERIFIED", "to": "CANDIDATE", "rollback": true }
+        {
+          "from": "PLANNED",
+          "to": "CANDIDATE"
+        },
+        {
+          "from": "CANDIDATE",
+          "to": "VERIFIED",
+          "requiresGate": "release-ready"
+        },
+        {
+          "from": "VERIFIED",
+          "to": "APPROVED",
+          "requiresSeparateApprover": true
+        },
+        {
+          "from": "APPROVED",
+          "to": "RELEASED",
+          "requiresGate": "release-ready",
+          "requiresCandidateCommit": true
+        },
+        {
+          "from": "RELEASED",
+          "to": "OBSERVED",
+          "requiresGate": "telemetry-ready"
+        },
+        {
+          "from": "OBSERVED",
+          "to": "ITERATED",
+          "requiresGate": "iteration-ready"
+        },
+        {
+          "from": "RELEASED",
+          "to": "ROLLED_BACK"
+        },
+        {
+          "from": "OBSERVED",
+          "to": "ROLLED_BACK"
+        },
+        {
+          "from": "ROLLED_BACK",
+          "to": "ITERATED",
+          "requiresGate": "iteration-ready"
+        },
+        {
+          "from": "CANDIDATE",
+          "to": "PLANNED",
+          "rollback": true
+        },
+        {
+          "from": "VERIFIED",
+          "to": "CANDIDATE",
+          "rollback": true
+        }
       ]
     }
   }

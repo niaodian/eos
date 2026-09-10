@@ -10,18 +10,25 @@ import { loadWorkflow, loadGates, loadAgentMap, loadActiveWork, posix } from './
 import { LEDGER_PATH } from './ledger.mjs';
 import { readEvents, stateOf, verifyChain } from './ledger.mjs';
 import { listStories, prdAcceptanceCriteria } from './story.mjs';
+import { SUMMARY_PATHS } from './machine-summary.mjs';
 
 export const ARTIFACTS = {
   discovery: 'docs/discovery.md',
+  discoveryRecord: 'docs/discovery.json',
   requirements: 'docs/requirements.md',
+  requirementsRecord: 'docs/requirements.json',
   prd: 'docs/prd.md',
   experience: 'docs/EXPERIENCE.md',
   design: 'docs/DESIGN.md',
+  designRecord: 'docs/design.json',
   architecture: 'docs/architecture.md',
+  architectureRecord: 'docs/architecture.json',
   traceMatrix: 'docs/trace-matrix.md',
   evalPlan: 'docs/eval-plan.md',
   releaseGate: 'docs/release-gate.md',
   telemetry: 'docs/telemetry-plan.md',
+  telemetryRecord: 'docs/telemetry.json',
+  iterationRecord: 'docs/iteration.json',
   activation: 'docs/eos/activation.md',
 };
 
@@ -131,16 +138,27 @@ export function gateInputs(snapshot, gateId, scopeType, scopeId) {
   const inputs = ['.eos/project.json'];
   const story = snapshot.stories.find((s) => s.id === scopeId);
   if (gateId === 'activation') inputs.push(ARTIFACTS.activation);
+  if (gateId === 'discovery-ready') inputs.push(ARTIFACTS.discovery, ARTIFACTS.discoveryRecord);
+  if (gateId === 'requirements-ready') inputs.push(ARTIFACTS.requirements, ARTIFACTS.requirementsRecord);
   if (gateId === 'prd-ready') inputs.push(ARTIFACTS.prd);
+  if (gateId === 'ux-ready') inputs.push(ARTIFACTS.designRecord, ARTIFACTS.design, ARTIFACTS.experience);
+  if (gateId === 'architecture-ready') inputs.push(ARTIFACTS.architecture, ARTIFACTS.architectureRecord, ARTIFACTS.requirementsRecord);
   if (gateId === 'story-ready') { inputs.push(ARTIFACTS.prd); if (story) inputs.push(story.path); }
   if (gateId === 'verified') {
     inputs.push(ARTIFACTS.traceMatrix, ARTIFACTS.prd);
+    // The machine summaries are EXCLUDED from the product tree (a verification run writes them, so
+    // counting them would make the digest they embed impossible to satisfy). They are bound here
+    // instead: editing one after the gate ran makes the recorded PASS STALE, exactly like any other
+    // input. Both properties, no self-reference.
+    inputs.push(SUMMARY_PATHS.testRun, SUMMARY_PATHS.evalSummary);
     if (story) inputs.push(story.path);
   }
   if (gateId === 'release-ready') {
-    inputs.push(ARTIFACTS.prd, ARTIFACTS.traceMatrix);
+    inputs.push(ARTIFACTS.prd, ARTIFACTS.traceMatrix, SUMMARY_PATHS.nfrSummary, SUMMARY_PATHS.testRun);
     for (const s of snapshot.stories) inputs.push(s.path);
   }
+  if (gateId === 'telemetry-ready') inputs.push(ARTIFACTS.telemetryRecord, ARTIFACTS.telemetry, ARTIFACTS.discoveryRecord);
+  if (gateId === 'iteration-ready') inputs.push(ARTIFACTS.iterationRecord, ARTIFACTS.telemetryRecord);
   return inputs.filter(Boolean);
 }
 

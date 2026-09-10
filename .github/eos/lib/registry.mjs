@@ -12,7 +12,7 @@ export const GATES_PATH = '.eos/gates.json';
 export const AGENT_MAP_PATH = '.eos/agent-map.json';
 export const ACTIVE_WORK_PATH = '.eos/local/active-work.json';
 /** Bumping this invalidates every previously written evidence file. */
-export const EVALUATOR_VERSION = '1.0.0';
+export const EVALUATOR_VERSION = '2.0.0';
 
 export const posix = (p) => p.split(/[\\/]/).join('/');
 

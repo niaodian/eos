@@ -24,6 +24,10 @@
           "title": { "type": "string", "minLength": 1 },
           "summary": { "type": "string" },
           "waivable": { "type": "boolean" },
+          "bindsProductTree": {
+            "description": "This gate asserts something about the PRODUCT (not just about a document), so its evidence records the identity of the tree it ran against and expires when that tree changes.",
+            "type": "boolean"
+          },
           "checks": {
             "type": "array",
             "minItems": 1,

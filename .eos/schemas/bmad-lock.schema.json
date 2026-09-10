@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eos.local/schemas/bmad-lock.schema.json",
+  "title": "EOS ⇄ BMAD compatibility manifest",
+  "description": "What EOS assumes about the BMAD skills it delegates authoring work to, and what those skills assume about the project. Machine-readable so `eos-doctor --deep` can report BLOCKED instead of a doctor PASS that coexists with a failing skill activation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "eosCompatibility", "bmadGeneration", "runtime", "requiredSkills"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schemaVersion": { "const": 1 },
+    "eosCompatibility": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+    "bmadGeneration": { "type": "string", "minLength": 1 },
+    "recordedAt": { "type": "string" },
+    "note": { "type": "string" },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["root", "scripts", "configs", "executables"],
+      "properties": {
+        "root": { "type": "string", "minLength": 1 },
+        "provider": { "type": "string" },
+        "scripts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["path", "purpose"],
+            "properties": { "path": { "type": "string" }, "purpose": { "type": "string" } }
+          }
+        },
+        "configs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["path"],
+            "properties": { "path": { "type": "string" }, "module": { "type": "string" } }
+          }
+        },
+        "executables": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "required"],
+            "properties": { "name": { "type": "string" }, "purpose": { "type": "string" }, "required": { "type": "boolean" } }
+          }
+        }
+      }
+    },
+    "deprecatedSkills": {
+      "description": "skill name → its replacement. EOS refuses to map a skill listed here.",
+      "type": "object",
+      "additionalProperties": { "type": "string", "minLength": 1 }
+    },
+    "requiredSkills": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "action"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "action": { "type": "string", "minLength": 1 },
+          "configs": { "type": "array", "items": { "type": "string" } },
+          "executables": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "optionalSkills": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name"],
+        "properties": { "name": { "type": "string" }, "purpose": { "type": "string" } }
+      }
+    },
+    "fallback": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["policy"],
+      "properties": { "policy": { "type": "string", "minLength": 20 }, "verifiedBy": { "type": "string" } }
+    }
+  }
+}

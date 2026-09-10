@@ -37,5 +37,5 @@ For each concern below, require one explicit decision: **ADOPT** (write requirem
 A decision table embedded at the top of `docs/requirements.md`, plus NFR entries in
 `docs/checklists/C-nfr.md`.
 
-> Reuse note: this composes with `bmad-create-prd` and `bmad-architecture`; it does not
+> Reuse note: this composes with `bmad-prd` and `bmad-architecture`; it does not
 > replace them — it adds the operational pre-flight gate they lack.

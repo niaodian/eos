@@ -5,27 +5,57 @@ import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { project, write, run, runJson, cleanup, EOS_DIR, APP_PROJECT, PRD_2AC, story } from './test-support.mjs';
+import { project, write, run, runJson, cleanup, EOS_DIR, APP_PROJECT, PRD_2AC, story,
+  baselineFiles, storyFiles, commitAll,
+  DISCOVERY_MD, DISCOVERY_RECORD, REQUIREMENTS_MD, REQUIREMENTS_RECORD,
+  DESIGN_SKIP_RECORD, ARCHITECTURE_MD, ARCHITECTURE_RECORD, ADR_STACK, ADR_TOPOLOGY } from './test-support.mjs';
 
 after(cleanup);
 
 const matrix = JSON.parse(readFileSync(join(EOS_DIR, 'fixtures/routing-matrix.json'), 'utf8'));
 
-/** Resolve the fixture DSL: "@APP"/"@PRD" constants, { _story } builders, raw strings and JSON. */
+const CONSTANTS = {
+  '@APP': APP_PROJECT,
+  '@PRD': PRD_2AC,
+  '@DISCOVERY_MD': DISCOVERY_MD,
+  '@REQUIREMENTS_MD': REQUIREMENTS_MD,
+  '@ARCHITECTURE_MD': ARCHITECTURE_MD,
+  // The same requirements record with one concern reduced to a bare "SKIP" — EOS-AUD-005.
+  '@REQUIREMENTS_SKIP': {
+    ...REQUIREMENTS_RECORD,
+    operationalPreFlight: { ...REQUIREMENTS_RECORD.operationalPreFlight, telemetry: { decision: 'SKIP' } },
+  },
+};
+
+/** Files that make a fixture PAST a named baseline stage. */
+const STAGE_FILES = {
+  discovery: { 'docs/discovery.md': DISCOVERY_MD, 'docs/discovery.json': DISCOVERY_RECORD },
+  requirements: { 'docs/requirements.md': REQUIREMENTS_MD, 'docs/requirements.json': REQUIREMENTS_RECORD },
+  prd: { 'docs/prd.md': PRD_2AC },
+  ux: { 'docs/design.json': DESIGN_SKIP_RECORD },
+  architecture: {
+    'docs/architecture.md': ARCHITECTURE_MD,
+    'docs/architecture.json': ARCHITECTURE_RECORD,
+    'docs/adr/001-tech-stack.md': ADR_STACK,
+    'docs/adr/002-deployment-topology.md': ADR_TOPOLOGY,
+  },
+};
+
+/** Resolve the fixture DSL: "@…" constants, { _story } builders, raw strings and JSON. */
 function materialize(spec) {
-  if (spec === '@APP') return APP_PROJECT;
-  if (spec === '@PRD') return PRD_2AC;
+  if (typeof spec === 'string' && spec in CONSTANTS) return CONSTANTS[spec];
   if (spec && typeof spec === 'object' && spec._story) return story(spec._story);
   return spec;
 }
 
 function build(c) {
   const files = {};
+  for (const stage of c.baseline || []) Object.assign(files, STAGE_FILES[stage]);
   for (const [rel, spec] of Object.entries(c.files || {})) {
     files[rel === '@project' ? '.eos/project.json' : rel] = materialize(spec);
   }
   const dir = project(files, { withGovernance: c.governance !== false, withHooks: !!c.hooks });
-  for (const [gate, scope] of c.checks || []) run(dir, ['check', '--gate', gate, '--scope', scope]);
+  for (const [gate, scope] of c.checks || []) run(dir, ['check', '--gate', gate, ...(scope ? ['--scope', scope] : [])]);
   for (const [scopeType, id, to] of c.transitions || []) {
     const r = run(dir, ['transition', '--scope', scopeType, '--id', id, '--to', to]);
     assert.equal(r.code, 0, `fixture setup transition ${id} → ${to} failed:\n${r.out}`);
@@ -129,12 +159,7 @@ test('local active work cannot reclassify a story into a gate-free change type',
 });
 
 test('a story that is MERGED hands the focus back to the next change', () => {
-  const dir = project({
-    '.eos/project.json': APP_PROJECT,
-    'docs/prd.md': PRD_2AC,
-    'docs/stories/STORY-001.md': story(),
-    'docs/trace-matrix.md': '| AC | Test | Result |\n| --- | --- | --- |\n| AC1.1 | login.test.mjs | ✅ |\n',
-  }, { withHooks: true });
+  const dir = project(storyFiles(), { withHooks: true });
   const steps = ['IN_REVIEW', 'READY_FOR_DEV', 'IN_DEVELOPMENT', 'READY_FOR_TEST', 'VERIFIED', 'MERGED'];
   run(dir, ['check', '--gate', 'story-ready', '--scope', 'STORY-001']);
   for (const to of steps) {

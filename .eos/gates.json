@@ -11,74 +11,448 @@
       "title": "EOS is locally activated",
       "summary": "The project declares what it is and how it is verified, and the workflow profile resolves. Everything downstream reads these files, so a broken declaration is an ERROR, never a skip.",
       "checks": [
-        { "id": "project-declaration", "title": ".eos/project.json exists and validates", "evaluator": "projectDeclaration", "fix": "Copy your stack's block from docs/eos/stack-presets.md into .eos/project.json (projectType + stacks + commands.test)." },
-        { "id": "declaration-matches-repo", "title": "the declaration is not the untouched template once code exists", "evaluator": "declarationMatchesRepo", "fix": "Change projectType from \"config-only\" to \"application\" (or \"library\") and declare commands.test." },
-        { "id": "workflow-profile", "title": "workflowProfile resolves in .eos/workflow.json", "evaluator": "workflowProfileResolves", "fix": "Set \"workflowProfile\" to a profile that exists in .eos/workflow.json (default: standard-product)." },
-        { "id": "activation-ledger", "title": "docs/eos/activation.md tracks the one-time hardening items", "evaluator": "activationLedger", "fix": "Run /eos-init in Copilot Chat; it creates and maintains docs/eos/activation.md." }
+        {
+          "id": "project-declaration",
+          "title": ".eos/project.json exists and validates",
+          "evaluator": "projectDeclaration",
+          "fix": "Copy your stack's block from docs/eos/stack-presets.md into .eos/project.json (projectType + stacks + commands.test)."
+        },
+        {
+          "id": "declaration-matches-repo",
+          "title": "the declaration is not the untouched template once code exists",
+          "evaluator": "declarationMatchesRepo",
+          "fix": "Change projectType from \"config-only\" to \"application\" (or \"library\") and declare commands.test."
+        },
+        {
+          "id": "workflow-profile",
+          "title": "workflowProfile resolves in .eos/workflow.json",
+          "evaluator": "workflowProfileResolves",
+          "fix": "Set \"workflowProfile\" to a profile that exists in .eos/workflow.json (default: standard-product)."
+        },
+        {
+          "id": "activation-ledger",
+          "title": "docs/eos/activation.md tracks the one-time hardening items",
+          "evaluator": "activationLedger",
+          "fix": "Run /eos-init in Copilot Chat; it creates and maintains docs/eos/activation.md."
+        }
+      ]
+    },
+    {
+      "id": "discovery-ready",
+      "code": "G1",
+      "scope": "product",
+      "version": "1.0.0",
+      "waivable": false,
+      "title": "The problem is framed, not merely filed",
+      "summary": "docs/discovery.md is written and docs/discovery.json records ONE falsifiable problem, a measurable success metric with a target and a data source, an explicit scope boundary, and no unresolved blocking question. An empty file used to pass this stage.",
+      "checks": [
+        {
+          "id": "discovery-written",
+          "title": "docs/discovery.md is written and docs/discovery.json validates",
+          "evaluator": "discoveryWritten",
+          "fix": "Run the eos-discovery agent (bmad-brainstorming, bmad-agent-analyst); it produces both the narrative and the record."
+        },
+        {
+          "id": "problem-falsifiable",
+          "title": "the problem statement can be proven wrong",
+          "evaluator": "discoveryProblemFalsifiable",
+          "fix": "Add problem.falsifiableBy: the observation that would show this problem does not exist."
+        },
+        {
+          "id": "metric-measurable",
+          "title": "the success metric has a target and a data source",
+          "evaluator": "discoveryMetricMeasurable",
+          "fix": "Give successMetric a target value and the data source the number will come from."
+        },
+        {
+          "id": "scope-bounded",
+          "title": "scope in and scope out are both stated",
+          "evaluator": "discoveryScopeBounded",
+          "fix": "List at least one item in scope.in and one in scope.out — a scope with no boundary is not a scope."
+        },
+        {
+          "id": "no-open-blockers",
+          "title": "no unresolved blocking question",
+          "evaluator": "discoveryNoOpenBlockers",
+          "fix": "Resolve every openQuestions entry with severity BLOCKER, or downgrade it with a resolution."
+        }
+      ]
+    },
+    {
+      "id": "requirements-ready",
+      "code": "G2",
+      "scope": "product",
+      "version": "1.0.0",
+      "waivable": false,
+      "title": "Requirements and operational pre-flight are decided",
+      "summary": "Functional requirements, quantified NFRs, and a decision for every operational concern (telemetry, authz, audit, rollback, monitoring, canary, quota, i18n, multi-tenancy, capacity/SLO, DR, and compliance when regulated). Each is ADOPT, SKIP with a reason, or DEFER with an owner and a trigger.",
+      "checks": [
+        {
+          "id": "requirements-written",
+          "title": "docs/requirements.md is written and docs/requirements.json validates",
+          "evaluator": "requirementsWritten",
+          "fix": "Run /requirements (bmad-agent-pm + eos-operational-readiness)."
+        },
+        {
+          "id": "functional-requirements",
+          "title": "functional requirements exist and are uniquely identified",
+          "evaluator": "requirementsFunctional",
+          "fix": "Give every functional requirement a unique FR<n> id and a statement."
+        },
+        {
+          "id": "nfr-quantified",
+          "title": "every NFR carries a target",
+          "evaluator": "requirementsNfr",
+          "fix": "Quantify each NFR — an unquantified NFR cannot be verified at the release gate."
+        },
+        {
+          "id": "operational-preflight",
+          "title": "every operational concern is decided, not skipped",
+          "evaluator": "requirementsOperationalPreFlight",
+          "fix": "For each concern record ADOPT + note, SKIP + reason, or DEFER + owner + trigger. A bare \"SKIP\" is not a decision."
+        },
+        {
+          "id": "no-open-blockers",
+          "title": "no unresolved blocking question",
+          "evaluator": "requirementsNoOpenBlockers",
+          "fix": "Resolve every openQuestions entry with severity BLOCKER."
+        }
       ]
     },
     {
       "id": "prd-ready",
       "code": "G3",
       "scope": "product",
-      "version": "1.0.0",
+      "version": "2.0.0",
       "waivable": false,
       "title": "PRD is the single source of truth",
-      "summary": "The PRD exists, its acceptance criteria are individually addressable, and nothing in it is still marked as an unresolved blocker.",
+      "summary": "The PRD exists, its acceptance criteria are DEFINED (not merely mentioned), each is individually addressable, every requirement carries at least one, and nothing is still marked as an unresolved blocker.",
       "checks": [
-        { "id": "prd-present", "title": "docs/prd.md exists", "evaluator": "prdPresent", "fix": "Run /spec to produce docs/prd.md (bmad-create-prd, validated by bmad-validate-prd)." },
-        { "id": "ac-parseable", "title": "the PRD contains parseable AC<n>.<n> ids", "evaluator": "prdAcParseable", "fix": "Give every requirement acceptance criteria with stable ids like AC1.1, AC1.2." },
-        { "id": "ac-unique", "title": "no acceptance-criterion id is defined twice", "evaluator": "prdAcUnique", "fix": "Renumber the duplicated AC ids so each one addresses exactly one statement." },
-        { "id": "no-open-blockers", "title": "no unresolved BLOCKER / TBD marker remains", "evaluator": "prdNoOpenBlockers", "fix": "Resolve every line marked BLOCKER or TBD, or move it out of the PRD into the backlog." }
+        {
+          "id": "prd-present",
+          "title": "docs/prd.md exists",
+          "evaluator": "prdPresent",
+          "fix": "Run /spec to produce docs/prd.md (bmad-prd — it detects create / update / validate intent)."
+        },
+        {
+          "id": "ac-parseable",
+          "title": "the PRD DEFINES its AC<n>.<n> ids, it does not merely mention them",
+          "evaluator": "prdAcParseable",
+          "fix": "State every criterion as a list item, table row or heading that opens with its id and carries the criterion text."
+        },
+        {
+          "id": "ac-unique",
+          "title": "no acceptance-criterion id is defined twice",
+          "evaluator": "prdAcUnique",
+          "fix": "Renumber the duplicated AC ids so each one addresses exactly one statement."
+        },
+        {
+          "id": "ac-covers-requirements",
+          "title": "every requirement has at least one acceptance criterion",
+          "evaluator": "prdCoversRequirements",
+          "fix": "Cite the FR id beside its acceptance criteria (or in the heading section that defines them) so no requirement ships unspecified."
+        },
+        {
+          "id": "no-open-blockers",
+          "title": "no unresolved BLOCKER / TBD marker remains",
+          "evaluator": "prdNoOpenBlockers",
+          "fix": "Resolve every line marked BLOCKER or TBD, or move it out of the PRD into the backlog."
+        }
+      ]
+    },
+    {
+      "id": "ux-ready",
+      "code": "G-UX",
+      "scope": "product",
+      "version": "1.0.0",
+      "waivable": false,
+      "title": "The interaction contract exists (or is explicitly not needed)",
+      "summary": "A user-facing product has BOTH docs/DESIGN.md and docs/EXPERIENCE.md with real content, and records coverage of flows, loading/empty/error/success states, accessibility, tokens and responsive behaviour. A non-UI product records a structured SKIP with a reason.",
+      "checks": [
+        {
+          "id": "ux-applicability",
+          "title": "the product states whether it has a user-facing surface",
+          "evaluator": "uxApplicabilityDecided",
+          "fix": "Create docs/design.json: { \"userInterface\": true } or { \"userInterface\": false, \"skipReason\": \"…\" }. Run /ux-spec."
+        },
+        {
+          "id": "ux-documents",
+          "title": "a user-facing product has both a design and an experience contract",
+          "evaluator": "uxDocumentsPresent",
+          "fix": "Produce docs/DESIGN.md AND docs/EXPERIENCE.md (eos-design agent / bmad-ux)."
+        },
+        {
+          "id": "ux-coverage",
+          "title": "flows, states, a11y, tokens and responsive behaviour are covered",
+          "evaluator": "uxCoverageComplete",
+          "fix": "Record each coverage dimension as COVERED + ref, or NOT_APPLICABLE + reason."
+        }
+      ]
+    },
+    {
+      "id": "architecture-ready",
+      "code": "G4",
+      "scope": "product",
+      "version": "1.0.0",
+      "waivable": false,
+      "title": "The architecture decides what stories will assume",
+      "summary": "docs/architecture.md is written, docs/architecture.json records a decision (or a reasoned N/A) for stack, topology, authz, security, audit, rollback, DR, data/API/event contracts — plus tool allow-list, bounded orchestration, memory layering, async boundary and eval architecture for an agentic product, and the data/approval boundary for a regulated one — and every NFR lands on a named component.",
+      "checks": [
+        {
+          "id": "architecture-written",
+          "title": "docs/architecture.md is written and docs/architecture.json validates",
+          "evaluator": "architectureWritten",
+          "fix": "Run the eos-architecture agent (bmad-architecture); it produces the narrative and the decision record."
+        },
+        {
+          "id": "architecture-decisions",
+          "title": "every architectural concern is decided or reasoned N/A",
+          "evaluator": "architectureDecisions",
+          "fix": "Record each decision as DECIDED + summary (+ ADR for the irreversible ones) or NOT_APPLICABLE + reason."
+        },
+        {
+          "id": "nfr-landing-points",
+          "title": "every NFR lands on a named component and mechanism",
+          "evaluator": "architectureNfrLanding",
+          "fix": "Add an nfrLandingPoints entry for each NFR in docs/requirements.json."
+        }
       ]
     },
     {
       "id": "story-ready",
       "code": "G5",
       "scope": "story",
-      "version": "1.0.0",
+      "version": "2.0.0",
       "waivable": true,
       "title": "Story is ready for development",
-      "summary": "The story is context-self-contained: it references real PRD acceptance criteria, every one of them has a designed test intent (ATDD), LLM-backed criteria carry an eval case, and telemetry / authorization / rollback are concrete tasks rather than intentions.",
+      "summary": "The story is context-self-contained: it references real PRD acceptance criteria, every one of them has a designed test intent (ATDD), LLM-backed criteria carry an eval case, and telemetry / authorization / rollback are decided — adopted with an owner and a verification, or skipped/deferred with a reason.",
       "checks": [
-        { "id": "story-present", "title": "the story file exists and parses", "evaluator": "storyPresent", "fix": "Create docs/stories/<STORY-ID>.md with an \"Acceptance criteria\" table (see docs/eos/developer-experience.md)." },
-        { "id": "state-not-hand-edited", "title": "the story does not claim a state the ledger disagrees with", "evaluator": "storyStateNotHandEdited", "fix": "Remove the state: field from the story front matter and use `eos transition` — hand-edited state is not evidence." },
-        { "id": "ac-references-resolve", "title": "every referenced AC exists in the PRD", "evaluator": "storyAcResolves", "fix": "Reference AC ids that exist in docs/prd.md, or add the criterion to the PRD first." },
-        { "id": "ac-test-intent", "title": "every acceptance criterion has a test intent", "evaluator": "storyAcTestIntent", "fix": "Use bmad-testarch-atdd to design one concrete test intent per AC before implementation." },
-        { "id": "agentic-eval-case", "title": "LLM-backed acceptance criteria have an eval case", "evaluator": "storyAgenticEvalCase", "fix": "Add an eval case id (EVAL-<n>) for every AC whose behaviour depends on model output; see docs/eos/examples/eval-starter/." },
-        { "id": "ops-tasks", "title": "telemetry, authorization and rollback are concrete tasks", "evaluator": "storyOpsTasks", "fix": "Add explicit Telemetry / Authorization / Rollback lines under an \"Operational tasks\" section (or record SKIP + reason)." }
+        {
+          "id": "story-present",
+          "title": "the story file exists and parses",
+          "evaluator": "storyPresent",
+          "fix": "Create docs/stories/<STORY-ID>.md with an \"Acceptance criteria\" table (see docs/eos/developer-experience.md)."
+        },
+        {
+          "id": "state-not-hand-edited",
+          "title": "the story does not claim a state the ledger disagrees with",
+          "evaluator": "storyStateNotHandEdited",
+          "fix": "Remove the state: field from the story front matter and use `eos transition` — hand-edited state is not evidence."
+        },
+        {
+          "id": "ac-references-resolve",
+          "title": "every referenced AC exists in the PRD",
+          "evaluator": "storyAcResolves",
+          "fix": "Reference AC ids that exist in docs/prd.md, or add the criterion to the PRD first."
+        },
+        {
+          "id": "ac-test-intent",
+          "title": "every acceptance criterion has a test intent",
+          "evaluator": "storyAcTestIntent",
+          "fix": "Use bmad-testarch-atdd to design one concrete test intent per AC before implementation."
+        },
+        {
+          "id": "agentic-eval-case",
+          "title": "LLM-backed acceptance criteria have an eval case",
+          "evaluator": "storyAgenticEvalCase",
+          "fix": "Add an eval case id (EVAL-<n>) for every AC whose behaviour depends on model output; see docs/eos/examples/eval-starter/."
+        },
+        {
+          "id": "ops-tasks",
+          "title": "telemetry, authorization and rollback are decided, not skipped",
+          "evaluator": "storyOpsTasks",
+          "fix": "Under \"## Operational tasks\" write `ADOPT — <task>; owner: <who>; verify: <how>`, `SKIP — <reason>` or `DEFER — owner: <who>; trigger: <what ends it>`. A bare \"SKIP\" is not a decision."
+        }
       ]
     },
     {
       "id": "verified",
       "code": "G7",
       "scope": "story",
-      "version": "1.0.0",
+      "version": "2.0.0",
       "waivable": false,
+      "bindsProductTree": true,
       "title": "Story is verified by executed tests",
-      "summary": "Tests really ran for the declared stack, every story acceptance criterion has a passing trace row, evals meet their threshold for agentic products, and the evidence belongs to the current inputs.",
+      "summary": "Tests really ran for the declared stack against a recorded product tree, every story acceptance criterion has a trace row backed by a real test file and a real run, evals meet their threshold for agentic products, and the evidence belongs to the current inputs.",
       "checks": [
-        { "id": "tests-executed", "title": "the declared test command ran and passed", "evaluator": "testsExecuted", "fix": "Run `node .github/hooks/project-gate.mjs` and fix failures; a missing toolchain is BLOCKED, never a pass." },
-        { "id": "trace-complete", "title": "every story AC has a passing trace-matrix row", "evaluator": "traceComplete", "fix": "Produce docs/trace-matrix.md at G7 (bmad-testarch-trace) so each AC maps to a passing test." },
-        { "id": "eval-threshold", "title": "eval baseline met (agentic products only)", "evaluator": "evalThreshold", "fix": "Run the declared commands.eval and record the result; see docs/eval-plan.md." },
-        { "id": "evidence-current", "title": "the evidence matches the current inputs", "evaluator": "evidenceCurrent", "fix": "An input moved after the prerequisite gate ran: re-run `eos check --gate story-ready --scope <STORY-ID>` first, then `eos check --gate verified --scope <STORY-ID>`." }
+        {
+          "id": "product-tree-bound",
+          "title": "the evidence records the product tree it was produced from",
+          "evaluator": "productTreeBound",
+          "fix": "Run this gate inside a git repository — EOS binds a verification to the source, tests, prompts and eval data it actually ran against."
+        },
+        {
+          "id": "tests-executed",
+          "title": "the declared test command ran and passed",
+          "evaluator": "testsExecuted",
+          "fix": "Run `node .github/hooks/project-gate.mjs` and fix failures; a missing toolchain is BLOCKED, never a pass."
+        },
+        {
+          "id": "trace-complete",
+          "title": "every story AC has a trace row bound to a real, executed test",
+          "evaluator": "traceComplete",
+          "fix": "Produce docs/trace-matrix.md at G7 (bmad-testarch-trace): each row needs the AC id, an existing test path, the command/run that executed it, and its machine result."
+        },
+        {
+          "id": "eval-threshold",
+          "title": "eval baseline met (agentic products only)",
+          "evaluator": "evalThreshold",
+          "fix": "Run the declared commands.eval so it writes a schema-valid summary to docs/evidence/eval-summary.json; see docs/eval-plan.md."
+        },
+        {
+          "id": "evidence-current",
+          "title": "the evidence matches the current inputs",
+          "evaluator": "evidenceCurrent",
+          "fix": "An input moved after the prerequisite gate ran: re-run `eos check --gate story-ready --scope <STORY-ID>` first, then `eos check --gate verified --scope <STORY-ID>`."
+        }
       ]
     },
     {
       "id": "release-ready",
       "code": "G8",
       "scope": "release",
+      "version": "2.0.0",
+      "waivable": false,
+      "bindsProductTree": true,
+      "title": "Release candidate is shippable",
+      "summary": "The candidate itself is re-tested here — not merely trusted because stories once passed. Every included story was verified against THIS tree, security, supply-chain, NFR, compliance and operational readiness hold, and the human/organisational items are recorded rather than assumed.",
+      "checks": [
+        {
+          "id": "candidate-identity",
+          "title": "the candidate is a committed, identifiable tree",
+          "evaluator": "releaseCandidateCommitted",
+          "fix": "Commit the outstanding product changes; a release must name a tree that exists in history."
+        },
+        {
+          "id": "candidate-quality",
+          "title": "the declared quality commands pass ON THIS candidate",
+          "evaluator": "releaseCandidateQuality",
+          "fix": "Run `node .github/hooks/project-gate.mjs` on the candidate and fix what fails — story state is not a substitute for testing the thing you are shipping."
+        },
+        {
+          "id": "stories-verified",
+          "title": "all stories in the release are VERIFIED or MERGED",
+          "evaluator": "releaseStoriesVerified",
+          "fix": "Finish or drop the unverified stories; `eos release-status` lists them."
+        },
+        {
+          "id": "story-evidence-current",
+          "title": "each story's verification describes THIS candidate",
+          "evaluator": "releaseStoryEvidenceCurrent",
+          "fix": "Re-run `eos check --gate verified --scope <STORY-ID>` for the stories whose verification predates the candidate tree."
+        },
+        {
+          "id": "spec-alignment",
+          "title": "spec-align --strict passes (no drift, no orphans)",
+          "evaluator": "releaseSpecAlignment",
+          "fix": "Run `node .github/hooks/spec-align.mjs --strict` and close drift/orphans/failing rows."
+        },
+        {
+          "id": "secret-scan",
+          "title": "secret scan is clean",
+          "evaluator": "releaseSecretScan",
+          "fix": "Run `node .github/hooks/secret-scan.mjs` and remove or rotate anything it finds."
+        },
+        {
+          "id": "dependency-audit",
+          "title": "the dependency / supply-chain audit is clean",
+          "evaluator": "releaseDependencyAudit",
+          "fix": "Run the declared commands.audit (npm audit / pip-audit / cargo audit …) and resolve findings; offline it is DEFERRED, never PASS — and for a regulated product it BLOCKS."
+        },
+        {
+          "id": "nfr-evidence",
+          "title": "NFR targets have recorded evidence",
+          "evaluator": "releaseNfrEvidence",
+          "fix": "Record measured NFR results in docs/evidence/nfr-summary.json (bmad-testarch-nfr); a deferral needs an owner and a trigger."
+        },
+        {
+          "id": "compliance-boundary",
+          "title": "the compliance data boundary holds",
+          "evaluator": "releaseComplianceBoundary",
+          "fix": "Run /compliance to record docs/compliance-profile.json; eos-doctor D5 explains what is missing."
+        },
+        {
+          "id": "no-expired-waivers",
+          "title": "no waiver in this release has expired",
+          "evaluator": "releaseWaiversValid",
+          "fix": "Renew the waiver with a new expiry and approver, or close the gap it was covering."
+        },
+        {
+          "id": "ops-artifacts",
+          "title": "runbook, rollback, canary and health/readiness are documented",
+          "evaluator": "releaseOpsArtifacts",
+          "fix": "Run /runbook and /deploy-topology so rollback, gradual rollout and health/readiness are written down before shipping."
+        },
+        {
+          "id": "deployment-topology",
+          "title": "the operational mechanisms match the recorded topology decision",
+          "evaluator": "releaseDeploymentTopology",
+          "fix": "Record the deployment topology in an ADR (docs/adr/*-deployment-topology.md) so rollback/canary/health are the ones that topology actually uses."
+        },
+        {
+          "id": "activation-authority",
+          "title": "enforcement authority is recorded, not assumed",
+          "evaluator": "releaseActivationAuthority",
+          "fix": "Close or explicitly waive every item in docs/eos/activation.md; EOS cannot verify server-side branch protection, so an unresolved item is UNVERIFIED, never PASS."
+        }
+      ]
+    },
+    {
+      "id": "telemetry-ready",
+      "code": "G9",
+      "scope": "release",
       "version": "1.0.0",
       "waivable": false,
-      "title": "Release candidate is shippable",
-      "summary": "Every story in the release is VERIFIED with fresh evidence, security and compliance gates hold, no waiver has expired, and the operational artifacts (runbook, rollback) exist.",
+      "title": "The shipped change can be observed",
+      "summary": "RELEASED is not the end of the loop. The discovery success metric is emitted as a real signal, dashboards and routed alerts exist, sensitive operations are audited, a rollback trigger is defined, and a named owner reads the result.",
       "checks": [
-        { "id": "stories-verified", "title": "all stories in the release are VERIFIED or MERGED", "evaluator": "releaseStoriesVerified", "fix": "Finish or drop the unverified stories; `eos release-status` lists them." },
-        { "id": "spec-alignment", "title": "spec-align --strict passes (no drift, no orphans)", "evaluator": "releaseSpecAlignment", "fix": "Run `node .github/hooks/spec-align.mjs --strict` and close drift/orphans/failing rows." },
-        { "id": "secret-scan", "title": "secret scan is clean", "evaluator": "releaseSecretScan", "fix": "Run `node .github/hooks/secret-scan.mjs` and remove or rotate anything it finds." },
-        { "id": "compliance-boundary", "title": "the compliance data boundary holds", "evaluator": "releaseComplianceBoundary", "fix": "Run /compliance to record docs/compliance-profile.json; eos-doctor D5 explains what is missing." },
-        { "id": "no-expired-waivers", "title": "no waiver in this release has expired", "evaluator": "releaseWaiversValid", "fix": "Renew the waiver with a new expiry and approver, or close the gap it was covering." },
-        { "id": "ops-artifacts", "title": "runbook and rollback plan exist", "evaluator": "releaseOpsArtifacts", "fix": "Run /runbook and record the rollback procedure before shipping." }
+        {
+          "id": "telemetry-plan",
+          "title": "docs/telemetry-plan.md is written and docs/telemetry.json validates",
+          "evaluator": "telemetryPlanWritten",
+          "fix": "Run /telemetry-plan; it produces the plan and the record."
+        },
+        {
+          "id": "signals-land",
+          "title": "the success metric is actually emitted",
+          "evaluator": "telemetrySignalsLand",
+          "fix": "Add a signals entry mapping the discovery success metric to the event/metric that carries it."
+        },
+        {
+          "id": "observability",
+          "title": "dashboards, routed alerts, audit and a rollback trigger exist",
+          "evaluator": "telemetryObservability",
+          "fix": "Record dashboards, alerts with routesTo, the sensitive-operation audit decision, and rolloutMetrics.rollbackTrigger."
+        }
+      ]
+    },
+    {
+      "id": "iteration-ready",
+      "code": "G10",
+      "scope": "release",
+      "version": "1.0.0",
+      "waivable": false,
+      "title": "Production learning is written back to the source of truth",
+      "summary": "What the release taught lands in the specs, user feedback reaches the eval dataset for an agentic product, a changed prompt/model/tool surface gets a new baseline, and a named owner records CONTINUE / CORRECT_COURSE / STOP.",
+      "checks": [
+        {
+          "id": "spec-write-back",
+          "title": "learnings are written back into documents that exist",
+          "evaluator": "iterationWriteBack",
+          "fix": "Create docs/iteration.json (eos-review agent: bmad-retrospective, bmad-correct-course) naming each spec you updated."
+        },
+        {
+          "id": "agentic-feedback",
+          "title": "feedback reaches the eval dataset (agentic products)",
+          "evaluator": "iterationAgenticFeedback",
+          "fix": "Record evalDatasetUpdate and baselineRebaselined — an agentic product that never learns from production is a fixed system with a random component."
+        },
+        {
+          "id": "iteration-decision",
+          "title": "the next-step decision has a named owner",
+          "evaluator": "iterationDecisionRecorded",
+          "fix": "Record decision.outcome and decision.owner."
+        }
       ]
     }
   ]

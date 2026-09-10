@@ -38,19 +38,26 @@ Paradigm isolation check (deterministic SaaS vs probabilistic Agentic):
   timeout) for transport/infra; cognitive (bounded reflection) for LLM failures. Flag any mix.
 - Keep state layers distinct: SQL/strong-consistency vs vector/long-term vs context/short-term.
 
-Gate G4: extensibility/resilience/DR/security each have an explicit design (not "later"),
+Gate G4 (`architecture-ready`, machine-verified): extensibility/resilience/DR/security each have an explicit design (not "later"),
 every irreversible decision has an ADR, the **tech stack is locked** (00-workspace updated + R3
 enabled + tech-stack ADR written), the **deployment topology is chosen** (NFR-justified, with a
 `docs/adr/*-deployment-topology.md`), and — if both paradigms are present — the isolation
 points above are designed (async boundary, separated fault models, layered state).
 
-Output: docs/architecture.md (incl. a Deployment section), docs/data-model.md, api/openapi.yaml,
-docs/checklists/G-deployment.md (filled), docs/adr/* (incl. the tech-stack ADR + the deployment-topology ADR).
+Output: docs/architecture.md (incl. a Deployment section), **docs/architecture.json**
+(schema `.eos/schemas/architecture.schema.json` — the decision record G4 actually reads:
+stack / topology / authz / security / audit / rollback / DR / data / API / event, each DECIDED with a
+summary and, for the two irreversible ones, an ADR path — plus the agentic and regulated decisions
+when they apply, and an `nfrLandingPoints` entry for every NFR in `docs/requirements.json`),
+docs/data-model.md, api/openapi.yaml, docs/checklists/G-deployment.md (filled),
+docs/adr/* (incl. the tech-stack ADR + the deployment-topology ADR).
+
+Verify with `node .github/eos/eos.mjs check --gate architecture-ready`.
 
 ## Return protocol (do not skip)
 
 When this stage's artifacts exist, return to `eos-guide` — the next step is decided by the router
-from the new state, not by this agent. This stage's gate (G4) is reviewed by a human this round;
+from the new state, not by this agent. This stage's gate (G4) is machine-verified;
 the router still verifies that the artifact exists before it lets the baseline advance.
 
 ```

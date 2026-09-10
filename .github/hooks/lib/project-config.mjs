@@ -17,7 +17,7 @@ export const PROJECT_CONFIG_PATH = '.eos/project.json';
 export const PROJECT_TYPES = ['application', 'library', 'config-only'];
 export const PARADIGMS = ['deterministic', 'agentic'];
 export const STACKS = ['node', 'python', 'go', 'java', 'rust', 'dotnet', 'other'];
-export const STEPS = ['install', 'lint', 'typecheck', 'test', 'eval'];
+export const STEPS = ['install', 'lint', 'typecheck', 'test', 'eval', 'audit'];
 const TOP_LEVEL_KEYS = new Set([
   '$schema', 'projectType', 'stacks', 'commands', 'productParadigms', 'evalRequired',
   'evalWaiver', 'rationale', 'workflowProfile', 'complianceProfile',

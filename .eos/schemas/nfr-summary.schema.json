@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eos.local/schemas/nfr-summary.schema.json",
+  "title": "EOS machine NFR summary",
+  "description": "Measured non-functional results for the release gate. A target written in a checklist is an intention; this file is the measurement. Every target is ADOPT (measured), SKIP (with a reason) or DEFER (with an owner and a trigger) — there is no empty cell.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "generatedAt", "targets"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schemaVersion": { "const": 1 },
+    "generatedAt": { "type": "string", "minLength": 20 },
+    "runId": { "type": "string", "minLength": 1 },
+    "productTree": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["digest"],
+      "properties": {
+        "digest": { "type": "string", "minLength": 32 },
+        "algorithm": { "type": "string" },
+        "version": { "type": "string" }
+      }
+    },
+    "targets": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "decision"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "category": { "enum": ["performance", "availability", "scalability", "security", "cost", "accessibility", "other"] },
+          "decision": { "enum": ["ADOPT", "SKIP", "DEFER"] },
+          "metric": { "type": "string" },
+          "comparator": { "enum": [">=", ">", "<=", "<", "=="] },
+          "threshold": { "type": "number" },
+          "observed": { "type": "number" },
+          "unit": { "type": "string" },
+          "status": { "enum": ["PASS", "FAIL"] },
+          "reason": { "type": "string", "minLength": 10 },
+          "owner": { "type": "string", "minLength": 1 },
+          "trigger": { "type": "string", "minLength": 5 },
+          "dueBy": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+          "evidenceRef": { "type": "string" }
+        }
+      }
+    }
+  }
+}

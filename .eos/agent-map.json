@@ -17,49 +17,68 @@
     "frame-the-problem": {
       "agent": "eos-discovery",
       "prompt": null,
-      "skills": ["bmad-brainstorming", "bmad-agent-analyst"],
-      "handoff": "Converge the idea into one falsifiable problem statement with a measurable success metric."
+      "skills": [
+        "bmad-brainstorming",
+        "bmad-agent-analyst"
+      ],
+      "handoff": "Converge the idea into one falsifiable problem statement with a measurable success metric, and record it in docs/discovery.md + docs/discovery.json."
     },
     "expand-requirements": {
       "agent": null,
       "prompt": "requirements",
-      "skills": ["bmad-agent-pm", "eos-operational-readiness"],
-      "handoff": "Expand the approved problem into functional + NFR + operational-readiness requirements."
+      "skills": [
+        "bmad-agent-pm",
+        "eos-operational-readiness"
+      ],
+      "handoff": "Expand the approved problem into functional + NFR + operational-readiness requirements in docs/requirements.md + docs/requirements.json. Every operational concern is ADOPT / SKIP+reason / DEFER+owner+trigger."
     },
     "write-prd": {
       "agent": null,
       "prompt": "spec",
-      "skills": ["bmad-create-prd", "bmad-validate-prd"],
-      "handoff": "Turn docs/requirements.md into docs/prd.md; every requirement gets addressable AC<n>.<n> ids."
+      "skills": [
+        "bmad-prd"
+      ],
+      "handoff": "Turn docs/requirements.md into docs/prd.md; every requirement gets addressable AC<n>.<n> ids that the PRD DEFINES, not merely mentions."
     },
     "repair-prd": {
       "agent": null,
       "prompt": "spec",
-      "skills": ["bmad-validate-prd"],
-      "handoff": "Repair only the listed PRD defects (duplicate/missing AC ids, unresolved blockers). Do not restructure the PRD."
+      "skills": [
+        "bmad-prd"
+      ],
+      "handoff": "Repair only the listed PRD defects (undefined/duplicate AC ids, uncovered requirements, unresolved blockers). Do not restructure the PRD."
     },
     "design-ux": {
       "agent": "eos-design",
       "prompt": "ux-spec",
-      "skills": ["bmad-ux"],
-      "handoff": "Produce docs/DESIGN.md + docs/EXPERIENCE.md, or record SKIP + reason for a non-user-facing product."
+      "skills": [
+        "bmad-ux"
+      ],
+      "handoff": "Produce docs/DESIGN.md + docs/EXPERIENCE.md and docs/design.json, or record { \"userInterface\": false, \"skipReason\": \"...\" } for a non-user-facing product."
     },
     "design-architecture": {
       "agent": "eos-architecture",
       "prompt": null,
-      "skills": ["bmad-architecture"],
-      "handoff": "Design the architecture, lock the tech stack in an ADR, and choose the deployment topology."
+      "skills": [
+        "bmad-architecture"
+      ],
+      "handoff": "Design the architecture, lock the tech stack and the deployment topology in ADRs, and record every decision in docs/architecture.json."
     },
     "plan-stories": {
       "agent": "eos-plan",
       "prompt": null,
-      "skills": ["bmad-create-epics-and-stories", "bmad-create-story"],
+      "skills": [
+        "bmad-create-epics-and-stories",
+        "bmad-create-story"
+      ],
       "handoff": "Slice the approved architecture into context-self-contained stories under docs/stories/."
     },
     "design-acceptance-tests": {
       "agent": "eos-plan",
       "prompt": null,
-      "skills": ["bmad-testarch-atdd"],
+      "skills": [
+        "bmad-testarch-atdd"
+      ],
       "handoff": "Create the missing acceptance-test intent for the listed acceptance criteria only."
     },
     "design-eval-cases": {
@@ -71,7 +90,9 @@
     "complete-story-readiness": {
       "agent": "eos-plan",
       "prompt": null,
-      "skills": ["bmad-check-implementation-readiness"],
+      "skills": [
+        "bmad-check-implementation-readiness"
+      ],
       "handoff": "Close the listed story-readiness gaps (telemetry / authorization / rollback / dependencies) only."
     },
     "justify-classification": {
@@ -95,26 +116,35 @@
     "implement-story": {
       "agent": "agent",
       "prompt": null,
-      "skills": ["bmad-dev-story"],
+      "skills": [
+        "bmad-dev-story"
+      ],
       "handoff": "Implement the ready story exactly to its acceptance criteria; do not widen scope."
     },
     "verify-story": {
       "agent": "agent",
       "prompt": null,
-      "skills": ["bmad-tea"],
-      "handoff": "Run the declared quality commands, then produce the trace matrix rows for this story's acceptance criteria."
+      "skills": [
+        "bmad-tea"
+      ],
+      "handoff": "Run the declared quality commands, then produce the trace-matrix rows AND the machine test-run summary (docs/evidence/test-run.json) for this story's acceptance criteria."
     },
     "repair-verification": {
       "agent": "agent",
       "prompt": null,
-      "skills": ["bmad-dev-story", "bmad-code-review"],
+      "skills": [
+        "bmad-dev-story",
+        "bmad-code-review"
+      ],
       "handoff": "Fix the failing checks listed by the verified gate. Do not edit tests to make failures green."
     },
     "build-trace-matrix": {
       "agent": null,
       "prompt": "spec-align",
-      "skills": ["bmad-testarch-trace"],
-      "handoff": "Map every listed acceptance criterion to a real, passing test row in docs/trace-matrix.md."
+      "skills": [
+        "bmad-testarch-trace"
+      ],
+      "handoff": "Map every listed acceptance criterion to a real test in docs/trace-matrix.md, and make the runner emit docs/evidence/test-run.json so the result is executed, not asserted."
     },
     "record-spike-outcome": {
       "agent": null,
@@ -134,10 +164,34 @@
       "skills": [],
       "handoff": "Close the listed release blockers only, then re-run the release-ready gate."
     },
+    "land-telemetry": {
+      "agent": null,
+      "prompt": "telemetry-plan",
+      "skills": [],
+      "handoff": "The change is live. Land the observability that makes it judgeable: the success metric as a real signal, dashboards, routed alerts, and a rollback trigger."
+    },
+    "repair-telemetry": {
+      "agent": null,
+      "prompt": "telemetry-plan",
+      "skills": [],
+      "handoff": "Close only the listed observability gaps in docs/telemetry.json, then re-run the telemetry-ready gate."
+    },
+    "review-incident": {
+      "agent": "eos-review",
+      "prompt": null,
+      "skills": [
+        "bmad-correct-course",
+        "bmad-retrospective"
+      ],
+      "handoff": "This release was rolled back. Establish what happened before anything ships again, and write the correction back into the requirements, the PRD and (for an agentic product) the eval dataset."
+    },
     "close-the-loop": {
       "agent": "eos-review",
       "prompt": null,
-      "skills": ["bmad-correct-course", "bmad-retrospective"],
+      "skills": [
+        "bmad-correct-course",
+        "bmad-retrospective"
+      ],
       "handoff": "Write the change back to the spec source of truth and open the next iteration."
     },
     "start-next-change": {

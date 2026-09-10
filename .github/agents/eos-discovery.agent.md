@@ -20,14 +20,19 @@ success metric and known constraints.
 Use skills `bmad-brainstorming` and `bmad-agent-analyst` (Mary). Optionally pressure-test
 with `bmad-forge-idea`.
 
-Gate G1: problem statement is one falsifiable sentence AND success metric is measurable.
+Gate G1 (`discovery-ready`, machine-verified): the narrative is written AND `docs/discovery.json`
+records a falsifiable problem, a metric with a target and a data source, an explicit scope
+boundary, and no unresolved blocking question.
 
-Output: `docs/discovery.md`.
+Output: `docs/discovery.md` (the narrative) **and** `docs/discovery.json`
+(schema `.eos/schemas/discovery.schema.json`) — the gate reads the record, because prose is exactly
+what a gate must not be able to be talked past. Verify with
+`node .github/eos/eos.mjs check --gate discovery-ready`.
 
 ## Return protocol (do not skip)
 
 When this stage's artifacts exist, return to `eos-guide` — the next step is decided by the router
-from the new state, not by this agent. This stage's gate (G1) is reviewed by a human this round;
+from the new state, not by this agent. This stage's gate (G1) is machine-verified;
 the router still verifies that the artifact exists before it lets the baseline advance.
 
 ```

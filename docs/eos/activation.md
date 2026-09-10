@@ -72,6 +72,21 @@
   - **Verify**: `node .github/hooks/project-gate.mjs` is PASS **and actually ran** your lint/typecheck/test;
     `node .github/hooks/validate-config.mjs` shows no S12 ERROR. **Never edit the declaration to turn a red gate green.**
 
+- [ ] (If you use BMAD skills) BMAD project runtime: run its own installer, or unmap the skills
+  - **Why**: EOS delegates *authoring* to BMAD skills, but every mapped skill resolves its customization
+    through a **project-local** `_bmad/` runtime (`resolve_customization.py`, `memlog.py`, and the
+    `core`/`bmm`/`tea` `config.yaml`) that EOS deliberately does not ship or download. Before `eos-1.13.0`
+    the doctor only checked that a directory named `bmad-<x>` existed, so it reported PASS for a repository
+    in which every one of those skills would fail on its **first activation step** (audit EOS-AUD-002).
+    **EOS itself does not need this**: no gate, evaluator, transition or routing decision calls a skill, and
+    `eos next` names the action, the gate and the done-when either way. This item is only about whether the
+    accelerators work.
+  - **Steps**: install the BMAD project runtime with **its own** installer (EOS will not guess the command
+    and will never pipe a remote script into a shell), or remove those skills from `.eos/agent-map.json` and
+    do the authoring steps by hand. Design rationale: `docs/adr/003-bmad-runtime-boundary.md`.
+  - **Verify**: `node .github/hooks/eos-doctor.mjs --deep` reports no `D6 BMAD (BLOCKED)` line.
+    With no BMAD skills installed at all it passes and simply notes which actions are manual.
+
 ## 2. Open the "org-compliance" axis (~+2 points) — only **regulated** projects need this
 
 - [ ] (If regulated) Compliance boundary: run `/compliance` to produce `docs/compliance-profile.md` **+ `docs/compliance-profile.json`**, and confirm org standards

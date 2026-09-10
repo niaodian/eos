@@ -1,6 +1,6 @@
 ---
 name: requirements
-description: Requirement analysis with operational pre-flight (reuses bmad-create-prd)
+description: Requirement analysis with operational pre-flight (reuses bmad-agent-pm / bmad-prd)
 argument-hint: <feature name, or path to docs/discovery.md>
 agent: agent
 tools: ['search', 'editFiles']
@@ -11,12 +11,33 @@ Input: read `docs/discovery.md`. If missing, first invoke skill `bmad-agent-anal
 (or `bmad-brainstorming`) to produce it.
 
 ## Step 1 — Functional requirements
-Draft functional requirements using skill `bmad-create-prd`.
+Draft functional requirements using skill `bmad-agent-pm` (talk to John), or `bmad-prd` for a
+document-first pass. Give each one a stable `FR<n>` id — the PRD gate later checks that every one of
+them carries at least one acceptance criterion.
 
 ## Step 2 — Operational & non-functional pre-flight (EOS reinforcement; no blanks)
-For EACH item, output one of [ADOPT / SKIP+reason / DEFER+trigger] plus an architecture landing point:
-telemetry, authz, audit, rollback/flag, monitoring/alerting, canary,
-rate-limit/quota, i18n/l10n, multi-tenancy, capacity/SLO, DR (RTO/RPO).
+For EACH item, record one of:
+
+- `ADOPT` + what will be built,
+- `SKIP` + **why this product genuinely does not need it** (a bare "SKIP" is an omission, not a decision),
+- `DEFER` + **owner** + **trigger** (the condition that ends the deferral).
+
+Items: telemetry, authz, audit, rollback/flag, monitoring/alerting, canary, rate-limit/quota,
+i18n/l10n, multi-tenancy, capacity/SLO, DR (RTO/RPO) — plus `compliance` when a regime applies.
+
+## Step 3 — Write BOTH outputs (Gate G2 reads the second one)
+
+| File | Audience |
+|---|---|
+| `docs/requirements.md` | people: the narrative, the trade-offs, the landing points |
+| `docs/requirements.json` | the machine: schema `.eos/schemas/requirements.schema.json` |
+
+The gate reads the JSON, because prose is exactly what a gate must not be able to be talked past.
+Every NFR needs a `target` — an unquantified NFR cannot be verified at G8. Check with:
+
+```sh
+node .github/eos/eos.mjs check --gate requirements-ready
+```
 
 ## Step 2.5 — Regulatory regime pre-flight (constrain EARLY, avoid a rewrite)
 Decide the regime(s) NOW, not after launch. Run the dedicated **`/compliance`** workflow (or inline it here):

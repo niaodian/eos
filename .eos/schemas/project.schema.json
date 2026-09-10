@@ -26,7 +26,11 @@
         "lint": { "$ref": "#/$defs/command" },
         "typecheck": { "$ref": "#/$defs/command" },
         "test": { "$ref": "#/$defs/command" },
-        "eval": { "$ref": "#/$defs/command" }
+        "eval": { "$ref": "#/$defs/command" },
+        "audit": {
+          "description": "Dependency / supply-chain audit (npm audit, pip-audit, cargo audit, govulncheck …). Not part of the per-push quality gate: it is executed by the release gate, where a network failure is DEFERRED and never a PASS.",
+          "$ref": "#/$defs/command"
+        }
       }
     },
     "workflowProfile": {

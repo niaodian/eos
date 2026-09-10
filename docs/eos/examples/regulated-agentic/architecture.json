@@ -1,0 +1,29 @@
+{
+  "$schema": "../../../../.eos/schemas/architecture.schema.json",
+  "schemaVersion": 1,
+  "decisions": {
+    "techStack": { "status": "DECIDED", "summary": "Node control plane, Python worker plane, one relational store", "adr": "docs/adr/001-tech-stack.md" },
+    "deploymentTopology": { "status": "DECIDED", "summary": "control plane on rolling deploy; workers as a queue-backed autoscaling pool", "adr": "docs/adr/002-deployment-topology.md" },
+    "authz": { "status": "DECIDED", "summary": "tenant scope derived from the authenticated principal; deny by default; the worker plane holds no publishing credential" },
+    "security": { "status": "DECIDED", "summary": "regulated fields encrypted at rest and redacted before any third-party call" },
+    "audit": { "status": "DECIDED", "summary": "append-only audit sink for every approval, edit, rejection and escalation" },
+    "rollback": { "status": "DECIDED", "summary": "prompt + model pin + worker image are one versioned artifact and roll back together" },
+    "disasterRecovery": { "status": "DECIDED", "summary": "control-plane RPO 5 minutes / RTO 1 hour; workers are stateless" },
+    "dataModel": { "status": "DECIDED", "summary": "case, draft, decision and audit entry, all tenant-scoped" },
+    "apiContract": { "status": "DECIDED", "summary": "OpenAPI in api/openapi.yaml; drafts are proposals, decisions are separate writes" },
+    "eventContract": { "status": "DECIDED", "summary": "draft.requested / draft.produced / draft.escalated / decision.recorded, versioned" },
+    "toolAllowList": { "status": "DECIDED", "summary": "retrieval and calculation only; no write tool, no network tool, no shell — enforced by the credential the worker holds, not by the prompt" },
+    "boundedOrchestration": { "status": "DECIDED", "summary": "hard caps per task: 8 tool calls, 40k tokens, 60s wall clock; exceeding any of them escalates to a human" },
+    "memoryLayering": { "status": "DECIDED", "summary": "per-task working memory only; no cross-tenant memory, no implicit long-term store" },
+    "asyncBoundary": { "status": "DECIDED", "summary": "the queue is the boundary; the control-plane request never blocks on a model call" },
+    "evalArchitecture": { "status": "DECIDED", "summary": "offline dataset + graders in CI writing docs/evidence/eval-summary.json; online sampling of production traces feeds the next dataset" },
+    "regulatedDataBoundary": { "status": "DECIDED", "summary": "regulated fields are redacted before leaving the boundary; the instrument (self-host / BAA / DPA) is recorded in docs/compliance-profile.json" },
+    "approvalBoundary": { "status": "DECIDED", "summary": "publication and formal review approval are control-plane operations behind ordinary authorization; a model output is never an approval" }
+  },
+  "nfrLandingPoints": [
+    { "nfr": "NFR1", "component": "worker pool", "mechanism": "streamed generation with a 12s budget and an escalation fallback" },
+    { "nfr": "NFR2", "component": "control plane", "mechanism": "queue-backed degraded mode that returns position instead of a fabricated draft" },
+    { "nfr": "NFR3", "component": "redaction middleware", "mechanism": "deny-by-default field allow-list asserted by a test on every outbound model call" },
+    { "nfr": "NFR4", "component": "orchestrator", "mechanism": "hard token and tool-call caps enforced before each step" }
+  ]
+}

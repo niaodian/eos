@@ -1,52 +1,71 @@
 ---
 name: release-gate
-description: Run the EOS release gate (quality + security + rollback + canary + NFR)
+description: Run the EOS release gate (quality + security + supply chain + NFR + rollback + canary)
 agent: agent
 tools: ['search', 'runCommands']
 ---
 # Release Gate (EOS) — Gate G8
 
-Verify and report PASS/FAIL for each:
-- [ ] Quality gate green (lint + typecheck + tests). Run `node .github/hooks/project-gate.mjs` — it
-      executes the commands declared in `.eos/project.json` for THIS project's stack(s). A missing
-      declaration, a missing `commands.test`, or a missing toolchain is a FAIL/BLOCKED, never a skip.
-- [ ] Spec alignment (no drift): `node .github/hooks/spec-align.mjs --strict` PASS — every PRD
-      acceptance criterion has a passing trace-matrix row. This is where the "never implement beyond
-      the approved spec" red line is ENFORCED (every-push CI runs it advisory; release runs it strict).
-      **Strict is fail-closed**: absent `docs/prd.md` / `docs/trace-matrix.md`, an AC-less PRD, an
-      empty matrix, drift, orphan rows or failing rows all exit 1 — there is no "nothing to score" pass.
-      N/A only if the project tracks specs outside docs/prd.md + docs/trace-matrix.md (state so).
-- [ ] No leaked secrets: `node .github/hooks/secret-scan.mjs` PASS (no hardcoded creds/keys/`.env`).
-- [ ] Supply chain: lockfile committed, versions pinned, deps vetted (no typosquat / remote-script-to-shell).
-- [ ] Dependency audit clean (`npm audit` / `pip-audit`). Needs a lockfile: if missing, run
-      `npm i --package-lock-only` first. Offline: `npm audit` returns clean for zero-dep projects;
-      with deps it needs the registry, so treat a network failure as "deferred, re-run when online"
-      (not a hard block on a local-only machine).
-- [ ] NFR targets from `docs/checklists/C-nfr.md` verified (perf P95/throughput,
-      availability SLO/RTO/RPO) — via `bmad-testarch-nfr` at G7; any deferral carries an
-      explicit trigger, never silent.
-- [ ] Regulatory controls verified: if a regime was selected (see `docs/compliance-profile.md` +
-      the structured `docs/compliance-profile.json`), every item in `docs/checklists/F-compliance.md`
-      is ADOPT / N/A+reason (no unresolved BLOCKER). For regulated + LLM/agent: the data-boundary
-      (BAA/DPA · self-host · redaction) is **implemented, not deferred** — proven by
-      `thirdPartyModelPolicy` + an `implemented` control + a non-expired `approval` in the JSON
-      profile, which `eos-doctor` D5 checks. Prose alone does not authorize. If regime = none, the
-      profile says `regimes: ["none"]` with a rationale.
-- [ ] Rollback plan exists and is executable (link `ops/runbook-*.md`).
-- [ ] Canary/gradual rollout strategy documented.
-- [ ] Health/readiness endpoints present.
-- [ ] Deployment topology matches the Phase-4 decision: the rollback / canary / health mechanisms
-      above are the ones the chosen topology actually uses (see `docs/checklists/G-deployment.md`
-      + `docs/adr/*-deployment-topology.md`). Its real cluster/registry/cloud stays `【Needs enterprise env】`.
-- [ ] **Enforcement authority active** (this is what turns the CI gates from advisory into merge-blocking):
-      server-side branch protection on the default branch requires the `verify` check + Code Owner review,
-      and `docs/eos/activation.md` has no unresolved item (each is `[x]` done or `[~]` waived-with-reason).
-      Run `node .github/hooks/eos-doctor.mjs` and read its `ACTIVATION` line. If this is a personal-namespace
-      / throwaway repo, mark N/A + reason. `【Needs org/GitHub settings】`
-- [ ] Config validation passes: `node .github/hooks/validate-config.mjs`.
-- [ ] SDLC gate wiring passes: `node .github/hooks/eos-doctor.mjs` (G-EVAL: LLM code ⇒ eval-plan).
-- [ ] Local CI green: `act push -j verify` (validate-config + eos-doctor + tests + evals). Needs Docker.
+**Run the machine gate first. This prompt walks the same list, in the same order, with the same
+verdicts — there is no item here that the evaluator does not check.**
 
-Any FAIL blocks release. Summarize as a gate report.
+```sh
+node .github/eos/eos.mjs verify-release --release <candidate-id>
+```
 
-> **Next (after G8):** run `/telemetry-plan` to land observability and close the ops loop (Gate G9).
+Every row below maps 1:1 to a check id in `.eos/gates.json` → `release-ready`. If the machine says
+FAIL / BLOCKED / DEFERRED, that is the answer; the job is to close it, not to re-adjudicate it.
+
+| # | Check id | What must hold | Where it is proven |
+|---|---|---|---|
+| 1 | `candidate-identity` | the candidate is a committed tree with no uncommitted product change | `eos product-tree` |
+| 2 | `candidate-quality` | lint + typecheck + tests + evals pass **on this candidate**, not on a past story | `project-gate.mjs --skip-install` |
+| 3 | `stories-verified` | every included story is VERIFIED or MERGED | the ledger |
+| 4 | `story-evidence-current` | each story's verification describes **this** tree | recorded product-tree identity |
+| 5 | `spec-alignment` | no drift, no orphan rows | `spec-align.mjs --strict` |
+| 6 | `secret-scan` | nothing hardcoded | `secret-scan.mjs` |
+| 7 | `dependency-audit` | the declared `commands.audit` is clean | `npm audit` / `pip-audit` / `cargo audit` … |
+| 8 | `nfr-evidence` | measured NFR results, or a deferral with an owner and a trigger | `docs/evidence/nfr-summary.json` |
+| 9 | `compliance-boundary` | the structured data-boundary decision is implemented and approved | `docs/compliance-profile.json` |
+| 10 | `no-expired-waivers` | no waiver has outlived its expiry | `.eos/waivers/` |
+| 11 | `ops-artifacts` | rollback **and** canary/gradual rollout **and** health/readiness are documented | `ops/runbook.md` |
+| 12 | `deployment-topology` | those mechanisms are the ones the chosen topology actually uses | `docs/adr/*-deployment-topology.md` |
+| 13 | `activation-authority` | every activation item is closed or waived-with-reason | `docs/eos/activation.md` |
+
+## Statuses, and what they are not
+
+- **PASS** — proven here, now, on this candidate.
+- **FAIL** — a check failed. Fix it.
+- **BLOCKED** — it could not be proven (no toolchain, no git repository, a regulated product with an
+  unrunnable audit). Absence of proof is never proof.
+- **DEFERRED** — it could not be completed and the reason is recorded: an offline dependency audit,
+  an NFR target with an owner and a trigger. **DEFERRED never makes the gate green.** It must carry
+  an owner, a reason, an expiry or trigger and an explicit release-policy decision, and it must be
+  re-run before the candidate ships.
+- A **network failure is DEFERRED, never PASS.** For a `complianceProfile: "regulated"` product it is
+  **BLOCKED**: a regulated release may not ship on an unproven supply chain or an unexamined
+  compliance boundary.
+
+## The two things a machine cannot decide
+
+1. **Enforcement authority** `【Needs org/GitHub settings】`. EOS runs locally and cannot see
+   server-side branch protection, so `activation-authority` reports BLOCKED while items are open —
+   it never issues itself a PASS. Close them, or mark each `[~] waived — <reason>` in
+   `docs/eos/activation.md`. For a personal or throwaway repository, waive with that reason.
+2. **The approval itself.** `VERIFIED → APPROVED` requires an approval event recorded by someone
+   **other** than whoever prepared the candidate:
+   `node .github/eos/eos.mjs approve --scope release --id <candidate-id>`.
+   You are running this prompt. **You do not approve, and neither does any model.**
+
+## After the gate
+
+```sh
+node .github/eos/eos.mjs transition --scope release --id <id> --to VERIFIED
+# ...a second person records the approval...
+node .github/eos/eos.mjs transition --scope release --id <id> --to APPROVED
+node .github/eos/eos.mjs transition --scope release --id <id> --to RELEASED
+```
+
+> **Next (after G8):** RELEASED is not the end. Run `/telemetry-plan` for Gate **G9**
+> (`telemetry-ready`) so the change can be observed, then close the loop at **G10**
+> (`iteration-ready`) with the `eos-review` agent. `eos next` will say so on its own.

@@ -65,6 +65,18 @@
   - **验证**：`node .github/hooks/project-gate.mjs` 为 PASS 且**真的执行了**你的 lint/typecheck/test；
     `node .github/hooks/validate-config.mjs` 无 S12 ERROR。**不要靠改声明来把红灯改绿。**
 
+- [ ] （若你使用 BMAD 技能）BMAD 项目运行时：用它自己的安装器安装，或取消技能映射
+  - **Why**：EOS 把*撰写*工作委托给 BMAD 技能，但每个被映射的技能都通过**项目级**的 `_bmad/` 运行时
+    （`resolve_customization.py`、`memlog.py`，以及 `core`/`bmm`/`tea` 的 `config.yaml`）解析自身定制，
+    而 EOS 刻意既不附带也不下载它。在 `eos-1.13.0` 之前，doctor 只检查是否存在名为 `bmad-<x>` 的目录，
+    因此会对"其中每个技能都会在**首个激活步骤**失败"的仓库报告 PASS（审计 EOS-AUD-002）。
+    **EOS 自身并不需要它**：任何门禁、求值器、迁移或路由决策都不调用技能，`eos next` 无论如何都会给出
+    动作、门禁与完成判据。本条只关乎这些加速器能否工作。
+  - **Steps**：用 BMAD **自己的**安装器安装项目运行时（EOS 不会猜测命令，也绝不把远程脚本管道进 shell），
+    或从 `.eos/agent-map.json` 移除这些技能并手工完成撰写步骤。设计依据：`docs/adr/003-bmad-runtime-boundary.md`。
+  - **Verify**：`node .github/hooks/eos-doctor.mjs --deep` 不再出现 `D6 BMAD (BLOCKED)` 行。
+    完全没有安装 BMAD 技能时它通过，并只提示哪些动作需要手工完成。
+
 ## 二、打开"组织合规"轴（约 +2 分）——仅**受监管**项目需要
 
 - [ ] （若受监管）合规边界: 跑 `/compliance` 产出 `docs/compliance-profile.md` **+ `docs/compliance-profile.json`**，并确认组织标准

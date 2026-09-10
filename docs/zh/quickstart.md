@@ -55,8 +55,13 @@ EOS **原生在 Windows 上运行**（PowerShell 或 Command Prompt）——核�
 这就是全部循环。下面的内容只在你想知道*为什么*时才需要。
 
 - Router 会带你走 discovery → requirements → PRD → UX → architecture → stories，然后按 Story：
-  readiness → implementation → verification → merge。每一步都会点名 Copilot agent（或 `/prompt`）
-  和最小 BMAD skill 链——你永远不用自己从 73 个已安装 skill 里挑。
+  readiness → implementation → verification → merge，上线之后还有：telemetry → 写回。
+  每一步都会点名 Copilot agent（或 `/prompt`）和最小 BMAD skill 链——你永远不用自己从
+  73 个已安装 skill 里挑。
+- 每个阶段既产出给人读的文档，**也**产出给机器读的结构化记录
+  （`docs/discovery.json`、`docs/requirements.json`、`docs/design.json`、`docs/architecture.json`）。
+  门禁读记录：空文档不会推进产品；而一次验证会绑定到它真正运行过的源码、测试、prompt 与 eval 数据——
+  因此改动它们会让已记录的 PASS 变成 `STALE`，而不是继续挂在那里。
 - **一次性硬化**（把 CI 门从 advisory 变成合并阻断）：在 Copilot Chat 里跑 `/eos-init`——
   branch protection + CODEOWNERS + 审批基线，记录在 `docs/eos/activation.md`。
   个人/一次性仓库？用理由豁免各项；`eos-doctor` 会持续记账。

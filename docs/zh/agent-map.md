@@ -13,10 +13,10 @@
 |---|---|
 | 导航（任意阶段） | EOS agent `eos-guide`；prompts `/eos-next`、`/eos-resume`、`/eos-status`；CLI `node .github/eos/eos.mjs next` |
 | 发现 Discovery | bmad-brainstorming, bmad-agent-analyst, bmad-forge-idea |
-| 需求 Requirements | bmad-agent-pm, bmad-create-prd, bmad-product-brief, eos-operational-readiness |
-| 规格 Spec | bmad-create-prd, bmad-validate-prd |
+| 需求 Requirements | bmad-agent-pm, bmad-prd, bmad-product-brief, eos-operational-readiness |
+| 规格 Spec | bmad-prd |
 | UX/设计 UX/Design | bmad-ux, bmad-agent-ux-designer (Sally), bmad-cis-design-thinking (Maya) |
-| 架构 Architecture | bmad-architecture / bmad-create-architecture (Winston)；EOS `/adr`、`/deploy-topology`（拓扑决策 → docs/checklists/G-deployment.md + deployment-topology ADR） |
+| 架构 Architecture | bmad-architecture (Winston)；EOS `/adr`、`/deploy-topology`（拓扑决策 → docs/checklists/G-deployment.md + deployment-topology ADR） |
 | 规划 Planning | bmad-create-epics-and-stories, bmad-create-story, bmad-sprint-planning, bmad-testarch-atdd, bmad-check-implementation-readiness |
 | 开发 Development | bmad-dev-story, bmad-agent-dev (Amelia), bmad-quick-dev, bmad-code-review；EOS skill `eos-compliance-skeletons`（隐私脚手架） |
 | 测试 Testing | bmad-tea (Murat), bmad-testarch-*, bmad-qa-generate-e2e-tests；EOS `/e2e`（Playwright 框架+生成+trace；开发期用沙箱化 **Playwright MCP** 驱动浏览器自查——阶段 7 经 `cp .vscode/mcp.json.example .vscode/mcp.json` opt-in，随仓 inert），`/spec-align`（AC 覆盖 / first-pass 率） |
@@ -27,6 +27,23 @@
 | CI（本地，用 act） | bmad-testarch-ci（脚手架）；`.github/workflows/eos-ci.yml` 跑 validate-config + eos-doctor + secret-scan + tests + evals |
 | 安全评审 Security review | bmad-review-adversarial-general, bmad-code-review；EOS secret-scan.mjs + E-security 清单 + guardrail |
 
-> 73 个 `bmad-*` skill 安装在 `~/.agents/skills/` 与 `~/.claude/skills/`（用户级，跨项目共享）。
-> EOS 从不一次性加载全部：Router 每个动作最多点名一两个，且对未安装的 skill 报 BLOCKED 并给出
-> 替代路径，而不是推荐一个用不了的东西。
+> 73 个 `bmad-*` 技能安装在 `~/.agents/skills/` 与 `~/.claude/skills/`（用户级，跨项目共享）。
+> EOS 从不全量加载：路由器每个动作至多点名一两个；未安装的技能被报告为 BLOCKED 并给出替代路径，
+> 而不是推荐一个用不了的东西。
+
+## 运行时兼容性 —— 在相信"doctor 变绿"之前先读这一段
+
+已安装不等于**可激活**。每个被映射的 BMAD 技能都通过**项目级**的 `_bmad/` 运行时解析自身定制
+（`resolve_customization.py`、`memlog.py`，以及 `bmm`/`core`/`tea` 的 `config.yaml`），而 EOS **不**附带它。
+因此仅检查目录名会把"首个激活步骤就会失败"的技能报告为 PASS（审计发现 EOS-AUD-002）。
+
+- `.eos/bmad.lock.json` 声明 EOS 的全部假设：必需技能、运行时脚本与配置、可执行文件，
+  以及 EOS 拒绝映射的已废弃技能。
+- `node .github/hooks/eos-doctor.mjs --deep` 检查它；当已映射的技能虽已安装却无法在此处激活时，
+  报告 **BLOCKED** 而绝不是 PASS。CI 运行 `--deep`。
+- **没有 BMAD，EOS 也是完整的。** 任何门禁、求值器、迁移或路由决策都不调用技能；
+  缺失技能只是一条 NOTE，`eos next` 仍会给出动作、目标门禁与完成判据。
+- 设计依据：[ADR-003 —— BMAD 运行时边界](../adr/003-bmad-runtime-boundary.md)。
+
+上游已废弃、此处不再映射：`bmad-create-prd` 与 `bmad-validate-prd` → **`bmad-prd`**
+（自动识别 create / update / validate 意图）；`bmad-create-architecture` → **`bmad-architecture`**。

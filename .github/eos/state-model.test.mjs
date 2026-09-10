@@ -5,7 +5,8 @@ import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync, appendFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { project, write, run, runJson, cleanup, APP_PROJECT, PRD_2AC, story, EOS_DIR } from './test-support.mjs';
+import { project, write, run, runJson, cleanup, APP_PROJECT, PRD_2AC, story, EOS_DIR,
+  baselineFiles, storyFiles, testRun, commitAll, git, TEST_FILE, TRACE_MATRIX } from './test-support.mjs';
 import { validate } from './lib/schema.mjs';
 import { loadWorkflow, loadGates, loadAgentMap } from './lib/registry.mjs';
 import { legalTransitions, planTransition } from './lib/transitions.mjs';
@@ -221,12 +222,7 @@ test('evidence: a PASS becomes STALE when the gate definition version changes (g
 });
 
 test('evidence: a story cannot be MERGED on stale evidence', () => {
-  const dir = project({
-    '.eos/project.json': APP_PROJECT,
-    'docs/prd.md': PRD_2AC,
-    'docs/trace-matrix.md': '| AC | Test | Result |\n| --- | --- | --- |\n| AC1.1 | login.test.mjs | ✅ |\n',
-    'docs/stories/STORY-001.md': story(),
-  }, { withHooks: true });
+  const dir = project(storyFiles(), { withHooks: true });
   for (const to of ['IN_REVIEW']) run(dir, ['transition', '--scope', 'story', '--id', 'STORY-001', '--to', to]);
   run(dir, ['check', '--gate', 'story-ready', '--scope', 'STORY-001']);
   run(dir, ['transition', '--scope', 'story', '--id', 'STORY-001', '--to', 'READY_FOR_DEV']);

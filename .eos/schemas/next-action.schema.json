@@ -40,7 +40,7 @@
         "properties": {
           "gate": { "type": "string" },
           "check": { "type": "string" },
-          "status": { "enum": ["PASS", "FAIL", "BLOCKED", "PENDING", "WAIVED", "NOT_APPLICABLE", "STALE", "ERROR"] },
+          "status": { "enum": ["PASS", "FAIL", "BLOCKED", "PENDING", "WAIVED", "NOT_APPLICABLE", "STALE", "DEFERRED", "ERROR"] },
           "detail": { "type": "string" },
           "fix": { "type": "string" }
         }
