@@ -37,6 +37,19 @@ declares the stack DECIDED. The reason is that no later agent ever reads your AD
 the always-on workspace rule, so a surviving placeholder would keep telling them to run `npm ci` on
 a Python project.
 
+**Do not hand-write it — generate it.** Declare the stack in `.eos/project.json` (`stacks` is legal
+while `projectType` is still `config-only`, which is the honest state until the first scaffold story
+lands), then run:
+
+```
+node .github/eos/eos.mjs stack sync --write
+```
+
+It renders the `Local commands` block and clears the provisional block from the project's own
+declaration, so the prose cannot disagree with what CI executes. It refuses to guess: with no stack
+declared it blocks rather than inventing one. Re-run it whenever `commands` change — once real
+commands exist they replace the presets, and re-running is a no-op when the file already agrees.
+
 Paradigm isolation check (deterministic SaaS vs probabilistic Agentic):
 - If the system mixes a high-concurrency web path with LLM/agent calls, require an async
   decoupling point (queue/worker) so multi-second inference never blocks a request thread.

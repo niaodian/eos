@@ -1,6 +1,6 @@
 # EOS User Manual (Engineering Operating System)
 
-> Version: synced with `docs/eos/VERSION` (current `eos-1.16.2`)
+> Version: synced with `docs/eos/VERSION` (current `eos-1.17.0`)
 > Applies to: recent VS Code + GitHub Copilot Chat (custom agent / hooks are recent-version capabilities; confirm the version in the "About VS Code" panel) + 73 installed `bmad-*` skills (user-level)
 > Positioning: this manual is an **operating guide (how to use it)**; for design rationale and trade-offs, see `blueprint.md` in the same directory (why it is designed this way).
 > Conventions: prose in English; file names / paths / commands / config keys kept verbatim.
@@ -155,7 +155,7 @@ If you want to promote some `eos-*.agent.md` files to "available in all projects
 **Method A — degit (recommended, fastest)**
 ```sh
 # Public template — plain degit works (no auth needed)
-npx degit niaodian/eos#eos-1.16.2 my-new-app
+npx degit niaodian/eos#eos-1.17.0 my-new-app
 cd my-new-app
 git init && git add -A && git commit -m "chore: scaffold from eos"
 ```
@@ -193,7 +193,7 @@ Open `.github/instructions/00-workspace.instructions.md` and change it to the re
 ## 3.4 Full Day-1 sequence (copy-ready)
 
 ```sh
-npx degit niaodian/eos#eos-1.16.2 my-new-app && cd my-new-app
+npx degit niaodian/eos#eos-1.17.0 my-new-app && cd my-new-app
 git init && git add -A && git commit -q -m "chore: scaffold from eos"
 node .github/hooks/validate-config.mjs
 # Key: run `code .` from inside the project directory so my-new-app becomes the workspace root (including .github/).
@@ -312,7 +312,7 @@ So EOS **never depends on "Rule A overriding Rule B"**. The only reliable contro
 | Item | Content |
 |---|---|
 | **Goal** | Get an empty project with healthy configuration from the template |
-| **How to start** | `npx degit niaodian/eos#eos-1.16.2 my-app && cd my-app` |
+| **How to start** | `npx degit niaodian/eos#eos-1.17.0 my-app && cd my-app` |
 | **Output** | Complete `.github/` + `docs/` skeleton |
 | **Gate** | `node .github/hooks/validate-config.mjs` → **PASS** |
 | **Must check** | PASS 0 errors. **If the stack is undecided, do not change** `00-workspace` yet--keep the Node placeholder; the stack is an irreversible decision, and the authority is locked in **Phase 4 (ADR)**. If the stack is known, copy `docs/eos/stack-presets.md` directly (fast path). |
@@ -575,7 +575,7 @@ So EOS **never depends on "Rule A overriding Rule B"**. The only reliable contro
 
 ### Step 0: Create project + choose stack (5 minutes)
 ```sh
-npx degit niaodian/eos#eos-1.16.2 todo-api && cd todo-api
+npx degit niaodian/eos#eos-1.17.0 todo-api && cd todo-api
 node .github/hooks/validate-config.mjs          # expect PASS
 ```
 **Stack already decided?** Open `.github/instructions/00-workspace.instructions.md` and copy `Local commands` from your stack block (`docs/eos/stack-presets.md`, fast path).
@@ -634,7 +634,7 @@ SaaS **G7** requires: every AC has ≥1 test, **API contract tests** (against op
 
 ### Step 0: Create project + create AI directories
 ```sh
-npx degit niaodian/eos#eos-1.16.2 cs-agent && cd cs-agent
+npx degit niaodian/eos#eos-1.17.0 cs-agent && cd cs-agent
 mkdir -p ai/prompts evals                       # AI code goes here; Agentic rules overlay automatically
 node .github/hooks/validate-config.mjs          # expect PASS
 ```
@@ -748,6 +748,7 @@ rejected transition · `2` blocked/pending/stale · `3` EOS itself cannot be eva
 | `ledger [--verify] [--against <ref>]` | Verify the append-only hash chain |
 | `focus --scope <type> --id <id>` | Set this machine's local focus (carries no authority) |
 | `init [--write]` | Report or create local, non-destructive integration files |
+| `stack sync [--write]` | Render the always-on workspace rule's `Local commands` from `.eos/project.json`, so the prose cannot disagree with what CI runs. Blocks rather than guessing when no stack is declared |
 | `doctor` | Is EOS itself wired correctly? |
 
 **Gate ids** (`check --gate <id>`): `activation` · `discovery-ready` · `requirements-ready` ·
@@ -991,16 +992,16 @@ Agent output does not match expectation
 ```sh
 # Method A: degit (public repository — no auth needed)
 # Pin the release tag: the default branch moves, a tag does not.
-npx degit niaodian/eos#eos-1.16.2 my-app
+npx degit niaodian/eos#eos-1.17.0 my-app
 
 # Method B: git clone at the tag, into a fresh history
-git clone --depth 1 --branch eos-1.16.2 https://github.com/niaodian/eos.git my-app
-cd my-app && git checkout --orphan main && git commit -m "chore: start from eos-1.16.2"
+git clone --depth 1 --branch eos-1.17.0 https://github.com/niaodian/eos.git my-app
+cd my-app && git checkout --orphan main && git commit -m "chore: start from eos-1.17.0"
 ```
 
 ## 10.3 Distribution to a team (purely local, no enterprise dependency)
 
-1. Everyone starts from the **same release tag** (`eos-1.16.2`). The default branch keeps moving, so
+1. Everyone starts from the **same release tag** (`eos-1.17.0`). The default branch keeps moving, so
    an unpinned copy is a slightly different EOS for every person who takes one.
 2. `【Needs org/GitHub settings】` The GitHub **template repository** setting is owner-level: EOS can
    neither apply nor verify it locally, so do not take this page's word for it —
@@ -1081,13 +1082,13 @@ Recorded evidence from 1.13.x becomes `STALE` (the gate versions moved) and is c
 the gates. Nothing needs hand-editing, and nothing is silently reinterpreted.
 
 
-### 10.4.3 Upgrading from `eos-1.15.x` to `eos-1.16.2`
+### 10.4.3 Upgrading from `eos-1.15.x` to `eos-1.17.0`
 
 Nothing needs a decision from you, but one gate can newly fail on an existing project.
 
 | What changed | What you will see | What to do |
 |---|---|---|
-| **The locked stack must reach the always-on rule** | `architecture-ready` fails with `… still carries the PROVISIONAL placeholder` | Replace the `Local commands` block in `.github/instructions/00-workspace.instructions.md` with your stack's block from `stack-presets.md`. Your ADR was never the problem: no later agent reads it, they all read that rule, so a surviving ⛳ marker kept telling them to run `npm ci` on a Python project. |
+| **The locked stack must reach the always-on rule** | `architecture-ready` fails with `… still carries the PROVISIONAL placeholder` | Declare the stack in `.eos/project.json`, then run `node .github/eos/eos.mjs stack sync --write` — it renders the `Local commands` block from that declaration. Your ADR was never the problem: no later agent reads it, they all read that rule, so a surviving ⛳ marker kept telling them to run `npm ci` on a Python project. |
 | **Story evidence follows the criteria a story cites** | Most story evidence is `STALE` once (`gate definition version changed`), then stops going stale for unrelated PRD edits | Re-run `eos check --gate story-ready --scope <id>`. From here, adding or rewriting a criterion your story does **not** cite leaves it fresh — which is what makes specifying a whole backlog up front affordable. |
 | **Stage agents run their own gates** | Stages end with a preview, a confirmation request, the gate output and the next stage named | Nothing. If an agent still hands you a command to paste, it is not following `05-stage-closeout` — say so. |
 | **Optional answer language** | Nothing, unless you set it | Add `"language": "zh-CN"` (any BCP-47 tag) to `.eos/project.json` to fix the language agents reply in. A non-tag value is now an error rather than a silent fallback to English. |
@@ -1240,7 +1241,7 @@ EOS stack rules are **pluggable**. Adding a stack = add one `*.instructions.md` 
 
 ```
 # ── Terminal — the loop (this is all you need day to day) ──
-npx degit niaodian/eos#eos-1.16.2 my-app   # create new project
+npx degit niaodian/eos#eos-1.17.0 my-app   # create new project
 node .github/eos/eos.mjs init --write               # local VS Code tasks (never overwrites)
 node .github/eos/eos.mjs next                       # the ONE next action, why, how to start it
 node .github/eos/eos.mjs resume                     # new session? pick up where you stopped
@@ -1296,7 +1297,7 @@ A real dry-run that passed end to end (feature: user login), **12/12 gates passe
 
 **Reproduce** (terminal):
 ```sh
-npx degit niaodian/eos#eos-1.16.2 my-app && cd my-app
+npx degit niaodian/eos#eos-1.17.0 my-app && cd my-app
 node .github/hooks/validate-config.mjs        # PASS
 npm test                                      # 10/10 green
 echo '{"tool_input":{"command":"rm -rf /tmp/x"}}' | node .github/hooks/deny-dangerous.js  # deny

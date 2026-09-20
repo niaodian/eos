@@ -220,7 +220,7 @@
           "id": "stack-landed-in-workspace-rule",
           "title": "the locked stack reached the always-on workspace rule",
           "evaluator": "architectureStackLanded",
-          "fix": "Replace the PROVISIONAL \"Local commands\" block in .github/instructions/00-workspace.instructions.md with your stack's block from docs/eos/stack-presets.md, and enable the matching R3 stack rule."
+          "fix": "Declare the stack in .eos/project.json, then run `node .github/eos/eos.mjs stack sync --write` — it renders the \"Local commands\" block from that declaration, so the always-on rule cannot disagree with what CI runs."
         }
       ]
     },

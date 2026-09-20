@@ -22,6 +22,7 @@ import { listEvidence, evidenceFreshness, validateEvidenceShape, sha256File } fr
 import { currentProductTree, uncommittedProductChanges } from './lib/product-tree.mjs';
 import { readManifest, manifestPath, manifestDigest as computeManifestDigest, listManifests } from './lib/release.mjs';
 import { loadProviders, consult } from './adapters/contract.mjs';
+import { syncWorkspaceRule } from './lib/workspace-rule.mjs';
 import { loadWaivers, expiredWaivers } from './lib/waivers.mjs';
 import { resolveAction, ACTIVE_WORK_PATH } from './lib/registry.mjs';
 
@@ -49,6 +50,7 @@ usage: node .github/eos/eos.mjs <command> [flags]
   ledger [--verify] [--against <git-ref>]
   focus --scope <type> --id <id>          set this machine's local focus (no authority)
   init [--write]                          write .vscode/tasks.json only (NOT the /eos-init hardening walkthrough)
+  stack sync [--write]                    render the always-on workspace rule from .eos/project.json
   doctor                                  is EOS itself wired correctly?
 
   global: --json  --why  --all  --no-color
@@ -612,8 +614,43 @@ const commands = {
     return EXIT.OK;
   },
 
-  doctor(snapshot, flags) {
-    const problems = [];
+  /**
+   * Put the locked stack where agents actually read it. G4 and S14 can only say the workspace rule
+   * is wrong; this is the one command that makes it right, deterministically, from the declaration
+   * CI already executes — so the prose cannot drift from the commands.
+   */
+  stack(snapshot, flags) {
+    const sub = flags._[1];
+    if (sub !== 'sync') {
+      console.log(`unknown "stack" subcommand ${sub ? `"${sub}"` : '(missing)'} — expected: stack sync [--write]`);
+      return EXIT.ERROR;
+    }
+    const r = syncWorkspaceRule(snapshot.root, snapshot.project, { write: !!flags.write });
+    const lines = ['EOS stack sync', ''];
+    if (!r.ok) {
+      lines.push(`  BLOCKED  ${r.reason}`, '',
+        '  This command states what the project declared; it does not guess a stack.', '');
+      emit(flags, { ok: false, reason: r.reason, changed: false }, lines.join('\n'));
+      return EXIT.BLOCKED;
+    }
+    const origin = r.source === 'declared-commands'
+      ? '.eos/project.json commands (what CI actually runs)'
+      : 'stack presets — no commands declared yet, so these are defaults to replace once code lands';
+    lines.push(`  source  ${origin}`, `  line    ${r.line}`, '');
+    if (!r.changed) {
+      lines.push(`  kept    ${r.path} already states this`, '');
+    } else if (flags.write) {
+      lines.push(`  updated ${r.path}`, '',
+        '  Re-run the gate so the recorded result describes this file:',
+        '    node .github/eos/eos.mjs check --gate architecture-ready', '');
+    } else {
+      lines.push(`  would update ${r.path}`, '', '  Nothing was written. Re-run with --write to apply.', '');
+    }
+    emit(flags, { ok: true, changed: r.changed, wrote: !!(flags.write && r.changed), line: r.line, source: r.source, path: r.path }, lines.join('\n'));
+    return EXIT.OK;
+  },
+
+  doctor(snapshot, flags) {    const problems = [];
     const notes = [];
     for (const e of snapshot.errors) problems.push({ level: 'ERROR', detail: e });
     for (const e of snapshot.agentMapErrors) problems.push({ level: 'ERROR', detail: e });
