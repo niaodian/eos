@@ -3,7 +3,7 @@
 // Run from project root: node .github/hooks/validate-config.mjs
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join, relative } from 'node:path';
-import { loadProjectConfig, detectStacks, PROJECT_CONFIG_PATH } from './lib/project-config.mjs';
+import { loadProjectConfig, detectStacks, stacksInProse, PROJECT_CONFIG_PATH } from './lib/project-config.mjs';
 import { loadWorkflow, loadGates, loadAgentMap } from '../eos/lib/registry.mjs';
 
 const root = process.cwd();
@@ -217,6 +217,25 @@ if (am.agentMap) {
     }
     if (entry.prompt && !existsSync(join(root, `.github/prompts/${entry.prompt}.prompt.md`))) {
       errors.push(`S13 .eos/agent-map.json: action "${actionId}" maps to prompt "/${entry.prompt}" but .github/prompts/${entry.prompt}.prompt.md does not exist`);
+    }
+  }
+}
+
+// S14 the always-on workspace rule must not contradict the declared stack. `00-workspace` states
+// this contract about itself ("the prose line above is for humans … keep them in sync"), but until
+// now nothing checked it. It matters because NO later agent reads your tech-stack ADR — every one
+// of them reads this always-on rule, so prose left saying `npm ci` in a Python project misdirects
+// every session while the gates stay green. G4 makes the stack LAND here once; this keeps it honest
+// afterwards. Only a provable CONTRADICTION is an error: a stack-agnostic command (`make test`)
+// proves nothing, and `stacks: ["other"]` is unprovable by construction.
+if (proj.present && proj.config && proj.config.projectType !== 'config-only') {
+  const declared = proj.config.stacks || [];
+  const rel = '.github/instructions/00-workspace.instructions.md';
+  const full = join(root, rel);
+  if (declared.length && !declared.includes('other') && existsSync(full)) {
+    for (const [stack, command] of stacksInProse(readFileSync(full, 'utf8'))) {
+      if (declared.includes(stack)) continue;
+      errors.push(`S14 ${rel}: the commands describe a ${stack} project (\`${command}\`) but ${PROJECT_CONFIG_PATH} declares ${declared.join(' + ')} — every agent reads this always-on rule instead of your ADR, so stale prose misdirects every session. Replace the "Local commands" block from docs/eos/stack-presets.md.`);
     }
   }
 }

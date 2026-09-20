@@ -17,7 +17,10 @@ applyTo: "**"
 - Install: `npm ci` · Lint: `npm run lint` · Test: `npm test` · Typecheck: `npm run typecheck`.
 - Machine-executed source of truth: **`.eos/project.json`** (`projectType` + `stacks` + `commands`).
   The prose line above is for humans; `node .github/hooks/project-gate.mjs` runs the JSON. Keep them
-  in sync — an `application` without `commands.test` fails closed instead of passing vacuously.
+  in sync — an `application` without `commands.test` fails closed instead of passing vacuously, and
+  `validate-config` (S14) fails CI if the commands above describe a stack this project did not
+  declare. That check exists because no later agent reads your tech-stack ADR; every one of them
+  reads this file.
 - Local CI: `act push` runs `.github/workflows/eos-ci.yml` in Docker (validate-config + eos-doctor + project-gate).
 
 ## Git

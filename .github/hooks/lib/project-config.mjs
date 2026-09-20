@@ -41,6 +41,46 @@ export const STACK_MANIFESTS = {
 const DOTNET_EXT = /\.(sln|csproj|fsproj|vbproj)$/i;
 const SKIP_DIRS = new Set(['node_modules', '.git', '.github', 'dist', 'build', '.next', 'coverage', 'vendor', 'target', '.venv', 'venv', '__pycache__']);
 
+// Which stack a command BELONGS to. Deliberately not "are these two strings equal": `npm test` and
+// `npm run test` are the same instruction, so comparing text would report a difference that is not
+// a defect. What actually misleads an agent is a stack CONTRADICTION — prose saying `npm ci` in a
+// project declared Python — and that survives every harmless rewording.
+const STACK_COMMANDS = {
+  node: ['npm', 'npx', 'pnpm', 'yarn', 'bun', 'node', 'tsc', 'vitest', 'jest', 'eslint', 'biome'],
+  python: ['pip', 'pip3', 'python', 'python3', 'pytest', 'ruff', 'mypy', 'uv', 'poetry', 'tox', 'black', 'flake8', 'pyright'],
+  go: ['go', 'golangci-lint', 'gofmt', 'govulncheck'],
+  java: ['mvn', 'mvnw', 'gradle', 'gradlew'],
+  rust: ['cargo', 'rustc', 'clippy'],
+  dotnet: ['dotnet'],
+};
+const COMMAND_STACK = new Map();
+for (const [stack, bins] of Object.entries(STACK_COMMANDS)) for (const b of bins) COMMAND_STACK.set(b, stack);
+
+/**
+ * The stack a shell command implies, or null when it implies nothing we can prove.
+ * `make test`, `./run.sh` and `just ci` are legitimately stack-agnostic: unknown is not wrong.
+ */
+export function stackOfCommand(command) {
+  const first = String(command || '').trim().split(/\s+/)[0] || '';
+  // `./gradlew` and `./mvnw` are the same tools with a path prefix.
+  const bin = first.replace(/^.*\//, '');
+  return COMMAND_STACK.get(bin) || null;
+}
+
+/**
+ * Stacks implied by the ``-quoted commands in a prose rule file (the `Local commands` block of
+ * `.github/instructions/00-workspace.instructions.md`).
+ * @returns {Map<string, string>} stack -> the first command that implied it
+ */
+export function stacksInProse(text) {
+  const found = new Map();
+  for (const m of String(text || '').matchAll(/`([^`\n]+)`/g)) {
+    const stack = stackOfCommand(m[1]);
+    if (stack && !found.has(stack)) found.set(stack, m[1].trim());
+  }
+  return found;
+}
+
 // Shell metacharacters are REJECTED, not escaped: declared commands are executed WITHOUT a shell
 // (spawn with shell:false), so a config value can never smuggle in a second, destructive command
 // or a remote-script-to-shell pipeline. Chain steps with an ARRAY of commands instead of `&&`.
