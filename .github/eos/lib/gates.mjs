@@ -346,7 +346,7 @@ const evaluators = {
     }
     const text = readFileSync(join(ctx.root, WORKSPACE_RULE), 'utf8');
     return PROVISIONAL_STACK.test(text)
-      ? fail(`${WORKSPACE_RULE} still carries the PROVISIONAL placeholder while docs/architecture.json declares the stack DECIDED — replace the "Local commands" block from docs/eos/stack-presets.md so the always-on rule matches the ADR`)
+      ? fail(`${WORKSPACE_RULE} still carries the PROVISIONAL placeholder while docs/architecture.json declares the stack DECIDED — declare the stack in .eos/project.json, then run \`node .github/eos/eos.mjs stack sync --write\` to render the "Local commands" block from it`)
       : ok(`${WORKSPACE_RULE} no longer carries the provisional stack placeholder`);
   },
 

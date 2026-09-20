@@ -235,7 +235,7 @@ if (proj.present && proj.config && proj.config.projectType !== 'config-only') {
   if (declared.length && !declared.includes('other') && existsSync(full)) {
     for (const [stack, command] of stacksInProse(readFileSync(full, 'utf8'))) {
       if (declared.includes(stack)) continue;
-      errors.push(`S14 ${rel}: the commands describe a ${stack} project (\`${command}\`) but ${PROJECT_CONFIG_PATH} declares ${declared.join(' + ')} — every agent reads this always-on rule instead of your ADR, so stale prose misdirects every session. Replace the "Local commands" block from docs/eos/stack-presets.md.`);
+      errors.push(`S14 ${rel}: the commands describe a ${stack} project (\`${command}\`) but ${PROJECT_CONFIG_PATH} declares ${declared.join(' + ')} — every agent reads this always-on rule instead of your ADR, so stale prose misdirects every session. Run \`node .github/eos/eos.mjs stack sync --write\` to render it from the declaration.`);
     }
   }
 }
