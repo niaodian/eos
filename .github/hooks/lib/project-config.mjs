@@ -59,13 +59,20 @@ for (const [stack, bins] of Object.entries(STACK_COMMANDS)) for (const b of bins
 /**
  * The stack a shell command implies, or null when it implies nothing we can prove.
  * `make test`, `./run.sh` and `just ci` are legitimately stack-agnostic: unknown is not wrong.
+ *
+ * EOS's own tooling is excluded too. EOS is a zero-dependency Node program that runs inside
+ * projects of every stack, so `node .github/hooks/project-gate.mjs` says what EOS is, never what
+ * the project is — counting it would report a false Node stack in every Python or Go repository.
  */
 export function stackOfCommand(command) {
-  const first = String(command || '').trim().split(/\s+/)[0] || '';
+  const parts = String(command || '').trim().split(/\s+/);
+  const first = parts[0] || '';
   // `./gradlew` and `./mvnw` are the same tools with a path prefix.
   const bin = first.replace(/^.*\//, '');
+  if (parts.slice(1).some((a) => EOS_OWN_PATH.test(a))) return null;
   return COMMAND_STACK.get(bin) || null;
 }
+const EOS_OWN_PATH = /^\.?\/?(\.github|\.eos|docs\/eos)\//;
 
 /**
  * Stacks implied by the ``-quoted commands in a prose rule file (the `Local commands` block of

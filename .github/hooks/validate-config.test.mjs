@@ -29,6 +29,7 @@ function repo(mutate = () => {}) {
     },
     remove: (rel) => rm(join(dir, rel), { recursive: true, force: true }),
     read: (rel) => JSON.parse(readFileSync(join(dir, rel), 'utf8')),
+    readText: (rel) => readFileSync(join(dir, rel), 'utf8'),
   });
   return dir;
 }
@@ -136,55 +137,73 @@ test('S12: complianceProfile only accepts the declared enum', () => {
 // No later agent reads your tech-stack ADR — every one of them reads the always-on workspace rule.
 // G4 makes the locked stack LAND there once; S14 keeps it honest afterwards. The check compares
 // which STACK a command belongs to, never the text, so rewording is never reported as drift.
+//
+// These fixtures mutate the SHIPPED rule file rather than a hand-written stub. A stub is what let
+// the first cut of S14 ship a false positive: the real file explains itself with
+// `node .github/hooks/project-gate.mjs`, and counting EOS's own Node tooling as project evidence
+// flagged every Python and Go repo. Test the file users actually get.
 const RULE = '.github/instructions/00-workspace.instructions.md';
-const rule = (cmds) => `---\napplyTo: "**"\n---\n# Workspace Conventions\n\n## Local commands\n- ${cmds}\n`;
+const COMMANDS_LINE = /^- Install: .*$/m;
+const withCommands = (read, cmds) => read(RULE).replace(COMMANDS_LINE, `- ${cmds}`);
 const declare = (extra) => ({ projectType: 'application', stacks: ['python'], commands: { test: 'pytest' }, productParadigms: ['deterministic'], ...extra });
 
 test('S14: prose describing another stack than the one declared fails', () => {
-  const { code, out } = run(repo(({ write }) => {
+  const { code, out } = run(repo(({ write, readText }) => {
     write('.eos/project.json', declare());
-    write(RULE, rule('Install: `npm ci` · Test: `npm test`.'));
+    write(RULE, withCommands(readText, 'Install: `npm ci` · Test: `npm test`.'));
   }));
   assert.equal(code, 1, out);
   assert.match(out, /S14 .*describe a node project/);
 });
 
-test('S14: prose matching the declared stack passes, however it is worded', () => {
+test('S14: the shipped rule, retargeted to its real stack, passes', () => {
+  // Regression for the false positive: this file still contains EOS's own
+  // `node .github/hooks/project-gate.mjs`, which must not count as a Node stack.
   for (const cmds of [
-    'Install: `uv sync` · Lint: `ruff check .` · Test: `pytest`.',
-    'Install: `pip install -r requirements.txt` · Test: `python -m pytest -q`.',
+    'Install: `pip install -r requirements.txt` · Lint: `ruff check .` · Test: `pytest` · Typecheck: `mypy .`.',
+    'Install: `uv sync` · Test: `python -m pytest -q`.',
   ]) {
-    const { code, out } = run(repo(({ write }) => {
+    const { code, out } = run(repo(({ write, readText }) => {
       write('.eos/project.json', declare());
-      write(RULE, rule(cmds));
+      write(RULE, withCommands(readText, cmds));
     }));
     assert.equal(code, 0, `${cmds}\n${out}`);
   }
 });
 
 test('S14: a stack that IS declared never fails, even alongside another', () => {
-  const { code, out } = run(repo(({ write }) => {
+  const { code, out } = run(repo(({ write, readText }) => {
     write('.eos/project.json', declare({ stacks: ['node', 'python'] }));
-    write(RULE, rule('Install: `npm ci` · Test: `npm test` · Eval: `pytest evals/`.'));
+    write(RULE, withCommands(readText, 'Install: `npm ci` · Test: `npm test` · Eval: `pytest evals/`.'));
   }));
   assert.equal(code, 0, out);
 });
 
 test('S14: what it cannot prove, it does not report', () => {
   // (a) stack-agnostic commands imply nothing; (b) "other" is unprovable by construction;
-  // (c) config-only has not declared a real stack yet — the template itself is in this state,
-  //     and flagging it would fire on every fresh scaffold before any decision was made.
+  // (c) config-only has not declared a real stack yet — the state every fresh scaffold is in,
+  //     which is also why the UNMODIFIED template (Node prose, config-only) still passes.
   const cases = [
-    [declare(), rule('Test: `make test` · Build: `just build`.')],
-    [declare({ stacks: ['other'] }), rule('Test: `npm test`.')],
-    [{ projectType: 'config-only', stacks: [], productParadigms: ['deterministic'] }, rule('Test: `npm test`.')],
+    [declare(), 'Test: `make test` · Build: `just build`.'],
+    [declare({ stacks: ['other'] }), 'Test: `npm test`.'],
+    [{ projectType: 'config-only', stacks: [], productParadigms: ['deterministic'] }, 'Test: `npm test`.'],
   ];
-  for (const [proj, body] of cases) {
-    const { code, out } = run(repo(({ write }) => {
+  for (const [proj, cmds] of cases) {
+    const { code, out } = run(repo(({ write, readText }) => {
       write('.eos/project.json', proj);
-      write(RULE, body);
+      write(RULE, withCommands(readText, cmds));
     }));
     assert.equal(code, 0, `${JSON.stringify(proj.stacks)} / ${proj.projectType}\n${out}`);
     assert.doesNotMatch(out, /S14/);
   }
+});
+
+test('S14: a project-owned Node script still counts as evidence', () => {
+  // The EOS-tooling exemption must not become a blanket "ignore every `node` invocation".
+  const { code, out } = run(repo(({ write, readText }) => {
+    write('.eos/project.json', declare());
+    write(RULE, withCommands(readText, 'Test: `node scripts/test.mjs`.'));
+  }));
+  assert.equal(code, 1, out);
+  assert.match(out, /S14 .*describe a node project/);
 });
