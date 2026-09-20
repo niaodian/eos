@@ -3,7 +3,7 @@ name: requirements
 description: Requirement analysis with operational pre-flight (reuses bmad-agent-pm / bmad-prd)
 argument-hint: <feature name, or path to docs/discovery.md>
 agent: agent
-tools: ['search', 'editFiles']
+tools: ['search', 'editFiles', 'runCommands']
 ---
 # Requirement Analysis (EOS)
 
@@ -59,4 +59,15 @@ Any unresolved item => mark BLOCKER. Do not proceed to Spec until cleared.
 ## Output
 Write `docs/requirements.md` with an "Operational Pre-Flight Decision Table" at the top.
 
-> **Next (after G2 clears):** run `/spec` to turn this into the PRD (Gate G3).
+## Close-out (do not skip)
+
+Follow the always-on `05-stage-closeout` rule: **preview → confirm → gate → announce**. Digest the
+decisions and every BLOCKER you resolved, ask the developer to amend or confirm, then run the gate
+yourself and report the machine result verbatim:
+
+```sh
+node .github/eos/eos.mjs check --gate requirements-ready
+```
+
+> **Next (after G2 clears):** run `/spec` to turn this into the PRD (Gate G3). Say so explicitly —
+> do not make the developer ask what comes next.

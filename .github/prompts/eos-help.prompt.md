@@ -2,7 +2,7 @@
 name: eos-help
 description: Orient me — print the EOS memory card, detect which phase this repo is in, tell me the exact next step, and show any pending one-time activation
 agent: agent
-tools: ['search']
+tools: ['search', 'runCommands']
 ---
 # EOS Help — "Where am I, what's next?"
 

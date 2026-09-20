@@ -5,7 +5,7 @@
 
 # EOS 用户手册（Engineering Operating System User Manual）
 
-> 版本：与 `docs/eos/VERSION` 同步（当前 `eos-1.15.1`）
+> 版本：与 `docs/eos/VERSION` 同步（当前 `eos-1.16.0`）
 > 适用：较新版本的 VS Code + GitHub Copilot Chat（自定义 agent / hooks 属近版能力，用「关于 VS Code」面板确认版本）+ 已安装 73 个 `bmad-*` skill（用户级）
 > 定位：本手册是**操作指南（怎么用）**；设计原理与取舍见同目录 `blueprint.md`（为什么这么设计）。
 > 约定：正文中文；文件名/路径/命令/配置键保留英文原文。
@@ -172,7 +172,7 @@ bmad-code-review                   → 审查无阻断项           (Gate G6)
 **方式 A — degit（推荐，最快）**
 ```sh
 # public 模板 —— 直接 degit（无需鉴权）
-npx degit niaodian/eos#eos-1.15.1 my-new-app
+npx degit niaodian/eos#eos-1.16.0 my-new-app
 cd my-new-app
 git init && git add -A && git commit -m "chore: scaffold from eos"
 ```
@@ -209,7 +209,7 @@ node .github/hooks/validate-config.mjs      # 期望：PASS
 ## 3.4 Day-1 完整序列（复制即用）
 
 ```sh
-npx degit niaodian/eos#eos-1.15.1 my-new-app && cd my-new-app
+npx degit niaodian/eos#eos-1.16.0 my-new-app && cd my-new-app
 git init && git add -A && git commit -q -m "chore: scaffold from eos"
 node .github/hooks/validate-config.mjs
 # 关键：从项目目录内执行 `code .`，让 my-new-app 成为工作区根（含 .github/）。
@@ -328,7 +328,7 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 | 项 | 内容 |
 |---|---|
 | **目标** | 从模板得到一个配置健康的空项目 |
-| **怎么启动** | `npx degit niaodian/eos#eos-1.15.1 my-app && cd my-app` |
+| **怎么启动** | `npx degit niaodian/eos#eos-1.16.0 my-app && cd my-app` |
 | **产出** | 完整 `.github/` + `docs/` 骨架 |
 | **门** | `node .github/hooks/validate-config.mjs` → **PASS** |
 | **必查** | PASS 0 errors。**栈未定则先别改** `00-workspace`——保留 Node 占位即可；栈是不可逆决策，权威锁定在**阶段 4（ADR）**。已知栈可即抄 `docs/eos/stack-presets.md`（快路径）。 |
@@ -454,6 +454,7 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 | **决策门 G5** | ☑ 每个 story 上下文自包含 ☑ 可独立实现 ☑ 含 AC **且每条 AC 有验收测试设计（ATDD）** ☑ 把 telemetry/authz/rollback 落成具体任务 **☑ LLM 功能有 eval-plan（G-EVAL）或显式 SKIP** |
 | **必查项** | 开发者拿到这个 story，**不回头翻别处**就能开工吗？DoD 写了吗？**每条 AC 的验收测试意图定义了吗**？**LLM 功能的 eval 集/grader/阈值定了吗**？ |
 | **防返工** | "就绪门"防开发中途缺上下文；**测试左移**让验收标准在写码前就可测，防"事后补测凑覆盖率"；**eval 左移**让非确定的 LLM 输出在写码前就有可度量基线。 |
+| **节奏** | **一次性起草整个 backlog，一次性集中评审，然后逐个提升。** `story-ready` 是按 scope 评估的（`--scope <STORY-ID>`），且路由器只聚焦第一个未完成的 story，因此未提升的草稿不阻塞任何东西。把 20 个草稿作为一张表一起评审，是砍掉/合并/重排范围唯一便宜的时机；逐个发现 backlog 只会把它藏起来。提升刻意保持串行——每个 story 应当先吸收前序故事的真实结论，再进入就绪。 |
 | **样例** | `my-app/docs/stories/story-001-auth.md`（AC + 自包含 context + DoD = Ready） |
 
 ---
@@ -598,7 +599,7 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 
 ### 第 0 步：建项目 + 选栈（5 分钟）
 ```sh
-npx degit niaodian/eos#eos-1.15.1 todo-api && cd todo-api
+npx degit niaodian/eos#eos-1.16.0 todo-api && cd todo-api
 node .github/hooks/validate-config.mjs          # 期望 PASS
 ```
 **已定栈**？打开 `.github/instructions/00-workspace.instructions.md` 把 `Local commands` 抄成你的栈块（`docs/eos/stack-presets.md`，快路径）。
@@ -661,7 +662,7 @@ SaaS 的 **G7** 要求：每条 AC ≥1 测试、**API 契约测试**（对 open
 
 ### 第 0 步：建项目 + 建 AI 目录
 ```sh
-npx degit niaodian/eos#eos-1.15.1 cs-agent && cd cs-agent
+npx degit niaodian/eos#eos-1.16.0 cs-agent && cd cs-agent
 mkdir -p ai/prompts evals                       # AI 代码放这里，自动叠加 Agentic 规则
 node .github/hooks/validate-config.mjs          # 期望 PASS
 ```
@@ -1017,6 +1018,7 @@ Agent 输出不符预期
 - 私有模板 `npx degit user/repo` 会失败 → 必须 `npx degit --mode=git user/repo`。
 - PreToolUse 用错 schema（`decision:"block"` 是 PostToolUse 的）→ 拦不住。正确是 `hookSpecificOutput.permissionDecision:"deny"`。
 - 多个 `applyTo:"**"` 文件**不是**冲突（薄、互补、单一职责），验证器 S3 已豁免。
+- 改 `docs/prd.md` **不会**让所有 story 失效。story 证据只绑定它**自己引用**的那些验收标准，因此新增或改写无关的 `AC` 不会影响 backlog 其余部分；而改写或删除某个 story 引用的标准，才会正确地让该 story 变 `STALE`。验证（G7）同时绑定产品树，所以改 PRD 仍会重新打开它。
 
 ---
 
@@ -1037,16 +1039,16 @@ Agent 输出不符预期
 ```sh
 # 方式 A：degit（public 仓库，无需鉴权）
 # 固定到 release tag：默认分支会移动，tag 不会。
-npx degit niaodian/eos#eos-1.15.1 my-app
+npx degit niaodian/eos#eos-1.16.0 my-app
 
 # 方式 B：在 tag 上 clone，并开一段全新历史
-git clone --depth 1 --branch eos-1.15.1 https://github.com/niaodian/eos.git my-app
-cd my-app && git checkout --orphan main && git commit -m "chore: start from eos-1.15.1"
+git clone --depth 1 --branch eos-1.16.0 https://github.com/niaodian/eos.git my-app
+cd my-app && git checkout --orphan main && git commit -m "chore: start from eos-1.16.0"
 ```
 
 ## 10.3 分发给团队（纯本地、无企业依赖）
 
-1. 所有人从**同一个 release tag**（`eos-1.15.1`）开始。默认分支会持续变动，
+1. 所有人从**同一个 release tag**（`eos-1.16.0`）开始。默认分支会持续变动，
    不固定版本就意味着每个人拿到的都是略有差异的 EOS。
 2. `【需组织/GitHub 设置】` GitHub **template repository** 属于所有者级设置：EOS 既无法替你设置，
    也无法在本地验证，所以别信本页面的说法——
@@ -1124,7 +1126,21 @@ node .github/eos/eos.mjs check --gate release-ready --scope <id>
 也没有任何东西被静默重新解释。
 
 
-### 10.4.3 `evidencePolicy` —— 你的发布证据需要多强的来源证明
+### 10.4.3 从 `eos-1.15.x` 升级到 `eos-1.16.0`
+
+不需要你做任何决策，但既有项目上可能有一道门禁会新报失败。
+
+| 变化 | 你会看到 | 怎么处理 |
+|---|---|---|
+| **锁定的技术栈必须落到常驻规则** | `architecture-ready` 失败，提示 `… still carries the PROVISIONAL placeholder` | 用 `stack-presets.md` 中你所用栈的区块替换 `.github/instructions/00-workspace.instructions.md` 的 `Local commands`。你的 ADR 从来不是问题：后续没有任何智能体会读它，它们全都读那条常驻规则，残留的 ⛳ 标记会持续让它们在 Python 项目上跑 `npm ci`。 |
+| **story 证据跟随它所引用的验收标准** | 大多数 story 证据会 `STALE` 一次（`gate definition version changed`），此后不再因无关的 PRD 改动而失效 | 重跑 `eos check --gate story-ready --scope <id>`。此后，新增或改写一条你的 story **未引用**的标准不会让它失效——这正是"提前铺开整个 backlog"变得划算的原因。 |
+| **阶段智能体自己跑门禁** | 每个阶段以预览、请求确认、门禁输出、点名下一阶段结束 | 无需处理。若某个智能体仍把命令丢给你粘贴，说明它没有遵守 `05-stage-closeout`，请当场指出。 |
+| **可选的回答语言** | 不设置则无变化 | 在 `.eos/project.json` 加 `"language": "zh-CN"`（任意 BCP-47 标签）即可固定智能体的回答语言。非标签值现在会报错，而不是静默退回英文。 |
+
+已记录证据会因门禁版本变动而 `STALE` 一次，重跑门禁即可清除。无需重写台账，也无需手工编辑。
+
+
+### 10.4.4 `evidencePolicy` —— 你的发布证据需要多强的来源证明
 
 `docs/evidence/*.json` 只是磁盘上的字节。CI 产出的摘要和人手敲的摘要**字节完全一样**，唯一区别是
 `producer` 字段 —— 那是一个**声明**，不是证明。因此由项目声明它需要多强的来源证明，EOS 执行*它*：
@@ -1151,7 +1167,7 @@ node .github/eos/eos.mjs check --gate release-ready --scope <id>
 见 [ADR-005](../adr/005-external-authority-boundary.md)。
 
 
-### 10.4.4 Provider adapter —— 让 EOS 去问一个它自己当不了的权威
+### 10.4.5 Provider adapter —— 让 EOS 去问一个它自己当不了的权威
 
 有两件事，跑在你笔记本上的程序无从知晓：服务端是否真的在强制分支保护，以及一个构建是否真的来自
 它所声称的流水线。EOS 对这两件事都诚实地报告（`BLOCKED` / `UNVERIFIED`）然后止步。adapter 就是让
@@ -1261,7 +1277,7 @@ EOS 的栈规则是**可插拔**的。新增一个栈 = 加一个 `*.instruction
 
 ```
 # ── 终端 —— 唯一循环（日常只需要这些）──
-npx degit niaodian/eos#eos-1.15.1 my-app   # 新建项目
+npx degit niaodian/eos#eos-1.16.0 my-app   # 新建项目
 node .github/eos/eos.mjs init --write               # 本地 VS Code 任务（绝不覆盖已有文件）
 node .github/eos/eos.mjs next                       # 唯一的下一步、为什么、怎么开始
 node .github/eos/eos.mjs resume                     # 新会话？接着上次继续
@@ -1317,7 +1333,7 @@ bmad-tea / bmad-testarch-*   # 阶段7：测试+追溯        → G7
 
 **复现**（终端）：
 ```sh
-npx degit niaodian/eos#eos-1.15.1 my-app && cd my-app
+npx degit niaodian/eos#eos-1.16.0 my-app && cd my-app
 node .github/hooks/validate-config.mjs        # PASS
 npm test                                       # 10/10 green
 echo '{"tool_input":{"command":"rm -rf /tmp/x"}}' | node .github/hooks/deny-dangerous.js  # deny
@@ -1338,15 +1354,25 @@ echo '{"tool_input":{"command":"rm -rf /tmp/x"}}' | node .github/hooks/deny-dang
 
 ## D.1 让 3 道 CI 硬门成为"必需检查" `【需组织/GitHub 设置】`
 
-GitHub 仓库 → **Settings → Branches → Add branch ruleset**（或 Add rule），针对默认分支：
+GitHub 仓库 → **Settings → Rules → Rulesets → New branch ruleset**，针对默认分支：
 
-1. 勾选 **Require a pull request before merging**（禁止直接 push 到默认分支）。
-2. 勾选 **Require status checks to pass before merging** → 搜索并选中 **`verify`**（`eos-ci.yml` 的 job）。
+1. 先把 **Enforcement status** 设为 **`Active`**。新建的 ruleset 默认是 **Disabled**，处于 Disabled 时无论下面勾选什么都不会生效 —— 这是开发者"以为已受保护、实则毫无保护"的最常见原因。
+2. 勾选 **Require a pull request before merging**（禁止直接 push 到默认分支）。
+3. 勾选 **Require status checks to pass before merging** → 搜索并选中 **`verify`**（`eos-ci.yml` 的 job）。
    —— 这一步把 validate-config / eos-doctor / secret-scan 从"绿灯建议"变成"红灯阻断"。
-3. 勾选 **Require review from Code Owners**（配合 D.2 的 CODEOWNERS）。
-4. （推荐）勾选 **Do not allow bypassing the above settings**，避免管理员随手绕过。
+4. 勾选 **Require review from Code Owners**（配合 D.2 的 CODEOWNERS）。
+5. （推荐）勾选 **Do not allow bypassing the above settings**，避免管理员随手绕过。
 
-> 本地无法验证服务端是否已开：请在 Settings 里自查。个人命名空间仓库默认**没有**这些保护。
+**计划限制 —— 动手前先看这一段。** 在 GitHub Free 下，**私有**仓库根本不会强制执行 ruleset：GitHub 会保存该 ruleset，然后提示 "Your rulesets won't be enforced on this private repository until you upgrade this organization account to GitHub Team"。**Require review from Code Owners** 同样不提供。你只有三个诚实的选择：把仓库改为公开、升级到 Pro/Team，或以该理由豁免台账中的这一项。
+
+请用终端验证，而不是相信设置页面：
+
+```sh
+gh api repos/<owner>/<repo>/rules/branches/main        # 返回非空数组 = Active 规则已生效；返回 [] = 无任何强制
+gh api repos/<owner>/<repo>/branches/main/protection   # 仅用于经典分支保护；使用 ruleset 时会返回 404
+```
+
+> 因为旧的 `/protection` 端点在使用 ruleset 时会返回 404，所以绝不能据此判断"未受保护" —— 请优先查 ruleset 端点。个人命名空间仓库默认**没有**这些保护。
 
 ## D.2 启用 CODEOWNERS 治理保护
 

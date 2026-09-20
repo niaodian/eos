@@ -144,9 +144,9 @@ export function gateInputs(snapshot, gateId, scopeType, scopeId) {
   if (gateId === 'prd-ready') inputs.push(ARTIFACTS.prd);
   if (gateId === 'ux-ready') inputs.push(ARTIFACTS.designRecord, ARTIFACTS.design, ARTIFACTS.experience);
   if (gateId === 'architecture-ready') inputs.push(ARTIFACTS.architecture, ARTIFACTS.architectureRecord, ARTIFACTS.requirementsRecord);
-  if (gateId === 'story-ready') { inputs.push(ARTIFACTS.prd); if (story) inputs.push(story.path); }
+  if (gateId === 'story-ready') { if (story) inputs.push(story.path); }
   if (gateId === 'verified') {
-    inputs.push(ARTIFACTS.traceMatrix, ARTIFACTS.prd);
+    inputs.push(ARTIFACTS.traceMatrix);
     // The machine summaries are EXCLUDED from the product tree (a verification run writes them, so
     // counting them would make the digest they embed impossible to satisfy). They are bound here
     // instead: editing one after the gate ran makes the recorded PASS STALE, exactly like any other
@@ -166,11 +166,35 @@ export function gateInputs(snapshot, gateId, scopeType, scopeId) {
 }
 
 /**
+ * The slice of the PRD a story actually depends on: the statements of the criteria it cites.
+ *
+ * Binding the WHOLE PRD file made every story's evidence stale the moment any criterion anywhere
+ * changed, so specifying a 20-story backlog meant re-running story-ready 20 times for edits that
+ * touched none of them. Both gates that read the PRD under a story scope (`storyAcResolves`,
+ * `traceComplete`) only ever ask about the story's own ids, so this digest is exact rather than an
+ * approximation: rewriting or deleting a cited criterion changes it, and editing an unrelated one
+ * does not. `<absent>` is recorded deliberately, so a criterion that disappears is a change too.
+ */
+function referencedAcDigest(snapshot, story) {
+  const statements = snapshot.prd?.statements;
+  const lines = [...new Set((story?.acs || []).map((a) => a.id))].sort()
+    .map((id) => `${id}:${(statements && statements.get(id)) ?? '<absent>'}`);
+  return createHash('sha256').update(lines.join('\n')).digest('hex');
+}
+
+/**
  * Set-membership digests a gate depends on. `release-ready` asserts something about the SET of
  * stories, so adding a story after the gate ran must invalidate it even though no recorded file
  * hash changed.
  */
 export function gateCollections(snapshot, gateId, scopeType = null, scopeId = null) {
+  if (gateId === 'story-ready' || gateId === 'verified') {
+    const story = snapshot.stories.find((s) => s.id === scopeId);
+    // No story file means `gateInputs` no longer lists it either, so the input-SET comparison
+    // already reports the evidence as stale. Adding a digest here would be a second, weaker
+    // statement of the same fact.
+    return story ? { referencedAcs: referencedAcDigest(snapshot, story) } : {};
+  }
   if (gateId !== 'release-ready') return {};
   // Membership now comes from the manifest, so the digest covers the stories the release CLAIMS
   // plus the files they resolve to. Adding an unrelated story no longer invalidates a release;

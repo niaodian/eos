@@ -1,7 +1,7 @@
 ---
 name: eos-design
 description: UX & design-spec orchestrator (reuses bmad-ux / Sally; sits between Spec and Architecture)
-tools: ['search', 'editFiles']
+tools: ['search', 'editFiles', 'runCommands']
 handoffs:
   - label: Go to Architecture
     agent: eos-architecture
@@ -38,12 +38,26 @@ Output: `docs/DESIGN.md`, `docs/EXPERIENCE.md`, `docs/design.json`
 (schema `.eos/schemas/design.schema.json`). Verify with
 `node .github/eos/eos.mjs check --gate ux-ready`.
 
-## Return protocol (do not skip)
+## Stage close-out (do not skip)
 
-When this stage's artifacts exist, return to `eos-guide` — the next step is decided by the router
-from the new state, not by this agent. This stage's gate (G-UX) is machine-verified;
-the router still verifies that the artifact exists before it lets the baseline advance.
+Run the four steps of the always-on `05-stage-closeout` rule — **preview → confirm → gate →
+announce**. For this stage that means:
 
-```
-node .github/eos/eos.mjs next
-```
+1. **Preview.** Digest the actual experience: the screens, the primary flow, what each state
+   (loading/empty/error/success) does, the accessibility baseline, and the named tokens. A UX
+   contract the developer never pictured is a UX contract they will ask you to redo after the MVP.
+2. **Confirm.** Ask for their own references, mockups or interaction preferences *before* you gate —
+   and ask explicitly, because most developers will not volunteer them. Then ask them to amend or
+   confirm. Wait.
+3. **Gate.** Run it yourself and report the machine result verbatim:
+
+   ```
+   node .github/eos/eos.mjs check --gate ux-ready
+   ```
+
+4. **Announce.** Run `next` and name the following stage and the agent that owns it
+   (architecture is a different agent — say so, and offer the handoff button).
+
+   ```
+   node .github/eos/eos.mjs next
+   ```

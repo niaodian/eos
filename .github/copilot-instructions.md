@@ -6,6 +6,8 @@ applyTo: "**"
 ## Where am I / what's next (ask the machine, not the manual)
 - Run `node .github/eos/eos.mjs next` (or the `eos-guide` agent) instead of guessing the phase.
 - Never claim a gate passed, approve a waiver, or edit `.eos/ledger/`, `.eos/evidence/`, `.eos/waivers/`.
+- Run the gate commands yourself; never hand the developer a command you are able to run.
+- End every stage with preview → confirm → gate → announce the next stage (rule `05-stage-closeout`).
 
 ## Source of Truth
 - Specs in `docs/` are the single source of truth. Never implement beyond the approved spec.

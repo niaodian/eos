@@ -19,10 +19,13 @@ export const PARADIGMS = ['deterministic', 'agentic'];
 export const STACKS = ['node', 'python', 'go', 'java', 'rust', 'dotnet', 'other'];
 export const STEPS = ['install', 'lint', 'typecheck', 'test', 'eval', 'audit'];
 const TOP_LEVEL_KEYS = new Set([
-  '$schema', 'projectType', 'stacks', 'commands', 'productParadigms', 'evalRequired',
+  '$schema', 'projectType', 'language', 'stacks', 'commands', 'productParadigms', 'evalRequired',
   'evalWaiver', 'rationale', 'workflowProfile', 'complianceProfile',
   'evidencePolicy', 'evidencePolicyReason',
 ]);
+// Prose language only (BCP-47). Deliberately not an enum: EOS must not ship a closed list of
+// languages a team is allowed to think in.
+export const LANGUAGE_TAG = /^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})*$/;
 export const EVIDENCE_POLICIES = ['local', 'ci', 'attested'];
 export const COMPLIANCE_PROFILES = ['none', 'regulated'];
 
@@ -167,6 +170,17 @@ export function loadProjectConfig(root) {
   if (!projectType) errors.push(`${PROJECT_CONFIG_PATH}: "projectType" is required (${PROJECT_TYPES.join(' | ')})`);
   else if (!PROJECT_TYPES.includes(projectType)) errors.push(`${PROJECT_CONFIG_PATH}: unknown projectType "${projectType}" (expected ${PROJECT_TYPES.join(' | ')})`);
 
+  // A malformed tag is an ERROR, not a warning: agents read this to pick the language they answer
+  // in, and "chinese" silently falling back to English is exactly the surprise this key removes.
+  let language;
+  if (parsed.language !== undefined) {
+    if (typeof parsed.language !== 'string' || !LANGUAGE_TAG.test(parsed.language)) {
+      errors.push(`${PROJECT_CONFIG_PATH}: "language" must be a BCP-47 tag such as "en", "zh-CN" or "pt-BR" (got ${JSON.stringify(parsed.language)}). Remove the key to let agents mirror whatever language you write in.`);
+    } else {
+      language = parsed.language;
+    }
+  }
+
   let stacks = [];
   if (parsed.stacks !== undefined) {
     if (!Array.isArray(parsed.stacks) || parsed.stacks.some((s) => typeof s !== 'string')) {
@@ -260,6 +274,7 @@ export function loadProjectConfig(root) {
 
   const config = {
     projectType,
+    language,
     stacks,
     commands,
     productParadigms,

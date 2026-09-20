@@ -3,7 +3,7 @@ name: compliance
 description: Assess regulatory regime + set boundary controls early (healthcare/finance/privacy)
 argument-hint: <regime e.g. HIPAA|PCI-DSS|GDPR, or a feature/domain description>
 agent: agent
-tools: ['search', 'editFiles']
+tools: ['search', 'editFiles', 'runCommands']
 ---
 # Regulatory Compliance Pre-Flight (EOS) — Gate G2 boundary controls
 

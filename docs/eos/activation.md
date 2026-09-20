@@ -32,12 +32,19 @@
   - **Why**: without it, CI is only a "green-light suggestion" — anyone with write access (or an agent granted
     `editFiles`) can merge without review. This is the root cause the audit judged "contractual rather than
     technical authority", and the single biggest point loss.
-  - **Steps**: GitHub repo → Settings → Branches → Add branch ruleset; for the default branch enable *Require a
-    pull request before merging* + *Require status checks to pass* → select `verify` (the `eos-ci.yml` job) +
-    *Require review from Code Owners*. (See Appendix D.1)
-  - **Verify**: self-check in Settings → Branches; or (optional, needs `gh` login)
-    `gh api repos/:owner/:repo/branches/main/protection` returns 200 rather than 404. **Local/offline cannot
-    verify server-side state — this is a reminder, not a gate.**
+  - **Steps**: GitHub repo → Settings → Rules → Rulesets → New branch ruleset; target the default branch, set
+    **Enforcement status: `Active`** (a new ruleset defaults to *Disabled*, and a Disabled ruleset enforces
+    nothing no matter what else you tick), then enable *Require a pull request before merging* + *Require
+    status checks to pass* → select `verify` (the `eos-ci.yml` job) + *Require review from Code Owners*.
+    (See Appendix D.1)
+  - **Plan limits**: on GitHub Free, a **private** repo does not enforce rulesets at all ("won't be enforced …
+    until you upgrade"), and *Require review from Code Owners* is not offered. Make the repo public, upgrade to
+    Pro/Team, or waive this line with exactly that reason.
+  - **Verify**: `gh api repos/<owner>/<repo>/rules/branches/main` — a non-empty array means **Active** rules
+    apply; `[]` means nothing is enforced (usually a ruleset left *Disabled*). Using classic protection instead?
+    Then `gh api repos/<owner>/<repo>/branches/main/protection` returning 200. The legacy endpoint returns 404
+    for a ruleset, so do not read that as "not protected". **Local/offline cannot verify server-side state —
+    this is a reminder, not a gate.**
 
 - [ ] CODEOWNERS: replace every `@niaodian` in `.github/CODEOWNERS` with your team handle
   - **Why**: combined with "Require review from Code Owners" above, this stops anyone (including an agent) from

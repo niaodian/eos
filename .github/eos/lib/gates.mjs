@@ -57,6 +57,11 @@ export function insideRepo(root, rel) {
 /** Existence that cannot be satisfied from outside the repository. */
 const repoFileExists = (root, rel) => insideRepo(root, rel) && existsSync(join(root, rel));
 
+// The always-on rule that tells every later agent how to build and test this project, and the
+// marker the template ships so "we never chose a stack" is visible instead of silently defaulting.
+const WORKSPACE_RULE = '.github/instructions/00-workspace.instructions.md';
+const PROVISIONAL_STACK = /⛳\s*PROVISIONAL/;
+
 /** Run a bundled validator, recording the real argv + exit code into the evidence. */
 function runHook(ctx, relScript, args = []) {
   const full = join(ctx.root, relScript);
@@ -320,6 +325,29 @@ const evaluators = {
     return missing.length
       ? fail(`NFR(s) with no landing point in the architecture: ${missing.join(', ')} — name the component and the mechanism that satisfies each one`)
       : ok(`${landed.size} NFR(s) land on a named component and mechanism`);
+  },
+  /**
+   * Locking the stack in an ADR is only half the decision: every agent in every later session reads
+   * the always-on workspace rule, not the ADR. While that rule still carries the PROVISIONAL
+   * placeholder it actively contradicts the architecture — a Python project keeps telling agents to
+   * run `npm ci`. An ADR nobody's tooling reads is not a locked stack.
+   */
+  architectureStackLanded(ctx) {
+    const r = readStageRecord(ctx.root, 'architecture');
+    if (!r.data) return awaiting(STAGE_RECORDS.architecture.path);
+    if (r.data.decisions?.techStack?.status !== 'DECIDED') {
+      return na('the tech stack is not DECIDED yet, so there is nothing to land in the workspace rule');
+    }
+    if (!repoFileExists(ctx.root, WORKSPACE_RULE)) {
+      // The failure this check exists to prevent is a placeholder CONTRADICTING the ADR. With no
+      // workspace rule there is no contradiction, and inventing a file-must-exist requirement here
+      // would be G4 enforcing something it was never about.
+      return na(`${WORKSPACE_RULE} does not exist, so no always-on rule can contradict the locked stack`);
+    }
+    const text = readFileSync(join(ctx.root, WORKSPACE_RULE), 'utf8');
+    return PROVISIONAL_STACK.test(text)
+      ? fail(`${WORKSPACE_RULE} still carries the PROVISIONAL placeholder while docs/architecture.json declares the stack DECIDED — replace the "Local commands" block from docs/eos/stack-presets.md so the always-on rule matches the ADR`)
+      : ok(`${WORKSPACE_RULE} no longer carries the provisional stack placeholder`);
   },
 
   // ---------------------------------------------------------------- prd-ready (G3)

@@ -272,3 +272,20 @@ test('loadProjectConfig rejects an evalWaiver without a real reason or an owner'
   const noOwner = loadProjectConfig(project({ '.eos/project.json': { ...base, evalWaiver: { reason: 'no model calls in this service' } } }));
   assert.ok(noOwner.errors.some((e) => /approvedBy/.test(e)));
 });
+
+test('loadProjectConfig accepts a BCP-47 language and rejects prose', () => {
+  const base = { projectType: 'config-only' };
+  const ok = loadProjectConfig(project({ '.eos/project.json': { ...base, language: 'zh-CN' } }));
+  assert.deepEqual(ok.errors, []);
+  assert.equal(ok.config.language, 'zh-CN');
+
+  // The whole point of the key is that an agent can act on it without guessing, so a value it
+  // would have to interpret must fail loudly instead of silently falling back to English.
+  const prose = loadProjectConfig(project({ '.eos/project.json': { ...base, language: 'Simplified Chinese' } }));
+  assert.ok(prose.errors.some((e) => /BCP-47/.test(e)));
+
+  // Absent is legal and means "mirror the developer" — it must not be coerced to a default.
+  const absent = loadProjectConfig(project({ '.eos/project.json': base }));
+  assert.deepEqual(absent.errors, []);
+  assert.equal(absent.config.language, undefined);
+});

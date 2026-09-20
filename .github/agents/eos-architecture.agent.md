@@ -1,7 +1,7 @@
 ---
 name: eos-architecture
 description: Architecture stage orchestrator (reuses bmad-architecture / Winston)
-tools: ['search', 'editFiles']
+tools: ['search', 'editFiles', 'runCommands']
 handoffs:
   - label: Go to Implementation Planning
     agent: eos-plan
@@ -31,6 +31,12 @@ placeholder. Once the architecture picks the language/framework: (1) update the 
 matching R3 stack rule, and (3) record it as `docs/adr/00X-tech-stack.md`. This resolves the ⛳
 PROVISIONAL marker so the always-on workspace rule matches the real stack.
 
+**Step (1) is gated, not advisory.** G4's `stack-landed-in-workspace-rule` fails while
+`00-workspace.instructions.md` still carries the ⛳ PROVISIONAL marker and `architecture.json`
+declares the stack DECIDED. The reason is that no later agent ever reads your ADR — they all read
+the always-on workspace rule, so a surviving placeholder would keep telling them to run `npm ci` on
+a Python project.
+
 Paradigm isolation check (deterministic SaaS vs probabilistic Agentic):
 - If the system mixes a high-concurrency web path with LLM/agent calls, require an async
   decoupling point (queue/worker) so multi-second inference never blocks a request thread.
@@ -54,12 +60,37 @@ docs/adr/* (incl. the tech-stack ADR + the deployment-topology ADR).
 
 Verify with `node .github/eos/eos.mjs check --gate architecture-ready`.
 
-## Return protocol (do not skip)
+## Before you write: trace, then brief
 
-When this stage's artifacts exist, return to `eos-guide` — the next step is decided by the router
-from the new state, not by this agent. This stage's gate (G4) is machine-verified;
-the router still verifies that the artifact exists before it lets the baseline advance.
+**Trace first.** Re-read `docs/requirements.json` and `docs/prd.md` and list every requirement and
+NFR. For each, say which component satisfies it. If you intend *not* to honour one — a dual
+local+cloud provider, an offline mode, a stated integration — you must say so out loud and get
+agreement. Dropping an approved requirement inside an architecture document is the most expensive
+silent failure in EOS, because everything downstream is built on it.
 
-```
-node .github/eos/eos.mjs next
-```
+**Then brief.** The tech stack and deployment topology are one-way doors. Before writing them,
+present: the options you considered, the trade-off that decides it, your recommendation, and the
+limits the developer will live with (cost, scale ceiling, lock-in, ops burden). Offer a fast path
+and a collaborative path, but never treat an unanswered recommendation as an approval.
+
+## Stage close-out (do not skip)
+
+Run the four steps of the always-on `05-stage-closeout` rule — **preview → confirm → gate →
+announce**. For this stage that means:
+
+1. **Preview.** Digest the spine: stack, topology, the request/inference boundary, where state
+   lives, and each irreversible decision with its ADR. Then state the architecture's *limits* —
+   what it will not do well, and what would force a rewrite.
+2. **Confirm.** Ask them to amend or confirm, and re-state any requirement you did not honour.
+   Wait for an explicit answer before you gate.
+3. **Gate.** Run it yourself and report the machine result verbatim:
+
+   ```
+   node .github/eos/eos.mjs check --gate architecture-ready
+   ```
+
+4. **Announce.** Run `next` and name the following stage and the agent that owns it.
+
+   ```
+   node .github/eos/eos.mjs next
+   ```

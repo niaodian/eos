@@ -1,6 +1,6 @@
 # EOS User Manual (Engineering Operating System)
 
-> Version: synced with `docs/eos/VERSION` (current `eos-1.15.1`)
+> Version: synced with `docs/eos/VERSION` (current `eos-1.16.0`)
 > Applies to: recent VS Code + GitHub Copilot Chat (custom agent / hooks are recent-version capabilities; confirm the version in the "About VS Code" panel) + 73 installed `bmad-*` skills (user-level)
 > Positioning: this manual is an **operating guide (how to use it)**; for design rationale and trade-offs, see `blueprint.md` in the same directory (why it is designed this way).
 > Conventions: prose in English; file names / paths / commands / config keys kept verbatim.
@@ -155,7 +155,7 @@ If you want to promote some `eos-*.agent.md` files to "available in all projects
 **Method A — degit (recommended, fastest)**
 ```sh
 # Public template — plain degit works (no auth needed)
-npx degit niaodian/eos#eos-1.15.1 my-new-app
+npx degit niaodian/eos#eos-1.16.0 my-new-app
 cd my-new-app
 git init && git add -A && git commit -m "chore: scaffold from eos"
 ```
@@ -193,7 +193,7 @@ Open `.github/instructions/00-workspace.instructions.md` and change it to the re
 ## 3.4 Full Day-1 sequence (copy-ready)
 
 ```sh
-npx degit niaodian/eos#eos-1.15.1 my-new-app && cd my-new-app
+npx degit niaodian/eos#eos-1.16.0 my-new-app && cd my-new-app
 git init && git add -A && git commit -q -m "chore: scaffold from eos"
 node .github/hooks/validate-config.mjs
 # Key: run `code .` from inside the project directory so my-new-app becomes the workspace root (including .github/).
@@ -312,7 +312,7 @@ So EOS **never depends on "Rule A overriding Rule B"**. The only reliable contro
 | Item | Content |
 |---|---|
 | **Goal** | Get an empty project with healthy configuration from the template |
-| **How to start** | `npx degit niaodian/eos#eos-1.15.1 my-app && cd my-app` |
+| **How to start** | `npx degit niaodian/eos#eos-1.16.0 my-app && cd my-app` |
 | **Output** | Complete `.github/` + `docs/` skeleton |
 | **Gate** | `node .github/hooks/validate-config.mjs` → **PASS** |
 | **Must check** | PASS 0 errors. **If the stack is undecided, do not change** `00-workspace` yet--keep the Node placeholder; the stack is an irreversible decision, and the authority is locked in **Phase 4 (ADR)**. If the stack is known, copy `docs/eos/stack-presets.md` directly (fast path). |
@@ -438,6 +438,7 @@ So EOS **never depends on "Rule A overriding Rule B"**. The only reliable contro
 | **Decision gate G5** | ☑ Every story is self-contained ☑ independently implementable ☑ includes AC **and every AC has acceptance test design (ATDD)** ☑ telemetry/authz/rollback are landed as concrete tasks **☑ LLM features have eval-plan (G-EVAL) or explicit SKIP** |
 | **Must-check items** | Can a developer start work from this story **without going back to read elsewhere**? Is DoD written? **Is the acceptance test intent defined for every AC**? **Are the eval set/grader/threshold for LLM features defined**? |
 | **Anti-rework** | The "readiness gate" prevents missing context in the middle of development; **shifting testing left** makes acceptance criteria testable before coding and prevents "adding tests later just to fill coverage"; **shifting eval left** gives nondeterministic LLM output a measurable baseline before coding. |
+| **Cadence** | **Draft the whole backlog in one pass, then review it in one pass, then promote one story at a time.** `story-ready` is evaluated per scope (`--scope <STORY-ID>`) and the router focuses the first unfinished story, so unpromoted drafts block nothing. Reviewing 20 drafts as one table is the only cheap moment to cut, merge or reorder scope; discovering the backlog one story at a time hides it. Promotion stays serial on purpose -- each story should absorb what the previous ones actually taught you before it goes ready. |
 | **Example** | `my-app/docs/stories/story-001-auth.md` (AC + self-contained context + DoD = Ready) |
 
 ---
@@ -574,7 +575,7 @@ So EOS **never depends on "Rule A overriding Rule B"**. The only reliable contro
 
 ### Step 0: Create project + choose stack (5 minutes)
 ```sh
-npx degit niaodian/eos#eos-1.15.1 todo-api && cd todo-api
+npx degit niaodian/eos#eos-1.16.0 todo-api && cd todo-api
 node .github/hooks/validate-config.mjs          # expect PASS
 ```
 **Stack already decided?** Open `.github/instructions/00-workspace.instructions.md` and copy `Local commands` from your stack block (`docs/eos/stack-presets.md`, fast path).
@@ -633,7 +634,7 @@ SaaS **G7** requires: every AC has ≥1 test, **API contract tests** (against op
 
 ### Step 0: Create project + create AI directories
 ```sh
-npx degit niaodian/eos#eos-1.15.1 cs-agent && cd cs-agent
+npx degit niaodian/eos#eos-1.16.0 cs-agent && cd cs-agent
 mkdir -p ai/prompts evals                       # AI code goes here; Agentic rules overlay automatically
 node .github/hooks/validate-config.mjs          # expect PASS
 ```
@@ -969,6 +970,7 @@ Agent output does not match expectation
 - Private template `npx degit user/repo` fails → must use `npx degit --mode=git user/repo`.
 - PreToolUse used the wrong schema (`decision:"block"` belongs to PostToolUse) → cannot block. Correct is `hookSpecificOutput.permissionDecision:"deny"`.
 - Multiple `applyTo:"**"` files are **not** conflicts (thin, complementary, single-responsibility); validator S3 exempts them.
+- Editing `docs/prd.md` does **not** invalidate every story. Story evidence is bound to the criteria each story *cites*, so adding or rewriting an unrelated `AC` leaves the rest of the backlog fresh; rewriting or deleting a criterion a story cites correctly makes that story `STALE`. Verification (G7) is bound to the product tree as well, so a PRD edit still re-opens it.
 
 ---
 
@@ -989,16 +991,16 @@ Agent output does not match expectation
 ```sh
 # Method A: degit (public repository — no auth needed)
 # Pin the release tag: the default branch moves, a tag does not.
-npx degit niaodian/eos#eos-1.15.1 my-app
+npx degit niaodian/eos#eos-1.16.0 my-app
 
 # Method B: git clone at the tag, into a fresh history
-git clone --depth 1 --branch eos-1.15.1 https://github.com/niaodian/eos.git my-app
-cd my-app && git checkout --orphan main && git commit -m "chore: start from eos-1.15.1"
+git clone --depth 1 --branch eos-1.16.0 https://github.com/niaodian/eos.git my-app
+cd my-app && git checkout --orphan main && git commit -m "chore: start from eos-1.16.0"
 ```
 
 ## 10.3 Distribution to a team (purely local, no enterprise dependency)
 
-1. Everyone starts from the **same release tag** (`eos-1.15.1`). The default branch keeps moving, so
+1. Everyone starts from the **same release tag** (`eos-1.16.0`). The default branch keeps moving, so
    an unpinned copy is a slightly different EOS for every person who takes one.
 2. `【Needs org/GitHub settings】` The GitHub **template repository** setting is owner-level: EOS can
    neither apply nor verify it locally, so do not take this page's word for it —
@@ -1079,7 +1081,22 @@ Recorded evidence from 1.13.x becomes `STALE` (the gate versions moved) and is c
 the gates. Nothing needs hand-editing, and nothing is silently reinterpreted.
 
 
-### 10.4.3 `evidencePolicy` — how much provenance your release evidence needs
+### 10.4.3 Upgrading from `eos-1.15.x` to `eos-1.16.0`
+
+Nothing needs a decision from you, but one gate can newly fail on an existing project.
+
+| What changed | What you will see | What to do |
+|---|---|---|
+| **The locked stack must reach the always-on rule** | `architecture-ready` fails with `… still carries the PROVISIONAL placeholder` | Replace the `Local commands` block in `.github/instructions/00-workspace.instructions.md` with your stack's block from `stack-presets.md`. Your ADR was never the problem: no later agent reads it, they all read that rule, so a surviving ⛳ marker kept telling them to run `npm ci` on a Python project. |
+| **Story evidence follows the criteria a story cites** | Most story evidence is `STALE` once (`gate definition version changed`), then stops going stale for unrelated PRD edits | Re-run `eos check --gate story-ready --scope <id>`. From here, adding or rewriting a criterion your story does **not** cite leaves it fresh — which is what makes specifying a whole backlog up front affordable. |
+| **Stage agents run their own gates** | Stages end with a preview, a confirmation request, the gate output and the next stage named | Nothing. If an agent still hands you a command to paste, it is not following `05-stage-closeout` — say so. |
+| **Optional answer language** | Nothing, unless you set it | Add `"language": "zh-CN"` (any BCP-47 tag) to `.eos/project.json` to fix the language agents reply in. A non-tag value is now an error rather than a silent fallback to English. |
+
+Recorded evidence becomes `STALE` once because the gate versions moved; re-running the gates clears
+it. No ledger rewrite, no hand-editing.
+
+
+### 10.4.4 `evidencePolicy` — how much provenance your release evidence needs
 
 `docs/evidence/*.json` is bytes on disk. A summary emitted by a verified CI run and one typed by a
 person are identical bytes, and `producer` is the only thing that separates them — a **claim**, not a
@@ -1108,7 +1125,7 @@ This is the same shape as SKIP / DEFER everywhere else in EOS: **a blank is refu
 decision is respected.** See [ADR-005](../adr/005-external-authority-boundary.md).
 
 
-### 10.4.4 Provider adapters — letting EOS ask an authority it cannot be
+### 10.4.5 Provider adapters — letting EOS ask an authority it cannot be
 
 Two things a program on your laptop cannot know: whether the server really enforces branch
 protection, and whether a build came from the pipeline it claims. EOS reports both honestly
@@ -1222,7 +1239,7 @@ EOS stack rules are **pluggable**. Adding a stack = add one `*.instructions.md` 
 
 ```
 # ── Terminal — the loop (this is all you need day to day) ──
-npx degit niaodian/eos#eos-1.15.1 my-app   # create new project
+npx degit niaodian/eos#eos-1.16.0 my-app   # create new project
 node .github/eos/eos.mjs init --write               # local VS Code tasks (never overwrites)
 node .github/eos/eos.mjs next                       # the ONE next action, why, how to start it
 node .github/eos/eos.mjs resume                     # new session? pick up where you stopped
@@ -1278,7 +1295,7 @@ A real dry-run that passed end to end (feature: user login), **12/12 gates passe
 
 **Reproduce** (terminal):
 ```sh
-npx degit niaodian/eos#eos-1.15.1 my-app && cd my-app
+npx degit niaodian/eos#eos-1.16.0 my-app && cd my-app
 node .github/hooks/validate-config.mjs        # PASS
 npm test                                      # 10/10 green
 echo '{"tool_input":{"command":"rm -rf /tmp/x"}}' | node .github/hooks/deny-dangerous.js  # deny
@@ -1298,15 +1315,25 @@ echo '{"tool_input":{"command":"rm -rf /tmp/x"}}' | node .github/hooks/deny-dang
 
 ## D.1 Make 3 CI hard gates "required checks" `【Needs org/GitHub settings】`
 
-GitHub repository → **Settings → Branches → Add branch ruleset** (or Add rule), targeting the default branch:
+GitHub repository → **Settings → Rules → Rulesets → New branch ruleset**, targeting the default branch:
 
-1. Check **Require a pull request before merging** (forbid direct push to the default branch).
-2. Check **Require status checks to pass before merging** → search and select **`verify`** (the job in `eos-ci.yml`).
+1. Set **Enforcement status** to **`Active`**. A new ruleset is created **Disabled**, and a Disabled ruleset enforces nothing no matter what else you tick below -- this is the most common way a developer ends up believing they are protected when they are not.
+2. Check **Require a pull request before merging** (forbid direct push to the default branch).
+3. Check **Require status checks to pass before merging** → search and select **`verify`** (the job in `eos-ci.yml`).
    -- This step turns validate-config / eos-doctor / secret-scan from "green-light advice" into "red-light block".
-3. Check **Require review from Code Owners** (paired with CODEOWNERS in D.2).
-4. (Recommended) Check **Do not allow bypassing the above settings**, to avoid casual administrator bypass.
+4. Check **Require review from Code Owners** (paired with CODEOWNERS in D.2).
+5. (Recommended) Check **Do not allow bypassing the above settings**, to avoid casual administrator bypass.
 
-> Server-side enablement cannot be verified locally: please self-check in Settings. Personal namespace repositories have **no** such protection by default.
+**Plan limits -- read this before you start.** On GitHub Free, a **private** repository does not enforce rulesets at all: GitHub saves the ruleset and then tells you "Your rulesets won't be enforced on this private repository until you upgrade this organization account to GitHub Team". **Require review from Code Owners** is likewise not offered. Your three honest options are: make the repository public, upgrade to Pro/Team, or waive the ledger line with exactly that reason.
+
+Verify from the terminal instead of trusting the settings page:
+
+```sh
+gh api repos/<owner>/<repo>/rules/branches/main        # non-empty array = Active rules apply; [] = nothing enforced
+gh api repos/<owner>/<repo>/branches/main/protection   # classic protection only; returns 404 when you use a ruleset
+```
+
+> Because the legacy `/protection` endpoint 404s for a ruleset, never read that 404 as "unprotected" -- check the ruleset endpoint first. Personal namespace repositories have **no** such protection by default.
 
 ## D.2 Enable CODEOWNERS governance protection
 

@@ -1,7 +1,7 @@
 ---
 name: eos-plan
 description: Implementation planning orchestrator (reuses bmad story skills)
-tools: ['search', 'editFiles']
+tools: ['search', 'editFiles', 'runCommands']
 handoffs:
   - label: Start Development
     agent: agent
@@ -31,12 +31,41 @@ concrete tasks.
 
 Output: docs/epics/*, docs/stories/* (each carrying an acceptance-test outline).
 
-## Return protocol (do not skip)
+## Draft the whole backlog at once; promote one at a time
 
-When this stage's artifacts exist: run the gate, report the machine result, then return to
-`eos-guide` — the next step is decided by the router from the new state, not by this agent.
+Do **not** make the developer discover the backlog one story at a time. `story-ready` is evaluated
+per scope (`--scope <STORY-ID>`) and the router focuses the first unfinished story, so unpromoted
+drafts sitting in `docs/stories/` block nothing. Therefore:
 
-```
-node .github/eos/eos.mjs check --gate story-ready --scope <STORY-ID>
-node .github/eos/eos.mjs next
-```
+1. **Draft them all in one pass** from the epics, each with AC ids that already exist in the PRD,
+   dependencies and an acceptance-test outline. Omit the `state:` front-matter key on a draft — the
+   ledger is authoritative, and a hand-written state is rejected by the gate anyway.
+2. **Review them all in one pass** with the developer: present the backlog as a table
+   (id · title · what it delivers · depends on) and get their cut/merge/reorder/priority calls
+   *before* any implementation. This is the only cheap moment to reshape scope.
+3. **Promote one at a time.** Immediately before promoting a story, re-read it against what the
+   previous stories actually taught you (implementation, tests, new ADRs) and amend it. That is the
+   real reason to promote serially — not an excuse to also *write* serially.
+
+If drafting a story would require new acceptance criteria that the PRD does not have, that is a PRD
+gap: say so and fix it in `/spec` **once, for the whole backlog**, rather than amending `docs/prd.md`
+19 more times and invalidating `prd-ready` evidence on every single story.
+
+## Stage close-out (do not skip)
+
+Run the four steps of the always-on `05-stage-closeout` rule — **preview → confirm → gate →
+announce**. For this stage that means:
+
+1. **Preview.** Show the full backlog table and the dependency order you chose.
+2. **Confirm.** Get their cut/merge/reorder decisions. Wait.
+3. **Gate.** Run it yourself for the story about to be implemented, and report the result verbatim:
+
+   ```
+   node .github/eos/eos.mjs check --gate story-ready --scope <STORY-ID>
+   ```
+
+4. **Announce.** Run `next` and name the following stage and the agent that owns it.
+
+   ```
+   node .github/eos/eos.mjs next
+   ```

@@ -2,7 +2,7 @@
 name: telemetry-plan
 description: Design the telemetry/analytics plan and close it against success metrics
 agent: agent
-tools: ['search', 'editFiles']
+tools: ['search', 'editFiles', 'runCommands']
 ---
 # Telemetry Plan (EOS)
 
