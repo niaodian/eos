@@ -131,3 +131,60 @@ test('S12: complianceProfile only accepts the declared enum', () => {
   assert.equal(code, 1, out);
   assert.match(out, /complianceProfile/);
 });
+
+// ---------------------------------------------------------------- S14 workspace-rule vs stack
+// No later agent reads your tech-stack ADR — every one of them reads the always-on workspace rule.
+// G4 makes the locked stack LAND there once; S14 keeps it honest afterwards. The check compares
+// which STACK a command belongs to, never the text, so rewording is never reported as drift.
+const RULE = '.github/instructions/00-workspace.instructions.md';
+const rule = (cmds) => `---\napplyTo: "**"\n---\n# Workspace Conventions\n\n## Local commands\n- ${cmds}\n`;
+const declare = (extra) => ({ projectType: 'application', stacks: ['python'], commands: { test: 'pytest' }, productParadigms: ['deterministic'], ...extra });
+
+test('S14: prose describing another stack than the one declared fails', () => {
+  const { code, out } = run(repo(({ write }) => {
+    write('.eos/project.json', declare());
+    write(RULE, rule('Install: `npm ci` · Test: `npm test`.'));
+  }));
+  assert.equal(code, 1, out);
+  assert.match(out, /S14 .*describe a node project/);
+});
+
+test('S14: prose matching the declared stack passes, however it is worded', () => {
+  for (const cmds of [
+    'Install: `uv sync` · Lint: `ruff check .` · Test: `pytest`.',
+    'Install: `pip install -r requirements.txt` · Test: `python -m pytest -q`.',
+  ]) {
+    const { code, out } = run(repo(({ write }) => {
+      write('.eos/project.json', declare());
+      write(RULE, rule(cmds));
+    }));
+    assert.equal(code, 0, `${cmds}\n${out}`);
+  }
+});
+
+test('S14: a stack that IS declared never fails, even alongside another', () => {
+  const { code, out } = run(repo(({ write }) => {
+    write('.eos/project.json', declare({ stacks: ['node', 'python'] }));
+    write(RULE, rule('Install: `npm ci` · Test: `npm test` · Eval: `pytest evals/`.'));
+  }));
+  assert.equal(code, 0, out);
+});
+
+test('S14: what it cannot prove, it does not report', () => {
+  // (a) stack-agnostic commands imply nothing; (b) "other" is unprovable by construction;
+  // (c) config-only has not declared a real stack yet — the template itself is in this state,
+  //     and flagging it would fire on every fresh scaffold before any decision was made.
+  const cases = [
+    [declare(), rule('Test: `make test` · Build: `just build`.')],
+    [declare({ stacks: ['other'] }), rule('Test: `npm test`.')],
+    [{ projectType: 'config-only', stacks: [], productParadigms: ['deterministic'] }, rule('Test: `npm test`.')],
+  ];
+  for (const [proj, body] of cases) {
+    const { code, out } = run(repo(({ write }) => {
+      write('.eos/project.json', proj);
+      write(RULE, body);
+    }));
+    assert.equal(code, 0, `${JSON.stringify(proj.stacks)} / ${proj.projectType}\n${out}`);
+    assert.doesNotMatch(out, /S14/);
+  }
+});
