@@ -3,7 +3,7 @@ name: eval-spec
 description: Design the evaluation plan for an LLM/agentic feature (eval sets + graders + baseline) — conditional Gate G-EVAL
 argument-hint: <path to docs/prd.md>
 agent: agent
-tools: ['search', 'editFiles']
+tools: ['search', 'editFiles', 'runCommands']
 ---
 # Evaluation Plan (EOS) — Gate G-EVAL (conditional)
 

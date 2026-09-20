@@ -3,7 +3,7 @@ name: ux-spec
 description: Design the UX/UI spec (visual + experience contracts) before architecture (reuses bmad-ux / Sally)
 argument-hint: <path to docs/prd.md>
 agent: agent
-tools: ['search', 'editFiles']
+tools: ['search', 'editFiles', 'runCommands']
 ---
 # UX & Design Spec (EOS) — Gate G-UX
 
@@ -51,6 +51,19 @@ and they are the source of truth for the frontend rules (a11y + loading/empty/er
 and for `/telemetry-plan` instrumentation of user actions.
 
 Output: `docs/DESIGN.md`, `docs/EXPERIENCE.md`.
+
+## Close-out (do not skip)
+
+Follow the always-on `05-stage-closeout` rule: **preview → confirm → gate → announce**.
+
+Ask for the developer's own references, screenshots or interaction preferences **before** you write
+— most will not volunteer them, and a UX contract they never pictured is one they will ask you to
+redo after the MVP. Then digest the screens, flows and states in the reply itself, ask them to amend
+or confirm, and run the gate yourself:
+
+```sh
+node .github/eos/eos.mjs check --gate ux-ready
+```
 
 > **Next (after G-UX):** switch to the `eos-architecture` agent in the Chat mode picker
 > (this hop is manual — a prompt workflow can't render a handoff button). That agent honors

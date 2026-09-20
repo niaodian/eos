@@ -13,6 +13,9 @@
 | 工具 | 用于 | 缺失时 |
 |---|---|---|
 | **Node.js**（18+） | 验证器、hooks、JS/TS 测试与 eval | 必需——唯一的硬依赖 |
+| **VS Code + GitHub Copilot** | `eos-*` 智能体、`/eos-*` 指令与常驻规则 | 引导式流程必需；`eos.mjs` CLI 本身不依赖它 |
+| **BMAD 技能**（`bmad-*`） | 各阶段工作流（`bmad-prd`、`bmad-architecture`、`bmad-create-story` 等） | 引导式流程必需——EOS 只做编排，不重复实现它们。用 `node .github/hooks/eos-doctor.mjs --deep` 核验 |
+| **`gh` CLI**（已登录） | 创建远端仓库，以及在 `/eos-init` 中验证分支保护 | **可选**：也可在 GitHub 网页端完成。用 `gh auth login` 配置 |
 | **Docker** + `act` | 本地 CI（`act push`）——在本地跑 GitHub Actions | **可选**：跳过 CI，直接跑同样的检查（见下） |
 | 各栈工具链（pnpm、python/pytest、go、spectral、golangci-lint、gitleaks…） | 只装你用到的那个栈；`gitleaks` 深化密钥扫描 | 按需安装，均可选（无 gitleaks 时 secret-scan 回退到内置正则） |
 
@@ -49,7 +52,7 @@ EOS **原生在 Windows 上运行**（PowerShell 或 Command Prompt）——核�
 ## Day-1（可直接复制——与用户手册 §3.4 完全一致的序列）
 
 ```sh
-npx degit niaodian/eos#eos-1.15.1 my-new-app && cd my-new-app
+npx degit niaodian/eos#eos-1.16.0 my-new-app && cd my-new-app
 git init && git add -A && git commit -q -m "chore: scaffold from eos"
 node .github/hooks/validate-config.mjs        # 期望 PASS
 code .                                        # 必须在项目目录*内部*执行——见下方警告
@@ -61,10 +64,24 @@ code .                                        # 必须在项目目录*内部*执
 **打开项目文件夹本身，绝不要打开它的上层目录。** VS Code 是相对于工作区根去发现 `.github/` 的；
 打开上层目录，自定义 agent、instructions 和 hooks 都会被静默地找不到。
 
+**GitHub 远端仓库是一个独立的手动步骤。** EOS 只在*本地*脚手架与硬化，既不会替你在 GitHub 上
+创建仓库，也不会替你推送。而分支保护（让 CI 门禁真正能阻断合并的那一环）必须依赖这个远端，
+因此请在 `/eos-init` 之前或过程中创建它：
+
+```sh
+gh repo create my-new-app --private --source=. --remote=origin --push
+```
+
 然后，在 **Copilot Chat** 里：
 
-1. **`/eos-init`**——一次性硬化引导：分支保护、CODEOWNERS、审批基线，记录在 `docs/eos/activation.md`。
+1. **`/eos-init`**——一次性硬化引导：回答语言、分支保护、CODEOWNERS、审批基线，
+   记录在 `docs/eos/activation.md`。
 2. **`/eos-next`**（或 `eos-guide` agent）——照着它说的做。然后重复。
+
+> **`.eos/project.json` 在 Day-1 保持 `config-only` 是正确的。** 这不是你欠下的任务：技术栈属于
+> 不可逆决策，EOS 刻意把它推迟到 **Phase 4（架构阶段）**，由 ADR 正式锁定。只有当真实的技术栈
+> 清单文件（`package.json`、`pyproject.toml`、`go.mod` 等）已经存在、而声明仍说"没有代码"时，
+> 它才会变成错误——因为那时质量门禁会空转通过。
 
 > **两个名字很像、但做的事完全不同。**
 > `/eos-init`（Copilot Chat）是上面那个**硬化引导**——这才是你 Day-1 需要的那个。

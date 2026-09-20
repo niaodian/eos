@@ -193,7 +193,7 @@
       "id": "architecture-ready",
       "code": "G4",
       "scope": "product",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "waivable": false,
       "title": "The architecture decides what stories will assume",
       "summary": "docs/architecture.md is written, docs/architecture.json records a decision (or a reasoned N/A) for stack, topology, authz, security, audit, rollback, DR, data/API/event contracts — plus tool allow-list, bounded orchestration, memory layering, async boundary and eval architecture for an agentic product, and the data/approval boundary for a regulated one — and every NFR lands on a named component.",
@@ -215,6 +215,12 @@
           "title": "every NFR lands on a named component and mechanism",
           "evaluator": "architectureNfrLanding",
           "fix": "Add an nfrLandingPoints entry for each NFR in docs/requirements.json."
+        },
+        {
+          "id": "stack-landed-in-workspace-rule",
+          "title": "the locked stack reached the always-on workspace rule",
+          "evaluator": "architectureStackLanded",
+          "fix": "Replace the PROVISIONAL \"Local commands\" block in .github/instructions/00-workspace.instructions.md with your stack's block from docs/eos/stack-presets.md, and enable the matching R3 stack rule."
         }
       ]
     },

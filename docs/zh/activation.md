@@ -30,11 +30,18 @@
 - [ ] Branch protection: default branch 要求 PR + 必需检查 `verify` + Code Owner 评审
   - **为什么**：没有它，CI 只是"绿灯建议"，任何写权限者（或获 `editFiles` 的 agent）可不评审直接合并——
     审计判定"契约性而非技术权威"的根因，也是失分最大的一项。
-  - **步骤**：GitHub 仓库 → Settings → Branches → Add branch ruleset，对默认分支勾选 *Require a pull request
-    before merging* + *Require status checks to pass* → 选中 `verify`（`eos-ci.yml` 的 job）+ *Require review
-    from Code Owners*。（详见附录 D.1）
-  - **验证**：Settings → Branches 自查；或（可选，需 `gh` 登录）`gh api repos/:owner/:repo/branches/main/protection`
-    返回 200 而非 404。**本地/离线无法验证服务端状态——这是提醒，不是门禁。**
+  - **步骤**：GitHub 仓库 → Settings → Rules → Rulesets → New branch ruleset，对默认分支先把
+    **Enforcement status 设为 `Active`**（新建 ruleset 默认是 *Disabled*，处于 Disabled 时无论勾选什么都
+    不会生效），再勾选 *Require a pull request before merging* + *Require status checks to pass* →
+    选中 `verify`（`eos-ci.yml` 的 job）+ *Require review from Code Owners*。
+    （详见附录 D.1）
+  - **计划限制**：GitHub Free 下**私有**仓库根本不会强制执行 ruleset（提示 "won't be enforced … until you
+    upgrade"），且不提供 *Require review from Code Owners*。请改为公开仓库、升级到 Pro/Team，
+    或以该理由豁免此项。
+  - **验证**：`gh api repos/<owner>/<repo>/rules/branches/main` —— 返回非空数组表示 **Active** 规则已生效；
+    返回 `[]` 表示没有任何强制（多半是 ruleset 仍为 *Disabled*）。若使用的是经典分支保护，
+    则用 `gh api repos/<owner>/<repo>/branches/main/protection` 返回 200。旧端点对 ruleset 会返回 404，
+    不要据此判断"未受保护"。**本地/离线无法验证服务端状态——这是提醒，不是门禁。**
 
 - [ ] CODEOWNERS: 把 `.github/CODEOWNERS` 里的 `@niaodian` 全部换成你的团队 handle
   - **为什么**：配合上面的 "Require review from Code Owners"，阻止任何人（含 agent）**免评审改动治理文件**

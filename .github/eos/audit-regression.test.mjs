@@ -356,6 +356,24 @@ test('EOS-AUD-003: an NFR with no landing point in the architecture does not pro
   assert.match(JSON.stringify(r.json.checks), /NFR1/);
 });
 
+// Locking the stack in an ADR is only half the decision. Every later agent reads the always-on
+// workspace rule, never the ADR, so a surviving placeholder keeps telling them to run `npm ci` on a
+// Python project — the ADR is then a document nobody's tooling obeys.
+test('EOS-AUD-003: a locked tech stack that never reached the always-on workspace rule does not promote', () => {
+  const RULE = '.github/instructions/00-workspace.instructions.md';
+  const provisional = '---\napplyTo: "**"\n---\n# Workspace Conventions\n\n## Local commands  ⛳ PROVISIONAL — stack is locked at Phase 4 (Architecture) via ADR\n- Install: `npm ci` · Test: `npm test`.\n';
+
+  const stale = project(baselineFiles({ [RULE]: provisional }));
+  const r = runJson(stale, ['check', '--gate', 'architecture-ready']);
+  assert.notEqual(r.code, 0, r.out);
+  assert.match(JSON.stringify(r.json.checks), /PROVISIONAL placeholder/);
+
+  // Replacing the block clears it — the check is about the contradiction, not about ceremony.
+  const landed = project(baselineFiles({ [RULE]: provisional.replace(/ {2}⛳ PROVISIONAL[^\n]*/, '') }));
+  const ok = runJson(landed, ['check', '--gate', 'architecture-ready']);
+  assert.equal(ok.code, 0, ok.out);
+});
+
 test('EOS-AUD-003: the machine states say BASELINED, because no human approval was recorded', () => {
   const workflow = JSON.parse(readFileSync(join(REPO_ROOT, '.eos/workflow.json'), 'utf8'));
   const states = workflow.stateMachines.product.states;

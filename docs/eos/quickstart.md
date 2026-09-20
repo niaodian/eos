@@ -8,6 +8,9 @@
 | Tool | Needed for | If absent |
 |---|---|---|
 | **Node.js** (18+) | validators, hooks, JS/TS tests & evals | required — the only hard dependency |
+| **VS Code + GitHub Copilot** | the `eos-*` agents, `/eos-*` prompts and always-on rules | required for the guided flow; the `eos.mjs` CLI itself works without it |
+| **BMAD skills** (`bmad-*`) | every stage workflow (`bmad-prd`, `bmad-architecture`, `bmad-create-story`, …) | required for the guided flow — EOS orchestrates them, it does not reimplement them. Verify with `node .github/hooks/eos-doctor.mjs --deep` |
+| **`gh` CLI**, authenticated | creating the remote, and verifying branch protection during `/eos-init` | **optional**: do it in the GitHub web UI instead. Set up with `gh auth login` |
 | **Docker** + `act` | local CI (`act push`) — runs GitHub Actions locally | **optional**: skip CI and run the same checks directly (below) |
 | stack toolchains (pnpm, python/pytest, go, spectral, golangci-lint, gitleaks…) | only the stack you use; `gitleaks` deepens secret scanning | install on demand; each is optional (secret-scan falls back to built-in patterns without gitleaks) |
 
@@ -44,7 +47,7 @@ core flow (hooks, validators, tests are all Node, and paths are normalized cross
 ## Day-1 (copy-ready — the same sequence as the manual, §3.4)
 
 ```sh
-npx degit niaodian/eos#eos-1.15.1 my-new-app && cd my-new-app
+npx degit niaodian/eos#eos-1.16.0 my-new-app && cd my-new-app
 git init && git add -A && git commit -q -m "chore: scaffold from eos"
 node .github/hooks/validate-config.mjs        # expect PASS
 code .                                        # from INSIDE the project — see the warning below
@@ -57,11 +60,26 @@ is correct behaviour, but a confusing way to start.
 **Open the project folder itself, never its parent.** VS Code discovers `.github/` relative to the
 workspace root; open a parent and the custom agents, instructions and hooks are silently not found.
 
+**A GitHub remote is a separate, manual step.** EOS scaffolds and hardens *locally*; it neither
+creates a repository on GitHub for you nor pushes to one. Branch protection (the thing that makes
+the CI gates actually block a merge) needs that remote to exist, so create it before or during
+`/eos-init`:
+
+```sh
+gh repo create my-new-app --private --source=. --remote=origin --push
+```
+
 Then, in **Copilot Chat**:
 
-1. **`/eos-init`** — the one-time hardening walkthrough: branch protection, CODEOWNERS, approval
-   baseline, tracked in `docs/eos/activation.md`.
+1. **`/eos-init`** — the one-time hardening walkthrough: your answer language, branch protection,
+   CODEOWNERS, approval baseline, tracked in `docs/eos/activation.md`.
 2. **`/eos-next`** (or the `eos-guide` agent) — and do what it says. Repeat.
+
+> **`.eos/project.json` stays `config-only` on day one, and that is correct.** It is not a task you
+> are behind on: the tech stack is an irreversible decision that EOS defers to **Phase 4
+> (Architecture)**, where an ADR locks it. It only becomes an error once real stack manifests
+> (`package.json`, `pyproject.toml`, `go.mod`, …) exist while the declaration still claims there is
+> no code — because the quality gate would then be passing vacuously.
 
 > **Two similarly-named things, doing different jobs.**
 > `/eos-init` (Copilot Chat) is the **hardening walkthrough** above — the one you want on day one.

@@ -84,9 +84,13 @@ node .github/eos/eos.mjs handoff --scope <scopeType> --id <scopeId>
 
 ## 5. Return protocol (for the specialist agents)
 
-When a specialist finishes, it must: write its artifacts → run the gate that its stage targets
-(`eos check --gate <gate> --scope <id>`) → report the machine result → then return here. The next
-step is decided by the router from the new state, not by the agent that just finished.
+Every stage ends the same way — the always-on `05-stage-closeout` rule binds them:
+**preview** what was written → **confirm** it with the developer → **run the gate** themselves →
+**announce** the next stage. If a specialist hands back without having run its gate, or asks the
+developer to paste a command it could have run, that is a protocol violation: say so, and run
+`eos next` yourself to get the truth.
+
+The next step is decided by the router from the new state, never by the agent that just finished.
 
 ## 6. When the developer is lost
 

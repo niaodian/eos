@@ -114,13 +114,18 @@ test('journey: the full loop from a blocked story to a merged story and a releas
   assert.equal(blockedMerge.code, 1);
   assert.match(blockedMerge.out, /STALE/);
 
+  // ...but only what actually moved goes stale. AC1.3 is a criterion this story never cites, so its
+  // READINESS still holds: a 20-story backlog must not have to re-run story-ready 20 times because
+  // one unrelated criterion was added to the PRD. Verification is a different claim — it is bound to
+  // the product tree, and the tree did move.
+  assert.equal(run(dir, ['check', '--gate', 'story-ready', '--scope', 'STORY-012']).code, 0);
+
   // 8. the recovery path is spelled out, not left to the developer to guess
   const stale = runJson(dir, ['next']);
   assert.equal(stale.json.recommendedAction.id, 'refresh-stale-evidence');
-  assert.match(stale.json.recommendedAction.command, /check --gate story-ready --scope STORY-012/);
-  assert.equal(run(dir, ['check', '--gate', 'story-ready', '--scope', 'STORY-012']).code, 0);
+  assert.match(stale.json.recommendedAction.command, /check --gate verified --scope STORY-012/);
 
-  // ...but re-running the GATE is not enough on its own: the recorded test results still describe
+  // Re-running the GATE is not enough on its own: the recorded test results still describe
   // the tree as it was, and EOS says so rather than re-blessing them.
   const notYet = runJson(dir, ['check', '--gate', 'verified', '--scope', 'STORY-012']);
   assert.notEqual(notYet.code, 0, notYet.out);

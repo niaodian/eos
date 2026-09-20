@@ -9,6 +9,7 @@ import { project, write, run, runJson, cleanup, APP_PROJECT, PRD_2AC, story, EOS
   baselineFiles, storyFiles, testRun, commitAll, git, TEST_FILE, TRACE_MATRIX } from './test-support.mjs';
 import { validate } from './lib/schema.mjs';
 import { loadWorkflow, loadGates, loadAgentMap } from './lib/registry.mjs';
+import { readSnapshot, gateCollections } from './lib/state.mjs';
 import { legalTransitions, planTransition } from './lib/transitions.mjs';
 import { readEvents, appendEvent, verifyChain, stateOf } from './lib/ledger.mjs';
 import { evidenceFreshness } from './lib/evidence.mjs';
@@ -205,8 +206,45 @@ test('evidence: a PASS becomes STALE when an input file changes', () => {
   assert.equal(evidenceFreshness(dir, ev).status, 'STALE');
 });
 
-test('evidence: a PASS becomes STALE when the gate definition version changes (governance change)', () => {
-  const dir = project({
+// The 20-story backlog problem: binding the WHOLE PRD made every story's readiness stale whenever
+// any criterion anywhere moved, so specifying a backlog up front cost a re-run per story. Both
+// gates that read the PRD under a story scope only ask about that story's own ids, so staleness
+// must follow the cited criteria — no wider, and no narrower.
+test('evidence: story readiness tracks the criteria the story CITES, not the whole PRD', () => {
+  const files = {
+    '.eos/project.json': APP_PROJECT,
+    'docs/prd.md': PRD_2AC,
+    'docs/stories/STORY-001.md': story(), // cites AC1.1 only
+  };
+  const freshnessAfter = (prd) => {
+    const dir = project(files);
+    assert.equal(run(dir, ['check', '--gate', 'story-ready', '--scope', 'STORY-001']).code, 0);
+    write(dir, 'docs/prd.md', prd);
+    const snapshot = readSnapshot(dir, { withGit: false });
+    const ev = JSON.parse(readFileSync(join(dir, '.eos/evidence/story-ready__story__STORY-001.json'), 'utf8'));
+    return evidenceFreshness(dir, ev, {
+      collections: gateCollections(snapshot, 'story-ready', 'story', 'STORY-001'),
+    });
+  };
+
+  // An unrelated criterion is added: nothing this story claims has changed.
+  assert.equal(freshnessAfter(`${PRD_2AC}- AC1.3 the user can reset a password from the sign-in page\n`).status, 'FRESH');
+
+  // An unrelated criterion is REWRITTEN: still nothing this story claims.
+  assert.equal(freshnessAfter(PRD_2AC.replace('the user can log out and the session is destroyed', 'the user can log out from every device at once')).status, 'FRESH');
+
+  // The cited criterion is rewritten: the story was made ready against different words.
+  const rewritten = freshnessAfter(PRD_2AC.replace('the user can log in with a valid password', 'the user can log in with a passkey only'));
+  assert.equal(rewritten.status, 'STALE');
+  assert.match(rewritten.reasons.join(' '), /referencedAcs/);
+
+  // The cited criterion is DELETED: absence has to count as a change, or a story could stay "ready"
+  // against a criterion the PRD no longer makes.
+  const deleted = freshnessAfter(PRD_2AC.replace('- AC1.1 the user can log in with a valid password\n', ''));
+  assert.equal(deleted.status, 'STALE');
+});
+
+test('evidence: a PASS becomes STALE when the gate definition version changes (governance change)', () => {  const dir = project({
     '.eos/project.json': APP_PROJECT,
     'docs/prd.md': PRD_2AC,
     'docs/stories/STORY-001.md': story(),

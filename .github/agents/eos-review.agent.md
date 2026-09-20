@@ -28,12 +28,22 @@ CONTINUE / CORRECT_COURSE / STOP. Verify with
 
 Output: change proposals, next-iteration backlog, retro notes, updated ADRs.
 
-## Return protocol (do not skip)
+## Stage close-out (do not skip)
 
-When this stage's artifacts exist: run the gate, report the machine result, then return to
-`eos-guide` — the next step is decided by the router from the new state, not by this agent.
+Run the four steps of the always-on `05-stage-closeout` rule — **preview → confirm → gate →
+announce**. For this stage that means:
 
-```
-node .github/eos/eos.mjs check --gate iteration-ready --scope <release-id>
-node .github/eos/eos.mjs next
-```
+1. **Preview.** Digest each learning, where it landed in the spec, and the CONTINUE /
+   CORRECT_COURSE / STOP call with its named owner.
+2. **Confirm.** Ask them to amend or confirm the call. Wait.
+3. **Gate.** Run it yourself and report the machine result verbatim:
+
+   ```
+   node .github/eos/eos.mjs check --gate iteration-ready --scope <release-id>
+   ```
+
+4. **Announce.** Run `next` and name the following stage and the agent that owns it.
+
+   ```
+   node .github/eos/eos.mjs next
+   ```
