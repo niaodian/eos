@@ -26,6 +26,7 @@ import { syncWorkspaceRule } from './lib/workspace-rule.mjs';
 import { generateDocs } from './lib/docgen.mjs';
 import { planMigration, applyMigration, compatibilityErrors } from './lib/migrate.mjs';
 import { buildSbom, sbomFreshness, sbomDigest, SBOM_PATH } from './lib/sbom.mjs';
+import { PACKS, packDeclaration, packIds } from './lib/packs.mjs';
 import { loadWaivers, expiredWaivers, waiverStatus } from './lib/waivers.mjs';
 import { writeFileAtomic } from './lib/atomic.mjs';
 import { resolveAction, ACTIVE_WORK_PATH } from './lib/registry.mjs';
@@ -56,6 +57,7 @@ usage: node .github/eos/eos.mjs <command> [flags]
   focus --scope <type> --id <id>          set this machine's local focus (no authority)
   init [--write]                          write .vscode/tasks.json only (NOT the /eos-init hardening walkthrough)
   stack sync [--write]                    render the always-on workspace rule from .eos/project.json
+  new [<pack>] [--write]                  scaffold .eos/project.json from a starter pack
   sbom [--write] [--check]                software bill of materials, bound to the tree
   migrate [--apply]                       governance file versions; plan first, then apply
   docs [--write] [--check]                regenerate the docs that restate the policy
@@ -608,6 +610,61 @@ const commands = {
     if (notes.length) { lines.push('Not resolved'); for (const n of notes) lines.push(`  ${n}`); lines.push(''); }
     if (!flags.write) lines.push('  Nothing was written. Re-run with --write to apply, or --check to verify freshness.', '');
     emit(flags, json, lines.join('\n'));
+    return EXIT.OK;
+  },
+
+  /**
+   * Scaffold the project DECLARATION for a known shape of project.
+   *
+   * Deliberately not an application skeleton: EOS does not scaffold product code, and a
+   * half-maintained app template inside a governance repository rots faster than anything else in
+   * it. What a newcomer actually gets wrong is the declaration — an `application` with no
+   * `commands.test`, or a `config-only` that should not be one — and both of those are silent.
+   *
+   * Never overwrites. A declaration that already exists is the project's own decision.
+   */
+  new(snapshot, flags) {
+    const id = flags._[1];
+    if (!id) {
+      const lines = ['EOS starter packs', '', '  Each pack writes a correct .eos/project.json for a known shape of project.', '  It does NOT scaffold application code — use your ecosystem\'s own tool for that.', ''];
+      for (const packId of packIds()) lines.push(`  ${packId.padEnd(16)} ${PACKS[packId].title}`);
+      lines.push('', '  node .github/eos/eos.mjs new <pack> --write', '');
+      emit(flags, { packs: packIds().map((p) => ({ id: p, title: PACKS[p].title })) }, lines.join('\n'));
+      return EXIT.OK;
+    }
+    const declaration = packDeclaration(id);
+    if (!declaration) {
+      console.log(`unknown pack "${id}" — known packs: ${packIds().join(', ')}`);
+      return EXIT.FAIL;
+    }
+    const rel = '.eos/project.json';
+    const full = join(snapshot.root, rel);
+    const exists = existsSync(full);
+    const body = `${JSON.stringify(declaration, null, 2)}\n`;
+
+    const lines = [`EOS new · ${id} — ${PACKS[id].title}`, ''];
+    if (exists) {
+      lines.push(`  refused  ${rel} already exists.`,
+        '  A project declaration is a decision this project has already made; overwriting it would',
+        '  silently change which gates apply. Edit it by hand, or delete it first if you meant to',
+        '  start over.', '');
+      emit(flags, { pack: id, written: false, reason: 'declaration already exists', declaration }, lines.join('\n'));
+      return EXIT.FAIL;
+    }
+    if (flags.write) { mkdirSync(dirname(full), { recursive: true }); writeFileAtomic(full, body); }
+    lines.push(`  ${flags.write ? 'written' : 'would write'}  ${rel}`, '',
+      `  projectType      ${declaration.projectType}`,
+      `  stacks           ${declaration.stacks.join(', ')}`,
+      `  paradigms        ${declaration.productParadigms.join(', ')}`,
+      `  workflowProfile  ${declaration.workflowProfile}${declaration.complianceProfile ? `\n  complianceProfile ${declaration.complianceProfile}` : ''}`,
+      `  commands         ${Object.entries(declaration.commands).map(([k, v]) => `${k}: ${v}`).join('\n                   ')}`, '');
+    if (PACKS[id].notes.length) { lines.push('Before you rely on this'); for (const n of PACKS[id].notes) lines.push(`  · ${n}`); lines.push(''); }
+    lines.push('Next',
+      '  1. Replace the commands above with what CI actually runs — an unrunnable command fails closed.',
+      '  2. node .github/eos/eos.mjs stack sync --write   (put the stack in the always-on rule)',
+      '  3. node .github/eos/eos.mjs next                 (start the guided loop)', '');
+    if (!flags.write) lines.push('  Nothing was written. Re-run with --write to apply.', '');
+    emit(flags, { pack: id, written: !!flags.write, declaration, notes: PACKS[id].notes }, lines.join('\n'));
     return EXIT.OK;
   },
 

@@ -23,6 +23,7 @@
       "files": [
         ".github/eos/atomic.test.mjs",
         ".github/eos/migrate.test.mjs",
+        ".github/eos/packs.test.mjs",
         ".github/eos/state-model.test.mjs",
         ".github/eos/workspace-rule.test.mjs",
         ".github/hooks/check-doc-parity.test.mjs",
@@ -32,7 +33,7 @@
     },
     "contract": {
       "description": "Published interfaces: the CLI's JSON contract and exit codes, the provider-adapter contract, and the offline boundary that both rest on.",
-      "budgetMs": 11000,
+      "budgetMs": 15000,
       "files": [
         ".github/eos/cli.test.mjs",
         ".github/eos/adapters.test.mjs",
