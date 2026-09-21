@@ -10,7 +10,7 @@ import { join, isAbsolute, resolve, sep } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { detectStacks } from '../../hooks/lib/project-config.mjs';
 import { loadComplianceProfile, evaluateDataBoundary } from '../../hooks/lib/compliance-profile.mjs';
-import { EVALUATOR_VERSION, posix } from './registry.mjs';
+import { EVALUATOR_VERSION, posix, WORKFLOW_PATH } from './registry.mjs';
 import { gatePolicy, changeTypeOf, scopeState, gateInputs, gateCollections, ARTIFACTS } from './state.mjs';
 import { hashInputs, GOVERNANCE_INPUTS, writeEvidence, readEvidence, evidenceFreshness, evidenceFile, sha256File } from './evidence.mjs';
 import { currentProductTree, compareProductTree, uncommittedProductChanges } from './product-tree.mjs';
@@ -31,13 +31,13 @@ export const isBlocking = (s) => !['PASS', 'WAIVED', 'NOT_APPLICABLE', 'PENDING'
 /** Checks that shell out to another process. They are skipped (→ PENDING) in "cheap" mode. */
 const EXPENSIVE = new Set(['tests-executed', 'eval-threshold', 'spec-alignment', 'secret-scan', 'candidate-quality', 'dependency-audit']);
 
-const ok = (detail = '') => ({ status: 'PASS', detail });
-const fail = (detail) => ({ status: 'FAIL', detail });
-const blocked = (detail) => ({ status: 'BLOCKED', detail });
-const na = (detail) => ({ status: 'NOT_APPLICABLE', detail });
+const ok = (detail = '', artifact = null) => ({ status: 'PASS', detail, artifact });
+const fail = (detail, artifact = null) => ({ status: 'FAIL', detail, artifact });
+const blocked = (detail, artifact = null) => ({ status: 'BLOCKED', detail, artifact });
+const na = (detail, artifact = null) => ({ status: 'NOT_APPLICABLE', detail, artifact });
 // A check that depends on a record another check already reported as missing has not FAILED — it
 // has not run. Reporting it as BLOCKED would make it outrank the real cause in `eos next`.
-const awaiting = (path) => ({ status: 'PENDING', detail: `waiting on ${path} (the record check above explains what is missing)` });
+const awaiting = (path) => ({ status: 'PENDING', detail: `waiting on ${path} (the record check above explains what is missing)`, artifact: path });
 
 /**
  * Is this reference a real, repository-relative path INSIDE the repository?
@@ -1015,13 +1015,13 @@ const evaluators = {
 function stageDocCheck(ctx, kind, minWords) {
   const spec = STAGE_RECORDS[kind];
   const docProblem = emptyDocReason(ctx.root, spec.doc, { minWords });
-  if (docProblem) return fail(`${docProblem} — run ${spec.prompt}`);
+  if (docProblem) return fail(`${docProblem} — run ${spec.prompt}`, spec.doc);
   const r = readStageRecord(ctx.root, kind);
-  if (r.errors.length) return { status: 'ERROR', detail: r.errors.join('; ') };
+  if (r.errors.length) return { status: 'ERROR', detail: r.errors.join('; '), artifact: spec.path };
   if (!r.present) {
-    return fail(`${spec.doc} exists but ${spec.path} does not. Markdown is what people read; the record is what promotes — a gate that reads only prose can be talked past. Run ${spec.prompt}.`);
+    return fail(`${spec.doc} exists but ${spec.path} does not. Markdown is what people read; the record is what promotes — a gate that reads only prose can be talked past. Run ${spec.prompt}.`, spec.path);
   }
-  return ok(`${spec.doc} is written and ${spec.path} validates`);
+  return ok(`${spec.doc} is written and ${spec.path} validates`, spec.path);
 }
 
 const duplicates = (ids) => [...new Set(ids.filter((id, i) => ids.indexOf(id) !== i))];
@@ -1121,8 +1121,9 @@ export function evaluateGate(snapshot, gateId, scopeType, scopeId, { mode = 'all
   if (policy === 'not_applicable') {
     return {
       gate: def.id, code: def.code, status: 'NOT_APPLICABLE', policy, changeType, commands: [],
-      checks: def.checks.map((c) => ({ id: c.id, status: 'NOT_APPLICABLE', detail: `${changeType} declares ${def.id} not applicable`, fix: c.fix })),
+      checks: def.checks.map((c) => ({ id: c.id, status: 'NOT_APPLICABLE', detail: `${changeType} declares ${def.id} not applicable`, fix: c.fix, artifact: null })),
       detail: `${def.id} does not apply to a ${changeType} change (recorded, not skipped)`,
+      ...diagnosticContext(snapshot, def, scopeType, scopeId, changeType, policy),
     };
   }
 
@@ -1150,7 +1151,7 @@ export function evaluateGate(snapshot, gateId, scopeType, scopeId, { mode = 'all
         try { result = fn(ctx); } catch (e) { result = { status: 'ERROR', detail: `evaluator ${check.evaluator} crashed: ${e.message}` }; }
       }
     }
-    ctx.results.push({ id: check.id, title: check.title, fix: check.fix, ...result });
+    ctx.results.push({ id: check.id, title: check.title, fix: check.fix, artifact: null, ...result });
   }
 
   let status = aggregate(ctx.results);
@@ -1173,6 +1174,38 @@ export function evaluateGate(snapshot, gateId, scopeType, scopeId, { mode = 'all
   return {
     gate: def.id, code: def.code, title: def.title, summary: def.summary, scopeType, scopeId,
     status, policy, changeType, waiver, checks: ctx.results, commands: ctx.commands, mode,
+    ...diagnosticContext(snapshot, def, scopeType, scopeId, changeType, policy),
+  };
+}
+
+/**
+ * The part of a verdict that makes it ACTIONABLE rather than merely true.
+ *
+ * A status and a sentence tell you that something is wrong. They do not tell you which rule decided
+ * this gate applies (so you cannot argue with it), which files the verdict is about (so a tool
+ * cannot navigate to them), or how to run it again yourself (so you re-derive the command from
+ * documentation every time). Every field here already existed as prose somewhere; this makes it
+ * machine-readable so an agent can act on a gate result instead of parsing English.
+ *
+ *   policySource      the exact JSON path that made this gate required/waivable/not_applicable
+ *   affectedArtifacts the files the verdict is computed from — the same set evidence binds
+ *   rerunCommand      the command that reproduces this verdict
+ *   waiverEligible    whether a waiver could legally lift this, without having to infer it
+ */
+function diagnosticContext(snapshot, def, scopeType, scopeId, changeType, policy) {
+  const profile = snapshot.profileName || snapshot.project?.workflowProfile || 'standard-product';
+  const scopeArg = scopeType === 'product' ? '' : ` --scope ${scopeId}`;
+  return {
+    policySource: {
+      file: WORKFLOW_PATH,
+      profile,
+      changeType,
+      pointer: `profiles.${profile}.changeTypes.${changeType}.gates.${def.id}`,
+      value: policy,
+    },
+    affectedArtifacts: gateInputs(snapshot, def.id, scopeType, scopeId),
+    rerunCommand: `node .github/eos/eos.mjs check --gate ${def.id}${scopeArg}`,
+    waiverEligible: policy === 'waivable' && def.waivable !== false,
   };
 }
 

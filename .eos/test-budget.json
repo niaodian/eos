@@ -30,10 +30,11 @@
       "description": "Several modules together through real fixtures: routing decisions, gate bypasses, cross-stack quality.",
       "budgetMs": 19000,
       "files": [
-        ".github/eos/router.test.mjs",
         ".github/eos/bypass.test.mjs",
-        ".github/hooks/project-gate.test.mjs",
-        ".github/hooks/eos-doctor.test.mjs"
+        ".github/eos/incremental.test.mjs",
+        ".github/eos/router.test.mjs",
+        ".github/hooks/eos-doctor.test.mjs",
+        ".github/hooks/project-gate.test.mjs"
       ]
     },
     "journey": {

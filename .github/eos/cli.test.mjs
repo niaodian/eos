@@ -265,3 +265,44 @@ test('doctor qualifies its own PASS on a config-only repository', () => {
   assert.match(r.out, /NO PRODUCT CODE VERIFIED/);
   assert.match(r.out, /covers EOS configuration only/);
 });
+
+// ---------------------------------------------------------------- diagnostic contract
+// A status and a sentence tell you something is wrong. They do not tell you which rule decided the
+// gate applies, which files the verdict is about, or how to reproduce it — so every consumer
+// re-derived those from prose. These fields make a gate result actionable by a machine.
+test('a gate verdict carries its policy source, artifacts, rerun command and waiver eligibility', () => {
+  const r = runJson(project({ '.eos/project.json': APP_PROJECT }), ['check', '--gate', 'discovery-ready']);
+  const g = r.json;
+  assert.equal(g.policySource.file, '.eos/workflow.json');
+  assert.equal(g.policySource.value, g.policy, 'the recorded policy and its source must agree');
+  assert.match(g.policySource.pointer, /^profiles\..+\.changeTypes\..+\.gates\.discovery-ready$/);
+  assert.ok(g.affectedArtifacts.includes('docs/discovery.md'), JSON.stringify(g.affectedArtifacts));
+  assert.equal(g.rerunCommand, 'node .github/eos/eos.mjs check --gate discovery-ready');
+  assert.equal(typeof g.waiverEligible, 'boolean');
+});
+
+test('policySource points at a pointer that actually resolves in workflow.json', () => {
+  const dir = project({ '.eos/project.json': APP_PROJECT });
+  const { policySource } = runJson(dir, ['check', '--gate', 'discovery-ready']).json;
+  const workflow = JSON.parse(readFileSync(join(dir, '.eos/workflow.json'), 'utf8'));
+  const resolved = policySource.pointer.split('.').reduce((node, key) => node?.[key], { profiles: workflow.profiles });
+  assert.equal(resolved, policySource.value, 'a pointer nobody can follow is not a source');
+});
+
+test('a story-scoped gate names its own scope in the rerun command', () => {
+  const r = runJson(READY_REPO(), ['check', '--gate', 'story-ready', '--scope', 'STORY-012']);
+  assert.equal(r.json.rerunCommand, 'node .github/eos/eos.mjs check --gate story-ready --scope STORY-012');
+});
+
+test('a failing check names the artifact it is about, not only a sentence', () => {
+  const r = runJson(project({ '.eos/project.json': APP_PROJECT }), ['check', '--gate', 'discovery-ready']);
+  const written = r.json.checks.find((c) => c.id === 'discovery-written');
+  assert.equal(written.artifact, 'docs/discovery.md');
+});
+
+test('the human rendering explains why the gate applies and how to re-run it', () => {
+  const out = run(project({ '.eos/project.json': APP_PROJECT }), ['check', '--gate', 'discovery-ready']).out;
+  assert.match(out, /Why this gate applies/);
+  assert.match(out, /\.eos\/workflow\.json → profiles\./);
+  assert.match(out, /re-run: node \.github\/eos\/eos\.mjs check --gate discovery-ready/);
+});

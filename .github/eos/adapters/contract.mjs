@@ -18,7 +18,7 @@
 //   --  A network failure, a permission error or an outage may never become PASS.
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { validate } from '../lib/schema.mjs';
+import { validate, loadSchema } from '../lib/schema.mjs';
 
 export const PROVIDERS_PATH = '.eos/providers.json';
 
@@ -86,9 +86,9 @@ export function loadProviders(root) {
   try { parsed = JSON.parse(readFileSync(full, 'utf8')); } catch (e) {
     return { present: true, providers: [], errors: [`${PROVIDERS_PATH}: invalid JSON (${e.message})`] };
   }
-  let schema;
-  try { schema = JSON.parse(readFileSync(join(root, '.eos/schemas/providers.schema.json'), 'utf8')); } catch (e) {
-    return { present: true, providers: [], errors: [`.eos/schemas/providers.schema.json is missing or unreadable (${e.message}) — ${PROVIDERS_PATH} cannot be validated`] };
+  const { schema, error: schemaError } = loadSchema(root, 'providers.schema.json');
+  if (!schema) {
+    return { present: true, providers: [], errors: [`${schemaError} — ${PROVIDERS_PATH} cannot be validated`] };
   }
   const v = validate(schema, parsed, { label: PROVIDERS_PATH });
   if (!v.valid) return { present: true, providers: [], errors: v.errors.slice(0, 4) };

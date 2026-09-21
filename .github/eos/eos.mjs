@@ -18,7 +18,7 @@ import { appendEvent, readEvents, verifyChain, LEDGER_PATH } from './lib/ledger.
 import { route, activeScope } from './lib/router.mjs';
 import { renderCard, renderGate, renderExplain } from './lib/render.mjs';
 import { buildHandoff, writeHandoff, readHandoff, verifyHandoff, handoffPath } from './lib/handoff.mjs';
-import { listEvidence, evidenceFreshness, validateEvidenceShape, sha256File } from './lib/evidence.mjs';
+import { listEvidence, evidenceFreshness, validateEvidenceShape, sha256File, readEvidence } from './lib/evidence.mjs';
 import { currentProductTree, uncommittedProductChanges } from './lib/product-tree.mjs';
 import { readManifest, manifestPath, manifestDigest as computeManifestDigest, listManifests } from './lib/release.mjs';
 import { loadProviders, consult } from './adapters/contract.mjs';
@@ -38,6 +38,7 @@ usage: node .github/eos/eos.mjs <command> [flags]
   next [--why] [--all]                    the single recommended next action
   resume                                  restore the local focus in a new session
   check --gate <id> [--scope <id>]        run one gate and record evidence
+  verify [--full] [--plan]                run the gates this change can have affected
   transition --scope <type> --id <id> --to <STATE>
   approve --scope <type> --id <id>        record an approval (a second person, never the requester)
   explain <gate>                          the full rule set for one gate
@@ -255,8 +256,97 @@ const commands = {
     return statusExit(result.status);
   },
 
-  transition(snapshot, flags) {
-    const scopeType = flags.scope === true || !flags.scope ? 'story' : flags.scope;
+  /**
+   * Run the gates this change can actually have affected.
+   *
+   * Every gate already DECLARES its inputs — that is how recorded evidence knows when it has gone
+   * stale. The same declaration answers a question nobody was asking it: given these changed files,
+   * which gates could possibly have a different answer than last time? Re-running all of them on
+   * every edit is what makes a governance tool something people route around.
+   *
+   * The selection is deliberately conservative. A gate is run when its inputs intersect the change,
+   * when a governance file changed (which invalidates everything by design), when its recorded
+   * evidence is already STALE or absent, or when EOS cannot see the changes at all. Skipping is
+   * only ever justified by evidence that is present AND fresh — "nothing changed" is never
+   * inferred from silence.
+   */
+  async verify(snapshot, flags) {
+    const full = !!flags.full;
+    const changed = snapshot.changedFiles;
+    const gates = snapshot.gates?.gates || [];
+
+    // Every (gate, scope) pair this repository could be asked about.
+    const targets = [];
+    for (const def of gates) {
+      if (def.scope === 'product') targets.push({ def, scopeType: 'product', scopeId: 'product' });
+      else if (def.scope === 'story') for (const s of snapshot.stories) targets.push({ def, scopeType: 'story', scopeId: s.id });
+      else if (def.scope === 'release') for (const m of listManifests(snapshot.root)) { if (m.releaseId) targets.push({ def, scopeType: 'release', scopeId: m.releaseId }); }
+    }
+
+    const GOVERNANCE = ['.eos/gates.json', '.eos/workflow.json', '.eos/project.json'];
+    const governanceChanged = changed === null ? [] : GOVERNANCE.filter((g) => changed.includes(g));
+
+    const plan = [];
+    for (const t of targets) {
+      const policy = gatePolicy(snapshot, changeTypeOf(snapshot, t.scopeType, t.scopeId), t.def.id);
+      if (policy === 'not_applicable') { plan.push({ ...t, run: false, reason: 'not applicable to this change type' }); continue; }
+      if (full) { plan.push({ ...t, run: true, reason: '--full' }); continue; }
+      if (changed === null) { plan.push({ ...t, run: true, reason: 'no git repository — the change set is unknown, so nothing may be skipped' }); continue; }
+      if (governanceChanged.length) { plan.push({ ...t, run: true, reason: `governance changed (${governanceChanged.join(', ')}) — every prior result is invalidated by design` }); continue; }
+
+      const prior = readEvidence(snapshot.root, t.def.id, t.scopeType, t.scopeId);
+      if (!prior.present || !prior.evidence) { plan.push({ ...t, run: true, reason: 'no recorded evidence' }); continue; }
+      const fresh = evidenceFreshness(snapshot.root, prior.evidence, {
+        gateDefinition: t.def,
+        expectedInputs: gateInputs(snapshot, t.def.id, t.scopeType, t.scopeId),
+        collections: gateCollections(snapshot, t.def.id, t.scopeType, t.scopeId),
+      });
+      if (fresh.status !== 'FRESH') { plan.push({ ...t, run: true, reason: `evidence is STALE: ${fresh.reasons[0]}` }); continue; }
+
+      const inputs = gateInputs(snapshot, t.def.id, t.scopeType, t.scopeId);
+      const hits = inputs.filter((i) => changed.includes(i));
+      if (hits.length) { plan.push({ ...t, run: true, reason: `inputs changed: ${hits.join(', ')}` }); continue; }
+      plan.push({ ...t, run: false, reason: `evidence is FRESH and none of its inputs changed (recorded ${prior.evidence.status})` });
+    }
+
+    const selected = plan.filter((p) => p.run);
+    if (flags.plan) {
+      const json = { full, changedFiles: changed, planned: plan.map((p) => ({ gate: p.def.id, scopeType: p.scopeType, scopeId: p.scopeId, run: p.run, reason: p.reason })) };
+      const lines = [`EOS verify · plan (${selected.length} of ${plan.length} gate-scope pair(s) would run)`, ''];
+      for (const p of plan) lines.push(`  ${(p.run ? 'RUN ' : 'skip').padEnd(5)} ${p.def.id.padEnd(20)} ${String(p.scopeId).padEnd(14)} ${p.reason}`);
+      lines.push('');
+      emit(flags, json, lines.join('\n'));
+      return EXIT.OK;
+    }
+
+    const results = [];
+    for (const p of selected) {
+      const providerVerdicts = await consultProviders(snapshot, p.def.id);
+      const { result, evidenceFile } = runGate(snapshot, p.def.id, p.scopeType, p.scopeId, { providerVerdicts });
+      appendEvent(snapshot.root, {
+        type: 'gate',
+        scope: { type: p.scopeType, id: String(p.scopeId) },
+        changeType: result.changeType,
+        gate: result.gate,
+        status: result.status,
+        evidenceSha256: evidenceFile ? sha256File(snapshot.root, evidenceFile) : null,
+        commit: snapshot.commit,
+        detail: evidenceFile || '',
+      });
+      results.push({ gate: p.def.id, scopeType: p.scopeType, scopeId: p.scopeId, status: result.status, reason: p.reason, rerunCommand: result.rerunCommand });
+    }
+    const skipped = plan.filter((p) => !p.run);
+    const worst = results.reduce((acc, r) => (isBlocking(r.status) && !isBlocking(acc) ? r.status : acc), 'PASS');
+    const json = { full, changedFiles: changed, ran: results, skipped: skipped.map((p) => ({ gate: p.def.id, scopeId: p.scopeId, reason: p.reason })), status: worst };
+    const lines = [`EOS verify · ${results.length} gate(s) run, ${skipped.length} skipped`, ''];
+    for (const r of results) lines.push(`  ${r.status.padEnd(15)} ${r.gate.padEnd(20)} ${String(r.scopeId).padEnd(14)} ${r.reason}`);
+    if (!results.length) lines.push('  nothing to re-verify — every applicable gate has fresh evidence covering the current inputs');
+    lines.push('', `  ${skipped.length} skipped · run with --full to re-verify everything · --plan to see the selection without running it`, '', worst, '');
+    emit(flags, json, lines.join('\n'));
+    return statusExit(worst);
+  },
+
+  transition(snapshot, flags) {    const scopeType = flags.scope === true || !flags.scope ? 'story' : flags.scope;
     const scopeId = flags.id;
     const to = flags.to;
     if (!scopeId || !to || scopeId === true || to === true) { console.log('transition requires --scope <type> --id <id> --to <STATE>'); return EXIT.FAIL; }

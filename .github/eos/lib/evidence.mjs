@@ -8,7 +8,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { posix, EVALUATOR_VERSION, WORKFLOW_PATH, GATES_PATH } from './registry.mjs';
-import { validate } from './schema.mjs';
+import { validate, loadSchema } from './schema.mjs';
 import { waiverStatus } from './waivers.mjs';
 import { compareProductTree } from './product-tree.mjs';
 import { writeFileAtomic } from './atomic.mjs';
@@ -47,10 +47,10 @@ export function readEvidence(root, gateId, scopeType, scopeId) {
   try { parsed = JSON.parse(readFileSync(full, 'utf8')); } catch (e) {
     return { present: true, evidence: null, error: `${rel}: invalid JSON (${e.message})` };
   }
-  let schema;
-  try { schema = JSON.parse(readFileSync(join(root, '.eos/schemas/gate-evidence.schema.json'), 'utf8')); } catch (e) {
-    // Without the schema this file cannot be validated, and unvalidatable evidence is not evidence.
-    return { present: true, evidence: null, error: `.eos/schemas/gate-evidence.schema.json is missing or unreadable (${e.message}) — ${rel} cannot be validated; restore the schema from version control` };
+  // Without the schema this file cannot be validated, and unvalidatable evidence is not evidence.
+  const { schema, error: schemaError } = loadSchema(root, 'gate-evidence.schema.json');
+  if (!schema) {
+    return { present: true, evidence: null, error: `${schemaError} — ${rel} cannot be validated; restore the schema from version control` };
   }
   const v = validate(schema, parsed, { label: rel });
   if (!v.valid) return { present: true, evidence: null, error: `${rel}: not valid gate evidence — ${v.errors.slice(0, 3).join('; ')}. Evidence is machine-written; regenerate it with \`eos check\`.` };
@@ -129,8 +129,8 @@ export function validateEvidenceShape(root, evidence) {
   if (typeof evidence.gate !== 'string' || !evidence.scope || typeof evidence.scope.type !== 'string' || evidence.scope.id === undefined) {
     return 'missing gate/scope identity — evidence is machine-written; regenerate it with `eos check`';
   }
-  let schema = null;
-  try { schema = JSON.parse(readFileSync(join(root, '.eos/schemas/gate-evidence.schema.json'), 'utf8')); } catch { return null; }
+  const { schema } = loadSchema(root, 'gate-evidence.schema.json');
+  if (!schema) return null;
   const v = validate(schema, evidence, { label: 'evidence' });
   return v.valid ? null : `not valid gate evidence — ${v.errors.slice(0, 2).join('; ')}`;
 }
