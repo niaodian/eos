@@ -24,6 +24,7 @@ import { readManifest, manifestPath, manifestDigest as computeManifestDigest, li
 import { loadProviders, consult } from './adapters/contract.mjs';
 import { syncWorkspaceRule } from './lib/workspace-rule.mjs';
 import { generateDocs } from './lib/docgen.mjs';
+import { planMigration, applyMigration, compatibilityErrors } from './lib/migrate.mjs';
 import { loadWaivers, expiredWaivers, waiverStatus } from './lib/waivers.mjs';
 import { writeFileAtomic } from './lib/atomic.mjs';
 import { resolveAction, ACTIVE_WORK_PATH } from './lib/registry.mjs';
@@ -54,6 +55,7 @@ usage: node .github/eos/eos.mjs <command> [flags]
   focus --scope <type> --id <id>          set this machine's local focus (no authority)
   init [--write]                          write .vscode/tasks.json only (NOT the /eos-init hardening walkthrough)
   stack sync [--write]                    render the always-on workspace rule from .eos/project.json
+  migrate [--apply]                       governance file versions; plan first, then apply
   docs [--write] [--check]                regenerate the docs that restate the policy
   health                                  blockers, stale evidence, waivers, trend — one screen
   doctor                                  is EOS itself wired correctly?
@@ -520,6 +522,54 @@ const commands = {
     }
     if (!flags.write && !flags.check) lines.push('  Nothing was written. Re-run with --write to apply, or --check to fail on drift.', '');
     lines.push(flags.check ? 'PASS' : '', '');
+    emit(flags, json, lines.join('\n'));
+    return EXIT.OK;
+  },
+
+  /**
+   * Where every governance file stands relative to this engine, and what it would take to bring
+   * them into line.
+   *
+   * `schemaVersion` was being written into every governance file and read by nothing, which made it
+   * decoration rather than a contract. This reads it.
+   */
+  migrate(snapshot, flags) {
+    const plan = flags.apply ? applyMigration(snapshot.root) : planMigration(snapshot.root);
+    const json = {
+      schemaVersion: 1,
+      mode: flags.apply ? 'apply' : 'plan',
+      files: plan.files,
+      changes: plan.changes.map(({ after, ...rest }) => rest),
+      blocked: plan.blocked,
+      written: plan.written || [],
+      ok: plan.ok,
+    };
+    const lines = ['EOS migrate · governance file versions', ''];
+    for (const f of plan.files) lines.push(`  ${f.state.padEnd(12)} ${f.path.padEnd(26)} ${f.detail}`);
+    lines.push('');
+    if (plan.blocked.length) {
+      lines.push('Blocked');
+      for (const b of plan.blocked) lines.push(`  ${b.path} — ${b.reason}`);
+      lines.push('', '  Nothing was migrated. A file this engine cannot fully understand is never rewritten',
+        '  by it: an old engine reinterpreting a newer file is how governance state gets silently',
+        '  corrupted. Upgrade EOS instead.', '', 'FAIL', '');
+      emit(flags, json, lines.join('\n'));
+      return EXIT.FAIL;
+    }
+    if (!plan.changes.length) {
+      lines.push('  Every governance file matches the version this engine writes. Nothing to migrate.', '', 'PASS', '');
+      emit(flags, json, lines.join('\n'));
+      return EXIT.OK;
+    }
+    lines.push(flags.apply ? 'Applied' : 'Would change (review this before --apply)');
+    for (const c of plan.changes) {
+      lines.push(`  ${c.path}  schemaVersion ${c.from} → ${c.to}  [${c.steps.join(', ')}]`);
+      for (const d of c.diff.slice(0, 20)) lines.push(`      ${d}`);
+      if (c.diff.length > 20) lines.push(`      … and ${c.diff.length - 20} more change(s)`);
+    }
+    lines.push('');
+    if (!flags.apply) lines.push('  Nothing was written. Re-run with --apply once the diff above is what you expect.', '');
+    lines.push('PASS', '');
     emit(flags, json, lines.join('\n'));
     return EXIT.OK;
   },
@@ -1024,7 +1074,17 @@ async function main() {
   }
   // A broken EOS configuration is an ERROR for every command except the ones whose job is to
   // report or repair it. It is never downgraded into a pass.
-  if (snapshot.errors.length && !['doctor', 'init', 'next', 'resume', 'status', 'ledger'].includes(command)) {
+  // A file written by a NEWER EOS must stop every command except the ones that diagnose it. The
+  // schema validator would otherwise reject its unknown properties and report a symptom instead of
+  // the cause, sending people to edit a file whose format they are not the authority on.
+  const ahead = compatibilityErrors(process.cwd());
+  if (ahead.length && !['migrate', 'doctor'].includes(command)) {
+    console.log(['EOS ERROR — this repository was written by a newer version of EOS:', '',
+      ...ahead.map((e) => `  ERROR ${e}`), '',
+      '  Upgrade EOS, or run `node .github/eos/eos.mjs migrate` to see the version gap.', ''].join('\n'));
+    return EXIT.ERROR;
+  }
+  if (snapshot.errors.length && !['doctor', 'init', 'next', 'resume', 'status', 'ledger', 'migrate'].includes(command)) {
     console.log(['EOS ERROR — the configuration could not be evaluated:', '', ...snapshot.errors.map((e) => `  ERROR ${e}`), '',
       '  Fix the file(s) above, or run `node .github/eos/eos.mjs doctor`.', ''].join('\n'));
     return EXIT.ERROR;

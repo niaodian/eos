@@ -22,11 +22,12 @@
       "budgetMs": 12000,
       "files": [
         ".github/eos/atomic.test.mjs",
+        ".github/eos/migrate.test.mjs",
         ".github/eos/state-model.test.mjs",
         ".github/eos/workspace-rule.test.mjs",
+        ".github/hooks/check-doc-parity.test.mjs",
         ".github/hooks/deny-dangerous.test.mjs",
-        ".github/hooks/spec-align.test.mjs",
-        ".github/hooks/check-doc-parity.test.mjs"
+        ".github/hooks/spec-align.test.mjs"
       ]
     },
     "contract": {

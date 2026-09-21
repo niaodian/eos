@@ -69,6 +69,12 @@ jobs:
         # an en-only edit from silently drifting the Chinese tree out of parity.
         run: node .github/hooks/check-doc-parity.mjs
 
+      - name: EOS governance version compatibility
+        # schemaVersion used to be written into every governance file and read by nothing. This
+        # reads it: a file written by a NEWER EOS fails closed rather than being reinterpreted by
+        # an engine that does not know what its new fields mean. [audit #9]
+        run: node .github/eos/eos.mjs migrate
+
       - name: EOS generated-doc drift (the policy is the only authority)
         # Everything under docs/eos/generated/ is a projection of .eos/gates.json and
         # .eos/workflow.json. If a policy change did not regenerate them, the committed prose now
