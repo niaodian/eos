@@ -193,7 +193,34 @@ detailed rules need to be read.
 A missing tool, a crashed validator, an unreadable file or "there are no tests" is **never** mapped
 to `PASS`. That rule is the whole reason this layer exists.
 
-### 5.2 Evidence binding and staleness
+### 5.2 Workflow modes
+
+A mode is the gate policy for a whole project, selected by `workflowProfile` in
+`.eos/project.json` and defined as data in `.eos/workflow.json`. The same engine runs all of
+them; only the policy differs, so moving up a tier is a one-line edit rather than a migration.
+
+| Mode | `workflowProfile` | For | What it adds over the tier below |
+|---|---|---|---|
+| Lite | `prototype` | personal projects, proofs of concept, small tools | nothing is gated except local activation; every change is a spike and is not mergeable |
+| Standard | `standard-product` | ordinary team products | the full SDLC: discovery to iteration, per-story verification, release verification, one waivable escape hatch |
+| Controlled | `controlled` | enterprise and business-critical systems | no gate may be waived at all; a hotfix must still prove it works and that what shipped is what was verified; a release must plan its telemetry |
+| Regulated | `regulated` | compliance and audit-sensitive systems | every change records why it was classified that way; a spike may not be merged; the iteration write-back is required; not even a documentation change switches the activation gate off |
+
+Each tier is **strictly no weaker** than the tier below it, gate by gate and change type by change
+type, and a test asserts that property — a maturity ladder whose upper rung quietly permitted more
+than the lower one would be worse than no ladder, because adopting it would silently relax a control.
+
+Upgrading is progressive and safe in that direction only. Change the one field, then re-verify:
+
+```bash
+node .github/eos/eos.mjs verify --plan   # what the stricter policy would now require
+node .github/eos/eos.mjs verify --full   # re-run everything under the new tier
+```
+
+Gates the old tier recorded as `NOT_APPLICABLE` become `PENDING` rather than passing on the
+strength of a decision the project made when it was held to a lower standard.
+
+### 5.3 Evidence binding and staleness
 
 Every gate run writes `.eos/evidence/<gate>__<scopeType>__<scopeId>.json` binding:
 commit SHA · gate-definition version · evaluator version · SHA-256 of every input file ·
@@ -222,7 +249,7 @@ once locally — which is why the ledger, the gate definitions, the workflow, th
 project declaration are CODEOWNERS-protected, and why CI re-verifies the chain against the commit
 the build sits on.
 
-### 5.3 What these gates still do NOT prove
+### 5.4 What these gates still do NOT prove
 
 Naming a limit is cheaper than discovering it during an incident, so:
 

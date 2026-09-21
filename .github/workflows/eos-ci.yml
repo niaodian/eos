@@ -171,6 +171,56 @@ jobs:
   # BEING SHIPPED is. It re-runs the declared quality commands on the tag's own tree and requires
   # every included story's verification to describe THAT tree — story state is not evidence about
   # code. [EOS-AUD-001 / EOS-AUD-007]
+  # ---------------------------------------------------------------------------------------------
+  # CROSS-PLATFORM. EOS is a path-handling program — product-tree digests, porcelain parsing, the
+  # posix() normaliser, evidence file names — and all of it was only ever tested on Linux. A
+  # Windows contributor was discovering EOS's portability bugs on their own time. [audit #8]
+  #
+  # Deliberately NOT the whole matrix: unit + contract are where the path and filesystem behaviour
+  # lives, and running everything three times would triple CI for the parts that are platform
+  # independent.
+  cross-platform:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '20'
+      - name: EOS tests · unit + contract
+        # A shared runner is slower and noisier than the Linux one; scale the budget rather than
+        # raising it, so a breach keeps meaning the same thing on every platform.
+        env:
+          EOS_TEST_BUDGET_SCALE: '3'
+        run: node .github/eos/run-tests.mjs unit contract
+
+  # ---------------------------------------------------------------------------------------------
+  # COVERAGE. A ratchet, not a target: the thresholds in .eos/test-budget.json sit just below the
+  # measured figure so a real regression fails the build and normal variance does not. Needs Node
+  # 22+, which is where --test-coverage-* became enforceable. [audit #8]
+  coverage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+      - name: EOS branch + line coverage (thresholds enforced)
+        run: node .github/eos/run-tests.mjs --coverage
+
   release-candidate:
     if: startsWith(github.ref, 'refs/tags/')
     needs: verify

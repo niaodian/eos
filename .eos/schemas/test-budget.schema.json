@@ -15,6 +15,22 @@
       "minimum": 0.1,
       "description": "Multiplier applied to every budget. Overridden by EOS_TEST_BUDGET_SCALE. Scale for a slow runner instead of raising individual budgets, so a breach keeps meaning the same thing everywhere."
     },
+    "coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Thresholds for `run-tests.mjs --coverage`. Enforced natively by Node 22+; on older versions the report still prints and run-tests says the threshold was not applied rather than implying a pass.",
+      "properties": {
+        "description": { "type": "string" },
+        "lines": { "type": "number", "minimum": 0, "maximum": 100 },
+        "branches": { "type": "number", "minimum": 0, "maximum": 100 },
+        "functions": { "type": "number", "minimum": 0, "maximum": 100 },
+        "exclude": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Globs excluded from the measurement — the tests themselves and their harnesses, which would otherwise inflate the number with code that exists to exercise other code."
+        }
+      }
+    },
     "layers": {
       "type": "object",
       "minProperties": 1,

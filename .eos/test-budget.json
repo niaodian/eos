@@ -3,6 +3,19 @@
   "schemaVersion": 1,
   "description": "Test layers and their wall-clock budgets. Run with `node .github/eos/run-tests.mjs`. A layer is a set of files that run in ONE `node --test` invocation, so Node parallelises them across cores. Budgets are ~3x the observed local time: they exist to catch a genuine 2x regression, not to police variance. On a slow runner set EOS_TEST_BUDGET_SCALE instead of raising a budget, so the ratio a breach represents stays the same everywhere.",
   "defaultScale": 1,
+  "coverage": {
+    "description": "Thresholds for `run-tests.mjs --coverage`. Set just below the measured figure (lines 96.9 / branches 75.8 / functions 96.3 at the time of writing) so they catch a real regression rather than chasing a round number. Enforced natively by Node 22+; on Node 20 the report still prints but the threshold is not applied, and run-tests says so rather than implying it passed.",
+    "lines": 95,
+    "branches": 73,
+    "functions": 94,
+    "exclude": [
+      "**/*.test.mjs",
+      "**/test-support.mjs",
+      "**/audit-support.mjs",
+      "**/journey.demo.mjs",
+      "**/run-tests.mjs"
+    ]
+  },
   "layers": {
     "unit": {
       "description": "Pure logic and single-module behaviour. No repository fixtures beyond a temp dir.",

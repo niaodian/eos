@@ -19,17 +19,20 @@ const PROVIDER = 'github-governance';
 function gh(root, args, timeoutMs) {
   const r = spawnSync('gh', args, { cwd: root, encoding: 'utf8', timeout: timeoutMs });
   if (r.error) {
+    // A missing binary is a permanent fact about this machine; a timeout is not. Only the second
+    // is worth asking again.
+    const timedOut = r.error.code === 'ETIMEDOUT';
     const why = r.error.code === 'ENOENT'
       ? 'the GitHub CLI (`gh`) is not installed'
-      : r.error.code === 'ETIMEDOUT' ? `\`gh\` timed out after ${timeoutMs}ms` : r.error.message;
-    return { ok: false, why };
+      : timedOut ? `\`gh\` timed out after ${timeoutMs}ms` : r.error.message;
+    return { ok: false, why, transient: timedOut };
   }
   const out = (r.stdout || '') + (r.stderr || '');
   if (r.status !== 0) {
     if (/not logged|authentication|gh auth login/i.test(out)) return { ok: false, why: 'the GitHub CLI is not authenticated (`gh auth login`)' };
     if (/HTTP 40[34]|Resource not accessible|Must have admin/i.test(out)) return { ok: false, why: 'this account cannot read branch protection on that repository (admin rights are required)' };
     if (/HTTP 404|Branch not protected/i.test(out)) return { ok: false, notProtected: true, why: 'the branch has no protection rule' };
-    if (/dial tcp|no such host|network|timeout|ENOTFOUND/i.test(out)) return { ok: false, why: 'GitHub is unreachable from here' };
+    if (/dial tcp|no such host|network|timeout|ENOTFOUND/i.test(out)) return { ok: false, why: 'GitHub is unreachable from here', transient: true };
     return { ok: false, why: out.split('\n').filter(Boolean).slice(-1)[0]?.slice(0, 160) || `gh exited ${r.status}` };
   }
   return { ok: true, out: r.stdout || '' };
@@ -56,7 +59,7 @@ export async function check({ root, subject, options, now }) {
     }
     // Everything else is "I could not find out", which must never become a pass and must never
     // become a new blocker either — EOS's own verdict stands.
-    return result({ provider: PROVIDER, subject, status: 'UNVERIFIED', now, detail: r.why });
+    return result({ provider: PROVIDER, subject, status: 'UNVERIFIED', now, detail: r.why, transient: !!r.transient });
   }
 
   let p;

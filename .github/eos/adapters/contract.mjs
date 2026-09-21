@@ -39,11 +39,11 @@ const RAISES = (status) => status === 'PASS';
  * Build a provider result. Every field exists because a bare status is not reviewable: you cannot
  * act on "BLOCKED" without knowing who said so, about what, and when.
  */
-export function result({ provider, subject, status, detail, evidenceRef = null, expiry = null, now = new Date() }) {
+export function result({ provider, subject, status, detail, evidenceRef = null, expiry = null, transient = false, now = new Date() }) {
   if (!PROVIDER_STATUSES.includes(status)) {
-    return { provider, subject, status: 'ERROR', detail: `adapter returned an unknown status "${status}"`, checkedAt: now.toISOString(), evidenceRef: null, expiry: null };
+    return { provider, subject, status: 'ERROR', detail: `adapter returned an unknown status "${status}"`, checkedAt: now.toISOString(), evidenceRef: null, expiry: null, transient: false };
   }
-  return { provider, subject, status, detail, checkedAt: now.toISOString(), evidenceRef, expiry };
+  return { provider, subject, status, detail, checkedAt: now.toISOString(), evidenceRef, expiry, transient };
 }
 
 /**
@@ -57,13 +57,19 @@ export function result({ provider, subject, status, detail, evidenceRef = null, 
  * @param {object|null} verdict                      what the provider said, if anything
  */
 export function resolve(fallback, verdict) {
-  if (!verdict) return { ...fallback, provider: null };
+  if (!verdict) return { ...fallback, provider: null, verification: 'LOCAL' };
   if (RAISES(verdict.status) && fallback.status !== 'PASS') {
     return {
       status: verdict.status,
       detail: `${verdict.detail} (verified by ${verdict.provider} at ${verdict.checkedAt})`,
       provider: verdict.provider,
       evidenceRef: verdict.evidenceRef,
+      // An explicit marker, not an inference from a prose suffix. A PASS that only exists because
+      // something outside this machine said so is a materially different claim from one EOS proved
+      // offline: it is exactly as durable as that external authority, and an auditor reading the
+      // record has to be able to tell the two apart without parsing English.
+      verification: 'REMOTE_VERIFIED',
+      checkedAt: verdict.checkedAt,
     };
   }
   // The provider disagrees downward, or could not answer. Report BOTH: the fallback still governs,
@@ -71,6 +77,7 @@ export function resolve(fallback, verdict) {
   return {
     ...fallback,
     provider: verdict.provider,
+    verification: 'LOCAL',
     detail: `${fallback.detail} · ${verdict.provider}: ${verdict.status} — ${verdict.detail}`,
   };
 }
@@ -103,14 +110,38 @@ const BUILT_IN = {
 };
 
 /**
+ * Consecutive transient failures per adapter, for this process only.
+ *
+ * A gate run consults the same provider once per subject. With an unreachable authority and a 10s
+ * timeout, eleven subjects meant almost two minutes of waiting to learn the same thing eleven
+ * times. The breaker makes the second and later consultations return immediately — the verdict is
+ * identical either way (D4: a provider that cannot answer never changes the outcome), so the only
+ * thing the extra attempts bought was delay.
+ *
+ * In-process is the right lifetime: EOS is a short-lived CLI, and persisting breaker state would
+ * mean a provider that recovered stayed "broken" until something cleared a file.
+ */
+const breaker = new Map();
+export const resetProviderBreaker = () => breaker.clear();
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/**
  * Ask the configured provider about one subject.
  *
  * Never throws. An adapter that crashes yields ERROR, which under D4 leaves the fallback in place:
  * a governance tool that can be taken down by a broken integration is not a governance tool.
  *
+ * Retries are deliberately narrow. Only a TRANSIENT failure — unreachable, timed out — is retried;
+ * an authoritative answer is never retried, because asking a system that already said "no" again
+ * is how an integration eventually gets the answer it wants. `transient` is declared by the
+ * adapter, never guessed here from the text of an error message.
+ *
  * @returns {Promise<object|null>} null when no provider covers this subject
  */
-export async function consult(root, subject, { providers = null, now = new Date() } = {}) {
+export async function consult(root, subject, {
+  providers = null, now = new Date(), retries = 2, backoffMs = 200, breakerThreshold = 2,
+} = {}) {
   const configured = providers || loadProviders(root).providers;
   const entry = configured.find((p) => (p.subjects || []).includes(subject));
   if (!entry) return null;
@@ -118,11 +149,27 @@ export async function consult(root, subject, { providers = null, now = new Date(
   if (!load) {
     return result({ provider: entry.adapter, subject, status: 'ERROR', now, detail: `unknown adapter "${entry.adapter}" (known: ${Object.keys(BUILT_IN).join(', ')})` });
   }
-  try {
-    const mod = await load();
-    const verdict = await mod.check({ root, subject, options: entry.options || {}, now });
-    return verdict?.status ? verdict : result({ provider: entry.adapter, subject, status: 'ERROR', now, detail: 'the adapter returned no verdict' });
-  } catch (e) {
-    return result({ provider: entry.adapter, subject, status: 'ERROR', now, detail: `the adapter failed: ${e.message}` });
+  const failures = breaker.get(entry.adapter) || 0;
+  if (failures >= breakerThreshold) {
+    return result({
+      provider: entry.adapter, subject, status: 'UNVERIFIED', now, transient: true,
+      detail: `not consulted: ${entry.adapter} failed ${failures} time(s) in a row in this run, so it is assumed still unreachable. The verdict is the same as if it had been asked and could not answer.`,
+    });
   }
+
+  const attempts = Math.max(1, (entry.options?.retries ?? retries) + 1);
+  let verdict = null;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      const mod = await load();
+      const raw = await mod.check({ root, subject, options: entry.options || {}, now });
+      verdict = raw?.status ? raw : result({ provider: entry.adapter, subject, status: 'ERROR', now, detail: 'the adapter returned no verdict' });
+    } catch (e) {
+      verdict = result({ provider: entry.adapter, subject, status: 'ERROR', now, detail: `the adapter failed: ${e.message}` });
+    }
+    if (!verdict.transient) { breaker.delete(entry.adapter); return verdict; }
+    if (attempt < attempts - 1) await sleep(backoffMs * (2 ** attempt));
+  }
+  breaker.set(entry.adapter, failures + 1);
+  return { ...verdict, detail: `${verdict.detail} (after ${attempts} attempt(s))` };
 }

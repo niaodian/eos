@@ -67,6 +67,37 @@ if (!selected.length) {
 const results = [];
 let failed = false;
 
+// --coverage runs every layer's files in ONE invocation: coverage is a property of the engine as a
+// whole, and per-layer numbers would each look alarmingly low while the union is fine. Thresholds
+// come from .eos/test-budget.json and are set just below the measured figure — they exist to catch
+// a real regression, not to chase a round number.
+if (flag('coverage')) {
+  const files = selected.flatMap(([, spec]) => spec.files).filter((f) => existsSync(join(REPO_ROOT, f)));
+  const cov = budget.coverage || {};
+  const args = ['--test', '--experimental-test-coverage'];
+  for (const pattern of cov.exclude || []) args.push(`--test-coverage-exclude=${pattern}`);
+  // Node 22+ enforces thresholds natively and exits non-zero. On Node 20 the flags do not exist,
+  // so the report is printed and the threshold is simply not enforced — reported, never faked.
+  const major = Number(process.versions.node.split('.')[0]);
+  const enforced = major >= 22;
+  if (enforced) {
+    if (cov.lines != null) args.push(`--test-coverage-lines=${cov.lines}`);
+    if (cov.branches != null) args.push(`--test-coverage-branches=${cov.branches}`);
+    if (cov.functions != null) args.push(`--test-coverage-functions=${cov.functions}`);
+  }
+  const started = Date.now();
+  const r = spawnSync(process.execPath, [...args, ...files], { cwd: REPO_ROOT, stdio: 'inherit', env: process.env });
+  console.log(`\nEOS coverage · ${Date.now() - started}ms`);
+  if (!enforced) {
+    console.log(`  thresholds NOT enforced: node ${process.versions.node} has no --test-coverage-* flags (needs 22+).`);
+    console.log('  The report above is still printed; CI runs coverage on a version that enforces it.');
+  } else {
+    console.log(`  thresholds: lines ${cov.lines}% · branches ${cov.branches}% · functions ${cov.functions}%`);
+  }
+  console.log(`\n${r.status === 0 ? 'PASS' : 'FAIL'}\n`);
+  process.exit(r.status === 0 ? 0 : 1);
+}
+
 for (const [name, spec] of selected) {
   const missing = spec.files.filter((f) => !existsSync(join(REPO_ROOT, f)));
   if (missing.length) {

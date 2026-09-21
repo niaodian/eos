@@ -215,3 +215,60 @@ test('S14: a project-owned Node script still counts as evidence', () => {
   assert.equal(code, 1, out);
   assert.match(out, /S14 .*describe a node project/);
 });
+
+// ---------------------------------------------------------------- workflow modes [audit #12]
+// Four tiers, one mechanism: a profile is data in .eos/workflow.json, selected by
+// project.json.workflowProfile. The property that matters is that each tier is STRICTLY no weaker
+// than the one below it — a "maturity ladder" where a rung quietly permits more than the rung
+// below is worse than having no ladder, because adopting it would silently relax a control.
+test('the four workflow modes exist and are selectable', () => {
+  const wf = JSON.parse(readFileSync(join(ROOT, '.eos/workflow.json'), 'utf8'));
+  for (const name of ['prototype', 'standard-product', 'controlled', 'regulated']) {
+    assert.ok(wf.profiles[name], `profile "${name}" is missing`);
+    assert.ok(wf.profiles[name].description, `profile "${name}" must say what it is for`);
+  }
+});
+
+test('each tier is at least as strict as the one below it, gate by gate', () => {
+  const wf = JSON.parse(readFileSync(join(ROOT, '.eos/workflow.json'), 'utf8'));
+  const RANK = { not_applicable: 0, waivable: 1, required: 2 };
+  const ladder = ['standard-product', 'controlled', 'regulated'];
+  for (let i = 1; i < ladder.length; i += 1) {
+    const lower = wf.profiles[ladder[i - 1]];
+    const upper = wf.profiles[ladder[i]];
+    for (const [changeType, def] of Object.entries(lower.changeTypes)) {
+      const up = upper.changeTypes[changeType];
+      assert.ok(up, `${ladder[i]} dropped change type ${changeType}`);
+      for (const [gate, policy] of Object.entries(def.gates)) {
+        assert.ok(
+          RANK[up.gates[gate]] >= RANK[policy],
+          `${ladder[i]}/${changeType}/${gate} is ${up.gates[gate]}, weaker than ${ladder[i - 1]}'s ${policy}`,
+        );
+      }
+    }
+  }
+});
+
+test('controlled and regulated permit no waivers at all', () => {
+  const wf = JSON.parse(readFileSync(join(ROOT, '.eos/workflow.json'), 'utf8'));
+  for (const name of ['controlled', 'regulated']) {
+    const waivable = Object.entries(wf.profiles[name].changeTypes)
+      .flatMap(([ct, def]) => Object.entries(def.gates).filter(([, p]) => p === 'waivable').map(([g]) => `${ct}/${g}`));
+    assert.deepEqual(waivable, [], `${name} must not leave an escape hatch`);
+  }
+});
+
+test('regulated records a reason for every classification', () => {
+  const wf = JSON.parse(readFileSync(join(ROOT, '.eos/workflow.json'), 'utf8'));
+  for (const [ct, def] of Object.entries(wf.profiles.regulated.changeTypes)) {
+    assert.equal(def.requiresClassificationReason, true, `${ct} must justify its classification when audited`);
+  }
+});
+
+test('every profile passes the config validator it ships with', () => {
+  const base = JSON.parse(readFileSync(join(ROOT, '.eos/project.json'), 'utf8'));
+  for (const workflowProfile of ['prototype', 'standard-product', 'controlled', 'regulated']) {
+    const { code, out } = run(repo(({ write }) => write('.eos/project.json', { ...base, workflowProfile })));
+    assert.equal(code, 0, `${workflowProfile}\n${out}`);
+  }
+});
