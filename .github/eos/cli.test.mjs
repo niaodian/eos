@@ -5,7 +5,7 @@ import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { project, write, run, runJson, cleanup, REPO_ROOT, APP_PROJECT, PRD_2AC, story } from './test-support.mjs';
+import { project, write, run, runJson, cleanup, commitAll, REPO_ROOT, APP_PROJECT, PRD_2AC, story } from './test-support.mjs';
 import { validate } from './lib/schema.mjs';
 
 after(cleanup);
@@ -481,11 +481,24 @@ test('a missing SBOM is MISSING, not quietly fresh', () => {
   assert.match(r.out, /does not exist/);
 });
 
-test('writing the SBOM does not invalidate the tree the SBOM describes', () => {
+test('writing the SBOM, or editing unrelated source, leaves it fresh', () => {
   // The self-reference the machine summaries already had to solve: if the SBOM counted towards the
   // product tree, writing it would change the digest it had just recorded, and it could never be
   // fresh even once.
   const dir = project({ '.eos/project.json': APP_PROJECT });
   run(dir, ['sbom', '--write']);
   assert.equal(run(dir, ['sbom', '--check']).code, 0, 'an SBOM must be able to be fresh immediately after being written');
+});
+
+test('an unrelated commit does not make the SBOM stale', () => {
+  // The commit hash cannot participate in freshness: it does not exist until AFTER the file is
+  // written, so including it in the digest meant --check failed on every commit and could never
+  // pass in CI. The commit stays in the document as provenance; freshness rests on the component
+  // set, the lockfiles and the tree.
+  const dir = project({ '.eos/project.json': APP_PROJECT });
+  run(dir, ['sbom', '--write']);
+  assert.equal(run(dir, ['sbom', '--check']).code, 0);
+  write(dir, 'docs/notes.md', '# an unrelated document\n');
+  commitAll(dir, 'an unrelated commit');
+  assert.equal(run(dir, ['sbom', '--check']).code, 0, 'a commit that changes no dependency must not invalidate the SBOM');
 });

@@ -125,9 +125,27 @@ export function buildSbom(snapshot, { now = new Date() } = {}) {
   return { sbom, notes };
 }
 
-/** Digest over the part that must not change silently. */
+/**
+ * Digest over the part that must not change silently.
+ *
+ * Deliberately EXCLUDES both `eos:commit` and `eos:productTreeDigest`. Those two are PROVENANCE —
+ * where and against what this document was produced — and neither can participate in freshness:
+ *
+ *   the commit does not exist until AFTER the file is written, so including it made the SBOM stale
+ *   on every single commit and `--check` could never pass in CI;
+ *
+ *   the product tree changes on every source edit, and an SBOM's content does not depend on source
+ *   at all — binding it there would demand a regenerated bill of materials for a typo fix.
+ *
+ * What actually determines whether this document still describes this software is the component
+ * set, the lockfiles it was derived from, and the stacks that were searched.
+ */
 export const sbomDigest = (sbom) => createHash('sha256')
-  .update(JSON.stringify({ components: sbom.components, properties: sbom.metadata.properties, lockInputs: sbom.eos?.lockInputs }))
+  .update(JSON.stringify({
+    components: sbom.components,
+    stacks: (sbom.metadata?.properties || []).find((p) => p.name === 'eos:stacks')?.value ?? null,
+    lockInputs: sbom.eos?.lockInputs,
+  }))
   .digest('hex');
 
 /**
@@ -143,10 +161,7 @@ export function sbomFreshness(snapshot) {
   }
   const reasons = [];
   const prop = (name) => (recorded.metadata?.properties || []).find((p) => p.name === name)?.value ?? null;
-  const tree = currentProductTree(snapshot.root);
-  if (tree.identity?.digest && prop('eos:productTreeDigest') !== tree.identity.digest) {
-    reasons.push('the product tree changed since this SBOM was generated');
-  }
+  void prop; // provenance is recorded for the reader; it is not a freshness input (see sbomDigest)
   for (const input of recorded.eos?.lockInputs || []) {
     if (sha256File(snapshot.root, input.path) !== input.sha256) reasons.push(`lockfile changed: ${input.path}`);
   }
