@@ -69,6 +69,12 @@ jobs:
         # an en-only edit from silently drifting the Chinese tree out of parity.
         run: node .github/hooks/check-doc-parity.mjs
 
+      - name: EOS generated-doc drift (the policy is the only authority)
+        # Everything under docs/eos/generated/ is a projection of .eos/gates.json and
+        # .eos/workflow.json. If a policy change did not regenerate them, the committed prose now
+        # describes rules the engine no longer applies — and people act on prose. [audit #10]
+        run: node .github/eos/eos.mjs docs --check
+
       - name: EOS SDLC gate doctor (G-EVAL / G-UX wiring + BMAD runtime + secret hygiene)
         # --deep also verifies that every MAPPED BMAD skill can actually activate here (project
         # runtime + executables). Without it a directory-name check reports PASS for skills that

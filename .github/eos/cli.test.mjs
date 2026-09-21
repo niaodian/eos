@@ -306,3 +306,118 @@ test('the human rendering explains why the gate applies and how to re-run it', (
   assert.match(out, /\.eos\/workflow\.json → profiles\./);
   assert.match(out, /re-run: node \.github\/eos\/eos\.mjs check --gate discovery-ready/);
 });
+
+// ---------------------------------------------------------------- health [audit #14]
+// `status` answers "what next" and shows one thing. `health` answers the other question — how much
+// is blocked, how much of the green has gone stale, what exceptions are outstanding. Every number
+// must be DERIVED from records that already exist; a dashboard that can disagree with the engine
+// is worse than no dashboard.
+test('health reports progress, blockers, stale evidence, waivers and trend', () => {
+  const r = runJson(READY_REPO(), ['health']);
+  assert.equal(r.code, 0, r.out);
+  for (const key of ['progress', 'blockers', 'staleEvidence', 'waivers', 'remoteGovernance', 'releases', 'trend']) {
+    assert.ok(key in r.json, `health must report ${key}`);
+  }
+  assert.equal(r.json.progress.total, r.json.progress.gates.length);
+});
+
+test('health never invents a state the engine does not have', () => {
+  const dir = READY_REPO();
+  const health = runJson(dir, ['health']).json;
+  const status = runJson(dir, ['status']).json;
+  assert.equal(health.profile, status.profile);
+  assert.equal(health.productCodeVerified, status.productCodeVerified);
+  assert.deepEqual(health.stories.map((s) => s.id), status.stories.map((s) => s.id));
+});
+
+test('health counts a real waiver as an outstanding exception', () => {
+  // standard-product leaves exactly one escape hatch: story-ready on a HOTFIX. Waiving anything
+  // else is refused, so this is the only shape a real waiver can take at this tier.
+  const dir = project({
+    '.eos/project.json': APP_PROJECT,
+    'docs/prd.md': PRD_2AC,
+    'docs/stories/STORY-777.md': story({ id: 'STORY-777', changeType: 'HOTFIX', classificationReason: 'production incident: logins failing for all users' }),
+  });
+  const w = run(dir, ['waive', '--gate', 'story-ready', '--scope', 'STORY-777', '--reason', 'incident response: the fix ships before the story is fully specified',
+    '--risk-owner', 'alice', '--expires', '2099-01-01', '--control', 'a follow-up story is filed before the incident is closed']);
+  // EOS drafts waivers and never approves them, so this deliberately does NOT exit 0. The draft is
+  // still an outstanding exception a lead needs to see — in fact it is the one moment worth
+  // reviewing, before it starts lifting a gate.
+  assert.match(w.out, /DRAFTED/, w.out);
+  const h = runJson(dir, ['health']).json;
+  assert.equal(h.waivers.length, 1, JSON.stringify(h.waivers));
+  assert.equal(h.waivers[0].riskOwner, 'alice');
+  assert.equal(h.waivers[0].expired, false);
+  assert.equal(h.waivers[0].inEffect, false, 'an unapproved draft must never read as in force');
+  assert.match(h.waivers[0].why, /approver/);
+});
+
+test('health reports, it does not gate — a blocked project still exits 0', () => {
+  const r = run(project({ '.eos/project.json': APP_PROJECT }), ['health']);
+  assert.equal(r.code, 0, 'safe in a prompt or a watch loop');
+  assert.match(r.out, /Blockers \(\d+\)/);
+});
+
+test('health surfaces evidence that has gone stale', () => {
+  const dir = READY_REPO();
+  run(dir, ['check', '--gate', 'discovery-ready']);
+  write(dir, 'docs/discovery.md', '# Discovery\n\nrewritten after the gate ran\n');
+  const h = runJson(dir, ['health']).json;
+  assert.ok(h.staleEvidence.some((s) => s.gate === 'discovery-ready'), JSON.stringify(h.staleEvidence));
+});
+
+// ---------------------------------------------------------------- generated docs [audit #10]
+// The same rule used to live in gates.json, in docs/, in the prompts and in the agents, with
+// nothing keeping them in step. Generation makes the policy the only authority; --check makes CI
+// refuse the drift instead of leaving it to be discovered by someone acting on stale prose.
+test('docs --write generates the gate reference, the workflow and the evidence graph', () => {
+  const dir = project({ '.eos/project.json': APP_PROJECT });
+  assert.equal(run(dir, ['docs', '--write']).code, 0);
+  for (const f of ['gates.md', 'workflow.md', 'evidence-graph.md']) {
+    assert.ok(existsSync(join(dir, 'docs/eos/generated', f)), `${f} was not generated`);
+  }
+  const gatesDoc = readFileSync(join(dir, 'docs/eos/generated/gates.md'), 'utf8');
+  const gates = JSON.parse(readFileSync(join(dir, '.eos/gates.json'), 'utf8'));
+  for (const g of gates.gates) assert.match(gatesDoc, new RegExp(`\`${g.id}\``), `${g.id} is missing from the reference`);
+});
+
+test('the generated workflow carries a real mermaid state diagram', () => {
+  const dir = project({ '.eos/project.json': APP_PROJECT });
+  run(dir, ['docs', '--write']);
+  const wf = readFileSync(join(dir, 'docs/eos/generated/workflow.md'), 'utf8');
+  assert.match(wf, /```mermaid\nstateDiagram-v2/);
+  assert.match(wf, /\[\*\] --> UNINITIALIZED/);
+});
+
+test('docs --check is clean straight after a write', () => {
+  const dir = project({ '.eos/project.json': APP_PROJECT });
+  run(dir, ['docs', '--write']);
+  assert.equal(run(dir, ['docs', '--check']).code, 0);
+});
+
+test('docs --check fails when a generated file is hand-edited', () => {
+  const dir = project({ '.eos/project.json': APP_PROJECT });
+  run(dir, ['docs', '--write']);
+  write(dir, 'docs/eos/generated/gates.md', '# I decided the rules are different now\n');
+  const r = run(dir, ['docs', '--check']);
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.out, /no longer match the policy/);
+});
+
+test('docs --check fails when the POLICY moved and the prose did not', () => {
+  const dir = project({ '.eos/project.json': APP_PROJECT });
+  run(dir, ['docs', '--write']);
+  const gates = JSON.parse(readFileSync(join(dir, '.eos/gates.json'), 'utf8'));
+  gates.gates[0].checks[0].fix = 'a completely different instruction to the reader';
+  write(dir, '.eos/gates.json', gates);
+  const r = run(dir, ['docs', '--check']);
+  assert.equal(r.code, 1, 'prose describing a rule the engine no longer applies must fail the build');
+});
+
+test('docs without a flag writes nothing', () => {
+  const dir = project({ '.eos/project.json': APP_PROJECT });
+  const r = run(dir, ['docs']);
+  assert.equal(r.code, 0);
+  assert.equal(existsSync(join(dir, 'docs/eos/generated/gates.md')), false, 'a dry run must not write');
+  assert.match(r.out, /Nothing was written/);
+});

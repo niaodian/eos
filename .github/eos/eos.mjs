@@ -23,7 +23,8 @@ import { currentProductTree, uncommittedProductChanges } from './lib/product-tre
 import { readManifest, manifestPath, manifestDigest as computeManifestDigest, listManifests } from './lib/release.mjs';
 import { loadProviders, consult } from './adapters/contract.mjs';
 import { syncWorkspaceRule } from './lib/workspace-rule.mjs';
-import { loadWaivers, expiredWaivers } from './lib/waivers.mjs';
+import { generateDocs } from './lib/docgen.mjs';
+import { loadWaivers, expiredWaivers, waiverStatus } from './lib/waivers.mjs';
 import { writeFileAtomic } from './lib/atomic.mjs';
 import { resolveAction, ACTIVE_WORK_PATH } from './lib/registry.mjs';
 
@@ -53,6 +54,8 @@ usage: node .github/eos/eos.mjs <command> [flags]
   focus --scope <type> --id <id>          set this machine's local focus (no authority)
   init [--write]                          write .vscode/tasks.json only (NOT the /eos-init hardening walkthrough)
   stack sync [--write]                    render the always-on workspace rule from .eos/project.json
+  docs [--write] [--check]                regenerate the docs that restate the policy
+  health                                  blockers, stale evidence, waivers, trend — one screen
   doctor                                  is EOS itself wired correctly?
 
   global: --json  --why  --all  --no-color
@@ -344,6 +347,181 @@ const commands = {
     lines.push('', `  ${skipped.length} skipped · run with --full to re-verify everything · --plan to see the selection without running it`, '', worst, '');
     emit(flags, json, lines.join('\n'));
     return statusExit(worst);
+  },
+
+  /**
+   * One screen answering "what state is this project actually in?".
+   *
+   * `status` answers "what do I do next" and deliberately shows one thing. This answers the other
+   * question a lead asks — how much is blocked, how much of what is green is actually stale, what
+   * exceptions are outstanding, and is the trend getting better or worse. Every number here is
+   * derived from records that already existed (evidence, the ledger, waivers); none of it is a new
+   * source of truth, because a dashboard that can disagree with the engine is worse than no
+   * dashboard.
+   */
+  async health(snapshot, flags) {
+    const gates = snapshot.gates?.gates || [];
+    const events = readEvents(snapshot.root).events;
+
+    // --- workflow progress: the product spine, in order
+    const productGates = gates.filter((g) => g.scope === 'product');
+    const progress = productGates.map((def) => {
+      const policy = gatePolicy(snapshot, 'PRODUCT_BASELINE', def.id);
+      const recorded = recordedGateStatus(snapshot, def.id, 'product', 'product');
+      return { gate: def.id, code: def.code, policy, status: policy === 'not_applicable' ? 'NOT_APPLICABLE' : (recorded?.status || 'PENDING') };
+    });
+    const done = progress.filter((p) => ['PASS', 'WAIVED', 'NOT_APPLICABLE'].includes(p.status)).length;
+
+    // --- stale evidence: green that has stopped meaning anything
+    const stale = [];
+    for (const { file, evidence } of listEvidence(snapshot.root)) {
+      if (!evidence) { stale.push({ file, gate: null, scope: null, reason: 'unreadable' }); continue; }
+      const def = gates.find((g) => g.id === evidence.gate);
+      const f = evidenceFreshness(snapshot.root, evidence, {
+        gateDefinition: def,
+        expectedInputs: gateInputs(snapshot, evidence.gate, evidence.scope.type, evidence.scope.id),
+        collections: gateCollections(snapshot, evidence.gate, evidence.scope.type, evidence.scope.id),
+      });
+      if (f.status === 'STALE') stale.push({ file, gate: evidence.gate, scope: evidence.scope.id, reason: f.reasons[0] });
+    }
+
+    // --- waivers: every exception currently in force, and every one that has outlived itself
+    const { waivers, errors: waiverErrors } = loadWaivers(snapshot.root);
+    const expired = expiredWaivers(snapshot.root);
+    const waiverRows = waivers.map((w) => {
+      const s = waiverStatus(w.waiver, {
+        gateId: w.waiver?.gate, scopeType: w.waiver?.scope?.type, scopeId: w.waiver?.scope?.id,
+      });
+      return {
+        gate: w.waiver?.gate ?? null,
+        scope: w.waiver?.scope?.id ?? null,
+        riskOwner: w.waiver?.riskOwner ?? null,
+        approver: w.waiver?.approver || null,
+        expiresOn: w.waiver?.expiresOn ?? null,
+        expired: expired.some((e) => e.file === w.file),
+        // A drafted waiver is NOT in effect but IS an outstanding exception someone intends to
+        // take. Hiding it until approval would mean the one moment it is worth reviewing — before
+        // it starts lifting a gate — is the one moment it is invisible.
+        inEffect: s.honored,
+        why: s.reason,
+        file: w.file,
+      };
+    });
+
+    // --- gate trend: is the first-pass rate improving or degrading?
+    const gateEvents = events.filter((e) => e.type === 'gate');
+    const recent = gateEvents.slice(-20);
+    const rate = (list) => (list.length ? Math.round((list.filter((e) => e.status === 'PASS').length / list.length) * 100) : null);
+    const trend = { total: gateEvents.length, allTimePassRate: rate(gateEvents), recentPassRate: rate(recent), recentWindow: recent.length };
+
+    // --- remote governance: what EOS could not verify by itself
+    const { providers, errors: providerErrors } = loadProviders(snapshot.root);
+    const remote = { configured: providers.map((p) => ({ adapter: p.adapter, subjects: p.subjects })), errors: providerErrors };
+
+    // --- releases
+    const releases = listManifests(snapshot.root)
+      .filter((m) => m.releaseId)
+      .map((m) => ({ releaseId: m.releaseId, state: scopeState(snapshot, 'release', m.releaseId), stories: m.manifest?.includedStories?.length ?? 0 }));
+
+    const decision = route(snapshot);
+    const blockers = decision.blockers || [];
+
+    const json = {
+      schemaVersion: 1,
+      profile: snapshot.profileName,
+      productCodeVerified: snapshot.projectPresent && snapshot.project?.projectType !== 'config-only',
+      progress: { done, total: progress.length, gates: progress },
+      blockers,
+      staleEvidence: stale,
+      waivers: waiverRows,
+      waiverErrors,
+      remoteGovernance: remote,
+      releases,
+      trend,
+      stories: snapshot.stories.map((s) => ({ id: s.id, state: scopeState(snapshot, 'story', s.id) })),
+    };
+
+    const bar = `${'█'.repeat(done)}${'░'.repeat(Math.max(0, progress.length - done))}`;
+    const lines = [`EOS health · ${snapshot.profileName}`, ''];
+    lines.push('Product baseline', `  ${bar}  ${done}/${progress.length} gates satisfied`);
+    for (const p of progress) lines.push(`  ${p.status.padEnd(15)} ${p.gate}`);
+    lines.push('');
+    if (!json.productCodeVerified) lines.push('Scope', '  NO PRODUCT CODE VERIFIED — every gate above is about documents and governance only', '');
+    lines.push(`Blockers (${blockers.length})`);
+    if (!blockers.length) lines.push('  none');
+    for (const b of blockers.slice(0, 8)) lines.push(`  ${String(b.status).padEnd(10)} ${b.gate}/${b.check} — ${b.detail}`);
+    lines.push('');
+    lines.push(`Stale evidence (${stale.length})`);
+    if (!stale.length) lines.push('  none — every recorded result still describes its inputs');
+    for (const s of stale.slice(0, 8)) lines.push(`  ${String(s.gate).padEnd(20)} ${String(s.scope).padEnd(14)} ${s.reason}`);
+    lines.push('');
+    lines.push(`Waivers (${waiverRows.length} · ${waiverRows.filter((w) => w.inEffect).length} in effect · ${waiverRows.filter((w) => w.expired).length} expired)`);
+    if (!waiverRows.length) lines.push('  none — nothing is being carried as an exception');
+    for (const w of waiverRows) {
+      const state = w.expired ? 'EXPIRED' : w.inEffect ? 'IN EFFECT' : 'DRAFT';
+      lines.push(`  ${state.padEnd(9)} ${String(w.gate).padEnd(18)} ${String(w.scope).padEnd(14)} owner ${w.riskOwner} until ${w.expiresOn}`);
+      if (!w.inEffect) lines.push(`            ${w.why}`);
+    }
+    for (const e of waiverErrors) lines.push(`  ERROR ${e}`);
+    lines.push('');
+    lines.push('Remote governance');
+    if (!remote.configured.length) lines.push('  no provider configured — anything EOS cannot verify locally stays BLOCKED/UNVERIFIED by design');
+    for (const p of remote.configured) lines.push(`  ${p.adapter} → ${(p.subjects || []).join(', ')}`);
+    for (const e of remote.errors) lines.push(`  ERROR ${e}`);
+    lines.push('');
+    lines.push('Releases');
+    if (!releases.length) lines.push('  none');
+    for (const r of releases) lines.push(`  ${String(r.releaseId).padEnd(14)} ${String(r.state).padEnd(12)} ${r.stories} story/stories`);
+    lines.push('');
+    lines.push('Gate trend',
+      trend.total ? `  ${trend.total} gate run(s) recorded · first-pass rate ${trend.allTimePassRate}% all time · ${trend.recentPassRate}% over the last ${trend.recentWindow}` : '  no gate has been run yet');
+    lines.push('');
+    emit(flags, json, lines.join('\n'));
+    // Health REPORTS; it does not gate. Exit stays 0 unless the state source itself is broken, so
+    // it is safe in a shell prompt or a watch loop.
+    return EXIT.OK;
+  },
+
+  /**
+   * Regenerate every document that restates the machine-readable policy — and, with --check, fail
+   * when a committed one no longer matches what the policy would produce.
+   *
+   * The same rule used to live in `.eos/gates.json`, in `docs/`, in the prompts and in the agent
+   * definitions, with nothing keeping them in step. Prose drifts from the engine one edit at a
+   * time, and the drift is only ever found by someone who acted on documentation that had quietly
+   * stopped being true. Generation makes the policy the only authority; --check makes CI enforce it.
+   */
+  docs(snapshot, flags) {
+    if (!snapshot.gates || !snapshot.workflow) {
+      console.log('EOS docs — .eos/gates.json and .eos/workflow.json must both be readable to generate from them.');
+      return EXIT.ERROR;
+    }
+    const generated = generateDocs(snapshot);
+    const rows = [];
+    for (const [rel, body] of Object.entries(generated)) {
+      const full = join(snapshot.root, rel);
+      const before = existsSync(full) ? readFileSync(full, 'utf8') : null;
+      const drifted = before !== body;
+      if (drifted && flags.write) { mkdirSync(dirname(full), { recursive: true }); writeFileAtomic(full, body); }
+      rows.push({ path: rel, present: before !== null, drifted, action: drifted ? (flags.write ? 'written' : 'would write') : 'up to date' });
+    }
+    const drift = rows.filter((r) => r.drifted);
+    const json = { generated: rows, drifted: drift.length, mode: flags.write ? 'write' : flags.check ? 'check' : 'plan' };
+    const lines = ['EOS docs · generated from the machine-readable policy', ''];
+    for (const r of rows) lines.push(`  ${r.action.padEnd(12)} ${r.path}`);
+    lines.push('');
+    if (flags.check && drift.length) {
+      lines.push(`  ${drift.length} generated file(s) no longer match the policy they are generated from.`,
+        '  Run `node .github/eos/eos.mjs docs --write` and commit the result, in the same change that',
+        '  altered the policy — documentation that describes a rule the engine no longer applies is',
+        '  worse than no documentation, because people act on it.', '', 'FAIL', '');
+      emit(flags, json, lines.join('\n'));
+      return EXIT.FAIL;
+    }
+    if (!flags.write && !flags.check) lines.push('  Nothing was written. Re-run with --write to apply, or --check to fail on drift.', '');
+    lines.push(flags.check ? 'PASS' : '', '');
+    emit(flags, json, lines.join('\n'));
+    return EXIT.OK;
   },
 
   transition(snapshot, flags) {    const scopeType = flags.scope === true || !flags.scope ? 'story' : flags.scope;
