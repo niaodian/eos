@@ -1,0 +1,58 @@
+{
+  "$schema": "./schemas/test-budget.schema.json",
+  "schemaVersion": 1,
+  "description": "Test layers and their wall-clock budgets. Run with `node .github/eos/run-tests.mjs`. A layer is a set of files that run in ONE `node --test` invocation, so Node parallelises them across cores. Budgets are ~3x the observed local time: they exist to catch a genuine 2x regression, not to police variance. On a slow runner set EOS_TEST_BUDGET_SCALE instead of raising a budget, so the ratio a breach represents stays the same everywhere.",
+  "defaultScale": 1,
+  "layers": {
+    "unit": {
+      "description": "Pure logic and single-module behaviour. No repository fixtures beyond a temp dir.",
+      "budgetMs": 12000,
+      "files": [
+        ".github/eos/atomic.test.mjs",
+        ".github/eos/state-model.test.mjs",
+        ".github/eos/workspace-rule.test.mjs",
+        ".github/hooks/deny-dangerous.test.mjs",
+        ".github/hooks/spec-align.test.mjs",
+        ".github/hooks/check-doc-parity.test.mjs"
+      ]
+    },
+    "contract": {
+      "description": "Published interfaces: the CLI's JSON contract and exit codes, the provider-adapter contract, and the offline boundary that both rest on.",
+      "budgetMs": 11000,
+      "files": [
+        ".github/eos/cli.test.mjs",
+        ".github/eos/adapters.test.mjs",
+        ".github/eos/offline-boundary.test.mjs",
+        ".github/hooks/validate-config.test.mjs"
+      ]
+    },
+    "integration": {
+      "description": "Several modules together through real fixtures: routing decisions, gate bypasses, cross-stack quality.",
+      "budgetMs": 19000,
+      "files": [
+        ".github/eos/router.test.mjs",
+        ".github/eos/bypass.test.mjs",
+        ".github/hooks/project-gate.test.mjs",
+        ".github/hooks/eos-doctor.test.mjs"
+      ]
+    },
+    "journey": {
+      "description": "The whole developer loop end to end, executed through the real CLI, offline.",
+      "budgetMs": 8000,
+      "files": [
+        ".github/eos/journey.test.mjs"
+      ]
+    },
+    "audit-regression": {
+      "description": "One executable case per audit finding. Each test performs the reported bypass, then asserts it no longer works. A failure here means an audit finding has re-opened.",
+      "budgetMs": 29000,
+      "files": [
+        ".github/eos/audit-evidence.test.mjs",
+        ".github/eos/audit-gates.test.mjs",
+        ".github/eos/audit-release.test.mjs",
+        ".github/eos/audit-review.test.mjs",
+        ".github/eos/audit-robustness.test.mjs"
+      ]
+    }
+  }
+}

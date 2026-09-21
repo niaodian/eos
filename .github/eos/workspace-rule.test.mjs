@@ -87,10 +87,14 @@ test('stack sync: with nothing declared it blocks instead of guessing a stack', 
   // The clean template is exactly this state. Inventing Node here is how the placeholder became
   // wrong in the first place.
   const dir = repo({ projectType: 'config-only', stacks: [], productParadigms: ['deterministic'] });
+  const before = ruleText(dir);
   const { code, out } = run(dir, ['stack', 'sync', '--write']);
   assert.equal(code, 2, out);
   assert.match(out, /does not guess/);
-  assert.match(ruleText(dir), /⛳ PROVISIONAL/, 'an unproven stack must leave the placeholder in place');
+  // The property that matters is that a refusal WRITES NOTHING. Asserting on the provisional
+  // marker instead used to work only because the shipped rule happened to still carry one; once
+  // EOS locked its own stack that became a statement about EOS rather than about this behaviour.
+  assert.equal(ruleText(dir), before, 'a refusal must leave the rule byte-for-byte untouched');
 });
 
 test('stack sync: re-running is a no-op, so it is safe in a loop or a hook', () => {
@@ -113,4 +117,30 @@ test('renderCommandsLine: "other" has no preset to render, and says so', () => {
   const r = renderCommandsLine({ stacks: ['other'], commands: {} });
   assert.equal(r.line, null);
   assert.match(r.reason, /no stacks and no commands|no preset/);
+});
+
+// The anchor used to be /^- Install:.*$/m, which assumed every project declares an install step.
+// A project that declares only `commands.test` renders "- Test: …", and the anchor could then
+// never match its own output again: `stack sync` silently became a one-shot that could no longer
+// update the line it had just written. Idempotence has to hold for EVERY shape of commands block.
+test('stack sync can rewrite a line it wrote itself when there is no install step', () => {
+  const dir = repo({ projectType: 'application', stacks: ['other'], commands: { test: 'make check' }, productParadigms: ['deterministic'] });
+  assert.equal(run(dir, ['stack', 'sync', '--write']).code, 0);
+  assert.match(ruleText(dir), /^- Test: `make check`\.$/m);
+
+  // Now change the declared command: the second sync must still find and replace the first one.
+  writeFileSync(join(dir, '.eos/project.json'), JSON.stringify({
+    projectType: 'application', stacks: ['other'], commands: { test: 'make verify' }, productParadigms: ['deterministic'],
+  }, null, 2), 'utf8');
+  assert.equal(run(dir, ['stack', 'sync', '--write']).code, 0);
+  assert.match(ruleText(dir), /^- Test: `make verify`\.$/m);
+  assert.doesNotMatch(ruleText(dir), /make check/, 'the stale line must be gone, not duplicated');
+});
+
+test('stack sync restores a commands line that was deleted entirely', () => {
+  const dir = repo({ projectType: 'application', stacks: ['go'], commands: { test: 'go test ./...' }, productParadigms: ['deterministic'] });
+  const stripped = ruleText(dir).replace(/^- (?:Install|Lint|Test|Typecheck|Eval|Audit|Build): .*$/m, '');
+  writeFileSync(join(dir, WORKSPACE_RULE), stripped, 'utf8');
+  assert.equal(run(dir, ['stack', 'sync', '--write']).code, 0);
+  assert.match(ruleText(dir), /^- Test: `go test \.\/\.\.\.`\.$/m, 'a silent rule is worse than a wrong one');
 });

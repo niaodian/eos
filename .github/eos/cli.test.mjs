@@ -233,3 +233,35 @@ test('the CLI runs with no git repository and no network', () => {
   assert.notEqual(r.code, 3, r.out);
   assert.match(r.out, /EOS/);
 });
+
+// ---------------------------------------------------------------- scope of a green verdict
+// [audit: config-only false PASS] Every surface that can report "green" has to say what that green
+// does NOT cover. A repository with no product code can satisfy every gate EOS has while nothing
+// about a product was ever executed, and a reader cannot infer that from a state name.
+test('status says NO PRODUCT CODE VERIFIED when the project declares config-only', () => {
+  const dir = project({ '.eos/project.json': { projectType: 'config-only', stacks: [], productParadigms: ['deterministic'] } });
+  const r = runJson(dir, ['status']);
+  assert.equal(r.json.projectType, 'config-only');
+  assert.equal(r.json.productCodeVerified, false);
+  assert.match(run(dir, ['status']).out, /NO PRODUCT CODE VERIFIED/);
+});
+
+test('status says NO PRODUCT CODE VERIFIED when there is no project declaration at all', () => {
+  const dir = project({ 'README.md': '# nothing declared\n' });
+  assert.match(run(dir, ['status']).out, /NO PRODUCT CODE VERIFIED/);
+});
+
+test('status makes no such claim once real product code is declared', () => {
+  const r = runJson(READY_REPO(), ['status']);
+  assert.equal(r.json.projectType, 'application');
+  assert.equal(r.json.productCodeVerified, true);
+  assert.doesNotMatch(r.out, /NO PRODUCT CODE VERIFIED/);
+});
+
+test('doctor qualifies its own PASS on a config-only repository', () => {
+  const dir = project({ '.eos/project.json': { projectType: 'config-only', stacks: [], productParadigms: ['deterministic'] } });
+  const r = run(dir, ['doctor']);
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /NO PRODUCT CODE VERIFIED/);
+  assert.match(r.out, /covers EOS configuration only/);
+});

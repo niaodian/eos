@@ -143,8 +143,16 @@ test('S12: complianceProfile only accepts the declared enum', () => {
 // `node .github/hooks/project-gate.mjs`, and counting EOS's own Node tooling as project evidence
 // flagged every Python and Go repo. Test the file users actually get.
 const RULE = '.github/instructions/00-workspace.instructions.md';
-const COMMANDS_LINE = /^- Install: .*$/m;
-const withCommands = (read, cmds) => read(RULE).replace(COMMANDS_LINE, `- ${cmds}`);
+// Any label the rule's commands line can start with. Anchoring on `Install:` alone meant that once
+// the shipped rule declared only a test command, this replacement silently became a no-op — the
+// fixtures then asserted against the UNMODIFIED file, so the cases expecting a pass passed
+// vacuously and the cases expecting a failure broke. Mirrors COMMAND_LABELS in lib/workspace-rule.mjs.
+const COMMANDS_LINE = /^- (?:Install|Lint|Test|Typecheck|Eval|Audit|Build): .*$/m;
+const withCommands = (read, cmds) => {
+  const text = read(RULE);
+  assert.match(text, COMMANDS_LINE, `${RULE} has no commands line for the fixture to replace`);
+  return text.replace(COMMANDS_LINE, `- ${cmds}`);
+};
 const declare = (extra) => ({ projectType: 'application', stacks: ['python'], commands: { test: 'pytest' }, productParadigms: ['deterministic'], ...extra });
 
 test('S14: prose describing another stack than the one declared fails', () => {

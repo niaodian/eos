@@ -49,3 +49,7 @@ docs/zh/.*.html
 !.eos/local/.gitkeep
 .eos/handoffs/*
 !.eos/handoffs/.gitkeep
+# Cross-process write lock for the ledger. Transient coordination, never project state.
+.eos/ledger/.lock
+# Interrupted atomic writes (write-temp-then-rename). Never authoritative.
+.eos/**/*.tmp

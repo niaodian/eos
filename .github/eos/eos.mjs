@@ -24,6 +24,7 @@ import { readManifest, manifestPath, manifestDigest as computeManifestDigest, li
 import { loadProviders, consult } from './adapters/contract.mjs';
 import { syncWorkspaceRule } from './lib/workspace-rule.mjs';
 import { loadWaivers, expiredWaivers } from './lib/waivers.mjs';
+import { writeFileAtomic } from './lib/atomic.mjs';
 import { resolveAction, ACTIVE_WORK_PATH } from './lib/registry.mjs';
 
 const EXIT = { OK: 0, FAIL: 1, BLOCKED: 2, ERROR: 3 };
@@ -135,10 +136,18 @@ const commands = {
       .filter(({ evidence }) => evidence && (evidence.inputs || []).some((i) => changed.includes(i.path)))
       .map(({ evidence }) => ({ gate: evidence.gate, scope: evidence.scope.id, status: 'STALE' }));
 
+    // A repository with no declared product code can satisfy every gate EOS has and still have had
+    // nothing about a product verified. Saying so on every `status` is the difference between
+    // "green" and "green, and here is exactly what that green does not cover".
+    const declaredType = snapshot.project?.projectType ?? null;
+    const productCodeVerified = snapshot.projectPresent && declaredType !== 'config-only';
+
     const json = {
       schemaVersion: 1,
       repo: { commit: snapshot.commit, root: snapshot.root },
       product: { state: product.state, blockedBy: product.blockedBy ? product.blockedBy.reason : null },
+      projectType: declaredType,
+      productCodeVerified,
       profile: snapshot.profileName,
       stories,
       active: decision.current,
@@ -164,6 +173,15 @@ const commands = {
       lines.push('');
     }
     lines.push('Product', `  ${product.state}${product.blockedBy ? ` — next guard: ${product.blockedBy.reason}` : ''}`, '');
+    if (!productCodeVerified) {
+      lines.push('Scope of this verdict',
+        snapshot.projectPresent
+          ? '  NO PRODUCT CODE VERIFIED — .eos/project.json declares "config-only", so no test, lint or'
+          : '  NO PRODUCT CODE VERIFIED — there is no .eos/project.json, so no test, lint or',
+        '  eval command is executed. Every gate below is about documents and governance only.',
+        '  Declare projectType "application" (or "library") with commands.test when code lands.',
+        '');
+    }
     if (stories.length) {
       lines.push('Stories');
       for (const s of stories) lines.push(`  ${s.id.padEnd(14)} ${String(s.state).padEnd(16)} ${s.changeType}`);
@@ -414,7 +432,7 @@ const commands = {
       manifest = { ...existing.manifest, candidateCommit: snapshot.commit, productTreeDigest: tree.identity?.digest ?? null };
     }
     mkdirSync(dirname(full), { recursive: true });
-    writeFileSync(full, JSON.stringify(manifest, null, 2) + '\n', 'utf8');
+    writeFileAtomic(full, JSON.stringify(manifest, null, 2) + '\n');
     const digest = computeManifestDigest(manifest);
     const lines = [`EOS release ${sub} · ${rel}`, '',
       `  candidate   ${snapshot.commit ? snapshot.commit.slice(0, 8) : '(no git)'}`,
@@ -518,7 +536,7 @@ const commands = {
     if (!waiver.riskOwner) { console.log('waive requires --risk-owner'); return EXIT.FAIL; }
     const rel = `.eos/waivers/${def.id}__${scopeType}__${String(scopeId).replace(/[^A-Za-z0-9._-]/g, '_')}.json`;
     mkdirSync(join(snapshot.root, '.eos/waivers'), { recursive: true });
-    writeFileSync(join(snapshot.root, rel), JSON.stringify(waiver, null, 2) + '\n', 'utf8');
+    writeFileAtomic(join(snapshot.root, rel), JSON.stringify(waiver, null, 2) + '\n');
     appendEvent(snapshot.root, { type: 'waiver', scope: { type: scopeType, id: String(scopeId) }, gate: def.id, status: 'DRAFT', detail: rel });
     emit(flags, { drafted: rel, waiver, honored: false }, [
       `EOS waive · DRAFTED ${rel}`, '',
@@ -668,6 +686,14 @@ const commands = {
     }
     const { errors: waiverErrors } = loadWaivers(snapshot.root);
     for (const e of waiverErrors) problems.push({ level: 'ERROR', detail: e });
+    // Doctor's verdict covers EOS's own wiring. Saying so matters most when it is green: a PASS
+    // here has never meant "the product is tested", and on a config-only repository nothing about
+    // a product is executed at all. [audit: config-only false PASS]
+    if (!snapshot.projectPresent) {
+      notes.push('NO PRODUCT CODE VERIFIED — there is no .eos/project.json, so no test/lint/eval command runs. This verdict covers EOS configuration only.');
+    } else if (snapshot.project?.projectType === 'config-only') {
+      notes.push('NO PRODUCT CODE VERIFIED — .eos/project.json declares "config-only". This verdict covers EOS configuration only; declare "application" (or "library") with commands.test when code lands.');
+    }
     for (const { file, evidence } of listEvidence(snapshot.root)) {
       if (!evidence) { problems.push({ level: 'ERROR', detail: `${file}: unreadable evidence` }); continue; }
       const shape = validateEvidenceShape(snapshot.root, evidence);

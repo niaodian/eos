@@ -43,6 +43,34 @@ test('clean EOS template passes explicitly as config-only', () => {
   assert.match(out, /config-only/);
 });
 
+// [audit: config-only false PASS] A verdict line reading "PASS" is read as "the code is verified"
+// by every human and every agent that sees it. On a repository with no product code nothing was
+// executed, so there is nothing to have passed — the word has to match what actually happened,
+// while the exit code stays 0 because this is a legitimate state, not a failure.
+test('config-only reports NOT_APPLICABLE, never a bare PASS', () => {
+  const { code, out } = run(project({ '.eos/project.json': { projectType: 'config-only', stacks: [] } }));
+  assert.equal(code, 0, out);
+  assert.match(out, /NOT_APPLICABLE: no product code was verified/);
+  const verdict = out.trim().split('\n').at(-1);
+  assert.doesNotMatch(verdict, /^PASS/, 'the summary verdict must not be a bare PASS');
+});
+
+test('an inferred config-only repo (no declaration at all) also reports NOT_APPLICABLE', () => {
+  const { code, out } = run(project({ 'README.md': '# docs only\n' }));
+  assert.equal(code, 0, out);
+  assert.match(out, /NOT_APPLICABLE: no product code was verified/);
+});
+
+test('a project that really ran its quality commands still reports PASS', () => {
+  const { code, out } = run(project({
+    '.eos/project.json': { projectType: 'application', stacks: ['other'], commands: { test: passingCmd } },
+  }));
+  assert.equal(code, 0, out);
+  const verdict = out.trim().split('\n').at(-1);
+  assert.match(verdict, /^PASS/, 'executing the declared commands is a real PASS');
+  assert.doesNotMatch(out, /NOT_APPLICABLE/);
+});
+
 test('config-only cannot hide real product code (manifest present ⇒ fail closed)', () => {
   const { code, out } = run(project({
     '.eos/project.json': { projectType: 'config-only', stacks: [] },

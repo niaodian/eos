@@ -13,6 +13,51 @@ export const CLI = join(EOS_DIR, 'eos.mjs');
 
 const sandboxes = [];
 
+// --------------------------------------------------------------------------- timeouts + profiling
+//
+// Every subprocess a test starts is bounded. Without this a hung `git` or a CLI waiting on
+// something invisible turns a failing test into a silent 6-hour CI job that reports nothing — the
+// one failure mode a test suite must never have. On timeout the harness prints WHAT was running,
+// WHERE (the sandbox is preserved for inspection), and WHY it was killed, because a bare
+// "ETIMEDOUT" makes the next person reproduce the hang before they can even start debugging.
+//
+// EOS_TEST_SPAWN_TIMEOUT_MS overrides the per-process budget (slow CI runners, a debugger attached).
+// EOS_TEST_PROFILE=1 prints where the suite's wall time actually went, so a performance
+// regression is a number someone can point at rather than an impression.
+export const SPAWN_TIMEOUT_MS = Number(process.env.EOS_TEST_SPAWN_TIMEOUT_MS || 60000);
+
+const profile = { git: { n: 0, ms: 0 }, cli: { n: 0, ms: 0 }, fixture: { n: 0, ms: 0 } };
+
+function timed(bucket, fn) {
+  const started = Date.now();
+  try { return fn(); } finally {
+    profile[bucket].n += 1;
+    profile[bucket].ms += Date.now() - started;
+  }
+}
+
+/** Turn a timed-out subprocess into a diagnosis instead of an opaque failure. */
+function assertNotTimedOut(r, { what, cwd }) {
+  if (!r.error) return r;
+  if (r.error.code === 'ETIMEDOUT' || r.signal === 'SIGTERM') {
+    throw new Error(
+      `EOS test harness: \`${what}\` exceeded ${SPAWN_TIMEOUT_MS}ms and was killed.\n` +
+      `  sandbox : ${cwd}   (kept on disk for inspection)\n` +
+      '  raise the budget with EOS_TEST_SPAWN_TIMEOUT_MS if the runner is simply slow;\n' +
+      '  otherwise this is a real hang — run the command above in that directory to reproduce it.',
+    );
+  }
+  return r;
+}
+
+if (process.env.EOS_TEST_PROFILE) {
+  process.on('exit', () => {
+    const total = profile.git.ms + profile.cli.ms + profile.fixture.ms;
+    const row = (k) => `  ${k.padEnd(8)} ${String(profile[k].n).padStart(5)} call(s)  ${String(profile[k].ms).padStart(6)}ms`;
+    process.stderr.write(`\n# EOS test profile\n${row('fixture')}\n${row('git')}\n${row('cli')}\n  ${'TOTAL'.padEnd(8)} ${''.padStart(5)}           ${String(total).padStart(6)}ms\n`);
+  });
+}
+
 /** Templates copied into every sandbox so a fixture only declares what it changes. */
 export const TEMPLATE = {
   workflow: join(REPO_ROOT, '.eos/workflow.json'),
@@ -30,6 +75,10 @@ export const TEMPLATE = {
  * fixture that skipped that would be testing a different engine than the one developers run.
  */
 export function project(files = {}, { withGovernance = true, withHooks = false, git = true } = {}) {
+  return timed('fixture', () => buildProject(files, { withGovernance, withHooks, git }));
+}
+
+function buildProject(files, { withGovernance, withHooks, git }) {
   const dir = mkdtempSync(join(tmpdir(), 'eos-guide-'));
   sandboxes.push(dir);
   if (withGovernance) {
@@ -60,7 +109,8 @@ const GIT_ENV = {
 };
 
 export function git(dir, args) {
-  const r = spawnSync('git', args, { cwd: dir, encoding: 'utf8', env: { ...process.env, ...GIT_ENV } });
+  const r = timed('git', () => spawnSync('git', args, { cwd: dir, encoding: 'utf8', timeout: SPAWN_TIMEOUT_MS, env: { ...process.env, ...GIT_ENV } }));
+  assertNotTimedOut(r, { what: `git ${args.join(' ')}`, cwd: dir });
   return { code: r.status, out: (r.stdout || '') + (r.stderr || '') };
 }
 
@@ -85,11 +135,13 @@ export function write(dir, rel, body) {
 }
 
 export function run(dir, args = [], env = {}) {
-  const r = spawnSync(process.execPath, [CLI, ...args], {
+  const r = timed('cli', () => spawnSync(process.execPath, [CLI, ...args], {
     cwd: dir,
     encoding: 'utf8',
+    timeout: SPAWN_TIMEOUT_MS,
     env: { ...process.env, EOS_ACTOR: 'tester', ...env },
-  });
+  }));
+  assertNotTimedOut(r, { what: `eos ${args.join(' ')}`, cwd: dir });
   return { code: r.status, out: (r.stdout || '') + (r.stderr || ''), stdout: r.stdout || '' };
 }
 

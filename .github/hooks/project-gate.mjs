@@ -89,6 +89,7 @@ if (present && cfgErrors.length) {
 }
 
 let plan = null; // { mode, commands }
+let executed = 0; // quality steps actually run — 0 means nothing about the product was proven
 
 if (present) {
   const mode = config.projectType;
@@ -140,6 +141,7 @@ if (plan) {
 
   for (const step of ['lint', 'typecheck', 'test', 'eval']) {
     if (!plan.commands[step]) { notes.push(`${step}: not declared (N/A)`); continue; }
+    executed += 1;
     if (!runStep(step, plan.commands[step])) break;
   }
 }
@@ -153,5 +155,14 @@ console.log('');
 if (errors.length) {
   console.log(`FAIL: ${errors.length} error(s), ${warns.length} warning(s)`);
   process.exit(1);
+}
+if (executed === 0) {
+  // NOT "PASS". Nothing about the product was executed, so there is nothing to have passed.
+  // A summary line reading PASS is read as "the code is verified" by every human and every agent
+  // that sees it, which is precisely the false assurance a governance gate must never emit. The
+  // exit code stays 0 — this is a legitimate state for a repository with no product code, not a
+  // failure — but the WORD has to match what actually happened. [audit: config-only false PASS]
+  console.log(`NOT_APPLICABLE: no product code was verified${warns.length ? ` (${warns.length} warning(s))` : ''}`);
+  process.exit(0);
 }
 console.log(`PASS${warns.length ? ` (${warns.length} warning(s))` : ''}`);

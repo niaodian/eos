@@ -5,12 +5,13 @@
 // version and a SHA-256 of every input file — plus the governance files themselves, so changing
 // .eos/gates.json or .eos/workflow.json invalidates prior evidence by construction.
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { posix, EVALUATOR_VERSION, WORKFLOW_PATH, GATES_PATH } from './registry.mjs';
 import { validate } from './schema.mjs';
 import { waiverStatus } from './waivers.mjs';
 import { compareProductTree } from './product-tree.mjs';
+import { writeFileAtomic } from './atomic.mjs';
 
 export const EVIDENCE_DIR = '.eos/evidence';
 export const GOVERNANCE_INPUTS = [GATES_PATH, WORKFLOW_PATH];
@@ -31,7 +32,9 @@ export function writeEvidence(root, evidence) {
   const rel = evidenceFile(evidence.gate, evidence.scope.type, evidence.scope.id);
   const full = join(root, rel);
   mkdirSync(join(root, EVIDENCE_DIR), { recursive: true });
-  writeFileSync(full, JSON.stringify(evidence, null, 2) + '\n', 'utf8');
+  // Atomic: evidence that fails to parse is treated as an ERROR rather than a PASS, so a write
+  // interrupted halfway would turn a real PASS into a hard failure on the next read.
+  writeFileAtomic(full, JSON.stringify(evidence, null, 2) + '\n');
   return rel;
 }
 
