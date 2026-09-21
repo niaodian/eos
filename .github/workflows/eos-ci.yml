@@ -69,6 +69,11 @@ jobs:
         # an en-only edit from silently drifting the Chinese tree out of parity.
         run: node .github/hooks/check-doc-parity.mjs
 
+      - name: EOS software bill of materials (bound to the tree it describes)
+        # An SBOM nobody can tie to a build is a document, not evidence. --check fails when the
+        # committed one no longer describes this tree or these lockfiles. [audit #17]
+        run: node .github/eos/eos.mjs sbom --check
+
       - name: EOS governance version compatibility
         # schemaVersion used to be written into every governance file and read by nothing. This
         # reads it: a file written by a NEWER EOS fails closed rather than being reinterpreted by

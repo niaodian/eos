@@ -421,3 +421,71 @@ test('docs without a flag writes nothing', () => {
   assert.equal(existsSync(join(dir, 'docs/eos/generated/gates.md')), false, 'a dry run must not write');
   assert.match(r.out, /Nothing was written/);
 });
+
+// ---------------------------------------------------------------- SBOM [audit #17]
+// An SBOM nobody can tie to a build is a document, not evidence. The generated file binds the
+// commit, the product-tree digest and the lockfile digests, so it is invalidated by the same rules
+// that invalidate gate evidence: change what it describes and it stops describing it.
+test('sbom --write binds the SBOM to the tree and commit it describes', () => {
+  const dir = project({ '.eos/project.json': APP_PROJECT });
+  assert.equal(run(dir, ['sbom', '--write']).code, 0);
+  const sbom = JSON.parse(readFileSync(join(dir, '.eos/sbom.json'), 'utf8'));
+  assert.equal(sbom.bomFormat, 'CycloneDX');
+  const prop = (n) => sbom.metadata.properties.find((p) => p.name === n)?.value;
+  assert.ok(prop('eos:productTreeDigest'), 'an unbound SBOM is just a list');
+  assert.ok(prop('eos:commit'));
+});
+
+test('sbom enumerates real components from an npm lockfile', () => {
+  const dir = project({
+    '.eos/project.json': APP_PROJECT,
+    'package-lock.json': {
+      name: 'x', lockfileVersion: 3,
+      packages: { '': { name: 'x' }, 'node_modules/left-pad': { version: '1.3.0', integrity: 'sha512-abc' } },
+    },
+  });
+  const r = runJson(dir, ['sbom', '--write']);
+  assert.equal(r.json.components, 1, r.out);
+  const sbom = JSON.parse(readFileSync(join(dir, '.eos/sbom.json'), 'utf8'));
+  assert.equal(sbom.components[0].name, 'left-pad');
+  assert.equal(sbom.components[0].purl, 'pkg:npm/left-pad@1.3.0');
+});
+
+test('an unresolvable ecosystem is reported, never silently counted as clean', () => {
+  const dir = project({ '.eos/project.json': { ...APP_PROJECT, stacks: ['python'] }, 'poetry.lock': '# lock\n' });
+  const r = runJson(dir, ['sbom', '--write']);
+  assert.equal(r.json.components, 0);
+  assert.ok(r.json.notes.some((n) => /does not parse python lockfiles/.test(n)), JSON.stringify(r.json.notes));
+  // …and a human reading the plain output must see it too: an unexplained empty component list
+  // reads as "clean" when it means "unknown".
+  assert.match(run(dir, ['sbom']).out, /Not resolved/);
+});
+
+test('sbom --check is clean after a write and fails when a lockfile moves', () => {
+  const dir = project({
+    '.eos/project.json': APP_PROJECT,
+    'package-lock.json': { name: 'x', lockfileVersion: 3, packages: { '': { name: 'x' }, 'node_modules/a': { version: '1.0.0' } } },
+  });
+  run(dir, ['sbom', '--write']);
+  assert.equal(run(dir, ['sbom', '--check']).code, 0);
+
+  write(dir, 'package-lock.json', { name: 'x', lockfileVersion: 3, packages: { '': { name: 'x' }, 'node_modules/a': { version: '9.9.9' } } });
+  const r = run(dir, ['sbom', '--check']);
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.out, /lockfile changed|different component set/);
+});
+
+test('a missing SBOM is MISSING, not quietly fresh', () => {
+  const r = run(project({ '.eos/project.json': APP_PROJECT }), ['sbom', '--check']);
+  assert.equal(r.code, 1);
+  assert.match(r.out, /does not exist/);
+});
+
+test('writing the SBOM does not invalidate the tree the SBOM describes', () => {
+  // The self-reference the machine summaries already had to solve: if the SBOM counted towards the
+  // product tree, writing it would change the digest it had just recorded, and it could never be
+  // fresh even once.
+  const dir = project({ '.eos/project.json': APP_PROJECT });
+  run(dir, ['sbom', '--write']);
+  assert.equal(run(dir, ['sbom', '--check']).code, 0, 'an SBOM must be able to be fresh immediately after being written');
+});

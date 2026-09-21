@@ -25,6 +25,7 @@ import { loadProviders, consult } from './adapters/contract.mjs';
 import { syncWorkspaceRule } from './lib/workspace-rule.mjs';
 import { generateDocs } from './lib/docgen.mjs';
 import { planMigration, applyMigration, compatibilityErrors } from './lib/migrate.mjs';
+import { buildSbom, sbomFreshness, sbomDigest, SBOM_PATH } from './lib/sbom.mjs';
 import { loadWaivers, expiredWaivers, waiverStatus } from './lib/waivers.mjs';
 import { writeFileAtomic } from './lib/atomic.mjs';
 import { resolveAction, ACTIVE_WORK_PATH } from './lib/registry.mjs';
@@ -55,6 +56,7 @@ usage: node .github/eos/eos.mjs <command> [flags]
   focus --scope <type> --id <id>          set this machine's local focus (no authority)
   init [--write]                          write .vscode/tasks.json only (NOT the /eos-init hardening walkthrough)
   stack sync [--write]                    render the always-on workspace rule from .eos/project.json
+  sbom [--write] [--check]                software bill of materials, bound to the tree
   migrate [--apply]                       governance file versions; plan first, then apply
   docs [--write] [--check]                regenerate the docs that restate the policy
   health                                  blockers, stale evidence, waivers, trend — one screen
@@ -570,6 +572,41 @@ const commands = {
     lines.push('');
     if (!flags.apply) lines.push('  Nothing was written. Re-run with --apply once the diff above is what you expect.', '');
     lines.push('PASS', '');
+    emit(flags, json, lines.join('\n'));
+    return EXIT.OK;
+  },
+
+  /**
+   * Generate or verify the software bill of materials.
+   *
+   * An SBOM nobody can tie to a build is a document, not evidence, so the generated file binds the
+   * commit, the product-tree digest and the lockfile digests. That makes it invalidatable by the
+   * same rules as gate evidence: change what it describes, and it stops describing it.
+   */
+  sbom(snapshot, flags) {
+    const { sbom, notes } = buildSbom(snapshot);
+    const full = join(snapshot.root, SBOM_PATH);
+    if (flags.check) {
+      const fresh = sbomFreshness(snapshot);
+      const json = { path: SBOM_PATH, status: fresh.status, reasons: fresh.reasons, components: sbom.components.length };
+      const lines = [`EOS sbom · ${fresh.status}`, ''];
+      for (const r of fresh.reasons) lines.push(`  ${r}`);
+      if (fresh.status === 'FRESH') lines.push(`  ${SBOM_PATH} describes the current tree (${sbom.components.length} component(s))`);
+      lines.push('', fresh.status === 'FRESH' ? 'PASS' : 'FAIL', '');
+      emit(flags, json, lines.join('\n'));
+      return fresh.status === 'FRESH' ? EXIT.OK : EXIT.FAIL;
+    }
+    const body = `${JSON.stringify(sbom, null, 2)}\n`;
+    const changed = !existsSync(full) || readFileSync(full, 'utf8') !== body;
+    if (flags.write && changed) writeFileAtomic(full, body);
+    const json = { path: SBOM_PATH, written: !!(flags.write && changed), components: sbom.components.length, notes, digest: sbomDigest(sbom) };
+    const lines = [`EOS sbom · ${sbom.components.length} component(s)`, '',
+      `  ${flags.write ? (changed ? 'written' : 'up to date') : 'would write'}  ${SBOM_PATH}`,
+      `  bound to    commit ${snapshot.commit ? snapshot.commit.slice(0, 8) : '(no git)'} · tree ${(sbom.metadata.properties.find((p) => p.name === 'eos:productTreeDigest')?.value || '').slice(0, 12)}`, ''];
+    // Anything that could NOT be resolved has to be loud: an unexplained short component list reads
+    // as "clean" when it actually means "unknown".
+    if (notes.length) { lines.push('Not resolved'); for (const n of notes) lines.push(`  ${n}`); lines.push(''); }
+    if (!flags.write) lines.push('  Nothing was written. Re-run with --write to apply, or --check to verify freshness.', '');
     emit(flags, json, lines.join('\n'));
     return EXIT.OK;
   },
