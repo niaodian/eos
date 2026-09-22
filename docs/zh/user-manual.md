@@ -5,7 +5,7 @@
 
 # EOS 用户手册（Engineering Operating System User Manual）
 
-> 版本：与 `docs/eos/VERSION` 同步（当前 `eos-1.17.0`）
+> 版本：与 `docs/eos/VERSION` 同步（当前 `eos-1.18.0`）
 > 适用：较新版本的 VS Code + GitHub Copilot Chat（自定义 agent / hooks 属近版能力，用「关于 VS Code」面板确认版本）+ 已安装 73 个 `bmad-*` skill（用户级）
 > 定位：本手册是**操作指南（怎么用）**；设计原理与取舍见同目录 `blueprint.md`（为什么这么设计）。
 > 约定：正文中文；文件名/路径/命令/配置键保留英文原文。
@@ -172,7 +172,7 @@ bmad-code-review                   → 审查无阻断项           (Gate G6)
 **方式 A — degit（推荐，最快）**
 ```sh
 # public 模板 —— 直接 degit（无需鉴权）
-npx degit niaodian/eos#eos-1.17.0 my-new-app
+npx degit niaodian/eos#eos-1.18.0 my-new-app
 cd my-new-app
 git init && git add -A && git commit -m "chore: scaffold from eos"
 ```
@@ -209,7 +209,7 @@ node .github/hooks/validate-config.mjs      # 期望：PASS
 ## 3.4 Day-1 完整序列（复制即用）
 
 ```sh
-npx degit niaodian/eos#eos-1.17.0 my-new-app && cd my-new-app
+npx degit niaodian/eos#eos-1.18.0 my-new-app && cd my-new-app
 git init && git add -A && git commit -q -m "chore: scaffold from eos"
 node .github/hooks/validate-config.mjs
 # 关键：从项目目录内执行 `code .`，让 my-new-app 成为工作区根（含 .github/）。
@@ -328,7 +328,7 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 | 项 | 内容 |
 |---|---|
 | **目标** | 从模板得到一个配置健康的空项目 |
-| **怎么启动** | `npx degit niaodian/eos#eos-1.17.0 my-app && cd my-app` |
+| **怎么启动** | `npx degit niaodian/eos#eos-1.18.0 my-app && cd my-app` |
 | **产出** | 完整 `.github/` + `docs/` 骨架 |
 | **门** | `node .github/hooks/validate-config.mjs` → **PASS** |
 | **必查** | PASS 0 errors。**栈未定则先别改** `00-workspace`——保留 Node 占位即可；栈是不可逆决策，权威锁定在**阶段 4（ADR）**。已知栈可即抄 `docs/eos/stack-presets.md`（快路径）。 |
@@ -599,7 +599,7 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 
 ### 第 0 步：建项目 + 选栈（5 分钟）
 ```sh
-npx degit niaodian/eos#eos-1.17.0 todo-api && cd todo-api
+npx degit niaodian/eos#eos-1.18.0 todo-api && cd todo-api
 node .github/hooks/validate-config.mjs          # 期望 PASS
 ```
 **已定栈**？打开 `.github/instructions/00-workspace.instructions.md` 把 `Local commands` 抄成你的栈块（`docs/eos/stack-presets.md`，快路径）。
@@ -662,7 +662,7 @@ SaaS 的 **G7** 要求：每条 AC ≥1 测试、**API 契约测试**（对 open
 
 ### 第 0 步：建项目 + 建 AI 目录
 ```sh
-npx degit niaodian/eos#eos-1.17.0 cs-agent && cd cs-agent
+npx degit niaodian/eos#eos-1.18.0 cs-agent && cd cs-agent
 mkdir -p ai/prompts evals                       # AI 代码放这里，自动叠加 Agentic 规则
 node .github/hooks/validate-config.mjs          # 期望 PASS
 ```
@@ -1040,16 +1040,16 @@ Agent 输出不符预期
 ```sh
 # 方式 A：degit（public 仓库，无需鉴权）
 # 固定到 release tag：默认分支会移动，tag 不会。
-npx degit niaodian/eos#eos-1.17.0 my-app
+npx degit niaodian/eos#eos-1.18.0 my-app
 
 # 方式 B：在 tag 上 clone，并开一段全新历史
-git clone --depth 1 --branch eos-1.17.0 https://github.com/niaodian/eos.git my-app
-cd my-app && git checkout --orphan main && git commit -m "chore: start from eos-1.17.0"
+git clone --depth 1 --branch eos-1.18.0 https://github.com/niaodian/eos.git my-app
+cd my-app && git checkout --orphan main && git commit -m "chore: start from eos-1.18.0"
 ```
 
 ## 10.3 分发给团队（纯本地、无企业依赖）
 
-1. 所有人从**同一个 release tag**（`eos-1.17.0`）开始。默认分支会持续变动，
+1. 所有人从**同一个 release tag**（`eos-1.18.0`）开始。默认分支会持续变动，
    不固定版本就意味着每个人拿到的都是略有差异的 EOS。
 2. `【需组织/GitHub 设置】` GitHub **template repository** 属于所有者级设置：EOS 既无法替你设置，
    也无法在本地验证，所以别信本页面的说法——
@@ -1142,7 +1142,27 @@ node .github/eos/eos.mjs check --gate release-ready --scope <id>
 已记录证据会因门禁版本变动而 `STALE` 一次，重跑门禁即可清除。无需重写台账，也无需手工编辑。
 
 
-### 10.4.4 `evidencePolicy` —— 你的发布证据需要多强的来源证明
+### 10.4.4 从 `eos-1.17.x` 升级到 `eos-1.18.0`
+
+增量升级。已有内容全部照常工作，但有三处行为变化，外加一项你会想要的正确性修复。
+
+| 发生了什么变化 | 你会看到什么 | 你要做什么 |
+|---|---|---|
+| **账本在并发写入下是安全的** | 没遇到过就不会看到 | `appendEvent` 此前不加锁，两个进程同时写入（两个 Agent、Hook 与终端抢跑、CI 与本地抢跑）会让哈希链分叉，`ledger --verify` 随后报告一次根本没发生过的篡改。证据、Waiver、清单与 head 记录现在也都是原子写入。如果你曾见过莫名其妙的"账本被重写"，原因就在这里。 |
+| **没有产品代码的仓库不再报告 PASS** | `project-gate` 以 `NOT_APPLICABLE: no product code was verified` 结束；`status` 与 `doctor` 显示 `NO PRODUCT CODE VERIFIED` | 无需动作 —— 退出码仍然是 0。如果你此前把那个 PASS 读成"代码已验证"，它从来就不是那个意思。代码落地后，请声明 `application`/`library` 并填写 `commands.test`。 |
+| **门禁结果自带来源信息** | `check --json` 新增 `policySource`、`affectedArtifacts`、`rerunCommand`、`waiverEligible`；每项 Check 新增 `artifact` | 无需动作。原先解析散文的消费者现在可以直接读字段。 |
+| **来自更新版 EOS 的文件现在会 fail closed** | `EOS ERROR — this repository was written by a newer version of EOS` | 升级 EOS。`eos migrate` 会说明版本差距，并且绝不会重写一个它无法完全理解的文件。 |
+
+新增命令均为可选：`verify`（只跑本次改动可能影响到的门禁）、`health`（阻塞项、失效证据、Waiver、
+趋势）、`migrate`、`sbom`、`docs`（从策略生成门禁参考、状态图与证据图）、`new`（从 Starter Pack
+生成 `.eos/project.json`）。
+
+`standard-product` 之上新增两档工作流 Profile：`controlled` 完全不允许 Waiver，`regulated` 在此
+基础上还要求每次变更分类都记录理由。逐档严格不弱于下一档，并有测试强制这一点。通过
+`.eos/project.json` 的 `workflowProfile` 切换，然后重新验证：
+`node .github/eos/eos.mjs verify --full`。
+
+### 10.4.5 `evidencePolicy` —— 你的发布证据需要多强的来源证明
 
 `docs/evidence/*.json` 只是磁盘上的字节。CI 产出的摘要和人手敲的摘要**字节完全一样**，唯一区别是
 `producer` 字段 —— 那是一个**声明**，不是证明。因此由项目声明它需要多强的来源证明，EOS 执行*它*：
@@ -1169,7 +1189,7 @@ node .github/eos/eos.mjs check --gate release-ready --scope <id>
 见 [ADR-005](../adr/005-external-authority-boundary.md)。
 
 
-### 10.4.5 Provider adapter —— 让 EOS 去问一个它自己当不了的权威
+### 10.4.6 Provider adapter —— 让 EOS 去问一个它自己当不了的权威
 
 有两件事，跑在你笔记本上的程序无从知晓：服务端是否真的在强制分支保护，以及一个构建是否真的来自
 它所声称的流水线。EOS 对这两件事都诚实地报告（`BLOCKED` / `UNVERIFIED`）然后止步。adapter 就是让
@@ -1279,7 +1299,7 @@ EOS 的栈规则是**可插拔**的。新增一个栈 = 加一个 `*.instruction
 
 ```
 # ── 终端 —— 唯一循环（日常只需要这些）──
-npx degit niaodian/eos#eos-1.17.0 my-app   # 新建项目
+npx degit niaodian/eos#eos-1.18.0 my-app   # 新建项目
 node .github/eos/eos.mjs init --write               # 本地 VS Code 任务（绝不覆盖已有文件）
 node .github/eos/eos.mjs next                       # 唯一的下一步、为什么、怎么开始
 node .github/eos/eos.mjs resume                     # 新会话？接着上次继续
@@ -1335,7 +1355,7 @@ bmad-tea / bmad-testarch-*   # 阶段7：测试+追溯        → G7
 
 **复现**（终端）：
 ```sh
-npx degit niaodian/eos#eos-1.17.0 my-app && cd my-app
+npx degit niaodian/eos#eos-1.18.0 my-app && cd my-app
 node .github/hooks/validate-config.mjs        # PASS
 npm test                                       # 10/10 green
 echo '{"tool_input":{"command":"rm -rf /tmp/x"}}' | node .github/hooks/deny-dangerous.js  # deny

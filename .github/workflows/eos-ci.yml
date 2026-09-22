@@ -260,18 +260,34 @@ jobs:
 
       - name: Does this repository release a product?
         id: releasable
-        # EOS's own repository declares `config-only` — it ships governance, not a product — so the
-        # release gate has nothing to test and correctly reports BLOCKED. Running it anyway would
-        # make every tag red for a reason that is not a defect. Downstream product repositories
-        # declare `application`/`library` and DO run the gate below.
+        # WHAT THIS GUARD IS FOR: the candidate-bound release gate verifies a release MANIFEST —
+        # which stories ship, and whether each one's verification describes THIS tree. A repository
+        # with nothing declared to ship has nothing for it to verify, and running it anyway would
+        # make every tag red for a reason that is not a defect.
+        #
+        # It used to key off `projectType: config-only`, which stopped being true when EOS declared
+        # its own engine as an application so its own quality gate would actually execute. The
+        # accurate condition is the manifest, not the project type.
+        #
+        # This is NOT an escape hatch: a repository that HAS stories but no manifest FAILS here,
+        # so "delete the manifest to skip the release gate" does not work.
         run: |
           TYPE=$(node -e "try{process.stdout.write(require('./.eos/project.json').projectType||'')}catch{process.stdout.write('')}")
-          echo "projectType=$TYPE"
-          if [ "$TYPE" = "application" ] || [ "$TYPE" = "library" ]; then
-            echo "run=true" >> "$GITHUB_OUTPUT"
-          else
+          MANIFESTS=$(ls .eos/releases/*.json 2>/dev/null | wc -l | tr -d ' ')
+          STORIES=$(ls docs/stories/*.md 2>/dev/null | wc -l | tr -d ' ')
+          echo "projectType=$TYPE manifests=$MANIFESTS stories=$STORIES"
+          if [ "$TYPE" != "application" ] && [ "$TYPE" != "library" ]; then
             echo "run=false" >> "$GITHUB_OUTPUT"
             echo "::notice::projectType is '${TYPE:-unset}' — there is no product to release-verify. Declare application/library in .eos/project.json to enable the candidate-bound release gate."
+          elif [ "$MANIFESTS" -gt 0 ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          elif [ "$STORIES" -gt 0 ]; then
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "::error::This repository has $STORIES story/stories but no release manifest under .eos/releases/. Run 'node .github/eos/eos.mjs release init --release <id>' and declare what this tag ships — a tag that ships unnamed work cannot be verified."
+            exit 1
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::No stories and no release manifest — this repository ships tooling, not story-based product increments. The 'verify' job is the gate for this tag."
           fi
 
       - name: Install the declared toolchain for the candidate
