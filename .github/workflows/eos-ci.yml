@@ -213,11 +213,18 @@ jobs:
         with:
           node-version: '20'
       - name: EOS tests · unit + contract
-        # A shared runner is slower and noisier than the Linux one; scale the budget rather than
-        # raising it, so a breach keeps meaning the same thing on every platform.
-        env:
-          EOS_TEST_BUDGET_SCALE: '3'
-        run: node .github/eos/run-tests.mjs unit contract
+        # Budgets are NOT enforced here, and that is deliberate rather than a concession.
+        #
+        # These layers are dominated by process spawns, and Windows spawns are roughly 15x more
+        # expensive than on the Linux runner (measured: unit 4.2s -> 63s, contract 8.0s -> 91s).
+        # A scale factor large enough to accommodate that would have to be ~20x, which would make
+        # the number meaningless as a regression signal anywhere.
+        #
+        # So each job asserts the thing it is actually good at: this one asserts the tests PASS on
+        # another platform, and the Linux `verify` job asserts they pass FAST, at scale 1, where a
+        # regression is visible. Timings are still printed here — they are useful data, they just
+        # do not gate.
+        run: node .github/eos/run-tests.mjs unit contract --no-budget
 
   # ---------------------------------------------------------------------------------------------
   # COVERAGE. A ratchet, not a target: the thresholds in .eos/test-budget.json sit just below the
