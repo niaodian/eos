@@ -17,14 +17,19 @@ import { execFile } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync, openSync, closeSync, utimesSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname } from 'node:path';
 import { appendEvent, readEvents, verifyChain, LEDGER_PATH, LEDGER_HEAD_PATH, LEDGER_LOCK_PATH } from './lib/ledger.mjs';
 import { writeFileAtomic, withLock, LockTimeoutError } from './lib/atomic.mjs';
 
 const EOS_DIR = dirname(fileURLToPath(import.meta.url));
-const LEDGER_MODULE = join(EOS_DIR, 'lib/ledger.mjs');
-const ATOMIC_MODULE = join(EOS_DIR, 'lib/atomic.mjs');
+// These are ESM SPECIFIERS embedded in snippets run by a child `node`, not filesystem paths. On
+// Windows an absolute path is not a valid specifier — `import … from 'D:\\…'` fails with
+// ERR_UNSUPPORTED_ESM_URL_SCHEME ("Received protocol 'd:'") — so they have to be file:// URLs.
+// POSIX tolerated the raw path, which is exactly why this only showed up once the suite ran on
+// Windows. Anything passed to `fs` below stays a plain path.
+const LEDGER_MODULE = pathToFileURL(join(EOS_DIR, 'lib/ledger.mjs')).href;
+const ATOMIC_MODULE = pathToFileURL(join(EOS_DIR, 'lib/atomic.mjs')).href;
 
 const dirs = [];
 const sandbox = () => { const d = mkdtempSync(join(tmpdir(), 'eos-atomic-')); dirs.push(d); return d; };
