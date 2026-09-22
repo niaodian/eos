@@ -26,3 +26,10 @@
 *.otf   binary
 *.zip   binary
 *.gz    binary
+
+# The append-only ledger must NEVER be auto-merged. A textual merge of two appended tails produces
+# duplicated sequence numbers and prevHash pointers that lead nowhere — a chain that `ledger
+# --verify` correctly rejects, after git has already "succeeded". `-merge` forces a conflict
+# instead, and `eos ledger --resolve` replays both sides into one valid chain keeping every event.
+.eos/ledger/events.jsonl -merge
+.eos/ledger/head.json    -merge

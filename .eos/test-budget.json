@@ -47,6 +47,7 @@
       "files": [
         ".github/eos/bypass.test.mjs",
         ".github/eos/incremental.test.mjs",
+        ".github/eos/ledger-merge.test.mjs",
         ".github/eos/router.test.mjs",
         ".github/hooks/eos-doctor.test.mjs",
         ".github/hooks/project-gate.test.mjs"
