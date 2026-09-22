@@ -9,7 +9,7 @@ import { project, write, run, runJson, cleanup, APP_PROJECT, PRD_2AC, story, EOS
   baselineFiles, storyFiles, testRun, commitAll, git, TEST_FILE, TRACE_MATRIX } from './test-support.mjs';
 import { validate } from './lib/schema.mjs';
 import { loadWorkflow, loadGates, loadAgentMap } from './lib/registry.mjs';
-import { readSnapshot, gateCollections } from './lib/state.mjs';
+import { readSnapshot, gateCollections, parsePorcelain } from './lib/state.mjs';
 import { legalTransitions, planTransition } from './lib/transitions.mjs';
 import { readEvents, appendEvent, verifyChain, stateOf } from './lib/ledger.mjs';
 import { evidenceFreshness } from './lib/evidence.mjs';
@@ -367,4 +367,42 @@ test('paths: evidence and story lookup work with backslash-style relative input'
   for (const input of r.json.evidence.inputs) {
     assert.ok(!input.path.includes('\\'), `evidence paths must be POSIX-normalized: ${input.path}`);
   }
+});
+
+// ---------------------------------------------------------------- changed-file detection
+// `git status --porcelain` puts TWO status columns before the path, and either may be a space:
+// a plain modified file is " M path". The reader used to trim the whole output first, which ate
+// that leading space on the FIRST line only — so slice(3) cut one character too many and
+// ".eos/workflow.json" was reported as "eos/workflow.json". Silent, and wrong in exactly the most
+// common case: every consumer (stale-evidence detection, `status --changed`, `verify`) then
+// failed to match the file against anything.
+test('parsePorcelain keeps a leading dot on the first modified file', () => {
+  assert.deepEqual(parsePorcelain(' M .eos/workflow.json\n'), ['.eos/workflow.json']);
+});
+
+test('parsePorcelain handles every status column combination', () => {
+  const raw = [' M docs/prd.md', 'M  src/a.ts', 'A  src/b.ts', '?? untracked.md', 'MM both.ts', ' D gone.ts'].join('\n');
+  assert.deepEqual(parsePorcelain(raw), ['docs/prd.md', 'src/a.ts', 'src/b.ts', 'untracked.md', 'both.ts', 'gone.ts']);
+});
+
+test('parsePorcelain reports the destination of a rename, which is the file that exists now', () => {
+  assert.deepEqual(parsePorcelain('R  docs/old.md -> docs/new.md'), ['docs/new.md']);
+});
+
+test('parsePorcelain unquotes a path git chose to quote', () => {
+  assert.deepEqual(parsePorcelain(' M "docs/a b.md"'), ['docs/a b.md']);
+});
+
+test('parsePorcelain distinguishes "no git" from "nothing changed"', () => {
+  assert.equal(parsePorcelain(null), null, 'null means EOS cannot see the change set and must skip nothing');
+  assert.deepEqual(parsePorcelain(''), [], 'empty means a clean tree');
+});
+
+test('a real modified governance file is detected end to end', () => {
+  const dir = project(baselineFiles());
+  commitAll(dir, 'baseline');
+  write(dir, '.eos/workflow.json', JSON.parse(readFileSync(join(dir, '.eos/workflow.json'), 'utf8')));
+  writeFileSync(join(dir, 'docs/prd.md'), PRD_2AC + '\nedited\n', 'utf8');
+  const snap = readSnapshot(dir);
+  assert.ok(snap.changedFiles.includes('docs/prd.md'), JSON.stringify(snap.changedFiles));
 });

@@ -35,10 +35,13 @@ export async function check({ root, subject, options, now }) {
 
   const r = spawnSync('gh', args, { cwd: root, encoding: 'utf8', timeout: timeoutMs });
   if (r.error) {
+    // A missing binary is a permanent fact about this machine; a timeout is not. Only the second
+    // is worth asking again.
+    const timedOut = r.error.code === 'ETIMEDOUT';
     const why = r.error.code === 'ENOENT'
       ? 'the GitHub CLI (`gh`) is not installed'
-      : r.error.code === 'ETIMEDOUT' ? `\`gh attestation verify\` timed out after ${timeoutMs}ms` : r.error.message;
-    return result({ provider: PROVIDER, subject, status: 'UNVERIFIED', now, detail: why });
+      : timedOut ? `\`gh attestation verify\` timed out after ${timeoutMs}ms` : r.error.message;
+    return result({ provider: PROVIDER, subject, status: 'UNVERIFIED', now, detail: why, transient: timedOut });
   }
   const out = ((r.stdout || '') + (r.stderr || '')).trim();
 
@@ -60,5 +63,6 @@ export async function check({ root, subject, options, now }) {
   }
   // Everything else is "I could not find out": never a pass, never a new blocker.
   return result({ provider: PROVIDER, subject, status: 'UNVERIFIED', now,
+    transient: /dial tcp|no such host|network|timeout|ENOTFOUND|connection reset|503|502|504/i.test(out),
     detail: out.split('\n').filter(Boolean).slice(-1)[0]?.slice(0, 160) || `gh exited ${r.status}` });
 }

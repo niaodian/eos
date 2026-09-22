@@ -28,7 +28,18 @@ export const STACK_PRESETS = {
 };
 
 const LABELS = { install: 'Install', lint: 'Lint', test: 'Test', typecheck: 'Typecheck', eval: 'Eval', audit: 'Audit' };
-const COMMANDS_LINE = /^- Install:.*$/m;
+
+// The commands line, whatever it happens to start with. This used to be `/^- Install:.*$/m`, which
+// silently assumed every project declares an install step. A project that declares only
+// `commands.test` renders `- Test: …`, and the anchor could then never match its own output again:
+// `stack sync` became a one-shot that stopped being able to update the line it had just written.
+// The anchor therefore has to accept any label the renderer or a preset can emit.
+const COMMAND_LABELS = [...new Set([
+  ...Object.values(LABELS),
+  ...Object.values(STACK_PRESETS).flatMap((preset) => Object.keys(preset)),
+])];
+const COMMANDS_LINE = new RegExp(`^- (?:${COMMAND_LABELS.join('|')}): .*$`, 'm');
+const LOCAL_COMMANDS_HEADING = /^## Local commands.*$/m;
 // The whole provisional block: the ⛳ heading marker plus the blockquote that explains it. Both
 // exist only to say "no stack has been chosen yet", so both are wrong once one has been.
 const PROVISIONAL_MARKER = / {2}⛳ PROVISIONAL[^\n]*/;
@@ -89,7 +100,14 @@ export function renderCommandsLine(project) {
  */
 export function applyToRule(text, line) {
   let out = text;
-  if (COMMANDS_LINE.test(out)) out = out.replace(COMMANDS_LINE, line);
+  if (COMMANDS_LINE.test(out)) {
+    out = out.replace(COMMANDS_LINE, line);
+  } else if (LOCAL_COMMANDS_HEADING.test(out)) {
+    // Self-healing: the section exists but states no commands (someone deleted the line, or an
+    // older template never had one). Writing it is strictly better than reporting success while
+    // leaving the always-on rule silent about how this project is built.
+    out = out.replace(LOCAL_COMMANDS_HEADING, (h) => `${h}\n${line}`);
+  }
   out = out.replace(PROVISIONAL_MARKER, '').replace(PROVISIONAL_NOTE, '');
   return { text: out, changed: out !== text };
 }

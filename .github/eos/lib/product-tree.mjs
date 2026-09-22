@@ -43,6 +43,11 @@ export const SELF_REFERENCE_PREFIXES = [
   // just recorded. They stay reviewable in git and are bound separately, as gate INPUTS, so editing
   // one after the fact still makes the recorded result STALE.
   'docs/evidence/',
+  // The SBOM records the tree digest it describes, so counting the SBOM itself would be the same
+  // impossible self-reference: writing the file would change the very digest it just recorded.
+  // Freshness is enforced instead by binding the lockfile digests and re-deriving the component
+  // set, so a dependency change still invalidates it.
+  '.eos/sbom.json',
 ];
 
 export const isSelfReference = (rel) => SELF_REFERENCE_PREFIXES.some((p) => rel.startsWith(p));

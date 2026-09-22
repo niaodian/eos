@@ -18,12 +18,17 @@ import { appendEvent, readEvents, verifyChain, LEDGER_PATH } from './lib/ledger.
 import { route, activeScope } from './lib/router.mjs';
 import { renderCard, renderGate, renderExplain } from './lib/render.mjs';
 import { buildHandoff, writeHandoff, readHandoff, verifyHandoff, handoffPath } from './lib/handoff.mjs';
-import { listEvidence, evidenceFreshness, validateEvidenceShape, sha256File } from './lib/evidence.mjs';
+import { listEvidence, evidenceFreshness, validateEvidenceShape, sha256File, readEvidence } from './lib/evidence.mjs';
 import { currentProductTree, uncommittedProductChanges } from './lib/product-tree.mjs';
 import { readManifest, manifestPath, manifestDigest as computeManifestDigest, listManifests } from './lib/release.mjs';
 import { loadProviders, consult } from './adapters/contract.mjs';
 import { syncWorkspaceRule } from './lib/workspace-rule.mjs';
-import { loadWaivers, expiredWaivers } from './lib/waivers.mjs';
+import { generateDocs } from './lib/docgen.mjs';
+import { planMigration, applyMigration, compatibilityErrors } from './lib/migrate.mjs';
+import { buildSbom, sbomFreshness, sbomDigest, SBOM_PATH } from './lib/sbom.mjs';
+import { PACKS, packDeclaration, packIds } from './lib/packs.mjs';
+import { loadWaivers, expiredWaivers, waiverStatus } from './lib/waivers.mjs';
+import { writeFileAtomic } from './lib/atomic.mjs';
 import { resolveAction, ACTIVE_WORK_PATH } from './lib/registry.mjs';
 
 const EXIT = { OK: 0, FAIL: 1, BLOCKED: 2, ERROR: 3 };
@@ -37,6 +42,7 @@ usage: node .github/eos/eos.mjs <command> [flags]
   next [--why] [--all]                    the single recommended next action
   resume                                  restore the local focus in a new session
   check --gate <id> [--scope <id>]        run one gate and record evidence
+  verify [--full] [--plan]                run the gates this change can have affected
   transition --scope <type> --id <id> --to <STATE>
   approve --scope <type> --id <id>        record an approval (a second person, never the requester)
   explain <gate>                          the full rule set for one gate
@@ -51,6 +57,11 @@ usage: node .github/eos/eos.mjs <command> [flags]
   focus --scope <type> --id <id>          set this machine's local focus (no authority)
   init [--write]                          write .vscode/tasks.json only (NOT the /eos-init hardening walkthrough)
   stack sync [--write]                    render the always-on workspace rule from .eos/project.json
+  new [<pack>] [--write]                  scaffold .eos/project.json from a starter pack
+  sbom [--write] [--check]                software bill of materials, bound to the tree
+  migrate [--apply]                       governance file versions; plan first, then apply
+  docs [--write] [--check]                regenerate the docs that restate the policy
+  health                                  blockers, stale evidence, waivers, trend — one screen
   doctor                                  is EOS itself wired correctly?
 
   global: --json  --why  --all  --no-color
@@ -135,10 +146,18 @@ const commands = {
       .filter(({ evidence }) => evidence && (evidence.inputs || []).some((i) => changed.includes(i.path)))
       .map(({ evidence }) => ({ gate: evidence.gate, scope: evidence.scope.id, status: 'STALE' }));
 
+    // A repository with no declared product code can satisfy every gate EOS has and still have had
+    // nothing about a product verified. Saying so on every `status` is the difference between
+    // "green" and "green, and here is exactly what that green does not cover".
+    const declaredType = snapshot.project?.projectType ?? null;
+    const productCodeVerified = snapshot.projectPresent && declaredType !== 'config-only';
+
     const json = {
       schemaVersion: 1,
       repo: { commit: snapshot.commit, root: snapshot.root },
       product: { state: product.state, blockedBy: product.blockedBy ? product.blockedBy.reason : null },
+      projectType: declaredType,
+      productCodeVerified,
       profile: snapshot.profileName,
       stories,
       active: decision.current,
@@ -164,6 +183,15 @@ const commands = {
       lines.push('');
     }
     lines.push('Product', `  ${product.state}${product.blockedBy ? ` — next guard: ${product.blockedBy.reason}` : ''}`, '');
+    if (!productCodeVerified) {
+      lines.push('Scope of this verdict',
+        snapshot.projectPresent
+          ? '  NO PRODUCT CODE VERIFIED — .eos/project.json declares "config-only", so no test, lint or'
+          : '  NO PRODUCT CODE VERIFIED — there is no .eos/project.json, so no test, lint or',
+        '  eval command is executed. Every gate below is about documents and governance only.',
+        '  Declare projectType "application" (or "library") with commands.test when code lands.',
+        '');
+    }
     if (stories.length) {
       lines.push('Stories');
       for (const s of stories) lines.push(`  ${s.id.padEnd(14)} ${String(s.state).padEnd(16)} ${s.changeType}`);
@@ -237,8 +265,410 @@ const commands = {
     return statusExit(result.status);
   },
 
-  transition(snapshot, flags) {
-    const scopeType = flags.scope === true || !flags.scope ? 'story' : flags.scope;
+  /**
+   * Run the gates this change can actually have affected.
+   *
+   * Every gate already DECLARES its inputs — that is how recorded evidence knows when it has gone
+   * stale. The same declaration answers a question nobody was asking it: given these changed files,
+   * which gates could possibly have a different answer than last time? Re-running all of them on
+   * every edit is what makes a governance tool something people route around.
+   *
+   * The selection is deliberately conservative. A gate is run when its inputs intersect the change,
+   * when a governance file changed (which invalidates everything by design), when its recorded
+   * evidence is already STALE or absent, or when EOS cannot see the changes at all. Skipping is
+   * only ever justified by evidence that is present AND fresh — "nothing changed" is never
+   * inferred from silence.
+   */
+  async verify(snapshot, flags) {
+    const full = !!flags.full;
+    const changed = snapshot.changedFiles;
+    const gates = snapshot.gates?.gates || [];
+
+    // Every (gate, scope) pair this repository could be asked about.
+    const targets = [];
+    for (const def of gates) {
+      if (def.scope === 'product') targets.push({ def, scopeType: 'product', scopeId: 'product' });
+      else if (def.scope === 'story') for (const s of snapshot.stories) targets.push({ def, scopeType: 'story', scopeId: s.id });
+      else if (def.scope === 'release') for (const m of listManifests(snapshot.root)) { if (m.releaseId) targets.push({ def, scopeType: 'release', scopeId: m.releaseId }); }
+    }
+
+    const GOVERNANCE = ['.eos/gates.json', '.eos/workflow.json', '.eos/project.json'];
+    const governanceChanged = changed === null ? [] : GOVERNANCE.filter((g) => changed.includes(g));
+
+    const plan = [];
+    for (const t of targets) {
+      const policy = gatePolicy(snapshot, changeTypeOf(snapshot, t.scopeType, t.scopeId), t.def.id);
+      if (policy === 'not_applicable') { plan.push({ ...t, run: false, reason: 'not applicable to this change type' }); continue; }
+      if (full) { plan.push({ ...t, run: true, reason: '--full' }); continue; }
+      if (changed === null) { plan.push({ ...t, run: true, reason: 'no git repository — the change set is unknown, so nothing may be skipped' }); continue; }
+      if (governanceChanged.length) { plan.push({ ...t, run: true, reason: `governance changed (${governanceChanged.join(', ')}) — every prior result is invalidated by design` }); continue; }
+
+      const prior = readEvidence(snapshot.root, t.def.id, t.scopeType, t.scopeId);
+      if (!prior.present || !prior.evidence) { plan.push({ ...t, run: true, reason: 'no recorded evidence' }); continue; }
+      const fresh = evidenceFreshness(snapshot.root, prior.evidence, {
+        gateDefinition: t.def,
+        expectedInputs: gateInputs(snapshot, t.def.id, t.scopeType, t.scopeId),
+        collections: gateCollections(snapshot, t.def.id, t.scopeType, t.scopeId),
+      });
+      if (fresh.status !== 'FRESH') { plan.push({ ...t, run: true, reason: `evidence is STALE: ${fresh.reasons[0]}` }); continue; }
+
+      const inputs = gateInputs(snapshot, t.def.id, t.scopeType, t.scopeId);
+      const hits = inputs.filter((i) => changed.includes(i));
+      if (hits.length) { plan.push({ ...t, run: true, reason: `inputs changed: ${hits.join(', ')}` }); continue; }
+      plan.push({ ...t, run: false, reason: `evidence is FRESH and none of its inputs changed (recorded ${prior.evidence.status})` });
+    }
+
+    const selected = plan.filter((p) => p.run);
+    if (flags.plan) {
+      const json = { full, changedFiles: changed, planned: plan.map((p) => ({ gate: p.def.id, scopeType: p.scopeType, scopeId: p.scopeId, run: p.run, reason: p.reason })) };
+      const lines = [`EOS verify · plan (${selected.length} of ${plan.length} gate-scope pair(s) would run)`, ''];
+      for (const p of plan) lines.push(`  ${(p.run ? 'RUN ' : 'skip').padEnd(5)} ${p.def.id.padEnd(20)} ${String(p.scopeId).padEnd(14)} ${p.reason}`);
+      lines.push('');
+      emit(flags, json, lines.join('\n'));
+      return EXIT.OK;
+    }
+
+    const results = [];
+    for (const p of selected) {
+      const providerVerdicts = await consultProviders(snapshot, p.def.id);
+      const { result, evidenceFile } = runGate(snapshot, p.def.id, p.scopeType, p.scopeId, { providerVerdicts });
+      appendEvent(snapshot.root, {
+        type: 'gate',
+        scope: { type: p.scopeType, id: String(p.scopeId) },
+        changeType: result.changeType,
+        gate: result.gate,
+        status: result.status,
+        evidenceSha256: evidenceFile ? sha256File(snapshot.root, evidenceFile) : null,
+        commit: snapshot.commit,
+        detail: evidenceFile || '',
+      });
+      results.push({ gate: p.def.id, scopeType: p.scopeType, scopeId: p.scopeId, status: result.status, reason: p.reason, rerunCommand: result.rerunCommand });
+    }
+    const skipped = plan.filter((p) => !p.run);
+    const worst = results.reduce((acc, r) => (isBlocking(r.status) && !isBlocking(acc) ? r.status : acc), 'PASS');
+    const json = { full, changedFiles: changed, ran: results, skipped: skipped.map((p) => ({ gate: p.def.id, scopeId: p.scopeId, reason: p.reason })), status: worst };
+    const lines = [`EOS verify · ${results.length} gate(s) run, ${skipped.length} skipped`, ''];
+    for (const r of results) lines.push(`  ${r.status.padEnd(15)} ${r.gate.padEnd(20)} ${String(r.scopeId).padEnd(14)} ${r.reason}`);
+    if (!results.length) lines.push('  nothing to re-verify — every applicable gate has fresh evidence covering the current inputs');
+    lines.push('', `  ${skipped.length} skipped · run with --full to re-verify everything · --plan to see the selection without running it`, '', worst, '');
+    emit(flags, json, lines.join('\n'));
+    return statusExit(worst);
+  },
+
+  /**
+   * One screen answering "what state is this project actually in?".
+   *
+   * `status` answers "what do I do next" and deliberately shows one thing. This answers the other
+   * question a lead asks — how much is blocked, how much of what is green is actually stale, what
+   * exceptions are outstanding, and is the trend getting better or worse. Every number here is
+   * derived from records that already existed (evidence, the ledger, waivers); none of it is a new
+   * source of truth, because a dashboard that can disagree with the engine is worse than no
+   * dashboard.
+   */
+  async health(snapshot, flags) {
+    const gates = snapshot.gates?.gates || [];
+    const events = readEvents(snapshot.root).events;
+
+    // --- workflow progress: the product spine, in order
+    const productGates = gates.filter((g) => g.scope === 'product');
+    const progress = productGates.map((def) => {
+      const policy = gatePolicy(snapshot, 'PRODUCT_BASELINE', def.id);
+      const recorded = recordedGateStatus(snapshot, def.id, 'product', 'product');
+      return { gate: def.id, code: def.code, policy, status: policy === 'not_applicable' ? 'NOT_APPLICABLE' : (recorded?.status || 'PENDING') };
+    });
+    const done = progress.filter((p) => ['PASS', 'WAIVED', 'NOT_APPLICABLE'].includes(p.status)).length;
+
+    // --- stale evidence: green that has stopped meaning anything
+    const stale = [];
+    for (const { file, evidence } of listEvidence(snapshot.root)) {
+      if (!evidence) { stale.push({ file, gate: null, scope: null, reason: 'unreadable' }); continue; }
+      const def = gates.find((g) => g.id === evidence.gate);
+      const f = evidenceFreshness(snapshot.root, evidence, {
+        gateDefinition: def,
+        expectedInputs: gateInputs(snapshot, evidence.gate, evidence.scope.type, evidence.scope.id),
+        collections: gateCollections(snapshot, evidence.gate, evidence.scope.type, evidence.scope.id),
+      });
+      if (f.status === 'STALE') stale.push({ file, gate: evidence.gate, scope: evidence.scope.id, reason: f.reasons[0] });
+    }
+
+    // --- waivers: every exception currently in force, and every one that has outlived itself
+    const { waivers, errors: waiverErrors } = loadWaivers(snapshot.root);
+    const expired = expiredWaivers(snapshot.root);
+    const waiverRows = waivers.map((w) => {
+      const s = waiverStatus(w.waiver, {
+        gateId: w.waiver?.gate, scopeType: w.waiver?.scope?.type, scopeId: w.waiver?.scope?.id,
+      });
+      return {
+        gate: w.waiver?.gate ?? null,
+        scope: w.waiver?.scope?.id ?? null,
+        riskOwner: w.waiver?.riskOwner ?? null,
+        approver: w.waiver?.approver || null,
+        expiresOn: w.waiver?.expiresOn ?? null,
+        expired: expired.some((e) => e.file === w.file),
+        // A drafted waiver is NOT in effect but IS an outstanding exception someone intends to
+        // take. Hiding it until approval would mean the one moment it is worth reviewing — before
+        // it starts lifting a gate — is the one moment it is invisible.
+        inEffect: s.honored,
+        why: s.reason,
+        file: w.file,
+      };
+    });
+
+    // --- gate trend: is the first-pass rate improving or degrading?
+    const gateEvents = events.filter((e) => e.type === 'gate');
+    const recent = gateEvents.slice(-20);
+    const rate = (list) => (list.length ? Math.round((list.filter((e) => e.status === 'PASS').length / list.length) * 100) : null);
+    const trend = { total: gateEvents.length, allTimePassRate: rate(gateEvents), recentPassRate: rate(recent), recentWindow: recent.length };
+
+    // --- remote governance: what EOS could not verify by itself
+    const { providers, errors: providerErrors } = loadProviders(snapshot.root);
+    const remote = { configured: providers.map((p) => ({ adapter: p.adapter, subjects: p.subjects })), errors: providerErrors };
+
+    // --- releases
+    const releases = listManifests(snapshot.root)
+      .filter((m) => m.releaseId)
+      .map((m) => ({ releaseId: m.releaseId, state: scopeState(snapshot, 'release', m.releaseId), stories: m.manifest?.includedStories?.length ?? 0 }));
+
+    const decision = route(snapshot);
+    const blockers = decision.blockers || [];
+
+    const json = {
+      schemaVersion: 1,
+      profile: snapshot.profileName,
+      productCodeVerified: snapshot.projectPresent && snapshot.project?.projectType !== 'config-only',
+      progress: { done, total: progress.length, gates: progress },
+      blockers,
+      staleEvidence: stale,
+      waivers: waiverRows,
+      waiverErrors,
+      remoteGovernance: remote,
+      releases,
+      trend,
+      stories: snapshot.stories.map((s) => ({ id: s.id, state: scopeState(snapshot, 'story', s.id) })),
+    };
+
+    const bar = `${'█'.repeat(done)}${'░'.repeat(Math.max(0, progress.length - done))}`;
+    const lines = [`EOS health · ${snapshot.profileName}`, ''];
+    lines.push('Product baseline', `  ${bar}  ${done}/${progress.length} gates satisfied`);
+    for (const p of progress) lines.push(`  ${p.status.padEnd(15)} ${p.gate}`);
+    lines.push('');
+    if (!json.productCodeVerified) lines.push('Scope', '  NO PRODUCT CODE VERIFIED — every gate above is about documents and governance only', '');
+    lines.push(`Blockers (${blockers.length})`);
+    if (!blockers.length) lines.push('  none');
+    for (const b of blockers.slice(0, 8)) lines.push(`  ${String(b.status).padEnd(10)} ${b.gate}/${b.check} — ${b.detail}`);
+    lines.push('');
+    lines.push(`Stale evidence (${stale.length})`);
+    if (!stale.length) lines.push('  none — every recorded result still describes its inputs');
+    for (const s of stale.slice(0, 8)) lines.push(`  ${String(s.gate).padEnd(20)} ${String(s.scope).padEnd(14)} ${s.reason}`);
+    lines.push('');
+    lines.push(`Waivers (${waiverRows.length} · ${waiverRows.filter((w) => w.inEffect).length} in effect · ${waiverRows.filter((w) => w.expired).length} expired)`);
+    if (!waiverRows.length) lines.push('  none — nothing is being carried as an exception');
+    for (const w of waiverRows) {
+      const state = w.expired ? 'EXPIRED' : w.inEffect ? 'IN EFFECT' : 'DRAFT';
+      lines.push(`  ${state.padEnd(9)} ${String(w.gate).padEnd(18)} ${String(w.scope).padEnd(14)} owner ${w.riskOwner} until ${w.expiresOn}`);
+      if (!w.inEffect) lines.push(`            ${w.why}`);
+    }
+    for (const e of waiverErrors) lines.push(`  ERROR ${e}`);
+    lines.push('');
+    lines.push('Remote governance');
+    if (!remote.configured.length) lines.push('  no provider configured — anything EOS cannot verify locally stays BLOCKED/UNVERIFIED by design');
+    for (const p of remote.configured) lines.push(`  ${p.adapter} → ${(p.subjects || []).join(', ')}`);
+    for (const e of remote.errors) lines.push(`  ERROR ${e}`);
+    lines.push('');
+    lines.push('Releases');
+    if (!releases.length) lines.push('  none');
+    for (const r of releases) lines.push(`  ${String(r.releaseId).padEnd(14)} ${String(r.state).padEnd(12)} ${r.stories} story/stories`);
+    lines.push('');
+    lines.push('Gate trend',
+      trend.total ? `  ${trend.total} gate run(s) recorded · first-pass rate ${trend.allTimePassRate}% all time · ${trend.recentPassRate}% over the last ${trend.recentWindow}` : '  no gate has been run yet');
+    lines.push('');
+    emit(flags, json, lines.join('\n'));
+    // Health REPORTS; it does not gate. Exit stays 0 unless the state source itself is broken, so
+    // it is safe in a shell prompt or a watch loop.
+    return EXIT.OK;
+  },
+
+  /**
+   * Regenerate every document that restates the machine-readable policy — and, with --check, fail
+   * when a committed one no longer matches what the policy would produce.
+   *
+   * The same rule used to live in `.eos/gates.json`, in `docs/`, in the prompts and in the agent
+   * definitions, with nothing keeping them in step. Prose drifts from the engine one edit at a
+   * time, and the drift is only ever found by someone who acted on documentation that had quietly
+   * stopped being true. Generation makes the policy the only authority; --check makes CI enforce it.
+   */
+  docs(snapshot, flags) {
+    if (!snapshot.gates || !snapshot.workflow) {
+      console.log('EOS docs — .eos/gates.json and .eos/workflow.json must both be readable to generate from them.');
+      return EXIT.ERROR;
+    }
+    const generated = generateDocs(snapshot);
+    const rows = [];
+    for (const [rel, body] of Object.entries(generated)) {
+      const full = join(snapshot.root, rel);
+      const before = existsSync(full) ? readFileSync(full, 'utf8') : null;
+      const drifted = before !== body;
+      if (drifted && flags.write) { mkdirSync(dirname(full), { recursive: true }); writeFileAtomic(full, body); }
+      rows.push({ path: rel, present: before !== null, drifted, action: drifted ? (flags.write ? 'written' : 'would write') : 'up to date' });
+    }
+    const drift = rows.filter((r) => r.drifted);
+    const json = { generated: rows, drifted: drift.length, mode: flags.write ? 'write' : flags.check ? 'check' : 'plan' };
+    const lines = ['EOS docs · generated from the machine-readable policy', ''];
+    for (const r of rows) lines.push(`  ${r.action.padEnd(12)} ${r.path}`);
+    lines.push('');
+    if (flags.check && drift.length) {
+      lines.push(`  ${drift.length} generated file(s) no longer match the policy they are generated from.`,
+        '  Run `node .github/eos/eos.mjs docs --write` and commit the result, in the same change that',
+        '  altered the policy — documentation that describes a rule the engine no longer applies is',
+        '  worse than no documentation, because people act on it.', '', 'FAIL', '');
+      emit(flags, json, lines.join('\n'));
+      return EXIT.FAIL;
+    }
+    if (!flags.write && !flags.check) lines.push('  Nothing was written. Re-run with --write to apply, or --check to fail on drift.', '');
+    lines.push(flags.check ? 'PASS' : '', '');
+    emit(flags, json, lines.join('\n'));
+    return EXIT.OK;
+  },
+
+  /**
+   * Where every governance file stands relative to this engine, and what it would take to bring
+   * them into line.
+   *
+   * `schemaVersion` was being written into every governance file and read by nothing, which made it
+   * decoration rather than a contract. This reads it.
+   */
+  migrate(snapshot, flags) {
+    const plan = flags.apply ? applyMigration(snapshot.root) : planMigration(snapshot.root);
+    const json = {
+      schemaVersion: 1,
+      mode: flags.apply ? 'apply' : 'plan',
+      files: plan.files,
+      changes: plan.changes.map(({ after, ...rest }) => rest),
+      blocked: plan.blocked,
+      written: plan.written || [],
+      ok: plan.ok,
+    };
+    const lines = ['EOS migrate · governance file versions', ''];
+    for (const f of plan.files) lines.push(`  ${f.state.padEnd(12)} ${f.path.padEnd(26)} ${f.detail}`);
+    lines.push('');
+    if (plan.blocked.length) {
+      lines.push('Blocked');
+      for (const b of plan.blocked) lines.push(`  ${b.path} — ${b.reason}`);
+      lines.push('', '  Nothing was migrated. A file this engine cannot fully understand is never rewritten',
+        '  by it: an old engine reinterpreting a newer file is how governance state gets silently',
+        '  corrupted. Upgrade EOS instead.', '', 'FAIL', '');
+      emit(flags, json, lines.join('\n'));
+      return EXIT.FAIL;
+    }
+    if (!plan.changes.length) {
+      lines.push('  Every governance file matches the version this engine writes. Nothing to migrate.', '', 'PASS', '');
+      emit(flags, json, lines.join('\n'));
+      return EXIT.OK;
+    }
+    lines.push(flags.apply ? 'Applied' : 'Would change (review this before --apply)');
+    for (const c of plan.changes) {
+      lines.push(`  ${c.path}  schemaVersion ${c.from} → ${c.to}  [${c.steps.join(', ')}]`);
+      for (const d of c.diff.slice(0, 20)) lines.push(`      ${d}`);
+      if (c.diff.length > 20) lines.push(`      … and ${c.diff.length - 20} more change(s)`);
+    }
+    lines.push('');
+    if (!flags.apply) lines.push('  Nothing was written. Re-run with --apply once the diff above is what you expect.', '');
+    lines.push('PASS', '');
+    emit(flags, json, lines.join('\n'));
+    return EXIT.OK;
+  },
+
+  /**
+   * Generate or verify the software bill of materials.
+   *
+   * An SBOM nobody can tie to a build is a document, not evidence, so the generated file binds the
+   * commit, the product-tree digest and the lockfile digests. That makes it invalidatable by the
+   * same rules as gate evidence: change what it describes, and it stops describing it.
+   */
+  sbom(snapshot, flags) {
+    const { sbom, notes } = buildSbom(snapshot);
+    const full = join(snapshot.root, SBOM_PATH);
+    if (flags.check) {
+      const fresh = sbomFreshness(snapshot);
+      const json = { path: SBOM_PATH, status: fresh.status, reasons: fresh.reasons, components: sbom.components.length };
+      const lines = [`EOS sbom · ${fresh.status}`, ''];
+      for (const r of fresh.reasons) lines.push(`  ${r}`);
+      if (fresh.status === 'FRESH') lines.push(`  ${SBOM_PATH} describes the current tree (${sbom.components.length} component(s))`);
+      lines.push('', fresh.status === 'FRESH' ? 'PASS' : 'FAIL', '');
+      emit(flags, json, lines.join('\n'));
+      return fresh.status === 'FRESH' ? EXIT.OK : EXIT.FAIL;
+    }
+    const body = `${JSON.stringify(sbom, null, 2)}\n`;
+    const changed = !existsSync(full) || readFileSync(full, 'utf8') !== body;
+    if (flags.write && changed) writeFileAtomic(full, body);
+    const json = { path: SBOM_PATH, written: !!(flags.write && changed), components: sbom.components.length, notes, digest: sbomDigest(sbom) };
+    const lines = [`EOS sbom · ${sbom.components.length} component(s)`, '',
+      `  ${flags.write ? (changed ? 'written' : 'up to date') : 'would write'}  ${SBOM_PATH}`,
+      `  bound to    commit ${snapshot.commit ? snapshot.commit.slice(0, 8) : '(no git)'} · tree ${(sbom.metadata.properties.find((p) => p.name === 'eos:productTreeDigest')?.value || '').slice(0, 12)}`, ''];
+    // Anything that could NOT be resolved has to be loud: an unexplained short component list reads
+    // as "clean" when it actually means "unknown".
+    if (notes.length) { lines.push('Not resolved'); for (const n of notes) lines.push(`  ${n}`); lines.push(''); }
+    if (!flags.write) lines.push('  Nothing was written. Re-run with --write to apply, or --check to verify freshness.', '');
+    emit(flags, json, lines.join('\n'));
+    return EXIT.OK;
+  },
+
+  /**
+   * Scaffold the project DECLARATION for a known shape of project.
+   *
+   * Deliberately not an application skeleton: EOS does not scaffold product code, and a
+   * half-maintained app template inside a governance repository rots faster than anything else in
+   * it. What a newcomer actually gets wrong is the declaration — an `application` with no
+   * `commands.test`, or a `config-only` that should not be one — and both of those are silent.
+   *
+   * Never overwrites. A declaration that already exists is the project's own decision.
+   */
+  new(snapshot, flags) {
+    const id = flags._[1];
+    if (!id) {
+      const lines = ['EOS starter packs', '', '  Each pack writes a correct .eos/project.json for a known shape of project.', '  It does NOT scaffold application code — use your ecosystem\'s own tool for that.', ''];
+      for (const packId of packIds()) lines.push(`  ${packId.padEnd(16)} ${PACKS[packId].title}`);
+      lines.push('', '  node .github/eos/eos.mjs new <pack> --write', '');
+      emit(flags, { packs: packIds().map((p) => ({ id: p, title: PACKS[p].title })) }, lines.join('\n'));
+      return EXIT.OK;
+    }
+    const declaration = packDeclaration(id);
+    if (!declaration) {
+      console.log(`unknown pack "${id}" — known packs: ${packIds().join(', ')}`);
+      return EXIT.FAIL;
+    }
+    const rel = '.eos/project.json';
+    const full = join(snapshot.root, rel);
+    const exists = existsSync(full);
+    const body = `${JSON.stringify(declaration, null, 2)}\n`;
+
+    const lines = [`EOS new · ${id} — ${PACKS[id].title}`, ''];
+    if (exists) {
+      lines.push(`  refused  ${rel} already exists.`,
+        '  A project declaration is a decision this project has already made; overwriting it would',
+        '  silently change which gates apply. Edit it by hand, or delete it first if you meant to',
+        '  start over.', '');
+      emit(flags, { pack: id, written: false, reason: 'declaration already exists', declaration }, lines.join('\n'));
+      return EXIT.FAIL;
+    }
+    if (flags.write) { mkdirSync(dirname(full), { recursive: true }); writeFileAtomic(full, body); }
+    lines.push(`  ${flags.write ? 'written' : 'would write'}  ${rel}`, '',
+      `  projectType      ${declaration.projectType}`,
+      `  stacks           ${declaration.stacks.join(', ')}`,
+      `  paradigms        ${declaration.productParadigms.join(', ')}`,
+      `  workflowProfile  ${declaration.workflowProfile}${declaration.complianceProfile ? `\n  complianceProfile ${declaration.complianceProfile}` : ''}`,
+      `  commands         ${Object.entries(declaration.commands).map(([k, v]) => `${k}: ${v}`).join('\n                   ')}`, '');
+    if (PACKS[id].notes.length) { lines.push('Before you rely on this'); for (const n of PACKS[id].notes) lines.push(`  · ${n}`); lines.push(''); }
+    lines.push('Next',
+      '  1. Replace the commands above with what CI actually runs — an unrunnable command fails closed.',
+      '  2. node .github/eos/eos.mjs stack sync --write   (put the stack in the always-on rule)',
+      '  3. node .github/eos/eos.mjs next                 (start the guided loop)', '');
+    if (!flags.write) lines.push('  Nothing was written. Re-run with --write to apply.', '');
+    emit(flags, { pack: id, written: !!flags.write, declaration, notes: PACKS[id].notes }, lines.join('\n'));
+    return EXIT.OK;
+  },
+
+  transition(snapshot, flags) {    const scopeType = flags.scope === true || !flags.scope ? 'story' : flags.scope;
     const scopeId = flags.id;
     const to = flags.to;
     if (!scopeId || !to || scopeId === true || to === true) { console.log('transition requires --scope <type> --id <id> --to <STATE>'); return EXIT.FAIL; }
@@ -414,7 +844,7 @@ const commands = {
       manifest = { ...existing.manifest, candidateCommit: snapshot.commit, productTreeDigest: tree.identity?.digest ?? null };
     }
     mkdirSync(dirname(full), { recursive: true });
-    writeFileSync(full, JSON.stringify(manifest, null, 2) + '\n', 'utf8');
+    writeFileAtomic(full, JSON.stringify(manifest, null, 2) + '\n');
     const digest = computeManifestDigest(manifest);
     const lines = [`EOS release ${sub} · ${rel}`, '',
       `  candidate   ${snapshot.commit ? snapshot.commit.slice(0, 8) : '(no git)'}`,
@@ -518,7 +948,7 @@ const commands = {
     if (!waiver.riskOwner) { console.log('waive requires --risk-owner'); return EXIT.FAIL; }
     const rel = `.eos/waivers/${def.id}__${scopeType}__${String(scopeId).replace(/[^A-Za-z0-9._-]/g, '_')}.json`;
     mkdirSync(join(snapshot.root, '.eos/waivers'), { recursive: true });
-    writeFileSync(join(snapshot.root, rel), JSON.stringify(waiver, null, 2) + '\n', 'utf8');
+    writeFileAtomic(join(snapshot.root, rel), JSON.stringify(waiver, null, 2) + '\n');
     appendEvent(snapshot.root, { type: 'waiver', scope: { type: scopeType, id: String(scopeId) }, gate: def.id, status: 'DRAFT', detail: rel });
     emit(flags, { drafted: rel, waiver, honored: false }, [
       `EOS waive · DRAFTED ${rel}`, '',
@@ -668,6 +1098,14 @@ const commands = {
     }
     const { errors: waiverErrors } = loadWaivers(snapshot.root);
     for (const e of waiverErrors) problems.push({ level: 'ERROR', detail: e });
+    // Doctor's verdict covers EOS's own wiring. Saying so matters most when it is green: a PASS
+    // here has never meant "the product is tested", and on a config-only repository nothing about
+    // a product is executed at all. [audit: config-only false PASS]
+    if (!snapshot.projectPresent) {
+      notes.push('NO PRODUCT CODE VERIFIED — there is no .eos/project.json, so no test/lint/eval command runs. This verdict covers EOS configuration only.');
+    } else if (snapshot.project?.projectType === 'config-only') {
+      notes.push('NO PRODUCT CODE VERIFIED — .eos/project.json declares "config-only". This verdict covers EOS configuration only; declare "application" (or "library") with commands.test when code lands.');
+    }
     for (const { file, evidence } of listEvidence(snapshot.root)) {
       if (!evidence) { problems.push({ level: 'ERROR', detail: `${file}: unreadable evidence` }); continue; }
       const shape = validateEvidenceShape(snapshot.root, evidence);
@@ -730,7 +1168,17 @@ async function main() {
   }
   // A broken EOS configuration is an ERROR for every command except the ones whose job is to
   // report or repair it. It is never downgraded into a pass.
-  if (snapshot.errors.length && !['doctor', 'init', 'next', 'resume', 'status', 'ledger'].includes(command)) {
+  // A file written by a NEWER EOS must stop every command except the ones that diagnose it. The
+  // schema validator would otherwise reject its unknown properties and report a symptom instead of
+  // the cause, sending people to edit a file whose format they are not the authority on.
+  const ahead = compatibilityErrors(process.cwd());
+  if (ahead.length && !['migrate', 'doctor'].includes(command)) {
+    console.log(['EOS ERROR — this repository was written by a newer version of EOS:', '',
+      ...ahead.map((e) => `  ERROR ${e}`), '',
+      '  Upgrade EOS, or run `node .github/eos/eos.mjs migrate` to see the version gap.', ''].join('\n'));
+    return EXIT.ERROR;
+  }
+  if (snapshot.errors.length && !['doctor', 'init', 'next', 'resume', 'status', 'ledger', 'migrate'].includes(command)) {
     console.log(['EOS ERROR — the configuration could not be evaluated:', '', ...snapshot.errors.map((e) => `  ERROR ${e}`), '',
       '  Fix the file(s) above, or run `node .github/eos/eos.mjs doctor`.', ''].join('\n'));
     return EXIT.ERROR;

@@ -1,0 +1,41 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.5",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2026-09-22T00:32:10.492Z",
+    "component": {
+      "type": "application",
+      "name": "eos-template",
+      "version": "1.18.0"
+    },
+    "tools": [
+      {
+        "vendor": "EOS",
+        "name": "eos sbom",
+        "version": "1"
+      }
+    ],
+    "properties": [
+      {
+        "name": "eos:commit",
+        "value": "891d89c5365825c41a1398e954ede0739b1632a7"
+      },
+      {
+        "name": "eos:productTreeDigest",
+        "value": "d5d04c663f8c92c0cd8828fb05b40ee55454955261fd74da8627ef162b47c7d8"
+      },
+      {
+        "name": "eos:stacks",
+        "value": "node"
+      }
+    ]
+  },
+  "components": [],
+  "eos": {
+    "lockInputs": [],
+    "notes": [
+      "stack \"node\": none of package-lock.json, npm-shrinkwrap.json, pnpm-lock.yaml, yarn.lock is present, so its components could not be enumerated"
+    ]
+  }
+}

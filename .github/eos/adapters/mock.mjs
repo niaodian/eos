@@ -11,6 +11,18 @@ import { result } from './contract.mjs';
 
 export async function check({ subject, options, now }) {
   if (options.throw) throw new Error(options.throw);
+  // `failTimes` lets a test reproduce the shape that matters for retry and the circuit breaker: an
+  // authority that is down for a while and then answers. Counting per subject keeps each test case
+  // independent of the order the others ran in.
+  if (options.failTimes) {
+    attempts.set(subject, (attempts.get(subject) || 0) + 1);
+    if (attempts.get(subject) <= options.failTimes) {
+      return result({
+        provider: 'mock', subject, status: options.transientStatus || 'UNVERIFIED', now, transient: true,
+        detail: options.transientDetail || `mock is unreachable (attempt ${attempts.get(subject)})`,
+      });
+    }
+  }
   return result({
     provider: 'mock',
     subject,
@@ -18,6 +30,10 @@ export async function check({ subject, options, now }) {
     detail: options.detail || `mock verdict for ${subject}`,
     evidenceRef: options.evidenceRef || null,
     expiry: options.expiry || null,
+    transient: !!options.transient,
     now,
   });
 }
+
+const attempts = new Map();
+export const resetMockAttempts = () => attempts.clear();

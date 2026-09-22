@@ -11,7 +11,7 @@
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { validate } from './schema.mjs';
+import { validate, loadSchema } from './schema.mjs';
 
 /** Where a runner is expected to drop its machine summary. */
 export const SUMMARY_PATHS = {
@@ -42,9 +42,9 @@ export function readSummary(root, kind) {
   }
   // A missing schema must not silently DISABLE validation: deleting one file would then weaken
   // every gate that reads this summary.
-  let schema;
-  try { schema = JSON.parse(readFileSync(join(root, `.eos/schemas/${SCHEMAS[kind]}`), 'utf8')); } catch (e) {
-    return { present: true, path: rel, data: null, errors: [`.eos/schemas/${SCHEMAS[kind]} is missing or unreadable (${e.message}) — ${rel} cannot be validated, so it cannot be trusted`] };
+  const { schema, error: schemaError } = loadSchema(root, SCHEMAS[kind]);
+  if (!schema) {
+    return { present: true, path: rel, data: null, errors: [`${schemaError} — ${rel} cannot be validated, so it cannot be trusted`] };
   }
   const v = validate(schema, parsed, { label: rel });
   if (!v.valid) return { present: true, path: rel, data: null, errors: v.errors.slice(0, 4) };

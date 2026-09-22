@@ -1,9 +1,16 @@
 {
   "$schema": "./schemas/project.schema.json",
-  "projectType": "config-only",
+  "projectType": "application",
   "language": "en",
-  "stacks": [],
-  "productParadigms": ["deterministic"],
+  "stacks": [
+    "node"
+  ],
+  "productParadigms": [
+    "deterministic"
+  ],
   "workflowProfile": "standard-product",
-  "rationale": "Clean EOS template: governance config + docs only, no product code yet. Set \"language\" to the BCP-47 tag you want agents to answer in (e.g. \"zh-CN\"); remove it to mirror whatever language you write in. Change projectType to \"application\" (or \"library\"), list your stacks and fill in commands.test as soon as real code lands — see docs/eos/stack-presets.md. Building an LLM/agent product? Add \"agentic\" to productParadigms so the G-EVAL gate turns on. \"workflowProfile\" selects the gate policy in .eos/workflow.json; \"complianceProfile\": \"regulated\" turns the compliance boundary on early (docs/compliance-profile.json stays authoritative)."
+  "commands": {
+    "test": "node .github/eos/run-tests.mjs"
+  },
+  "rationale": "THIS REPOSITORY'S declaration, not a blank template line. EOS's product IS its engine: .github/eos/ is a zero-dependency Node program with a real test suite, so declaring \"config-only\" understated what lives here — and it meant EOS's own product-quality gate executed nothing while reporting green, the exact failure mode EOS exists to prevent. Declaring it honestly makes EOS run its own gate against its own code. IF YOU COPIED THIS TEMPLATE: this is the first file to edit. Set \"language\" to the BCP-47 tag you want agents to answer in (e.g. \"zh-CN\"), or remove it to mirror whatever language you write in. Replace \"stacks\" and \"commands\" with your own (see docs/eos/stack-presets.md) — commands.test is what the product-quality gate actually executes, and an \"application\" without it fails closed rather than passing vacuously. If your repo genuinely has no product code yet, set projectType to \"config-only\" and drop \"commands\"; the gate then reports NOT_APPLICABLE instead of PASS, so nobody reads governance-only green as \"the code is verified\". Building an LLM/agent product? Add \"agentic\" to productParadigms so the G-EVAL gate turns on. \"workflowProfile\" selects the gate policy in .eos/workflow.json; \"complianceProfile\": \"regulated\" turns the compliance boundary on early (docs/compliance-profile.json stays authoritative)."
 }

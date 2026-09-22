@@ -130,3 +130,53 @@ export function validate(schema, data, { label = '$' } = {}) {
   }
   return { valid: errors.length === 0, errors };
 }
+
+// --------------------------------------------------------------------------------- schema loading
+//
+// Every schema used to be read and re-parsed at each call site, on every call. One `eos next`
+// evaluates several gates, each gate reads stage records and evidence, and each of those re-parsed
+// the same JSON from disk — pure repeated work on a hot path, and the reason a "cheap" evaluation
+// was not as cheap as its name promised.
+//
+// The cache is keyed on path + mtime + size, not path alone. A process that outlives an edit to a
+// schema — the test suite does exactly this, and so does a developer with a watcher running — must
+// see the new schema. Caching by path would make a governance file's contents sticky for the
+// lifetime of the process, which is precisely the class of staleness EOS exists to refuse.
+import { readFileSync as readSchemaFile, statSync } from 'node:fs';
+import { join as joinSchemaPath } from 'node:path';
+
+const schemaCache = new Map();
+
+/**
+ * Read and parse a schema, memoised per (path, mtime, size).
+ *
+ * @param {string} root  repository root
+ * @param {string} name  file name under .eos/schemas, or a repo-relative path
+ * @returns {{schema: object|null, error: string|null, path: string}}
+ */
+export function loadSchema(root, name) {
+  const rel = name.includes('/') ? name : `.eos/schemas/${name}`;
+  const full = joinSchemaPath(root, rel);
+  let stamp;
+  try {
+    const st = statSync(full);
+    stamp = `${st.mtimeMs}:${st.size}`;
+  } catch (e) {
+    return { schema: null, error: `${rel} is missing or unreadable (${e.message})`, path: rel };
+  }
+  const key = `${full}\u0000${stamp}`;
+  const hit = schemaCache.get(key);
+  if (hit) return hit;
+  let entry;
+  try {
+    entry = { schema: JSON.parse(readSchemaFile(full, 'utf8')), error: null, path: rel };
+  } catch (e) {
+    entry = { schema: null, error: `${rel}: invalid JSON (${e.message})`, path: rel };
+  }
+  // Bounded so a long-lived process that keeps rewriting a schema cannot grow the map forever.
+  if (schemaCache.size > 256) schemaCache.clear();
+  schemaCache.set(key, entry);
+  return entry;
+}
+
+export const clearSchemaCache = () => schemaCache.clear();

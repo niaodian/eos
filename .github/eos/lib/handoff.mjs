@@ -1,12 +1,13 @@
 // Handoff context packages — the minimum an agent needs to continue, and nothing more.
 // A package is a CACHE: it records the commit and a hash per file so `--verify` can refuse to let
 // an agent act on a stale picture instead of silently working from one.
-import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { posix } from './registry.mjs';
 import { sha256File } from './evidence.mjs';
 import { scopeState, changeTypeOf, ARTIFACTS } from './state.mjs';
 import { route } from './router.mjs';
+import { writeFileAtomic } from './atomic.mjs';
 
 export const HANDOFF_DIR = '.eos/handoffs';
 export const handoffPath = (scopeId) => `${HANDOFF_DIR}/${String(scopeId).replace(/[^A-Za-z0-9._-]/g, '_')}.json`;
@@ -60,7 +61,7 @@ export function writeHandoff(root, pkg) {
   const rel = handoffPath(pkg.scope.id);
   const full = join(root, rel);
   mkdirSync(dirname(full), { recursive: true });
-  writeFileSync(full, JSON.stringify(pkg, null, 2) + '\n', 'utf8');
+  writeFileAtomic(full, JSON.stringify(pkg, null, 2) + '\n');
   return rel;
 }
 

@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eos.dev/schemas/test-budget.schema.json",
+  "title": "EOS test layers and wall-clock budgets",
+  "description": "Declares which test files make up each layer and how long that layer may take. Consumed by .github/eos/run-tests.mjs. A declared file that does not exist is an ERROR, so a renamed or deleted suite cannot silently stop running.",
+  "type": "object",
+  "required": ["schemaVersion", "layers"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "schemaVersion": { "type": "integer", "minimum": 1 },
+    "description": { "type": "string" },
+    "defaultScale": {
+      "type": "number",
+      "minimum": 0.1,
+      "description": "Multiplier applied to every budget. Overridden by EOS_TEST_BUDGET_SCALE. Scale for a slow runner instead of raising individual budgets, so a breach keeps meaning the same thing everywhere."
+    },
+    "coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Thresholds for `run-tests.mjs --coverage`. Enforced natively by Node 22+; on older versions the report still prints and run-tests says the threshold was not applied rather than implying a pass.",
+      "properties": {
+        "description": { "type": "string" },
+        "lines": { "type": "number", "minimum": 0, "maximum": 100 },
+        "branches": { "type": "number", "minimum": 0, "maximum": 100 },
+        "functions": { "type": "number", "minimum": 0, "maximum": 100 },
+        "exclude": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Globs excluded from the measurement — the tests themselves and their harnesses, which would otherwise inflate the number with code that exists to exercise other code."
+        }
+      }
+    },
+    "layers": {
+      "type": "object",
+      "minProperties": 1,
+      "description": "Layer name -> definition. Every file in a layer runs in ONE `node --test` invocation so Node parallelises them across cores.",
+      "patternProperties": {
+        "^[a-z0-9-]+$": {
+          "type": "object",
+          "required": ["budgetMs", "files"],
+          "additionalProperties": false,
+          "properties": {
+            "description": { "type": "string" },
+            "budgetMs": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Wall-clock ceiling for the layer. Set it around 2.5x the observed time: high enough to ignore normal variance, low enough that a 2x regression fails the build."
+            },
+            "files": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": { "type": "string", "pattern": "\\.test\\.mjs$" }
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

@@ -9,7 +9,7 @@
 // reads the record. Markdown stays the thing people read; the record is the thing that promotes.
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { validate } from './schema.mjs';
+import { validate, loadSchema } from './schema.mjs';
 
 export const STAGE_RECORDS = {
   discovery: { path: 'docs/discovery.json', schema: 'discovery.schema.json', doc: 'docs/discovery.md', prompt: 'the eos-discovery agent' },
@@ -34,9 +34,9 @@ export function readStageRecord(root, kind) {
   }
   // Fail closed: an absent schema disables validation, which would make deleting one file a way to
   // weaken the gate that reads this record.
-  let schema;
-  try { schema = JSON.parse(readFileSync(join(root, `.eos/schemas/${spec.schema}`), 'utf8')); } catch (e) {
-    return { present: true, path: spec.path, data: null, errors: [`.eos/schemas/${spec.schema} is missing or unreadable (${e.message}) — ${spec.path} cannot be validated, so it cannot be trusted`] };
+  const { schema, error: schemaError } = loadSchema(root, spec.schema);
+  if (!schema) {
+    return { present: true, path: spec.path, data: null, errors: [`${schemaError} — ${spec.path} cannot be validated, so it cannot be trusted`] };
   }
   const v = validate(schema, parsed, { label: spec.path });
   if (!v.valid) return { present: true, path: spec.path, data: null, errors: v.errors.slice(0, 4) };

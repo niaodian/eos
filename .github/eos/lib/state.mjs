@@ -34,11 +34,46 @@ export const ARTIFACTS = {
 };
 
 function gitInfo(root) {
-  const git = (args) => {
+  const git = (args, { trim = true } = {}) => {
     const r = spawnSync('git', args, { cwd: root, encoding: 'utf8' });
-    return r.status === 0 ? (r.stdout || '').trim() : null;
+    if (r.status !== 0) return null;
+    const out = r.stdout || '';
+    return trim ? out.trim() : out;
   };
-  return { commit: git(['rev-parse', 'HEAD']), changed: git(['status', '--porcelain']) };
+  return {
+    commit: git(['rev-parse', 'HEAD']),
+    // NOT trimmed. Porcelain's first two columns are status codes and either may be a SPACE — a
+    // plain modified file is " M path". Trimming ate that leading space on the first line only, so
+    // `slice(3)` then cut one character too many and ".eos/workflow.json" was reported as
+    // "eos/workflow.json". Silent, and wrong in exactly the most common case.
+    changed: git(['status', '--porcelain'], { trim: false }),
+  };
+}
+
+/**
+ * Parse `git status --porcelain` into repository-relative paths.
+ *
+ * Handles the three shapes that actually occur: `XY path`, a rename/copy `R  old -> new` (the NEW
+ * path is the one that exists now), and a path git chose to quote because it contains a special
+ * character.
+ *
+ * @param {string|null} raw
+ * @returns {string[]|null} null when there is no git repository to ask
+ */
+export function parsePorcelain(raw) {
+  if (raw === null || raw === undefined) return null;
+  const files = [];
+  for (const line of raw.split('\n')) {
+    if (line.length < 4) continue; // "XY " plus at least one character of path
+    let path = line.slice(3);
+    const arrow = path.indexOf(' -> ');
+    if (arrow !== -1) path = path.slice(arrow + 4);
+    if (path.startsWith('"') && path.endsWith('"') && path.length > 1) {
+      try { path = JSON.parse(path); } catch { path = path.slice(1, -1); }
+    }
+    if (path) files.push(posix(path));
+  }
+  return files;
 }
 
 /**
@@ -88,7 +123,7 @@ export function readSnapshot(root, { withGit = true } = {}) {
   return {
     root,
     commit: git.commit,
-    changedFiles: git.changed === null ? null : git.changed.split('\n').filter(Boolean).map((l) => posix(l.slice(3))),
+    changedFiles: parsePorcelain(git.changed),
     projectPresent: proj.present,
     project: proj.config,
     projectErrors: proj.errors,

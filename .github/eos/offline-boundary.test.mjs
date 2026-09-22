@@ -97,8 +97,15 @@ test('the network can only ever upgrade a verdict, never manufacture one', () =>
   // The rule the adapter contract must obey, expressed against the code that already follows it:
   // the dependency audit needs the network, and offline it is DEFERRED — visible, time-bound and
   // never green. Any future provider adapter is held to this same shape.
-  const gates = readFileSync(join(REPO_ROOT, '.github/eos/lib/gates.mjs'), 'utf8');
-  const audit = gates.slice(gates.indexOf('releaseDependencyAudit(ctx)'));
+  //
+  // Located by SEARCHING Core rather than by naming a file: this assertion is about an invariant,
+  // not about which module an evaluator currently lives in, and hard-coding the layout made it
+  // break the first time the rules were split out of the engine.
+  const holder = coreFiles()
+    .map((rel) => ({ rel, text: readFileSync(join(REPO_ROOT, rel), 'utf8') }))
+    .find((f) => f.text.includes('releaseDependencyAudit(ctx)'));
+  assert.ok(holder, 'releaseDependencyAudit must exist somewhere in EOS Core');
+  const audit = holder.text.slice(holder.text.indexOf('releaseDependencyAudit(ctx)'));
   const body = audit.slice(0, audit.indexOf('\n  },'));
   assert.match(body, /DEFERRED/, 'an unreachable network must yield DEFERRED');
   assert.match(body, /blocked\(/, 'a regulated product may not defer it');

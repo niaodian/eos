@@ -11,7 +11,8 @@ import { readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { project, write, run, runJson, cleanup, story, commitAll, releaseFiles, storyFiles,
   writeManifest, APP_PROJECT, REPO_ROOT } from './test-support.mjs';
-import { resolve, result, consult, loadProviders, PROVIDER_STATUSES } from './adapters/contract.mjs';
+import { resolve, result, consult, loadProviders, PROVIDER_STATUSES, resetProviderBreaker } from './adapters/contract.mjs';
+import { resetMockAttempts } from './adapters/mock.mjs';
 
 after(cleanup);
 
@@ -182,4 +183,76 @@ test('every provider status is one EOS already knows how to reason about', () =>
   assert.deepEqual([...PROVIDER_STATUSES].sort(), ['BLOCKED', 'DEFERRED', 'ERROR', 'FAIL', 'PASS', 'UNVERIFIED']);
   const bogus = result({ provider: 'mock', subject: 's', status: 'DEFINITELY_FINE', detail: 'x' });
   assert.equal(bogus.status, 'ERROR', 'an unknown status must degrade to ERROR, never to PASS');
+});
+
+// ---------------------------------------------------------------- resilience [audit #11]
+// Retry and the breaker exist to stop EOS wasting a developer's time on an authority that is down.
+// They must never change a VERDICT: under D4 a provider that cannot answer already leaves the
+// fallback untouched, so the only thing extra attempts could ever buy is delay.
+test('a transient failure is retried, and a recovered provider still answers', async () => {
+  resetProviderBreaker();
+  resetMockAttempts();
+  const providers = [{ adapter: 'mock', subjects: ['enforcement-authority'], options: { failTimes: 2, status: 'PASS', retries: 3 } }];
+  const v = await consult('/nowhere', 'enforcement-authority', { providers, backoffMs: 1 });
+  assert.equal(v.status, 'PASS', v.detail);
+});
+
+test('an authoritative answer is never retried — asking again until you like the answer is the bug', async () => {
+  resetProviderBreaker();
+  resetMockAttempts();
+  const providers = [{ adapter: 'mock', subjects: ['enforcement-authority'], options: { status: 'FAIL', detail: 'branch is not protected' } }];
+  const v = await consult('/nowhere', 'enforcement-authority', { providers, backoffMs: 1 });
+  assert.equal(v.status, 'FAIL');
+  assert.doesNotMatch(v.detail, /attempt/, 'a definitive no must be taken the first time');
+});
+
+test('retries are bounded, and exhausting them says so instead of pretending', async () => {
+  resetProviderBreaker();
+  resetMockAttempts();
+  const providers = [{ adapter: 'mock', subjects: ['enforcement-authority'], options: { failTimes: 99 } }];
+  const v = await consult('/nowhere', 'enforcement-authority', { providers, retries: 1, backoffMs: 1 });
+  assert.equal(v.status, 'UNVERIFIED');
+  assert.match(v.detail, /after 2 attempt\(s\)/);
+});
+
+test('the breaker stops re-asking an authority that is down, with the same verdict', async () => {
+  resetProviderBreaker();
+  resetMockAttempts();
+  const providers = [{ adapter: 'mock', subjects: ['enforcement-authority'], options: { failTimes: 99 } }];
+  const opts = { providers, retries: 0, backoffMs: 1, breakerThreshold: 2 };
+  const first = await consult('/nowhere', 'enforcement-authority', opts);
+  const second = await consult('/nowhere', 'enforcement-authority', opts);
+  const third = await consult('/nowhere', 'enforcement-authority', opts);
+  assert.equal(first.status, 'UNVERIFIED');
+  assert.equal(second.status, 'UNVERIFIED');
+  assert.equal(third.status, 'UNVERIFIED', 'the verdict must be identical whether or not it was asked');
+  assert.match(third.detail, /not consulted/, 'the third one is answered from the breaker');
+});
+
+test('a breaker-opened verdict still cannot raise a gate (D4 holds)', async () => {
+  resetProviderBreaker();
+  resetMockAttempts();
+  const providers = [{ adapter: 'mock', subjects: ['enforcement-authority'], options: { failTimes: 99 } }];
+  const opts = { providers, retries: 0, backoffMs: 1, breakerThreshold: 1 };
+  await consult('/nowhere', 'enforcement-authority', opts);
+  const open = await consult('/nowhere', 'enforcement-authority', opts);
+  const resolved = resolve({ status: 'BLOCKED', detail: 'EOS cannot verify this locally' }, open);
+  assert.equal(resolved.status, 'BLOCKED', 'an unanswered provider may never change the outcome');
+  assert.equal(resolved.verification, 'LOCAL');
+});
+
+// ---------------------------------------------------------------- REMOTE_VERIFIED [audit #11]
+test('a PASS that exists only because a remote authority said so is marked REMOTE_VERIFIED', async () => {
+  resetProviderBreaker();
+  resetMockAttempts();
+  const providers = [{ adapter: 'mock', subjects: ['enforcement-authority'], options: { status: 'PASS', detail: 'branch protection enforced' } }];
+  const verdict = await consult('/nowhere', 'enforcement-authority', { providers });
+  const resolved = resolve({ status: 'BLOCKED', detail: 'EOS cannot verify this locally' }, verdict);
+  assert.equal(resolved.status, 'PASS');
+  assert.equal(resolved.verification, 'REMOTE_VERIFIED', 'an auditor must not have to parse prose to learn this');
+  assert.ok(resolved.checkedAt, 'a remote claim is only as good as when it was made');
+});
+
+test('a verdict EOS reached on its own is marked LOCAL, not remote', () => {
+  assert.equal(resolve({ status: 'PASS', detail: 'proven offline' }, null).verification, 'LOCAL');
 });

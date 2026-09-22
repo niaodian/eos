@@ -4,7 +4,7 @@
 // and the approver is a different person from the requester.
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { validate } from './schema.mjs';
+import { validate, loadSchema } from './schema.mjs';
 
 export const WAIVERS_DIR = '.eos/waivers';
 
@@ -13,8 +13,7 @@ export function loadWaivers(root) {
   const waivers = [];
   const errors = [];
   if (!existsSync(dir)) return { waivers, errors };
-  let schema = null;
-  try { schema = JSON.parse(readFileSync(join(root, '.eos/schemas/waiver.schema.json'), 'utf8')); } catch { /* validated below only if present */ }
+  const { schema } = loadSchema(root, 'waiver.schema.json'); // validated below only if present
   for (const name of readdirSync(dir).filter((n) => n.endsWith('.json')).sort()) {
     const rel = `${WAIVERS_DIR}/${name}`;
     let data;

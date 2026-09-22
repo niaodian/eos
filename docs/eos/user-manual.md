@@ -1,6 +1,6 @@
 # EOS User Manual (Engineering Operating System)
 
-> Version: synced with `docs/eos/VERSION` (current `eos-1.17.0`)
+> Version: synced with `docs/eos/VERSION` (current `eos-1.18.0`)
 > Applies to: recent VS Code + GitHub Copilot Chat (custom agent / hooks are recent-version capabilities; confirm the version in the "About VS Code" panel) + 73 installed `bmad-*` skills (user-level)
 > Positioning: this manual is an **operating guide (how to use it)**; for design rationale and trade-offs, see `blueprint.md` in the same directory (why it is designed this way).
 > Conventions: prose in English; file names / paths / commands / config keys kept verbatim.
@@ -155,7 +155,7 @@ If you want to promote some `eos-*.agent.md` files to "available in all projects
 **Method A — degit (recommended, fastest)**
 ```sh
 # Public template — plain degit works (no auth needed)
-npx degit niaodian/eos#eos-1.17.0 my-new-app
+npx degit niaodian/eos#eos-1.18.0 my-new-app
 cd my-new-app
 git init && git add -A && git commit -m "chore: scaffold from eos"
 ```
@@ -193,7 +193,7 @@ Open `.github/instructions/00-workspace.instructions.md` and change it to the re
 ## 3.4 Full Day-1 sequence (copy-ready)
 
 ```sh
-npx degit niaodian/eos#eos-1.17.0 my-new-app && cd my-new-app
+npx degit niaodian/eos#eos-1.18.0 my-new-app && cd my-new-app
 git init && git add -A && git commit -q -m "chore: scaffold from eos"
 node .github/hooks/validate-config.mjs
 # Key: run `code .` from inside the project directory so my-new-app becomes the workspace root (including .github/).
@@ -312,7 +312,7 @@ So EOS **never depends on "Rule A overriding Rule B"**. The only reliable contro
 | Item | Content |
 |---|---|
 | **Goal** | Get an empty project with healthy configuration from the template |
-| **How to start** | `npx degit niaodian/eos#eos-1.17.0 my-app && cd my-app` |
+| **How to start** | `npx degit niaodian/eos#eos-1.18.0 my-app && cd my-app` |
 | **Output** | Complete `.github/` + `docs/` skeleton |
 | **Gate** | `node .github/hooks/validate-config.mjs` → **PASS** |
 | **Must check** | PASS 0 errors. **If the stack is undecided, do not change** `00-workspace` yet--keep the Node placeholder; the stack is an irreversible decision, and the authority is locked in **Phase 4 (ADR)**. If the stack is known, copy `docs/eos/stack-presets.md` directly (fast path). |
@@ -575,7 +575,7 @@ So EOS **never depends on "Rule A overriding Rule B"**. The only reliable contro
 
 ### Step 0: Create project + choose stack (5 minutes)
 ```sh
-npx degit niaodian/eos#eos-1.17.0 todo-api && cd todo-api
+npx degit niaodian/eos#eos-1.18.0 todo-api && cd todo-api
 node .github/hooks/validate-config.mjs          # expect PASS
 ```
 **Stack already decided?** Open `.github/instructions/00-workspace.instructions.md` and copy `Local commands` from your stack block (`docs/eos/stack-presets.md`, fast path).
@@ -634,7 +634,7 @@ SaaS **G7** requires: every AC has ≥1 test, **API contract tests** (against op
 
 ### Step 0: Create project + create AI directories
 ```sh
-npx degit niaodian/eos#eos-1.17.0 cs-agent && cd cs-agent
+npx degit niaodian/eos#eos-1.18.0 cs-agent && cd cs-agent
 mkdir -p ai/prompts evals                       # AI code goes here; Agentic rules overlay automatically
 node .github/hooks/validate-config.mjs          # expect PASS
 ```
@@ -992,16 +992,16 @@ Agent output does not match expectation
 ```sh
 # Method A: degit (public repository — no auth needed)
 # Pin the release tag: the default branch moves, a tag does not.
-npx degit niaodian/eos#eos-1.17.0 my-app
+npx degit niaodian/eos#eos-1.18.0 my-app
 
 # Method B: git clone at the tag, into a fresh history
-git clone --depth 1 --branch eos-1.17.0 https://github.com/niaodian/eos.git my-app
-cd my-app && git checkout --orphan main && git commit -m "chore: start from eos-1.17.0"
+git clone --depth 1 --branch eos-1.18.0 https://github.com/niaodian/eos.git my-app
+cd my-app && git checkout --orphan main && git commit -m "chore: start from eos-1.18.0"
 ```
 
 ## 10.3 Distribution to a team (purely local, no enterprise dependency)
 
-1. Everyone starts from the **same release tag** (`eos-1.17.0`). The default branch keeps moving, so
+1. Everyone starts from the **same release tag** (`eos-1.18.0`). The default branch keeps moving, so
    an unpinned copy is a slightly different EOS for every person who takes one.
 2. `【Needs org/GitHub settings】` The GitHub **template repository** setting is owner-level: EOS can
    neither apply nor verify it locally, so do not take this page's word for it —
@@ -1098,7 +1098,30 @@ Recorded evidence becomes `STALE` once because the gate versions moved; re-runni
 it. No ledger rewrite, no hand-editing.
 
 
-### 10.4.4 `evidencePolicy` — how much provenance your release evidence needs
+### 10.4.4 Upgrading from `eos-1.17.x` to `eos-1.18.0`
+
+Additive. Nothing you already have stops working, but three things behave differently and one is a
+correctness fix you want.
+
+| What changed | What you will see | What to do |
+|---|---|---|
+| **The ledger is safe under concurrent writers** | Nothing, unless you had it | `appendEvent` took no lock, so two processes writing at once (two agents, a hook racing a terminal, CI racing a local run) forked the hash chain and `ledger --verify` then reported tampering that never happened. Evidence, waivers, manifests and the head record are now written atomically too. If you ever saw an unexplained "the ledger was rewritten", this was why. |
+| **A repository with no product code no longer reports PASS** | `project-gate` ends with `NOT_APPLICABLE: no product code was verified`; `status` and `doctor` say `NO PRODUCT CODE VERIFIED` | Nothing — the exit code is still 0. If you were reading that PASS as "the code is verified", it never meant that. Declare `application`/`library` with `commands.test` when code lands. |
+| **Gate results carry their own provenance** | `check --json` gains `policySource`, `affectedArtifacts`, `rerunCommand`, `waiverEligible`; each check gains `artifact` | Nothing. Consumers that parsed prose can read fields instead. |
+| **A file from a NEWER EOS now fails closed** | `EOS ERROR — this repository was written by a newer version of EOS` | Upgrade EOS. `eos migrate` explains the gap and never rewrites a file it does not fully understand. |
+
+New commands, all optional: `verify` (run only the gates a change can have affected), `health`
+(blockers, stale evidence, waivers, trend), `migrate`, `sbom`, `docs` (generate the gate
+reference, state diagrams and evidence graph from the policy), and `new` (scaffold
+`.eos/project.json` from a starter pack).
+
+Two new workflow profiles sit above `standard-product`: `controlled` permits no waivers at all,
+and `regulated` additionally requires a recorded reason for every change classification. Each tier
+is strictly no weaker than the one below it, and a test enforces that. Switch with
+`workflowProfile` in `.eos/project.json`, then re-verify:
+`node .github/eos/eos.mjs verify --full`.
+
+### 10.4.5 `evidencePolicy` — how much provenance your release evidence needs
 
 `docs/evidence/*.json` is bytes on disk. A summary emitted by a verified CI run and one typed by a
 person are identical bytes, and `producer` is the only thing that separates them — a **claim**, not a
@@ -1127,7 +1150,7 @@ This is the same shape as SKIP / DEFER everywhere else in EOS: **a blank is refu
 decision is respected.** See [ADR-005](../adr/005-external-authority-boundary.md).
 
 
-### 10.4.5 Provider adapters — letting EOS ask an authority it cannot be
+### 10.4.6 Provider adapters — letting EOS ask an authority it cannot be
 
 Two things a program on your laptop cannot know: whether the server really enforces branch
 protection, and whether a build came from the pipeline it claims. EOS reports both honestly
@@ -1241,7 +1264,7 @@ EOS stack rules are **pluggable**. Adding a stack = add one `*.instructions.md` 
 
 ```
 # ── Terminal — the loop (this is all you need day to day) ──
-npx degit niaodian/eos#eos-1.17.0 my-app   # create new project
+npx degit niaodian/eos#eos-1.18.0 my-app   # create new project
 node .github/eos/eos.mjs init --write               # local VS Code tasks (never overwrites)
 node .github/eos/eos.mjs next                       # the ONE next action, why, how to start it
 node .github/eos/eos.mjs resume                     # new session? pick up where you stopped
@@ -1297,7 +1320,7 @@ A real dry-run that passed end to end (feature: user login), **12/12 gates passe
 
 **Reproduce** (terminal):
 ```sh
-npx degit niaodian/eos#eos-1.17.0 my-app && cd my-app
+npx degit niaodian/eos#eos-1.18.0 my-app && cd my-app
 node .github/hooks/validate-config.mjs        # PASS
 npm test                                      # 10/10 green
 echo '{"tool_input":{"command":"rm -rf /tmp/x"}}' | node .github/hooks/deny-dangerous.js  # deny

@@ -61,10 +61,21 @@ export function renderGate(result, { evidenceFile = null } = {}) {
   const failing = result.checks.filter((c) => !['PASS', 'WAIVED', 'NOT_APPLICABLE'].includes(c.status));
   if (failing.length) {
     out.push('Fix next');
-    failing.forEach((c, i) => out.push(`  ${i + 1}. ${c.detail || c.id}${c.fix ? `\n     → ${c.fix}` : ''}`));
+    failing.forEach((c, i) => out.push(`  ${i + 1}. ${c.detail || c.id}${c.artifact ? `\n     file: ${c.artifact}` : ''}${c.fix ? `\n     → ${c.fix}` : ''}`));
+    out.push('');
+  }
+  // Why this gate applies at all, and how to run it again. Both used to be things you looked up in
+  // documentation; a verdict should carry its own provenance and its own reproduction.
+  if (result.policySource) {
+    out.push('Why this gate applies',
+      `  ${result.policySource.value} for a ${result.policySource.changeType} change`,
+      `  ${result.policySource.file} → ${result.policySource.pointer}`);
+    if (result.waiverEligible) out.push('  a waiver can lift this (eos waive --gate …)');
+    else if (result.status !== 'PASS') out.push('  NOT waivable — this one has to be satisfied');
     out.push('');
   }
   if (evidenceFile) out.push(`  evidence: ${evidenceFile}`, '');
+  if (result.rerunCommand) out.push(`  re-run: ${result.rerunCommand}`, '');
   return out.join('\n');
 }
 

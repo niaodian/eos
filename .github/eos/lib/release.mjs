@@ -11,7 +11,7 @@
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { validate } from './schema.mjs';
+import { validate, loadSchema } from './schema.mjs';
 
 export const RELEASES_DIR = '.eos/releases';
 
@@ -54,9 +54,9 @@ export function readManifest(root, releaseId) {
   try { parsed = JSON.parse(readFileSync(full, 'utf8')); } catch (e) {
     return { present: true, path: rel, manifest: null, digest: null, errors: [`${rel}: invalid JSON (${e.message})`] };
   }
-  let schema;
-  try { schema = JSON.parse(readFileSync(join(root, '.eos/schemas/release-manifest.schema.json'), 'utf8')); } catch (e) {
-    return { present: true, path: rel, manifest: null, digest: null, errors: [`.eos/schemas/release-manifest.schema.json is missing or unreadable (${e.message}) — ${rel} cannot be validated, and an unvalidated manifest decides what ships`] };
+  const { schema, error: schemaError } = loadSchema(root, 'release-manifest.schema.json');
+  if (!schema) {
+    return { present: true, path: rel, manifest: null, digest: null, errors: [`${schemaError} — ${rel} cannot be validated, and an unvalidated manifest decides what ships`] };
   }
   const v = validate(schema, parsed, { label: rel });
   if (!v.valid) return { present: true, path: rel, manifest: null, digest: null, errors: v.errors.slice(0, 4) };

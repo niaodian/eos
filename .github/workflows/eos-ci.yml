@@ -69,6 +69,23 @@ jobs:
         # an en-only edit from silently drifting the Chinese tree out of parity.
         run: node .github/hooks/check-doc-parity.mjs
 
+      - name: EOS software bill of materials (bound to the tree it describes)
+        # An SBOM nobody can tie to a build is a document, not evidence. --check fails when the
+        # committed one no longer describes this tree or these lockfiles. [audit #17]
+        run: node .github/eos/eos.mjs sbom --check
+
+      - name: EOS governance version compatibility
+        # schemaVersion used to be written into every governance file and read by nothing. This
+        # reads it: a file written by a NEWER EOS fails closed rather than being reinterpreted by
+        # an engine that does not know what its new fields mean. [audit #9]
+        run: node .github/eos/eos.mjs migrate
+
+      - name: EOS generated-doc drift (the policy is the only authority)
+        # Everything under docs/eos/generated/ is a projection of .eos/gates.json and
+        # .eos/workflow.json. If a policy change did not regenerate them, the committed prose now
+        # describes rules the engine no longer applies — and people act on prose. [audit #10]
+        run: node .github/eos/eos.mjs docs --check
+
       - name: EOS SDLC gate doctor (G-EVAL / G-UX wiring + BMAD runtime + secret hygiene)
         # --deep also verifies that every MAPPED BMAD skill can actually activate here (project
         # runtime + executables). Without it a directory-name check reports PASS for skills that
@@ -81,69 +98,33 @@ jobs:
       - name: EOS spec-alignment (advisory — AC coverage / first-pass rate)
         run: node .github/hooks/spec-align.mjs
 
-      - name: EOS guardrail regression tests (deny-dangerous invariants)
-        # Enforces the fragile PreToolUse contract: --force-with-lease ALLOWED, rm long-flags/-R DENIED,
-        # benign not over-blocked. Zero-dep node:test, offline. [round-3 audit residual #9]
-        run: node --test .github/hooks/deny-dangerous.test.mjs
+      # ---------------------------------------------------------------------------------------
+      # TEST LAYERS. Each step runs one layer in a SINGLE `node --test` invocation, so Node
+      # parallelises the files across cores, and each step reports its own duration plus a budget
+      # check. This replaced ~15 one-file-per-step invocations that ran strictly sequentially and
+      # were gated by a single 1,246-line file (38.3s of a 38.7s run). Layers + the split brought
+      # the full suite from 38.7s to ~16s while ADDING tests.
+      #
+      # A layer that exceeds its budget in .eos/test-budget.json FAILS: a suite degrades one
+      # plausible second at a time, and the commit that caused it is the only affordable moment to
+      # fix it. On a slow runner scale the budget (EOS_TEST_BUDGET_SCALE) rather than raising it.
+      - name: EOS tests · unit (pure logic, atomic writes, single-module behaviour)
+        run: node .github/eos/run-tests.mjs unit
 
-      - name: EOS validator regression tests (spec-align strict/advisory contract)
-        # Locks the fail-closed release-gate semantics: strict must never pass on absent evidence.
-        run: node --test .github/hooks/spec-align.test.mjs
+      - name: EOS tests · contract (CLI JSON + exit codes, adapter contract, offline boundary)
+        run: node .github/eos/run-tests.mjs contract
 
-      - name: EOS doc-parity regression tests (drift gate still catches drift)
-        # Locks check-doc-parity.mjs: PASS on parity, FAIL on coverage/structure/factual-code drift,
-        # no false positive on shared incidental tokens. Zero-dep node:test, offline.
-        run: node --test .github/hooks/check-doc-parity.test.mjs
+      - name: EOS tests · integration (routing, gate bypasses, cross-stack quality, doctor)
+        run: node .github/eos/run-tests.mjs integration
 
-      - name: EOS project-gate regression tests (cross-stack quality contract)
-        run: node --test .github/hooks/project-gate.test.mjs
+      - name: EOS tests · journey (the whole developer loop, end to end, offline)
+        run: node .github/eos/run-tests.mjs journey
 
-      - name: EOS doctor regression tests (G-EVAL detection + compliance + BMAD runtime)
-        run: node --test .github/hooks/eos-doctor.test.mjs
-
-      - name: EOS config-validator regression tests (S13 workflow spine cross-references)
-        # Locks the guided-workflow spine: an absent .eos/workflow.json only WARNs (repos created
-        # before this contract keep working), but a corrupt one, a policy referencing an unknown
-        # gate, or an action mapped to a non-existent agent/prompt FAILS. [eos-1.12.0]
-        run: node --test .github/hooks/validate-config.test.mjs
-
-      - name: EOS state-model tests (transitions, evidence staleness, waivers, ledger chain)
-        run: node --test .github/eos/state-model.test.mjs
-
-      - name: EOS next-best-action routing matrix (table-driven fixtures via the CLI)
-        run: node --test .github/eos/router.test.mjs
-
-      - name: EOS CLI contract tests (JSON contract, exit codes, handoff, non-destructive init)
-        run: node --test .github/eos/cli.test.mjs
-
-      - name: EOS workspace-rule generation (what `stack sync` writes must satisfy G4 + S14)
-        run: node --test .github/eos/workspace-rule.test.mjs
-
-      - name: EOS end-to-end journey (blocked story → repair → verify → stale → merge → release)
-        # The whole developer loop as a regression, executed through the real CLI, offline.
-        run: node --test .github/eos/journey.test.mjs
-
-      - name: EOS bypass regression tests (one per defect found by the adversarial review)
-        # Each case performs the reported exploit — relabelling, an outlived waiver, a tampered or
-        # truncated ledger, hand-written evidence, a story added after a release gate — and asserts
-        # it no longer works.
-        run: node --test .github/eos/bypass.test.mjs
-
-      - name: EOS audit + robustness regressions (EOS-AUD-001 … 011, release manifests, project context)
-        # One executable case per audit finding: the product-tree bypass, the BMAD false green, the
-        # existence-only stage gates, fake ACs, reasonless SKIPs, hand-written trace PASS, the
-        # release prompt ⇄ machine gate gap, and the RELEASED → telemetry → iteration loop.
-        run: node --test .github/eos/audit-regression.test.mjs
-
-      - name: EOS provider adapters (the external-authority contract, exercised offline)
-        # Every adapter failure mode — unreachable, unauthorised, timed out, crashed, disagreeing —
-        # is reproduced through a deterministic mock, so an integration cannot ship untested.
-        run: node --test .github/eos/adapters.test.mjs
-
-      - name: EOS offline boundary (the local-first claim is an assertion, not a promise)
-        # EOS Core must reach every decision with no network and no third-party dependency. This
-        # turns that claim into a test that fails, so it cannot erode one pull request at a time.
-        run: node --test .github/eos/offline-boundary.test.mjs
+      - name: EOS tests · audit regressions (one executable case per audit finding)
+        # Each test performs the reported bypass — relabelling, an outlived waiver, a tampered or
+        # truncated ledger, hand-written evidence, a story added after a release gate, a forked
+        # ledger from concurrent writers — and asserts it no longer works.
+        run: node .github/eos/run-tests.mjs audit-regression
 
       - name: EOS ledger append-only verification
         # The hash chain is the offline guarantee; comparing against the base ref additionally
@@ -176,6 +157,12 @@ jobs:
         # Runs the PROJECT's own install/lint/typecheck/test/eval commands for whatever stack it
         # declares. Replaces the old `if [ -f package.json ]` branch, which silently skipped
         # Python/Go/Java/Rust/.NET projects so their failing tests could never fail CI. [audit EOS-002]
+        #
+        # This DELIBERATELY re-executes the test layers above. The steps above exist for fast,
+        # granular feedback (a red step names the layer); this step proves the DECLARED command in
+        # .eos/project.json actually runs and passes. EOS requires that of every other project, so
+        # it has to hold itself to it — a declaration nobody executes is exactly the vacuous green
+        # this gate exists to refuse. The overlap costs ~30s of a 20-minute budget.
         run: node .github/hooks/project-gate.mjs
 
       - name: EOS gate summary (published to the PR / run summary)
@@ -201,6 +188,63 @@ jobs:
   # BEING SHIPPED is. It re-runs the declared quality commands on the tag's own tree and requires
   # every included story's verification to describe THAT tree — story state is not evidence about
   # code. [EOS-AUD-001 / EOS-AUD-007]
+  # ---------------------------------------------------------------------------------------------
+  # CROSS-PLATFORM. EOS is a path-handling program — product-tree digests, porcelain parsing, the
+  # posix() normaliser, evidence file names — and all of it was only ever tested on Linux. A
+  # Windows contributor was discovering EOS's portability bugs on their own time. [audit #8]
+  #
+  # Deliberately NOT the whole matrix: unit + contract are where the path and filesystem behaviour
+  # lives, and running everything three times would triple CI for the parts that are platform
+  # independent.
+  cross-platform:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '20'
+      - name: EOS tests · unit + contract
+        # Budgets are NOT enforced here, and that is deliberate rather than a concession.
+        #
+        # These layers are dominated by process spawns, and Windows spawns are roughly 15x more
+        # expensive than on the Linux runner (measured: unit 4.2s -> 63s, contract 8.0s -> 91s).
+        # A scale factor large enough to accommodate that would have to be ~20x, which would make
+        # the number meaningless as a regression signal anywhere.
+        #
+        # So each job asserts the thing it is actually good at: this one asserts the tests PASS on
+        # another platform, and the Linux `verify` job asserts they pass FAST, at scale 1, where a
+        # regression is visible. Timings are still printed here — they are useful data, they just
+        # do not gate.
+        run: node .github/eos/run-tests.mjs unit contract --no-budget
+
+  # ---------------------------------------------------------------------------------------------
+  # COVERAGE. A ratchet, not a target: the thresholds in .eos/test-budget.json sit just below the
+  # measured figure so a real regression fails the build and normal variance does not. Needs Node
+  # 22+, which is where --test-coverage-* became enforceable. [audit #8]
+  coverage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+      - name: EOS branch + line coverage (thresholds enforced)
+        run: node .github/eos/run-tests.mjs --coverage
+
   release-candidate:
     if: startsWith(github.ref, 'refs/tags/')
     needs: verify
@@ -223,18 +267,34 @@ jobs:
 
       - name: Does this repository release a product?
         id: releasable
-        # EOS's own repository declares `config-only` — it ships governance, not a product — so the
-        # release gate has nothing to test and correctly reports BLOCKED. Running it anyway would
-        # make every tag red for a reason that is not a defect. Downstream product repositories
-        # declare `application`/`library` and DO run the gate below.
+        # WHAT THIS GUARD IS FOR: the candidate-bound release gate verifies a release MANIFEST —
+        # which stories ship, and whether each one's verification describes THIS tree. A repository
+        # with nothing declared to ship has nothing for it to verify, and running it anyway would
+        # make every tag red for a reason that is not a defect.
+        #
+        # It used to key off `projectType: config-only`, which stopped being true when EOS declared
+        # its own engine as an application so its own quality gate would actually execute. The
+        # accurate condition is the manifest, not the project type.
+        #
+        # This is NOT an escape hatch: a repository that HAS stories but no manifest FAILS here,
+        # so "delete the manifest to skip the release gate" does not work.
         run: |
           TYPE=$(node -e "try{process.stdout.write(require('./.eos/project.json').projectType||'')}catch{process.stdout.write('')}")
-          echo "projectType=$TYPE"
-          if [ "$TYPE" = "application" ] || [ "$TYPE" = "library" ]; then
-            echo "run=true" >> "$GITHUB_OUTPUT"
-          else
+          MANIFESTS=$(ls .eos/releases/*.json 2>/dev/null | wc -l | tr -d ' ')
+          STORIES=$(ls docs/stories/*.md 2>/dev/null | wc -l | tr -d ' ')
+          echo "projectType=$TYPE manifests=$MANIFESTS stories=$STORIES"
+          if [ "$TYPE" != "application" ] && [ "$TYPE" != "library" ]; then
             echo "run=false" >> "$GITHUB_OUTPUT"
             echo "::notice::projectType is '${TYPE:-unset}' — there is no product to release-verify. Declare application/library in .eos/project.json to enable the candidate-bound release gate."
+          elif [ "$MANIFESTS" -gt 0 ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          elif [ "$STORIES" -gt 0 ]; then
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "::error::This repository has $STORIES story/stories but no release manifest under .eos/releases/. Run 'node .github/eos/eos.mjs release init --release <id>' and declare what this tag ships — a tag that ships unnamed work cannot be verified."
+            exit 1
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::No stories and no release manifest — this repository ships tooling, not story-based product increments. The 'verify' job is the gate for this tag."
           fi
 
       - name: Install the declared toolchain for the candidate
