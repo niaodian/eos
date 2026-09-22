@@ -14,7 +14,7 @@ import { spawnSync } from 'node:child_process';
 import { readSnapshot, gatePolicy, changeTypeOf, scopeState, gateInputs, gateCollections } from './lib/state.mjs';
 import { runGate, evaluateGate, recordedGateStatus, evidenceIntegrity, isBlocking } from './lib/gates.mjs';
 import { checkTransition, deriveProductState, legalTransitions } from './lib/transitions.mjs';
-import { appendEvent, readEvents, verifyChain, LEDGER_PATH } from './lib/ledger.mjs';
+import { appendEvent, readEvents, verifyChain, parseConflicted, reconcileEvents, writeLedger, divergence, LEDGER_PATH } from './lib/ledger.mjs';
 import { route, activeScope } from './lib/router.mjs';
 import { renderCard, renderGate, renderExplain } from './lib/render.mjs';
 import { buildHandoff, writeHandoff, readHandoff, verifyHandoff, handoffPath } from './lib/handoff.mjs';
@@ -53,7 +53,7 @@ usage: node .github/eos/eos.mjs <command> [flags]
   product-tree                            the identity of the tree a verification applies to
   waive --gate <id> --scope <id> --reason <text> --risk-owner <who> --expires <YYYY-MM-DD> --control <text>
   handoff --scope <type> --id <id> [--verify]
-  ledger [--verify] [--against <git-ref>]
+  ledger [--verify] [--against <ref>] [--resolve [--write]]
   focus --scope <type> --id <id>          set this machine's local focus (no authority)
   init [--write]                          write .vscode/tasks.json only (NOT the /eos-init hardening walkthrough)
   stack sync [--write]                    render the always-on workspace rule from .eos/project.json
@@ -981,6 +981,7 @@ const commands = {
   },
 
   ledger(snapshot, flags) {
+    if (flags.resolve) return resolveLedger(snapshot, flags);
     const { events, errors } = readEvents(snapshot.root);
     const chain = verifyChain(events, { root: snapshot.root });
     const problems = [...errors, ...chain.problems];
@@ -1135,6 +1136,78 @@ const commands = {
     return problems.length ? (problems.some((p) => p.level === 'ERROR' && !p.detail.startsWith('ledger')) ? EXIT.BLOCKED : EXIT.BLOCKED) : EXIT.OK;
   },
 };
+
+/**
+ * Reconcile a ledger that two branches both appended to.
+ *
+ * Git cannot merge an append-only hash chain. A textual merge leaves duplicated sequence numbers
+ * and prevHash pointers that lead nowhere; `.gitattributes` therefore forces a conflict instead,
+ * and this is the tool that resolves it — by REPLAYING both sides onto the shared prefix in
+ * timestamp order, re-deriving seq/prevHash/hash. Every event survives; only its position moves.
+ */
+function resolveLedger(snapshot, flags) {
+  const full = join(snapshot.root, LEDGER_PATH);
+  if (!existsSync(full)) {
+    emit(flags, { resolved: false, reason: 'no ledger' }, `EOS ledger · ${LEDGER_PATH} does not exist — nothing to resolve.\n`);
+    return EXIT.OK;
+  }
+  const raw = readFileSync(full, 'utf8');
+  const { common, ours, theirs } = parseConflicted(raw);
+  const conflicted = ours.length > 0 || theirs.length > 0;
+
+  let sources;
+  if (conflicted) {
+    sources = [common, ours, theirs];
+  } else {
+    // No markers. The other shape of the same problem: a merge that already "succeeded" textually
+    // and left duplicated sequence numbers behind.
+    const { events } = readEvents(snapshot.root);
+    if (!divergence(events).diverged) {
+      const chain = verifyChain(events, { root: snapshot.root });
+      const lines = ['EOS ledger · resolve', '',
+        chain.problems.length
+          ? '  This ledger is broken, but NOT by a merge: no conflict markers and no duplicated sequence numbers.'
+          : '  Nothing to resolve — no conflict markers, no duplicated sequence numbers.',
+        ...chain.problems.map((p) => `  ERROR ${p}`),
+        '', chain.problems.length ? 'FAIL' : 'PASS', ''];
+      emit(flags, { resolved: false, diverged: false, problems: chain.problems }, lines.join('\n'));
+      return chain.problems.length ? EXIT.FAIL : EXIT.OK;
+    }
+    sources = [events];
+  }
+
+  const replayed = reconcileEvents(sources);
+  const before = conflicted ? common.length + ours.length + theirs.length : sources[0].length;
+  const json = {
+    resolved: !!flags.write, conflicted, events: replayed.length, inputEvents: before,
+    ours: ours.length, theirs: theirs.length, common: common.length,
+  };
+  const lines = ['EOS ledger · resolve', '',
+    conflicted
+      ? `  conflict markers found · ${common.length} shared · ${ours.length} ours · ${theirs.length} theirs`
+      : `  merged ledger with duplicated sequence numbers · ${before} event(s)`,
+    `  replayed into a single chain of ${replayed.length} event(s) in timestamp order`,
+    '  Every event is kept. Timestamps, actors, gates, statuses and evidence digests are unchanged;',
+    '  only seq/prevHash/hash move, because that is what giving two histories one order means.',
+    ''];
+  if (flags.write) {
+    writeLedger(snapshot.root, replayed);
+    const check = verifyChain(readEvents(snapshot.root).events, { root: snapshot.root });
+    lines.push(`  written ${LEDGER_PATH} (+ head.json)`, '');
+    if (check.problems.length) {
+      lines.push(...check.problems.map((p) => `  ERROR ${p}`), '', 'FAIL', '');
+      emit(flags, { ...json, verified: false, problems: check.problems }, lines.join('\n'));
+      return EXIT.FAIL;
+    }
+    lines.push('  the replayed chain verifies', '',
+      '  Review the diff and commit it as the merge resolution:', `    git add ${LEDGER_PATH} .eos/ledger/head.json`, '', 'PASS', '');
+    emit(flags, { ...json, verified: true }, lines.join('\n'));
+    return EXIT.OK;
+  }
+  lines.push('  Nothing was written. Re-run with --write once the numbers above are what you expect.', '', 'PASS', '');
+  emit(flags, json, lines.join('\n'));
+  return EXIT.OK;
+}
 
 const VSCODE_TASKS = JSON.stringify({
   version: '2.0.0',

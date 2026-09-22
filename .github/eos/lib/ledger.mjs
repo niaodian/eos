@@ -28,19 +28,131 @@ function canonical(event) {
 
 export const hashEvent = (event) => createHash('sha256').update(canonical(event)).digest('hex');
 
-/** @returns {{events: object[], errors: string[]}} */
+/** Git conflict markers. Their presence changes the diagnosis completely, so they are detected. */
+const CONFLICT_RE = /^(<{7}|={7}|>{7})/;
+
+/** @returns {{events: object[], errors: string[], conflicted: boolean}} */
 export function readEvents(root) {
   const full = join(root, LEDGER_PATH);
-  if (!existsSync(full)) return { events: [], errors: [] };
+  if (!existsSync(full)) return { events: [], errors: [], conflicted: false };
   const errors = [];
   const events = [];
   let raw;
-  try { raw = readFileSync(full, 'utf8'); } catch (e) { return { events: [], errors: [`${LEDGER_PATH}: unreadable (${e.message})`] }; }
+  try { raw = readFileSync(full, 'utf8'); } catch (e) { return { events: [], errors: [`${LEDGER_PATH}: unreadable (${e.message})`], conflicted: false }; }
+  const conflicted = raw.split('\n').some((l) => CONFLICT_RE.test(l));
+  if (conflicted) {
+    // Reporting this as "not valid JSON … must never be hand-edited" accused the developer of
+    // tampering when what actually happened is that two branches both appended and git could not
+    // merge an append-only log. Different cause, different fix.
+    return {
+      events: [],
+      conflicted: true,
+      errors: [`${LEDGER_PATH} contains git conflict markers — two branches both appended to the append-only ledger. `
+        + 'Do NOT resolve this by hand: picking a side loses events, and keeping both breaks the hash chain. '
+        + 'Run `node .github/eos/eos.mjs ledger --resolve` to replay both sides into one valid chain.'],
+    };
+  }
   raw.split('\n').forEach((line, i) => {
     if (!line.trim()) return;
     try { events.push(JSON.parse(line)); } catch { errors.push(`${LEDGER_PATH}:${i + 1}: not valid JSON — the ledger is append-only and must never be hand-edited`); }
   });
-  return { events, errors };
+  return { events, errors, conflicted: false };
+}
+
+/**
+ * Split a conflicted ledger into the two sides git could not reconcile.
+ *
+ * Both sides share everything before the branch point, so the shared prefix appears in neither
+ * conflict hunk and is returned as `common`.
+ *
+ * @returns {{common: object[], ours: object[], theirs: object[]}}
+ */
+export function parseConflicted(raw) {
+  const common = [];
+  const ours = [];
+  const theirs = [];
+  let target = common;
+  for (const line of raw.split('\n')) {
+    if (/^<{7}/.test(line)) { target = ours; continue; }
+    if (/^={7}/.test(line)) { target = theirs; continue; }
+    if (/^>{7}/.test(line)) { target = common; continue; }
+    if (!line.trim()) continue;
+    try { target.push(JSON.parse(line)); } catch { /* a non-JSON line inside a hunk is not an event */ }
+  }
+  return { common, ours, theirs };
+}
+
+/**
+ * Replay events into one valid chain.
+ *
+ * THE POLICY, and why it is the only honest one: the ledger is append-only and hash-chained, so a
+ * "merge" cannot interleave lines — every event after the branch point has a `prevHash` that no
+ * longer points anywhere. Reconciliation therefore REPLAYS the divergent events onto the shared
+ * prefix, re-deriving `seq`, `prevHash` and `hash`.
+ *
+ * What is preserved: every event, and every field that says what happened — `ts`, `actor`, `type`,
+ * `scope`, `gate`, `status`, `evidenceSha256`, `detail`. Nothing is dropped and nothing is invented.
+ * What necessarily changes: chain position. That is not a rewrite of history, it is history being
+ * given a single order — and the ORDER is by timestamp, so it reflects when things actually
+ * happened rather than which branch won.
+ *
+ * Deduplication is by hash, which is exactly right: the shared prefix is identical on both sides
+ * and collapses, while two genuinely separate runs of the same gate have different hashes and are
+ * both kept. Collapsing those would be inventing a history in which one of them never ran.
+ */
+export function reconcileEvents(groups) {
+  const seen = new Set();
+  const all = [];
+  for (const group of groups) {
+    for (const e of group || []) {
+      if (!e || typeof e !== 'object') continue;
+      const key = e.hash || JSON.stringify(e);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      all.push(e);
+    }
+  }
+  // Stable: timestamp first, then the order encountered, so an identical input yields an identical
+  // output and two people resolving the same conflict get the same chain.
+  const ordered = all
+    .map((e, i) => ({ e, i }))
+    .sort((a, b) => (String(a.e.ts || '') === String(b.e.ts || '') ? a.i - b.i : String(a.e.ts || '').localeCompare(String(b.e.ts || ''))))
+    .map((x) => x.e);
+
+  const replayed = [];
+  let prevHash = null;
+  for (const [index, source] of ordered.entries()) {
+    const body = {};
+    for (const f of HASHED_FIELDS) if (f !== 'seq' && f !== 'prevHash' && source[f] !== undefined) body[f] = source[f];
+    const event = { seq: index + 1, ts: source.ts, ...body, prevHash };
+    event.hash = hashEvent(event);
+    replayed.push(event);
+    prevHash = event.hash;
+  }
+  return replayed;
+}
+
+/** Write a reconciled chain, replacing the ledger and its head record atomically. */
+export function writeLedger(root, events) {
+  const body = events.map((e) => JSON.stringify(e)).join('\n') + (events.length ? '\n' : '');
+  writeFileAtomic(join(root, LEDGER_PATH), body);
+  writeHead(root, events);
+  return events.length;
+}
+
+/**
+ * Did this ledger DIVERGE (two branches appended, then merged) rather than get tampered with?
+ *
+ * A duplicated `seq` is the fingerprint: an attacker editing a line leaves the sequence intact,
+ * whereas a textual merge of two appended tails produces two events claiming the same position.
+ * Naming the two apart matters — one is a git accident with a mechanical fix, the other is an
+ * accusation.
+ */
+export function divergence(events) {
+  const bySeq = new Map();
+  for (const e of events) bySeq.set(e.seq, (bySeq.get(e.seq) || 0) + 1);
+  const duplicated = [...bySeq.entries()].filter(([, n]) => n > 1).map(([seq]) => seq).sort((a, b) => a - b);
+  return { diverged: duplicated.length > 0, duplicatedSeq: duplicated };
 }
 
 export function readHead(root) {
@@ -67,6 +179,19 @@ function writeHead(root, events) {
 export function verifyChain(events, { root = null } = {}) {
   const problems = [];
   const warnings = [];
+  // A merged ledger is not a tampered one. Diagnose it first, so the report names the real cause
+  // and the mechanical fix instead of accusing whoever ran `git merge` of rewriting history.
+  const merge = divergence(events);
+  if (merge.diverged) {
+    problems.push(
+      `${LEDGER_PATH} has ${merge.duplicatedSeq.length} duplicated sequence number(s) (${merge.duplicatedSeq.join(', ')}) — `
+      + 'this is a MERGE DIVERGENCE, not tampering: two branches each appended to the append-only ledger and the histories were combined. '
+      + 'Run `node .github/eos/eos.mjs ledger --resolve` to replay both sides into one valid chain; every event is kept.',
+    );
+    // The per-event walk below would now emit a cascade of "the ledger was rewritten" for the same
+    // single cause, which buries the one line that explains what to do.
+    return { ok: false, problems, warnings };
+  }
   let prevHash = null;
   events.forEach((e, i) => {
     const at = `event #${i + 1}`;

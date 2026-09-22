@@ -1,6 +1,6 @@
 {
   "name": "eos-template",
-  "version": "1.18.0",
+  "version": "1.19.0",
   "private": true,
   "description": "Engineering Operating System template — a local-first, zero-dependency governance engine for VS Code + GitHub Copilot.",
   "license": "MIT",
