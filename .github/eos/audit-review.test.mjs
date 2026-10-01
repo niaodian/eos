@@ -51,11 +51,16 @@ test('review: a release refuses a story whose LATEST verification is a FAIL', ()
 
 test('review: the product-tree identity sees a mode change, a symlink retarget and a deletion', () => {
   const dir = project({ 'src/deploy.sh': '#!/bin/sh\necho deploy\n', 'src/real-a.txt': 'a\n', 'src/real-b.txt': 'b\n' });
+  // The executable bit is recorded through git as well as chmod: on Windows (core.fileMode=false)
+  // a working-tree chmod never reaches the index, so chmod alone would make no mode change at all
+  // there. The identity reads git's recorded mode — which is what every platform ships.
   chmodSync(join(dir, 'src/deploy.sh'), 0o755);
+  assert.equal(git(dir, ['add', '--chmod=+x', 'src/deploy.sh']).code, 0);
   commitAll(dir, 'make it executable');
   clearProductTreeCache();
   const withExec = computeProductTree(dir).identity.digest;
   chmodSync(join(dir, 'src/deploy.sh'), 0o644);
+  assert.equal(git(dir, ['add', '--chmod=-x', 'src/deploy.sh']).code, 0);
   commitAll(dir, 'drop the executable bit');
   clearProductTreeCache();
   // The CONTENT is byte-for-byte identical; only the mode moved. A content-only digest is blind

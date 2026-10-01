@@ -67,7 +67,7 @@ export function policySnapshot({ gates, workflow, project }) {
         gates: { ...(d.gates || {}) },
       };
     }
-    profiles[name] = { defaultChangeType: p.defaultChangeType ?? null, changeTypes };
+    profiles[name] = { defaultChangeType: p.defaultChangeType ?? null, requiresCompliance: !!p.requiresCompliance, changeTypes };
   }
   const stateMachines = {};
   for (const [name, m] of Object.entries(workflow?.stateMachines || {})) {
@@ -103,6 +103,10 @@ export const policyDigest = (snapshot) => createHash('sha256').update(canonical(
 
 /** Compare two profiles; used for a profile edited in place AND for a project switching profiles. */
 function diffProfile(pa, pb, label, prefix, add) {
+  // Dropping the flag lets the profile be selected without the compliance boundary — exactly the
+  // gap #12 closed — so it is held to the same sign-off as switching a gate off.
+  if (pa.requiresCompliance && !pb.requiresCompliance) add('WEAKENING', `${prefix}:requires-compliance-dropped`, `${label} no longer requires complianceProfile "regulated"`);
+  if (!pa.requiresCompliance && pb.requiresCompliance) add('STRENGTHENING', `${prefix}:requires-compliance`, `${label} now requires complianceProfile "regulated"`);
   if (pa.defaultChangeType !== pb.defaultChangeType) {
     const before = pa.changeTypes[pa.defaultChangeType]?.gates || {};
     const after = pb.changeTypes[pb.defaultChangeType]?.gates || {};

@@ -5,9 +5,12 @@ import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { project, write, run, runJson, cleanup, commitAll, REPO_ROOT, APP_PROJECT, PRD_2AC, story } from './test-support.mjs';
+import { boundedSpawnSync } from './test-spawn.mjs';
 import { validate } from './lib/schema.mjs';
 import { activeWorkPath } from './lib/registry.mjs';
+import { commands } from './commands/index.mjs';
 
 after(cleanup);
 
@@ -95,6 +98,36 @@ test('exit codes: an unknown command exits 3 with usage, never 0', () => {
   const { code, out } = run(project({ '.eos/project.json': APP_PROJECT }), ['frobnicate']);
   assert.equal(code, 3);
   assert.match(out, /usage/i);
+});
+
+// ---------------------------------------------------------------- command registry
+test('a large --json document reaches a pipe whole, not cut off at the pipe buffer', () => {
+  // Pipes are asynchronous on macOS and Windows. Exiting straight after the write cut a
+  // verify-release document off at exactly 8192 bytes on Node 20 / macOS. Linux pipes are
+  // synchronous, so this can only fail on the cross-platform job — which is where it matters.
+  const exitModule = pathToFileURL(join(REPO_ROOT, '.github/eos/lib/exit.mjs')).href;
+  const script = `import { exitAfterFlush } from ${JSON.stringify(exitModule)};
+process.stdout.write(JSON.stringify({ pad: 'x'.repeat(1 << 20) }) + '\\n');
+exitAfterFlush(2);`;
+  const r = boundedSpawnSync(process.execPath, ['--input-type=module', '-e', script], { maxBuffer: 8 << 20, timeout: 30000 });
+  assert.equal(r.status, 2, r.stderr);
+  assert.equal(JSON.parse(r.stdout).pad.length, 1 << 20);
+});
+
+test('every documented command is registered, and every registered command is documented', () => {
+  const usage = run(REPO_ROOT, ['help']).out;
+  const documented = [...usage.matchAll(/^ {2}([a-z][a-z-]*)\b/gm)].map((m) => m[1]).filter((n) => n !== 'global');
+  assert.deepEqual([...documented].sort(), Object.keys(commands).sort());
+});
+
+test('an inherited property name is an unknown command, not something to dispatch to', () => {
+  // A plain-object registry resolved `constructor` to Object and crashed in process.exit — exit 1,
+  // which reads as a FAIL verdict rather than a usage error.
+  for (const name of ['constructor', 'toString', '__proto__', 'hasOwnProperty']) {
+    const { code, out } = run(REPO_ROOT, [name]);
+    assert.equal(code, 3, `${name}\n${out}`);
+    assert.ok(out.includes(`unknown command "${name}"`), out);
+  }
 });
 
 // ---------------------------------------------------------------- explain

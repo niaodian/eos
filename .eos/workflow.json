@@ -340,7 +340,8 @@
       }
     },
     "regulated": {
-      "description": "Compliance and audit-sensitive systems (HIPAA / PCI-DSS / SOC2 / SOX / GDPR and friends). Everything Controlled requires, plus: every change is classified with a recorded reason, a spike may not be merged, the iteration write-back is required so the loop is closed in the record, and DOC_ONLY no longer switches the activation gate off — in an audited environment \"it was only documentation\" is a claim that still has to be verifiable.",
+      "description": "Compliance and audit-sensitive systems (HIPAA / PCI-DSS / SOC2 / SOX / GDPR and friends). Everything Controlled requires, plus: every change is classified with a recorded reason, a spike may not be merged, the iteration write-back is required so the loop is closed in the record, and DOC_ONLY no longer switches the activation gate off — in an audited environment \"it was only documentation\" is a claim that still has to be verifiable. Selecting it requires \"complianceProfile\": \"regulated\" in .eos/project.json, so the release evidence it accepts is held to the compliance boundary rather than to the label.",
+      "requiresCompliance": true,
       "defaultChangeType": "FEATURE",
       "changeTypes": {
         "PRODUCT_BASELINE": {

@@ -220,18 +220,41 @@ jobs:
   # posix() normaliser, evidence file names — and all of it was only ever tested on Linux. A
   # Windows contributor was discovering EOS's portability bugs on their own time. [audit #8]
   #
-  # Deliberately NOT the whole matrix: unit + contract are where the path and filesystem behaviour
-  # lives, and running everything three times would triple CI for the parts that are platform
-  # independent.
+  # Every layer runs here. The git-heavy layers (integration, journey, audit-regression) are where
+  # Windows differs most — path separators, file locking, rename semantics, git's own behaviour —
+  # so leaving them Linux-only tested the platform-independent half and skipped the half most
+  # likely to break.
   cross-platform:
     strategy:
       fail-fast: false
       matrix:
         os: [windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
+    # Measured on Node 20: all five layers take ~8 min on Windows and ~2.5 min on macOS. 30 min is
+    # ~3.5x the slower of the two — room for a slow runner, not for a hang.
+    timeout-minutes: 30
     permissions:
       contents: read
+    # Budgets are NOT enforced here, and that is deliberate rather than a concession.
+    #
+    # These layers are dominated by process spawns, and Windows spawns are roughly 15x more
+    # expensive than on the Linux runner (measured: unit 4.2s -> 63s, contract 8.0s -> 91s). A scale
+    # factor large enough to accommodate that would have to be ~20x, which would make the number
+    # meaningless as a regression signal anywhere.
+    #
+    # So each job asserts the thing it is actually good at: this one asserts the tests PASS on
+    # another platform, and the Linux `verify` job asserts they pass FAST, at scale 1, where a
+    # regression is visible. Timings are still printed here — they are useful data, they just do
+    # not gate.
+    #
+    # The limits need the same care. Node 20 applies --test-timeout to each test FILE (it wraps a
+    # file as one top-level test), and on Windows a whole file can legitimately take longer than the
+    # 120s default sized for Linux, so Windows gets a longer per-test limit by explicit override.
+    # The layer backstop needs no override: the slowest layer measured on Windows takes ~155s, and
+    # the 15-minute default leaves ~6x headroom. EOS_LAYER_TIMEOUT_MS exists for a slower runner.
+    # macOS keeps every default, so a hang there is still caught early.
+    env:
+      EOS_TEST_TIMEOUT_MS: ${{ matrix.os == 'windows-latest' && '900000' || '120000' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -239,26 +262,22 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '20'
-      - name: EOS tests · unit + contract
-        # Budgets are NOT enforced here, and that is deliberate rather than a concession.
-        #
-        # These layers are dominated by process spawns, and Windows spawns are roughly 15x more
-        # expensive than on the Linux runner (measured: unit 4.2s -> 63s, contract 8.0s -> 91s).
-        # A scale factor large enough to accommodate that would have to be ~20x, which would make
-        # the number meaningless as a regression signal anywhere.
-        #
-        # So each job asserts the thing it is actually good at: this one asserts the tests PASS on
-        # another platform, and the Linux `verify` job asserts they pass FAST, at scale 1, where a
-        # regression is visible. Timings are still printed here — they are useful data, they just
-        # do not gate.
-        #
-        # The per-test limit needs the same care. Node 20 applies --test-timeout to each test FILE
-        # (it wraps a file as one top-level test), and on Windows a whole file can legitimately take
-        # longer than the 120s default (cli.test.mjs: ~9s on Linux). Windows gets a longer limit by
-        # explicit override; macOS keeps the default, so a hang there is still caught early.
-        env:
-          EOS_TEST_TIMEOUT_MS: ${{ matrix.os == 'windows-latest' && '900000' || '120000' }}
-        run: node .github/eos/run-tests.mjs unit contract --no-budget
+      # One step per layer, and every layer runs even after an earlier one failed: a platform defect
+      # in one layer must not hide the ones in the next.
+      - name: EOS tests · unit
+        run: node .github/eos/run-tests.mjs unit --no-budget
+      - name: EOS tests · contract
+        if: ${{ !cancelled() }}
+        run: node .github/eos/run-tests.mjs contract --no-budget
+      - name: EOS tests · integration
+        if: ${{ !cancelled() }}
+        run: node .github/eos/run-tests.mjs integration --no-budget
+      - name: EOS tests · journey
+        if: ${{ !cancelled() }}
+        run: node .github/eos/run-tests.mjs journey --no-budget
+      - name: EOS tests · audit-regression
+        if: ${{ !cancelled() }}
+        run: node .github/eos/run-tests.mjs audit-regression --no-budget
 
   # ---------------------------------------------------------------------------------------------
   # COVERAGE. A ratchet, not a target: the thresholds in .eos/test-budget.json sit just below the

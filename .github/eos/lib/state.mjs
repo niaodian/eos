@@ -5,7 +5,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { loadProjectConfig } from '../../hooks/lib/project-config.mjs';
+import { loadProjectConfig, complianceRequirementProblem } from '../../hooks/lib/project-config.mjs';
 import { loadWorkflow, loadGates, loadAgentMap, loadActiveWork, posix } from './registry.mjs';
 import { LEDGER_PATH } from './ledger.mjs';
 import { readLedgerSnapshot, stateOf } from './ledger.mjs';
@@ -113,6 +113,8 @@ export function readSnapshot(root, { withGit = true } = {}) {
   if (wf.workflow && !profile) {
     errors.push(`.eos/project.json: workflowProfile "${profileName}" is not defined in .eos/workflow.json (available: ${Object.keys(wf.workflow.profiles).join(', ')})`);
   }
+  const complianceProblem = complianceRequirementProblem(proj.config, wf.workflow);
+  if (complianceProblem) errors.push(complianceProblem);
 
   const stories = listStories(root);
   const prd = prdAcceptanceCriteria(root);

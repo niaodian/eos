@@ -247,3 +247,23 @@ test('with no lock, a weakening fails instead of slipping through', () => {
   assert.equal(r.code, 1, r.out);
   assert.match(r.out, /need acknowledgement but there is no/);
 });
+
+// ---------------------------------------------------------------- #12 regulated needs the boundary
+test('dropping a profile\'s compliance requirement is a weakening', () => {
+  const c = flagged((p) => { delete p.workflow.profiles.regulated.requiresCompliance; });
+  assert.equal(c.length, 1, JSON.stringify(c));
+  assert.equal(c[0].kind, 'WEAKENING');
+  assert.match(c[0].id, /profile:regulated:requires-compliance-dropped/);
+});
+
+test('every EOS command fails closed on a regulated profile without the boundary', () => {
+  const dir = project({ '.eos/project.json': { ...APP_PROJECT, workflowProfile: 'regulated' } });
+  const r = run(dir, ['check', '--gate', 'discovery-ready']);
+  assert.equal(r.code, 3, r.out);
+  assert.match(r.out, /requires "complianceProfile": "regulated"/);
+});
+
+test('a regulated profile with the boundary declared works normally', () => {
+  const dir = project({ '.eos/project.json': { ...APP_PROJECT, workflowProfile: 'regulated', complianceProfile: 'regulated', evidencePolicy: 'ci' } });
+  assert.notEqual(run(dir, ['status']).code, 3);
+});

@@ -204,7 +204,7 @@ them; only the policy differs, so moving up a tier is a one-line edit rather tha
 | Lite | `prototype` | personal projects, proofs of concept, small tools | nothing is gated except local activation; every change is a spike and is not mergeable |
 | Standard | `standard-product` | ordinary team products | the full SDLC: discovery to iteration, per-story verification, release verification, one waivable escape hatch |
 | Controlled | `controlled` | enterprise and business-critical systems | no gate may be waived at all; a hotfix must still prove it works and that what shipped is what was verified; a release must plan its telemetry |
-| Regulated | `regulated` | compliance and audit-sensitive systems | every change records why it was classified that way; a spike may not be merged; the iteration write-back is required; not even a documentation change switches the activation gate off |
+| Regulated | `regulated` | compliance and audit-sensitive systems | every change records why it was classified that way; a spike may not be merged; the iteration write-back is required; not even a documentation change switches the activation gate off; and selecting it requires `"complianceProfile": "regulated"`, so the evidence it accepts is held to the compliance boundary, not just to the name |
 
 Each tier is **strictly no weaker** than the tier below it, gate by gate and change type by change
 type, and a test asserts that property — a maturity ladder whose upper rung quietly permitted more

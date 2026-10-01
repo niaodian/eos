@@ -3,7 +3,7 @@
 // Run from project root: node .github/hooks/validate-config.mjs
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join, relative } from 'node:path';
-import { loadProjectConfig, detectStacks, stacksInProse, PROJECT_CONFIG_PATH } from './lib/project-config.mjs';
+import { loadProjectConfig, detectStacks, stacksInProse, complianceRequirementProblem, PROJECT_CONFIG_PATH } from './lib/project-config.mjs';
 import { loadWorkflow, loadGates, loadAgentMap } from '../eos/lib/registry.mjs';
 
 const root = process.cwd();
@@ -208,6 +208,11 @@ if (wf.workflow && gt.gates) {
       if (!machine.states.includes(t.from) || !machine.states.includes(t.to)) errors.push(`S13 .eos/workflow.json: transition ${t.from} → ${t.to} uses a state that is not declared`);
     }
   }
+}
+// S13 a profile that requires the compliance boundary cannot be selected without it. [#12]
+if (wf.workflow && proj.present && proj.config) {
+  const problem = complianceRequirementProblem(proj.config, wf.workflow);
+  if (problem) errors.push(`S13 ${problem}`);
 }
 if (am.agentMap) {
   for (const [actionId, entry] of Object.entries(am.agentMap.actions)) {
