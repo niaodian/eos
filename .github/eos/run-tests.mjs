@@ -66,7 +66,9 @@ const layers = Object.entries(budget.layers);
 // as slow as GitHub's Windows one (spawns ~15x Linux) means a file legitimately needs longer. Raise
 // it there by override; the default stays tight everywhere else.
 const TEST_TIMEOUT_MS = Number(process.env.EOS_TEST_TIMEOUT_MS || budget.testTimeoutMs || 120000);
-const LAYER_TIMEOUT_MS = budget.layerTimeoutMs ?? 900000;
+// The layer backstop takes the same per-environment override (EOS_LAYER_TIMEOUT_MS), for the same
+// reason: on the Windows runner a whole layer can legitimately outlive a limit sized for Linux.
+const LAYER_TIMEOUT_MS = Number(process.env.EOS_LAYER_TIMEOUT_MS || budget.layerTimeoutMs || 900000);
 const COVERAGE_TIMEOUT_MS = budget.coverageTimeoutMs ?? 1800000;
 const BASELINE_ENV = process.env.EOS_TEST_BASELINE_ENV || null;
 const TOLERANCE = budget.baselineTolerance ?? 0.5;
@@ -96,7 +98,7 @@ function backstopMessage(what, ms) {
   return [`\n✖ ${what} exceeded its backstop of ${ms}ms and was killed.`,
     '  Every test also has its own limit (--test-timeout), so a whole layer outliving this means the',
     '  test PROCESS hung — usually an unclosed handle or a child process that never exited.',
-    `  Raise layerTimeoutMs in ${BUDGET_PATH} only if the runner is genuinely that slow.`].join('\n');
+    `  Raise layerTimeoutMs in ${BUDGET_PATH} (or EOS_LAYER_TIMEOUT_MS for one environment) only if the runner is genuinely that slow.`].join('\n');
 }
 
 const results = [];
