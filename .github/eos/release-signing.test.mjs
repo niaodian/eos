@@ -31,6 +31,9 @@ function releaseRepo(declaration = APP_PROJECT) {
   const keygen = run(dir, ['release', 'keygen', '--out', join(keys, 'release.pem'), '--write']);
   assert.equal(keygen.code, 0, keygen.out);
   commitAll(dir, 'release key');
+  // A real release is cut from a history in which gates have run; binding records its head.
+  run(dir, ['check', '--gate', 'activation']);
+  commitAll(dir, 'activation evidence');
   assert.equal(run(dir, ['release', 'init', '--release', 'v1.0.0']).code, 0);
   const bind = run(dir, ['release', 'bind', '--release', 'v1.0.0']);
   assert.equal(bind.code, 0, bind.out);
@@ -70,9 +73,13 @@ test('a private-key path that reaches the repository through a symlink is still 
 });
 
 // ---------------------------------------------------------------- bind records what ships
-test('bind records the artifacts, the SBOM and the ledger head the release was cut from', () => {
+test('bind records the artifacts, the SBOM and the ledger head the release was cut from — and appends nothing', () => {
   const { dir } = releaseRepo();
   const m = manifestOf(dir);
+  const events = readFileSync(join(dir, '.eos/ledger/events.jsonl'), 'utf8').trim().split('\n');
+  assert.equal(JSON.parse(events.at(-1)).hash, m.ledger.hash, 'the manifest points at the committed head');
+  assert.equal(run(dir, ['release', 'bind', '--release', 'v1.0.0']).code, 0);
+  assert.equal(readFileSync(join(dir, '.eos/ledger/events.jsonl'), 'utf8').trim().split('\n').length, events.length, 'binding must not write to the ledger');
   assert.deepEqual(validate(MANIFEST_SCHEMA, m).errors, []);
   assert.deepEqual(m.artifacts.map((a) => a.path), ['dist/app-1.0.0.tgz']);
   assert.equal(m.artifacts[0].sha256, sha256(readFileSync(join(dir, 'dist/app-1.0.0.tgz'))));

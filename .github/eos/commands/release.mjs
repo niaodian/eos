@@ -220,13 +220,11 @@ export const releaseCommands = {
     }
     let binding = null;
     if (sub === 'bind') {
-      // 2.0: what ships, by digest — the artifacts, the SBOM, the provenance — and the ledger event
-      // that records this binding. The event carries the manifest's decision digest, which does not
-      // include the ledger field, so the manifest can point at the event that points at it.
+      // 2.0: what ships, by digest — the artifacts, the SBOM, the provenance — and the head of the
+      // COMMITTED ledger. Binding appends nothing: a manifest bound in a CI workspace must point at
+      // history the repository has, not at an event that lived only in that workspace.
       binding = bindRelease(snapshot.root, snapshot.project, manifest, { artifacts: list(flags.artifact), provenance: list(flags.provenance) });
       manifest = binding.manifest;
-      const event = appendEvent(snapshot.root, { type: 'release', scope: { type: 'release', id: String(id) }, commit: snapshot.commit, manifestDigest: computeManifestDigest(manifest), detail: `bound ${binding.artifacts.length} artifact(s)` });
-      manifest = { ...manifest, ledger: { seq: event.seq, hash: event.hash } };
     }
     mkdirSync(dirname(full), { recursive: true });
     writeFileAtomic(full, JSON.stringify(manifest, null, 2) + '\n');
@@ -243,7 +241,7 @@ export const releaseCommands = {
     } else {
       lines.push(`  artifacts   ${binding.artifacts.length ? binding.artifacts.join(', ') : '(none — declare release.artifacts, or pass --artifact <path>)'}`,
         `  sbom        ${manifest.sbom ? manifest.sbom.sha256.slice(0, 12) : '(none — run eos sbom --write first)'}`,
-        `  ledger      event ${manifest.ledger.seq}`, '',
+        `  ledger      ${manifest.ledger ? `event ${manifest.ledger.seq}` : '(empty — no gate has run yet)'}`, '',
         '  Re-bound to the current candidate. Any approval given for the previous manifest no',
         '  longer applies — that is deliberate.', ...(binding.droppedSignature ? ['  The previous signature was over different content and has been removed — sign again.'] : []), '');
     }

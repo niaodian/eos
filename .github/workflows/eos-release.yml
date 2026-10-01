@@ -1,0 +1,272 @@
+# EOS release supply chain — build, attest, bind, sign, publish. (ADR-012)
+#
+# The track comes from the project's own declaration, read by the engine (release-plan.mjs), never
+# from a copy of the rule in this file:
+#   Standard  — the release artifacts get GitHub artifact attestations (free for public
+#               repositories; `gh attestation verify <file> -R <owner>/<repo>` checks them). A release
+#               manifest, if the project keeps one, is bound to the build and verified. Signing it
+#               is optional, and nothing here blocks on a missing signature.
+#   Regulated — additionally SLSA Build L3 provenance from the isolated generator, a manifest signed
+#               with the key in the EOS_RELEASE_SIGNING_KEY secret, and `eos release verify` must
+#               pass before anything is published.
+#
+# Least privilege: the default token is read-only. Only the attestation jobs can mint an OIDC token
+# (id-token: write); only the SLSA job (release uploads) and the publish job can write contents.
+# eos-ci.yml never gets either. Tested by .github/eos/release-workflow.test.mjs.
+#
+# Pinning: every action is pinned to a commit SHA, with ONE documented exception. The SLSA generator
+# is a reusable workflow that checks it was referenced by a release tag and refuses a SHA, so it is
+# pinned to v2.1.0. Its provenance is still checked against the artifact digests by
+# `eos release verify`.
+#
+# A push of a tag (`v*` or `eos-*`) builds, attests and — once everything the track requires has
+# passed — publishes to that tag's GitHub release, creating a draft if none exists. A manual dispatch, or a pull request that changes this file, is
+# a dry run: it builds and attests, and publishes nothing.
+name: EOS release
+
+on:
+  push:
+    tags: ['v*', 'eos-*']
+  workflow_dispatch:
+    inputs:
+      track:
+        description: 'auto (from .eos/project.json) | standard | regulated — a dispatch is a dry run'
+        type: choice
+        default: auto
+        options: [auto, standard, regulated]
+  pull_request:
+    paths: ['.github/workflows/eos-release.yml']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: eos-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      track: ${{ steps.plan.outputs.track }}
+      release: ${{ steps.plan.outputs.release }}
+      manifest: ${{ steps.plan.outputs.manifest }}
+      attest: ${{ steps.plan.outputs.attest }}
+      publish: ${{ steps.plan.outputs.publish }}
+      name: ${{ steps.plan.outputs.name }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '20'
+      - id: plan
+        env:
+          EOS_EVENT: ${{ github.event_name }}
+          EOS_REF_TYPE: ${{ github.ref_type }}
+          EOS_REF_NAME: ${{ github.ref_name }}
+          EOS_TRACK: ${{ inputs.track || 'auto' }}
+          EOS_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          EOS_REPO: ${{ github.repository }}
+        run: node .github/eos/release-plan.mjs >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    outputs:
+      digests: ${{ steps.hash.outputs.digests }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '20'
+      # REPLACE THIS STEP when your product ships built artifacts (a package, a binary, an image
+      # digest file). Everything that lands in dist/ is attested; list the files in
+      # .eos/project.json → release.artifacts (e.g. "dist/*.tgz") so the release manifest binds
+      # them. The default ships the repository itself as a source archive, which is what EOS ships.
+      - name: Build release artifacts
+        env:
+          NAME: ${{ needs.plan.outputs.name }}
+        run: |
+          mkdir -p dist
+          git archive --format=tar.gz --prefix="${NAME}/" -o "dist/${NAME}.tar.gz" HEAD
+          if [ -f .eos/sbom.json ]; then cp .eos/sbom.json "dist/${NAME}.sbom.json"; fi
+      - id: hash
+        working-directory: dist
+        run: |
+          sha256sum -- * > SHA256SUMS
+          echo "digests=$(sha256sum -- * | grep -v ' SHA256SUMS$' | base64 -w0)" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-dist
+          path: dist/
+          if-no-files-found: error
+
+  # Standard and Regulated: GitHub artifact attestations (SLSA build provenance, Sigstore-signed).
+  attest:
+    needs: [plan, build]
+    if: needs.plan.outputs.attest == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+      contents: read
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-dist
+          path: dist
+      - id: attest
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: 'dist/*'
+      - name: Keep the attestation bundle with the release
+        env:
+          BUNDLE: ${{ steps.attest.outputs.bundle-path }}
+          NAME: ${{ needs.plan.outputs.name }}
+        run: |
+          mkdir -p provenance
+          cp "$BUNDLE" "provenance/${NAME}.sigstore.json"
+          {
+            echo "### Provenance"
+            echo ""
+            echo "Verify any artifact of this run: \`gh attestation verify <file> -R ${GITHUB_REPOSITORY}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-attestation
+          path: provenance/
+          if-no-files-found: error
+
+  # Regulated only: SLSA Build L3 provenance from the isolated generator. Tag-pinned — see the header.
+  slsa:
+    needs: [plan, build]
+    if: needs.plan.outputs.track == 'regulated' && needs.plan.outputs.attest == 'true'
+    permissions:
+      actions: read
+      id-token: write
+      contents: write
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v2.1.0
+    with:
+      base64-subjects: ${{ needs.build.outputs.digests }}
+      # Never upload from here: the publish job attaches everything, and only after
+      # `eos release verify` has passed. Uploading here would publish before verification.
+      upload-assets: false
+      provenance-name: ${{ needs.plan.outputs.name }}.intoto.jsonl
+
+  # Bind the project's release manifest (if it keeps one) to what was built, sign it, verify it.
+  manifest:
+    needs: [plan, build, attest, slsa]
+    if: >-
+      always() && needs.plan.outputs.manifest == 'true' && needs.build.result == 'success'
+      && contains(fromJSON('["success","skipped"]'), needs.attest.result)
+      && contains(fromJSON('["success","skipped"]'), needs.slsa.result)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    env:
+      RELEASE: ${{ needs.plan.outputs.release }}
+      TRACK: ${{ needs.plan.outputs.track }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '20'
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-dist
+          path: dist
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        if: needs.attest.result == 'success'
+        with:
+          name: release-attestation
+          path: provenance
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        if: needs.slsa.result == 'success'
+        with:
+          name: ${{ needs.slsa.outputs.provenance-name }}
+          path: provenance
+      - name: Bind the manifest to the built artifacts and their provenance
+        run: |
+          set -- $(ls provenance/* 2>/dev/null | sed 's/^/--provenance /')
+          node .github/eos/eos.mjs release bind --release "$RELEASE" "$@"
+      - name: Sign the manifest (required on the Regulated track)
+        env:
+          SIGNING_KEY: ${{ secrets.EOS_RELEASE_SIGNING_KEY }}
+        run: |
+          if [ -z "$SIGNING_KEY" ]; then
+            if [ "$TRACK" = regulated ]; then
+              echo "::error::Regulated track: set the EOS_RELEASE_SIGNING_KEY secret (the private key from eos release keygen)"
+              exit 1
+            fi
+            echo "::notice::Standard track: no EOS_RELEASE_SIGNING_KEY secret, so the manifest ships unsigned"
+            exit 0
+          fi
+          umask 077
+          printf '%s\n' "$SIGNING_KEY" > "$RUNNER_TEMP/release.pem"
+          status=0
+          node .github/eos/eos.mjs release sign --release "$RELEASE" --key "$RUNNER_TEMP/release.pem" || status=$?
+          node -e "require('fs').unlinkSync(process.argv[1])" "$RUNNER_TEMP/release.pem"
+          exit $status
+      - name: Verify the release
+        run: node .github/eos/eos.mjs release verify --release "$RELEASE"
+      - name: Keep the bound manifest with the release
+        env:
+          NAME: ${{ needs.plan.outputs.name }}
+        run: |
+          mkdir -p bound
+          cp ".eos/releases/${RELEASE}.json" "bound/${NAME}.manifest.json"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-manifest
+          path: bound/
+          if-no-files-found: error
+
+  # Nothing is published until everything the track requires has succeeded. A job that was
+  # skipped because something upstream failed must not read as "not needed".
+  publish:
+    needs: [plan, build, attest, slsa, manifest]
+    if: >-
+      always() && needs.plan.outputs.publish == 'true' && needs.build.result == 'success'
+      && needs.attest.result == 'success'
+      && (needs.plan.outputs.manifest != 'true' || needs.manifest.result == 'success')
+      && (needs.plan.outputs.track != 'regulated'
+          || (needs.slsa.result == 'success' && needs.manifest.result == 'success'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: release-*
+          path: assets
+          merge-multiple: true
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        if: needs.slsa.result == 'success'
+        with:
+          name: ${{ needs.slsa.outputs.provenance-name }}
+          path: assets
+      - name: Attach the artifacts, provenance and manifest to the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release view "$TAG" -R "$GITHUB_REPOSITORY" > /dev/null 2>&1 \
+            || gh release create "$TAG" -R "$GITHUB_REPOSITORY" --draft --verify-tag --title "$TAG" \
+                 --notes "Draft created by eos-release.yml. Edit the notes, then publish."
+          gh release upload "$TAG" assets/* -R "$GITHUB_REPOSITORY" --clobber
