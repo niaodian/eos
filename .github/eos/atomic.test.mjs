@@ -20,7 +20,7 @@ import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname } from 'node:path';
 import { appendEvent, readEvents, verifyChain, readLedgerSnapshot, LEDGER_PATH, LEDGER_HEAD_PATH, LEDGER_LOCK_PATH } from './lib/ledger.mjs';
-import { writeFileAtomic, withLock, LockTimeoutError, renameWithRetry } from './lib/atomic.mjs';
+import { writeFileAtomic, withLock, LockTimeoutError, renameWithRetry, lockBusyOnWindows } from './lib/atomic.mjs';
 
 const EOS_DIR = dirname(fileURLToPath(import.meta.url));
 // These are ESM SPECIFIERS embedded in snippets run by a child `node`, not filesystem paths. On
@@ -298,4 +298,14 @@ test('an error that is not transient is thrown at once', () => {
   const rename = () => { calls += 1; throw Object.assign(new Error('gone'), { code: 'ENOENT' }); };
   assert.throws(() => renameWithRetry('a', 'b', { rename, pauseMs: 1 }), /gone/);
   assert.equal(calls, 1, 'only EPERM/EACCES/EBUSY are worth waiting for');
+});
+
+test('on Windows a delete-pending lock reads as busy; elsewhere EPERM is still an error', () => {
+  const eperm = Object.assign(new Error('operation not permitted'), { code: 'EPERM' });
+  const eacces = Object.assign(new Error('access denied'), { code: 'EACCES' });
+  assert.equal(lockBusyOnWindows(eperm, 'win32'), true, 'a lock still disappearing is someone else\'s lock');
+  assert.equal(lockBusyOnWindows(eacces, 'win32'), true);
+  assert.equal(lockBusyOnWindows(eperm, 'linux'), false, 'on POSIX it is a real permission problem — never waited on');
+  assert.equal(lockBusyOnWindows(eperm, 'darwin'), false);
+  assert.equal(lockBusyOnWindows(Object.assign(new Error('x'), { code: 'ENOENT' }), 'win32'), false);
 });

@@ -77,6 +77,19 @@ export class LockTimeoutError extends Error {
 }
 
 /**
+ * Windows' version of "someone else has the lock".
+ *
+ * A file deleted while ANY other process still has a handle on it — even the instant a reader spends
+ * checking whether it exists — lingers in a "delete pending" state, and creating it again fails with
+ * EPERM or EACCES rather than EEXIST. The previous holder has released it; it just has not finished
+ * disappearing. CI's Windows runner hit exactly this under concurrent readers. On every other
+ * platform those codes mean a real permission problem and are still thrown at once.
+ */
+export function lockBusyOnWindows(e, platform = process.platform) {
+  return platform === 'win32' && (e?.code === 'EPERM' || e?.code === 'EACCES');
+}
+
+/**
  * Run `fn` with an exclusive, cross-process lock held on `lockPath`.
  *
  * `open(…, 'wx')` is O_CREAT|O_EXCL: the kernel guarantees exactly one caller creates the file, so
@@ -102,7 +115,7 @@ export function withLock(lockPath, fn, { timeoutMs = 10000, staleMs = 60000, now
       fd = openSync(lockPath, 'wx');
       break;
     } catch (e) {
-      if (e.code !== 'EEXIST') throw e;
+      if (e.code !== 'EEXIST' && !lockBusyOnWindows(e)) throw e;
       let age = null;
       try { age = now() - statSync(lockPath).mtimeMs; } catch { /* released between open and stat */ }
       if (age !== null && age > staleMs) {
