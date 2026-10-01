@@ -45,11 +45,30 @@ export function writeFileAtomic(full, data) {
     fsyncSync(fd);
     closeSync(fd);
     fd = null;
-    renameSync(tmp, full);
+    renameWithRetry(tmp, full);
   } catch (e) {
     if (fd !== null) { try { closeSync(fd); } catch { /* already closed */ } }
     try { unlinkSync(tmp); } catch { /* never created, or already gone */ }
     throw e;
+  }
+}
+
+/**
+ * rename(2), patient with Windows.
+ *
+ * On Windows, replacing a file that another process has open — a reader in the middle of reading
+ * head.json — fails with EPERM/EACCES/EBUSY instead of succeeding as it does on POSIX. A reader holds
+ * the file for microseconds, so the right response is a short retry, not a failure. Without it, a
+ * concurrent READER could make a WRITER throw after appending its ledger line but before committing
+ * the head record — leaving a genuinely interrupted write behind. CI's Windows runner caught exactly
+ * that. Any other error, or one that outlasts the retries, is still thrown.
+ */
+export function renameWithRetry(from, to, { attempts = 60, pauseMs = 15, rename = renameSync } = {}) {
+  for (let i = 1; ; i += 1) {
+    try { rename(from, to); return; } catch (e) {
+      if (!['EPERM', 'EACCES', 'EBUSY'].includes(e.code) || i >= attempts) throw e;
+      sleep(pauseMs);
+    }
   }
 }
 

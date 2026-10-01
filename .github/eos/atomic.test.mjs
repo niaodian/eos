@@ -14,13 +14,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync, openSync, closeSync, utimesSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync, openSync, closeSync, utimesSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname } from 'node:path';
 import { appendEvent, readEvents, verifyChain, readLedgerSnapshot, LEDGER_PATH, LEDGER_HEAD_PATH, LEDGER_LOCK_PATH } from './lib/ledger.mjs';
-import { writeFileAtomic, withLock, LockTimeoutError } from './lib/atomic.mjs';
+import { writeFileAtomic, withLock, LockTimeoutError, renameWithRetry } from './lib/atomic.mjs';
 
 const EOS_DIR = dirname(fileURLToPath(import.meta.url));
 // These are ESM SPECIFIERS embedded in snippets run by a child `node`, not filesystem paths. On
@@ -209,7 +209,8 @@ test('a reader racing a writer never mistakes a write in progress for truncation
     for (let i = 0; i < 300; i += 1) appendEvent(${JSON.stringify(dir)}, { type: 'note', detail: 'w' + i, scope: { type: 'product', id: 'product' } });
   `);
   let done = false;
-  writer.then(() => { done = true; });
+  let writerResult = null;
+  writer.then((r) => { writerResult = r; done = true; });
   let reads = 0;
   const false_alarms = [];
   while (!done) {
@@ -218,6 +219,10 @@ test('a reader racing a writer never mistakes a write in progress for truncation
     if (chain.problems.length || errors.length) false_alarms.push([...errors, ...chain.problems].join(' | '));
     await new Promise((r) => setImmediate(r));
   }
+  // The writer has to SUCCEED. On Windows a reader holding head.json open once made the writer's
+  // rename fail mid-write — a crash after the append and before the commit — and a dead writer
+  // would otherwise look like a quiet, successful run.
+  assert.equal(writerResult.code, 0, `the writer failed while being read:\n${writerResult.out}`);
   assert.ok(reads > 10, `the reader must actually overlap the writer (read ${reads} times)`);
   assert.deepEqual(false_alarms, [], 'an honest concurrent write must never read as tampering');
   assert.equal(readLedgerSnapshot(dir).events.length, 301);
@@ -272,4 +277,25 @@ test('the same state with NO writer is reported — an interrupted write is stil
   midWrite(dir);
   const s = readLedgerSnapshot(dir, { attempts: 3, pauseMs: 1 });
   assert.match(s.chain.problems.join(' '), /interrupted write/);
+});
+
+test('a rename refused transiently is retried, and succeeds', () => {
+  // The Windows case: the target is open in another process for a moment. Simulated, because no
+  // portable call produces a transient EPERM.
+  let calls = 0;
+  const rename = () => { calls += 1; if (calls < 3) throw Object.assign(new Error('busy'), { code: 'EPERM' }); };
+  renameWithRetry('a', 'b', { rename, pauseMs: 1 });
+  assert.equal(calls, 3, 'two refusals, then the rename goes through');
+});
+
+test('a rename that stays refused is thrown, not retried forever', () => {
+  const rename = () => { throw Object.assign(new Error('busy'), { code: 'EACCES' }); };
+  assert.throws(() => renameWithRetry('a', 'b', { rename, attempts: 5, pauseMs: 1 }), /busy/);
+});
+
+test('an error that is not transient is thrown at once', () => {
+  let calls = 0;
+  const rename = () => { calls += 1; throw Object.assign(new Error('gone'), { code: 'ENOENT' }); };
+  assert.throws(() => renameWithRetry('a', 'b', { rename, pauseMs: 1 }), /gone/);
+  assert.equal(calls, 1, 'only EPERM/EACCES/EBUSY are worth waiting for');
 });
