@@ -26,7 +26,7 @@ import { findWaiver, expiredWaivers } from './waivers.mjs';
 import { AC_ID, opsDecisionProblem } from './story.mjs';
 import {
   STATUSES, SEVERITY, EXPENSIVE, isBlocking, insideRepo, parseTraceMatrix,
-  ok, fail, blocked, na, awaiting, runHook, refMatches, selectorPresent,
+  ok, fail, blocked, na, awaiting, runHook, runProjectGate, refMatches, selectorPresent,
   stageDocCheck, manifestStories, thresholdMet, listAdrs, runCommandList, aggregate,
   WORKSPACE_RULE, PROVISIONAL_STACK, TEST_REF,
   repoFileExists, duplicates, decisionIsPlaceholder, isRegulated, evidenceIntegrity,
@@ -376,11 +376,12 @@ export const evaluators = {
     if (p.projectType === 'config-only') {
       return blocked('this repository declares projectType "config-only" — a story cannot be verified where no product code is declared');
     }
-    const r = runHook(ctx, '.github/hooks/project-gate.mjs', ['--skip-install']);
+    const r = runProjectGate(ctx);
     if (r.command) ctx.commands.push(r.command);
     if (r.status === 'PASS') return ok('the declared quality commands ran and passed');
     if (r.status === 'ERROR') return { status: 'ERROR', detail: r.detail };
-    if (/BLOCKED/.test(r.out || '')) return blocked(`the product-quality gate is BLOCKED: ${r.detail}`);
+    if (r.status === 'BLOCKED') return blocked(`the product-quality gate is BLOCKED: ${r.detail}`);
+    if (r.status === 'NOT_APPLICABLE') return blocked('the product-quality gate executed no quality command, so nothing about the product was verified');
     return fail(`the product-quality gate failed (exit ${r.exitCode}): ${r.detail}`);
   },
   traceComplete(ctx) {
@@ -535,11 +536,12 @@ export const evaluators = {
     if (p.projectType === 'config-only') {
       return blocked('this repository declares projectType "config-only" — a release candidate cannot be proven where no product code is declared');
     }
-    const r = runHook(ctx, '.github/hooks/project-gate.mjs', ['--skip-install']);
+    const r = runProjectGate(ctx);
     if (r.command) ctx.commands.push(r.command);
     if (r.status === 'PASS') return ok('the declared quality commands ran and passed on the current candidate tree');
     if (r.status === 'ERROR') return { status: 'ERROR', detail: r.detail };
-    if (/BLOCKED/.test(r.out || '')) return blocked(`the product-quality gate is BLOCKED on the candidate: ${r.detail}`);
+    if (r.status === 'BLOCKED') return blocked(`the product-quality gate is BLOCKED on the candidate: ${r.detail}`);
+    if (r.status === 'NOT_APPLICABLE') return blocked('the product-quality gate executed no quality command on the candidate, so nothing about it was verified');
     return fail(`the product-quality gate failed on the candidate (exit ${r.exitCode}): ${r.detail}`);
   },
   /**

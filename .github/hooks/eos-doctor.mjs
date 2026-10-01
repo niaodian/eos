@@ -2,7 +2,7 @@
 // EOS SDLC gate doctor — zero external deps.
 // Statically enforces CONDITIONAL-GATE wiring that lives in project structure
 // (complements validate-config.mjs, which checks EOS *config*). Run from project root:
-//   node .github/hooks/eos-doctor.mjs
+//   node .github/hooks/eos-doctor.mjs [--deep] [--json]
 // Designed to run in local CI (act) and as a manual pre-release check.
 import { readdirSync, existsSync, readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -11,10 +11,16 @@ import { loadProjectConfig, PROJECT_CONFIG_PATH } from './lib/project-config.mjs
 import { loadComplianceProfile, evaluateDataBoundary, COMPLIANCE_PROFILE_PATH } from './lib/compliance-profile.mjs';
 import { bmadReadiness, deprecatedMappings, BMAD_LOCK_PATH } from './lib/bmad-runtime.mjs';
 import { resolveProjectRoot, projectRootFromArgv, RESOLUTION_ORDER } from '../eos/lib/project-context.mjs';
+import { wantsJson, humanOutput, splitCode, worstStatus, writeReport } from './lib/diagnostics.mjs';
+import { exitAfterFlush } from './lib/exit.mjs';
 
 const resolution = resolveProjectRoot({ cliRoot: projectRootFromArgv(process.argv) });
 const root = resolution.root;
 const deep = process.argv.includes('--deep');
+// --json: one report on stdout (.eos/schemas/diagnostic.schema.json, ADR-010); the human report
+// moves to stderr. Every finding below already starts with its D-code, which becomes `code`.
+const json = wantsJson();
+const say = humanOutput(json);
 const errors = [];
 const warns = [];
 // Vendored / installed / generated trees are third-party code: their dirs and manifests say nothing
@@ -357,16 +363,46 @@ const bmadOut = [];
 }
 
 // --- Report (same shape as validate-config.mjs) ---
-console.log('EOS SDLC gate doctor\n');
-for (const line of activationOut) console.log(line);
-if (activationOut.length) console.log('');
-for (const line of bmadOut) console.log(line);
-if (bmadOut.length) console.log('');
-for (const w of warns) console.log('  WARN  ' + w);
-for (const e of errors) console.log('  ERROR ' + e);
-console.log('');
-if (errors.length) {
-  console.log(`FAIL: ${errors.length} error(s), ${warns.length} warning(s)`);
-  process.exit(1);
+say('EOS SDLC gate doctor\n');
+for (const line of activationOut) say(line);
+if (activationOut.length) say('');
+for (const line of bmadOut) say(line);
+if (bmadOut.length) say('');
+for (const w of warns) say('  WARN  ' + w);
+for (const e of errors) say('  ERROR ' + e);
+say('');
+const verdict = errors.length
+  ? `FAIL: ${errors.length} error(s), ${warns.length} warning(s)`
+  : `PASS${warns.length ? ` (${warns.length} warning(s))` : ''}`;
+say(verdict);
+
+if (json) {
+  // D0 means the project declaration every other check reads is broken: nothing below it can be
+  // trusted, so it is ERROR. "(BLOCKED)" marks a skill that cannot activate — a precondition, not a
+  // wrong answer. Everything else is a finding: FAIL.
+  const statusOf = (code, message) => (code === 'D0' ? 'ERROR' : /\(BLOCKED\)/.test(message) ? 'BLOCKED' : 'FAIL');
+  const problems = [
+    ...errors.map((line) => {
+      const { code, message } = splitCode(line);
+      return { level: 'error', code: code || 'D', status: statusOf(code, message), message };
+    }),
+    ...warns.map((line) => {
+      const { code, message } = splitCode(line);
+      return { level: 'warning', code: code || 'D', message };
+    }),
+  ];
+  const projectRootArg = resolution.source === 'cli:--project-root' ? ` --project-root ${JSON.stringify(root)}` : '';
+  writeReport({
+    schemaVersion: 1,
+    tool: 'eos-doctor',
+    status: errors.length ? worstStatus(problems.filter((p) => p.level === 'error').map((p) => p.status), 'FAIL') : 'PASS',
+    exitCode: errors.length ? 1 : 0,
+    summary: verdict,
+    scope: { type: 'product', id: 'product' },
+    problems,
+    notes: [...activationOut, ...bmadOut].map((l) => l.trim()).filter(Boolean),
+    rerunCommand: `node .github/hooks/eos-doctor.mjs${deep ? ' --deep' : ''}${projectRootArg}`,
+    details: { deep },
+  });
 }
-console.log(`PASS${warns.length ? ` (${warns.length} warning(s))` : ''}`);
+exitAfterFlush(errors.length ? 1 : 0);

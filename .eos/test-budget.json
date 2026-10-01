@@ -51,6 +51,7 @@
       "files": [
         ".github/eos/cli.test.mjs",
         ".github/eos/adapters.test.mjs",
+        ".github/eos/diagnostic-contract.test.mjs",
         ".github/eos/offline-boundary.test.mjs",
         ".github/hooks/validate-config.test.mjs"
       ]

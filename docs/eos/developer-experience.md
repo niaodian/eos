@@ -436,6 +436,44 @@ Done when
 `next` and `resume` deliberately exit 2 while a blocker exists, so a script or a task can tell
 "there is work to unblock" from "you are clear to proceed" without parsing text.
 
+### 10.2 Diagnostic reports (`--json`)
+
+Every EOS verdict can be read as data, in one shape ([ADR-010](../adr/010-one-diagnostic-contract.md)):
+
+- `eos check --json` and `eos verify-release --json` list the gate's failing checks in `problems[]`.
+- `node .github/hooks/project-gate.mjs --json` and `node .github/hooks/eos-doctor.mjs --json` write
+  one report to stdout that conforms to `.eos/schemas/diagnostic.schema.json`. Everything a person
+  reads, including the product's own test output, moves to stderr.
+
+```json
+{
+  "schemaVersion": 1,
+  "tool": "project-gate",
+  "status": "FAIL",
+  "exitCode": 1,
+  "summary": "FAIL: 1 error(s), 0 warning(s)",
+  "scope": { "type": "product", "id": "product" },
+  "problems": [
+    { "level": "error", "code": "P3", "status": "FAIL", "message": "test FAIL: npm test exited 1" }
+  ],
+  "rerunCommand": "node .github/hooks/project-gate.mjs --skip-install"
+}
+```
+
+| `status` | Meaning | Hook exit code |
+|---|---|---|
+| `PASS` | verified | 0 |
+| `NOT_APPLICABLE` | nothing to verify — never read it as PASS | 0 |
+| `FAIL` | checked, and wrong | 1 |
+| `BLOCKED` | could not be checked: a precondition (a toolchain, a skill) is missing | 1 |
+| `ERROR` | the configuration itself could not be evaluated | 1 |
+
+`--json` never changes a hook's exit code; the status says which kind of non-zero it was. Codes:
+project-gate `P0` invalid declaration · `P1` repository vs. declaration · `P2` no eval command ·
+`P3` a command failed · `P4` a command could not run. eos-doctor keeps `D0`–`D6`. A problem carries
+`level`, `code` and `message`, plus `status`, `gate`, `scope`, `artifact`, `fix` and `rerunCommand`
+where they apply.
+
 ## 11. Honest capability boundary (VS Code + Copilot)
 
 There is **no supported public API** to force VS Code / GitHub Copilot Chat to switch the active

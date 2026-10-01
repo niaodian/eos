@@ -4,7 +4,7 @@
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { gatePolicy, changeTypeOf, gateInputs, gateCollections } from '../lib/state.mjs';
-import { prepareGateRun, isBlocking } from '../lib/gates.mjs';
+import { prepareGateRun, isBlocking, gateProblems } from '../lib/gates.mjs';
 import { recordGateRun } from '../lib/record.mjs';
 import { crossBranchActivity, crossBranchLines } from '../lib/cross-branch.mjs';
 import { checkTransition, legalTransitions } from '../lib/transitions.mjs';
@@ -33,7 +33,7 @@ export const gateCommands = {
       evidenceFile,
       event: { type: 'gate', scope: { type: scope.type, id: String(scope.id) }, changeType: result.changeType, gate: result.gate, status: result.status, commit: snapshot.commit },
     });
-    emit(flags, { ...result, evidence: { file: evidenceFile, inputs: (listEvidence(snapshot.root).find((e) => e.file === evidenceFile)?.evidence?.inputs) || [] } }, renderGate(result, { evidenceFile }));
+    emit(flags, { ...result, problems: gateProblems(result), evidence: { file: evidenceFile, inputs: (listEvidence(snapshot.root).find((e) => e.file === evidenceFile)?.evidence?.inputs) || [] } }, renderGate(result, { evidenceFile }));
     return statusExit(result.status);
   },
 
