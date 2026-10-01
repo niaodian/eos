@@ -15,7 +15,7 @@ import { readSnapshot, gatePolicy, changeTypeOf, scopeState, gateInputs, gateCol
 import { prepareGateRun, evaluateGate, recordedGateStatus, evidenceIntegrity, isBlocking } from './lib/gates.mjs';
 import { recordGateRun, readIntent } from './lib/record.mjs';
 import { checkTransition, deriveProductState, legalTransitions } from './lib/transitions.mjs';
-import { appendEvent, withLedger, readEvents, verifyChain, parseConflicted, reconcileEvents, writeLedger, divergence, LEDGER_PATH } from './lib/ledger.mjs';
+import { appendEvent, withLedger, readEvents, verifyChain, parseConflicted, reconcileEvents, writeLedger, divergence, transitionConflicts, stateOf, LEDGER_PATH } from './lib/ledger.mjs';
 import { route, activeScope } from './lib/router.mjs';
 import { renderCard, renderGate, renderExplain } from './lib/render.mjs';
 import { buildHandoff, writeHandoff, readHandoff, verifyHandoff, handoffPath } from './lib/handoff.mjs';
@@ -1056,6 +1056,14 @@ const commands = {
     const { events, errors } = readEvents(snapshot.root);
     const chain = verifyChain(events, { root: snapshot.root });
     const problems = [...errors, ...chain.problems];
+    // A valid chain can still carry a history that does not follow from itself: two branches
+    // moved the same story and the merge replayed both. Not tampering — but the derived state
+    // rests on a sequence that never happened, so it is reported until it is reconciled.
+    if (!chain.problems.length) {
+      for (const c of transitionConflicts(events, snapshot.workflow)) {
+        problems.push(`${c.scope.id}: the status change at seq ${c.seq} starts from ${c.recordedFrom}, but the history was already in ${c.derived} — two branches changed it concurrently. Run \`eos ledger --resolve --write\`: it resets ${c.scope.id} to ${c.agreed} and keeps every event.`);
+      }
+    }
     const warnings = [...chain.warnings];
     if (flags.against && flags.against !== true) {
       const r = spawnSync('git', ['show', `${flags.against}:${LEDGER_PATH}`], { cwd: snapshot.root, encoding: 'utf8' });
@@ -1210,6 +1218,11 @@ const commands = {
     // An unverifiable ledger is BLOCKED, not a note: "PASS (1 note)" would be the same
     // absence-of-proof-as-proof that this layer exists to refuse.
     for (const w of chain.warnings) problems.push({ level: 'BLOCKED', detail: `ledger: ${w}` });
+    if (!chain.problems.length) {
+      for (const c of transitionConflicts(snapshot.events, snapshot.workflow)) {
+        problems.push({ level: 'BLOCKED', detail: `ledger: ${c.scope.id} was moved on two branches at once (seq ${c.seq} starts from ${c.recordedFrom}, the history was in ${c.derived}) — run \`eos ledger --resolve --write\`` });
+      }
+    }
 
     const lines = ['EOS doctor', ''];
     for (const n of notes) lines.push(`  NOTE    ${n}`);
@@ -1219,6 +1232,27 @@ const commands = {
     return problems.length ? (problems.some((p) => p.level === 'ERROR' && !p.detail.startsWith('ledger')) ? EXIT.BLOCKED : EXIT.BLOCKED) : EXIT.OK;
   },
 };
+
+/**
+ * One `reconcile` entry per story/release whose status history stopped following from itself.
+ *
+ * Its timestamp is placed after everything already in the ledger (not merely "now"), so a replay in
+ * timestamp order can never slide it in front of the events it settles — even with a skewed clock.
+ */
+function buildReconciles(events, workflow) {
+  const conflicts = transitionConflicts(events, workflow);
+  if (!conflicts.length) return [];
+  const latest = Math.max(Date.now(), ...events.map((e) => Date.parse(e.ts) || 0));
+  return conflicts.map((c, i) => ({
+    ts: new Date(latest + 1 + i).toISOString(),
+    type: 'reconcile',
+    scope: c.scope,
+    from: stateOf(events, workflow, c.scope.type, c.scope.id),
+    to: c.agreed,
+    actor: 'eos ledger --resolve',
+    detail: `two histories changed ${c.scope.id} concurrently: seq ${c.seq} moved it ${c.recordedFrom} → ${c.to} while the merged history was already in ${c.derived}. Reset to ${c.agreed}, the last state both agreed on; re-run its gates to move it forward.`,
+  }));
+}
 
 /**
  * Reconcile a ledger that two branches both appended to.
@@ -1247,6 +1281,22 @@ function resolveLedger(snapshot, flags) {
     const { events } = readEvents(snapshot.root);
     if (!divergence(events).diverged) {
       const chain = verifyChain(events, { root: snapshot.root });
+      const pending = buildReconciles(events, snapshot.workflow);
+      if (!chain.problems.length && pending.length) {
+        // The chain is intact, but two histories already replayed together left status changes
+        // that do not follow from each other (a ledger resolved before 1.20.0 did not check this).
+        // Nothing needs replaying; the settling entries are appended like any other event.
+        const lines = ['EOS ledger · resolve', '', `  ${pending.length} story/release status history does not follow from itself after a merge:`, ''];
+        for (const r of pending) lines.push(`  ${r.scope.id.padEnd(14)} ${r.from} → ${r.to}  (${r.detail})`);
+        if (flags.write) {
+          withLedger(snapshot.root, ({ append }) => { for (const r of pending) append(r); });
+          lines.push('', `  appended ${pending.length} reconcile entr${pending.length === 1 ? 'y' : 'ies'} — every earlier event is unchanged`, '', 'PASS', '');
+        } else {
+          lines.push('', '  Nothing was written. Re-run with --write to record the reconciliation.', '', 'PASS', '');
+        }
+        emit(flags, { resolved: !!flags.write, diverged: false, reconciled: pending.map((r) => ({ scope: r.scope, from: r.from, to: r.to })) }, lines.join('\n'));
+        return EXIT.OK;
+      }
       const lines = ['EOS ledger · resolve', '',
         chain.problems.length
           ? '  This ledger is broken, but NOT by a merge: no conflict markers and no duplicated sequence numbers.'
@@ -1259,11 +1309,18 @@ function resolveLedger(snapshot, flags) {
     sources = [events];
   }
 
-  const replayed = reconcileEvents(sources);
+  const merged = reconcileEvents(sources);
+  // Replaying makes the CHAIN valid; it does not make the history mean something. A story both
+  // branches moved now has a status change that starts from a state the merged history already
+  // left. Each such story is reset to the last state both histories agreed on, by an entry that
+  // says so — never by editing or dropping the events that disagree.
+  const reconciles = buildReconciles(merged, snapshot.workflow);
+  const replayed = reconciles.length ? reconcileEvents([merged, reconciles]) : merged;
   const before = conflicted ? common.length + ours.length + theirs.length : sources[0].length;
   const json = {
     resolved: !!flags.write, conflicted, events: replayed.length, inputEvents: before,
     ours: ours.length, theirs: theirs.length, common: common.length,
+    reconciled: reconciles.map((r) => ({ scope: r.scope, from: r.from, to: r.to })),
   };
   const lines = ['EOS ledger · resolve', '',
     conflicted
@@ -1273,6 +1330,11 @@ function resolveLedger(snapshot, flags) {
     '  Every event is kept. Timestamps, actors, gates, statuses and evidence digests are unchanged;',
     '  only seq/prevHash/hash move, because that is what giving two histories one order means.',
     ''];
+  if (reconciles.length) {
+    lines.push(`  ${reconciles.length} story/release was changed on both sides; each is reset to the last state both agreed on:`);
+    for (const r of reconciles) lines.push(`    ${r.scope.id.padEnd(14)} ${r.from} → ${r.to}`);
+    lines.push('  Re-run their gates to move them forward again — the merged code is not what either side verified.', '');
+  }
   if (flags.write) {
     writeLedger(snapshot.root, replayed);
     const check = verifyChain(readEvents(snapshot.root).events, { root: snapshot.root });

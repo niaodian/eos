@@ -277,9 +277,48 @@ export function stateOf(events, workflow, scopeType, scopeId) {
   const machine = workflow?.stateMachines?.[scopeType];
   let state = machine ? machine.initial : null;
   for (const e of events) {
-    if (e.type === 'transition' && e.scope?.type === scopeType && e.scope?.id === scopeId && e.to) state = e.to;
+    // A `reconcile` entry is written by `ledger --resolve` when two branches moved the same scope:
+    // it sets the state both histories last agreed on, so the merged history has one meaning.
+    if ((e.type === 'transition' || e.type === 'reconcile') && e.scope?.type === scopeType && e.scope?.id === scopeId && e.to) state = e.to;
   }
   return state;
+}
+
+/**
+ * Status changes that do not follow from the history before them, and that no later `reconcile`
+ * entry has settled.
+ *
+ * Every status change records the state it started FROM. In a single history that always equals the
+ * state the ledger derives at that point; when two branches each moved the same story and the
+ * histories were replayed together, the second branch's change starts from a state the merged
+ * history has already left. The derived state then rests on a sequence that never happened.
+ *
+ * The check is deliberately about consistency, not legality: whether an edge is still allowed
+ * depends on today's workflow, and a later policy change must not make yesterday's history invalid.
+ * A repeated change that lands where the history already is (both branches moved B → C) is a
+ * harmless duplicate, not a conflict. Only story and release scopes are checked — the product state
+ * is derived live from its gates, so its recorded `from` legitimately differs.
+ *
+ * @returns {{scope:{type:string,id:string}, seq:number, recordedFrom:string, derived:string, to:string, agreed:string}[]}
+ */
+export function transitionConflicts(events, workflow, { scopeTypes = ['story', 'release'] } = {}) {
+  const states = new Map();
+  const open = new Map();
+  for (const e of events) {
+    const type = e.scope?.type;
+    if (!scopeTypes.includes(type) || (e.type !== 'transition' && e.type !== 'reconcile')) continue;
+    const key = `${type}/${e.scope.id}`;
+    const current = states.has(key) ? states.get(key) : workflow?.stateMachines?.[type]?.initial ?? null;
+    if (e.type === 'reconcile') {
+      open.delete(key);
+    } else if (e.from !== undefined && e.from !== current && e.to !== current && !open.has(key)) {
+      // The FROM of the first change that does not follow is the state the other history started
+      // from — the last state every history agreed on.
+      open.set(key, { scope: { type, id: e.scope.id }, seq: e.seq, recordedFrom: e.from, derived: current, to: e.to, agreed: e.from });
+    }
+    if (e.to) states.set(key, e.to);
+  }
+  return [...open.values()];
 }
 
 export const eventsFor = (events, scopeType, scopeId) =>
