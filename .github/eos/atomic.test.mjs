@@ -309,3 +309,66 @@ test('on Windows a delete-pending lock reads as busy; elsewhere EPERM is still a
   assert.equal(lockBusyOnWindows(eperm, 'darwin'), false);
   assert.equal(lockBusyOnWindows(Object.assign(new Error('x'), { code: 'ENOENT' }), 'win32'), false);
 });
+
+test('a reader never misreads a SLOW writer (Windows-sized gaps, on any platform)', { timeout: 120000 }, async () => {
+  // A load test of the protocol appendEvent follows — lock, append, commit the head, release — with
+  // a random pause between append and commit. Honest limit: on a fast machine this does NOT reproduce
+  // the Windows failure (the previous reader also passes here); scheduler-granularity phase-locking
+  // is what caused that, and the deterministic straddle test below is its regression test. This one
+  // stays because it keeps the whole protocol under concurrent load on every platform CI runs.
+  const dir = sandbox();
+  appendEvent(dir, { type: 'note', detail: 'seed', scope: { type: 'product', id: 'product' } });
+  const writer = node(`
+    import { withLock, writeFileAtomic, sleep } from ${JSON.stringify(ATOMIC_MODULE)};
+    import { hashEvent, readEvents, LEDGER_PATH, LEDGER_HEAD_PATH, LEDGER_LOCK_PATH } from ${JSON.stringify(LEDGER_MODULE)};
+    import { appendFileSync } from 'node:fs';
+    import { join } from 'node:path';
+    const dir = ${JSON.stringify(dir)};
+    for (let i = 0; i < 150; i += 1) {
+      withLock(join(dir, LEDGER_LOCK_PATH), () => {
+        const { events } = readEvents(dir);
+        const prev = events.at(-1) || null;
+        const body = { seq: events.length + 1, ts: new Date().toISOString(), actor: 'w', type: 'note', detail: 'w' + i, scope: { type: 'product', id: 'product' }, prevHash: prev ? prev.hash : null };
+        body.hash = hashEvent(body);
+        appendFileSync(join(dir, LEDGER_PATH), JSON.stringify(body) + '\\n');
+        sleep(Math.floor(Math.random() * 4));
+        writeFileAtomic(join(dir, LEDGER_HEAD_PATH), JSON.stringify({ schemaVersion: 1, count: events.length + 1, hash: body.hash }, null, 2) + '\\n');
+      });
+      sleep(Math.floor(Math.random() * 2));
+    }
+  `);
+  let done = false;
+  let writerResult = null;
+  writer.then((r) => { writerResult = r; done = true; });
+  let reads = 0;
+  const alarms = [];
+  while (!done) {
+    const { chain, errors } = readLedgerSnapshot(dir);
+    reads += 1;
+    if (chain.problems.length || errors.length) alarms.push([...errors, ...chain.problems].join(' | '));
+    await new Promise((r) => setImmediate(r));
+  }
+  assert.equal(writerResult.code, 0, writerResult.out);
+  assert.ok(reads > 10, `the reader must overlap the writer (read ${reads} times)`);
+  assert.deepEqual(alarms, [], 'a slow, honest writer must never read as damage');
+  assert.equal(readLedgerSnapshot(dir).events.length, 151);
+});
+
+test('a commit landing inside a read, attempt after attempt, is never reported as damage', () => {
+  // The Windows failure, made deterministic. A writer whose cycle lines up with the reader's re-read
+  // pause lands a whole write — append, commit, release — between the reader's reads on every
+  // attempt. Waiting cannot fix phase-locking; noticing that the head moved during the read does.
+  const dir = sandbox();
+  appendEvent(dir, { type: 'note', detail: 'seed', scope: { type: 'product', id: 'product' } });
+  let writes = 0;
+  const onRead = (stage) => {
+    if (stage === 'after-head' && writes < 5) {
+      appendEvent(dir, { type: 'note', detail: `straddle ${writes}`, scope: { type: 'product', id: 'product' } });
+      writes += 1;
+    }
+  };
+  const s = readLedgerSnapshot(dir, { pauseMs: 1, onRead });
+  assert.equal(writes, 5, 'the first five attempts were each straddled by a complete write');
+  assert.deepEqual([...s.errors, ...s.chain.problems], [], 'and none of them read as an interrupted write');
+  assert.equal(s.events.length, 6);
+});

@@ -292,12 +292,24 @@ export function withLedger(root, fn) {
  *
  * @returns {{events:object[], errors:string[], conflicted:boolean, chain:{ok:boolean, problems:string[], warnings:string[]}}}
  */
-export function readLedgerSnapshot(root, { attempts = 40, pauseMs = 25 } = {}) {
+export function readLedgerSnapshot(root, { attempts = 40, pauseMs = 25, onRead = null } = {}) {
+  const headKey = (h) => (h.error ? 'error' : h.present && h.head ? `${h.head.count}:${h.head.hash}` : 'absent');
+  const lockPath = join(root, LEDGER_LOCK_PATH);
   let last = null;
+  let quietConfirmations = 0;
   for (let i = 0; i < attempts; i += 1) {
     const headRecord = readHead(root);
+    // `onRead` is a TEST SEAM: it runs between the reads of one attempt, so interleavings that need a
+    // slow scheduler to happen naturally (Windows) can be reproduced deterministically anywhere.
+    onRead?.('after-head', i);
     const read = readEvents(root);
-    const writing = existsSync(join(root, LEDGER_LOCK_PATH));
+    const writing = existsSync(lockPath);
+    // The head is read again AFTER the lock check. If it moved, a write committed while this read was
+    // under way — the pair is unreliable, so read again. Without this, a writer could append, commit
+    // and release the lock entirely between the reads, and the reader would see "an extra line and
+    // nobody writing": an interrupted write that never happened. CI's Windows runner caught that once
+    // in hundreds of reads.
+    if (headKey(readHead(root)) !== headKey(headRecord)) { sleep(1); continue; }
     let { events, errors } = read;
     const committed = headRecord.present && headRecord.head ? headRecord.head.count : null;
     if (writing && committed !== null && !read.conflicted) {
@@ -312,9 +324,17 @@ export function readLedgerSnapshot(root, { attempts = 40, pauseMs = 25 } = {}) {
     const settling = chain.problems.some((p) => p.includes(LEDGER_HEAD_PATH))
       || (!read.conflicted && errors.some((e) => /not valid JSON/.test(e)));
     if (!settling) return last;
-    // Patience is only owed to a write that is actually happening.
-    if (i >= 2 && !writing) return last;
+    // Patience is only owed to a write that is actually happening: a head that did not move, with
+    // nobody holding the lock, confirmed three times, is real damage and is reported as such.
+    if (!writing) quietConfirmations += 1;
+    if (quietConfirmations >= 3) return last;
     sleep(pauseMs);
+  }
+  // Every attempt saw the head move: a writer committing faster than a read completes. Report what a
+  // plain read sees rather than nothing at all — this is the one outcome patience could not settle.
+  if (!last) {
+    const read = readEvents(root);
+    return { ...read, chain: read.conflicted ? { ok: false, problems: [], warnings: [] } : verifyChain(read.events, { root }) };
   }
   return last;
 }
