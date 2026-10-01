@@ -1,0 +1,148 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/niaodian/eos/.eos/schemas/governance-org-report.schema.json",
+  "title": "EOS organization governance report",
+  "description": "What `eos report --org <report.json>…` writes: many repositories' governance reports, aggregated offline into one view.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "kind",
+    "generatedAt",
+    "repositories",
+    "totals"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "kind": {
+      "const": "eos-org-governance-report"
+    },
+    "generatedAt": {
+      "type": "string",
+      "minLength": 20
+    },
+    "repositories": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "track",
+          "productCodeVerified",
+          "gatePassRate",
+          "ledgerIntact",
+          "policyOk",
+          "expiredWaivers",
+          "unsignedReleases",
+          "attention"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "commit": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "eosVersion": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "track": {
+            "enum": [
+              "standard",
+              "regulated"
+            ]
+          },
+          "productCodeVerified": {
+            "type": "boolean"
+          },
+          "gatePassRate": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1
+          },
+          "ledgerIntact": {
+            "type": "boolean"
+          },
+          "policyOk": {
+            "type": "boolean"
+          },
+          "upstream": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "expiredWaivers": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "unsignedReleases": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "attention": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "totals": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repositories",
+        "byTrack",
+        "needsAttention"
+      ],
+      "properties": {
+        "repositories": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "byTrack": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "standard",
+            "regulated"
+          ],
+          "properties": {
+            "standard": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "regulated": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "needsAttention": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "baselines": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    }
+  }
+}

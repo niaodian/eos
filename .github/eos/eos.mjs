@@ -51,6 +51,8 @@ usage: node .github/eos/eos.mjs <command> [flags]
   migrate [--apply]                       governance file versions; plan first, then apply
   docs [--write] [--check]                regenerate the docs that restate the policy
   health                                  blockers, stale evidence, waivers, trend — one screen
+  report [--format json|markdown] [--out <file>] [--org <report.json>…]
+                                          governance report for one repository, or many aggregated
   doctor                                  is EOS itself wired correctly?
 
   global: --json  --why  --all  --no-color

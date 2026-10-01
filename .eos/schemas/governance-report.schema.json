@@ -1,0 +1,354 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/niaodian/eos/.eos/schemas/governance-report.schema.json",
+  "title": "EOS governance report",
+  "description": "What `eos report --format json` writes: one repository's governance state, from the engine's own records (ledger, waivers, policy lock, SBOM, release manifests). Offline. `eos report --org` aggregates these.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "kind",
+    "generatedAt",
+    "repo",
+    "project",
+    "gates",
+    "ledger",
+    "waivers",
+    "policy",
+    "supplyChain",
+    "releases",
+    "attention"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "kind": {
+      "const": "eos-governance-report"
+    },
+    "generatedAt": {
+      "type": "string",
+      "minLength": 20
+    },
+    "eosVersion": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "repo": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "commit"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "commit": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "project": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "declared",
+        "track",
+        "profile",
+        "productCodeVerified"
+      ],
+      "properties": {
+        "declared": {
+          "enum": [
+            "missing",
+            "template",
+            "declared"
+          ]
+        },
+        "projectType": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "stacks": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "track": {
+          "enum": [
+            "standard",
+            "regulated"
+          ]
+        },
+        "profile": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "productCodeVerified": {
+          "type": "boolean"
+        }
+      }
+    },
+    "gates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "gate",
+          "runs",
+          "pass",
+          "passRate"
+        ],
+        "properties": {
+          "gate": {
+            "type": "string",
+            "minLength": 1
+          },
+          "code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "runs": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "pass": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "passRate": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "lastStatus": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "lastRunAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "ledger": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "events",
+        "intact"
+      ],
+      "properties": {
+        "events": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "intact": {
+          "type": "boolean"
+        },
+        "problems": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "waivers": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "active",
+        "expired"
+      ],
+      "properties": {
+        "active": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "expired": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "gate",
+              "scope",
+              "status"
+            ],
+            "properties": {
+              "gate": {
+                "type": "string"
+              },
+              "scope": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "expiresOn": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "riskOwner": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "locked",
+        "ok"
+      ],
+      "properties": {
+        "locked": {
+          "type": "boolean"
+        },
+        "ok": {
+          "type": "boolean"
+        },
+        "problems": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "acknowledged": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "upstream": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": false,
+          "required": [
+            "name",
+            "version",
+            "pinned"
+          ],
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "version": {
+              "type": "string"
+            },
+            "pinned": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    },
+    "supplyChain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sbom"
+      ],
+      "properties": {
+        "sbom": {
+          "enum": [
+            "fresh",
+            "stale",
+            "missing"
+          ]
+        },
+        "components": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "releaseKey": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "releases": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "signed"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "state": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "signed": {
+            "type": "boolean"
+          },
+          "signature": {
+            "enum": [
+              "PASS",
+              "FAIL",
+              "NOT_APPLICABLE"
+            ]
+          },
+          "artifacts": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "attention": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  }
+}

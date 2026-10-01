@@ -68,6 +68,7 @@
         ".github/eos/first-run.test.mjs",
         ".github/eos/release-signing.test.mjs",
         ".github/eos/policy-upstream.test.mjs",
+        ".github/eos/report.test.mjs",
         ".github/eos/incremental.test.mjs",
         ".github/eos/ledger-merge.test.mjs",
         ".github/eos/policy.test.mjs",

@@ -22,6 +22,7 @@ import { EXIT, emit, privateKeyFromFile } from './shared.mjs';
 import { fetchBaseline } from '../adapters/policy-upstream.mjs';
 import { signDocument, verifyDocument, loadPublicKey, keyId } from '../lib/signing.mjs';
 import { loadSchema, validate } from '../lib/schema.mjs';
+import { buildReport, renderReportMarkdown, buildOrgReport, renderOrgMarkdown, readReports } from '../lib/report.mjs';
 
 const CLI = 'node .github/eos/eos.mjs';
 
@@ -257,6 +258,43 @@ async function policySync(snapshot, flags) {
 }
 
 export const maintenanceCommands = {
+  /**
+   * `eos report [--format json|markdown] [--out <file>]`: this repository's governance report.
+   * `eos report --org <report.json>… [--format …] [--out <file>]`: many repositories, aggregated.
+   * Offline. The output is checked against its own schema before it is written: a malformed report
+   * is an ERROR, not a document someone files. (2.0)
+   */
+  report(snapshot, flags) {
+    const format = flags.json ? 'json' : (typeof flags.format === 'string' ? flags.format : 'markdown');
+    if (!['json', 'markdown'].includes(format)) { console.log('report --format must be json or markdown'); return EXIT.FAIL; }
+    let data;
+    let schemaName;
+    let markdown;
+    if (flags.org !== undefined) {
+      const paths = [...[].concat(flags.org).filter((p) => typeof p === 'string'), ...flags._.slice(1)];
+      if (!paths.length) { console.log('report --org needs one or more report files written by `eos report --format json`'); return EXIT.FAIL; }
+      const { reports, problems } = readReports(paths);
+      if (problems.length) { console.log(['EOS report --org', '', ...problems.map((p) => `  ERROR ${p}`), ''].join('\n')); return EXIT.FAIL; }
+      data = buildOrgReport(reports);
+      schemaName = 'governance-org-report.schema.json';
+      markdown = () => renderOrgMarkdown(data);
+    } else {
+      data = buildReport(snapshot);
+      schemaName = 'governance-report.schema.json';
+      markdown = () => renderReportMarkdown(data);
+    }
+    const { schema, error } = loadSchema(snapshot.root, schemaName);
+    const invalid = schema ? validate(schema, data, { label: 'report' }).errors : [error];
+    if (invalid.length) { console.log(['EOS ERROR — the report does not conform to its schema:', ...invalid.slice(0, 5).map((e) => `  ${e}`)].join('\n')); return EXIT.ERROR; }
+    const text = format === 'json' ? `${JSON.stringify(data, null, 2)}\n` : `${markdown()}\n`;
+    if (typeof flags.out === 'string') {
+      writeFileSync(flags.out, text);
+      console.log(`EOS report · written ${flags.out} (${format}${data.attention ? `, ${data.attention.length} item(s) need attention` : ''})`);
+      return EXIT.OK;
+    }
+    process.stdout.write(text);
+    return EXIT.OK;
+  },
   /**
    * Regenerate every document that restates the machine-readable policy — and, with --check, fail
    * when a committed one no longer matches what the policy would produce.

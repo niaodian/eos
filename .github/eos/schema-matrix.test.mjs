@@ -23,6 +23,7 @@ import { route } from './lib/router.mjs';
 import { buildHandoff } from './lib/handoff.mjs';
 import { prepareGateRun } from './lib/gates.mjs';
 import { appendEvent, readEvents } from './lib/ledger.mjs';
+import { buildReport, buildOrgReport } from './lib/report.mjs';
 
 after(cleanup);
 
@@ -87,6 +88,8 @@ const EXAMPLES = {
   iteration: () => [bindDigests(produced().dir, ITERATION_RECORD)],
   'next-action': () => [produced().nextAction],
   'nfr-summary': () => [produced().nfr],
+  'governance-report': () => [buildReport(readSnapshot(produced().dir)), RICH_REPORT],
+  'governance-org-report': () => [buildOrgReport([buildReport(readSnapshot(produced().dir)), RICH_REPORT])],
   'policy-baseline': () => [{
     schemaVersion: 1, kind: 'eos-policy-baseline', name: 'acme-engineering', version: '2026.10', issuedAt: NOW,
     snapshot: { gates: { verified: { scope: 'story' } }, workflow: { profiles: {} }, project: null },
@@ -118,6 +121,21 @@ const EXAMPLES = {
     expiresOn: '2026-12-31', trigger: 'the format migration lands', compensatingControls: ['manual review of every merged story'],
   }],
   workflow: () => [repoFile('.eos/workflow.json')],
+};
+
+
+// A report with every optional part present, so the matrix reaches the nested constraints too.
+const RICH_REPORT = {
+  schemaVersion: 1, kind: 'eos-governance-report', generatedAt: NOW, eosVersion: 'eos-2.0.0',
+  repo: { name: 'acme-app', commit: 'a'.repeat(40) },
+  project: { declared: 'declared', projectType: 'application', stacks: ['node'], track: 'regulated', profile: 'regulated', productCodeVerified: true },
+  gates: [{ gate: 'verified', code: 'G7', runs: 4, pass: 3, passRate: 0.75, lastStatus: 'PASS', lastRunAt: NOW }],
+  ledger: { events: 9, intact: true, problems: [] },
+  waivers: { active: 1, expired: 0, items: [{ gate: 'story-ready', scope: 'story/STORY-001', status: 'ACTIVE', expiresOn: '2026-12-31', riskOwner: 'lead-b' }] },
+  policy: { locked: true, ok: true, problems: [], acknowledged: 1, upstream: { name: 'acme-engineering', version: '2026.10', pinned: true } },
+  supplyChain: { sbom: 'fresh', components: 0, releaseKey: '.eos/keys/release.pub' },
+  releases: [{ id: 'v1.0.0', state: 'CANDIDATE', signed: true, signature: 'PASS', artifacts: 2 }],
+  attention: ['nothing urgent'],
 };
 
 // ---------------------------------------------------------------- the mutation engine
