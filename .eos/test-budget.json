@@ -7,7 +7,15 @@
   "layerTimeoutMs": 900000,
   "coverageTimeoutMs": 1800000,
   "baselineTolerance": 0.5,
-  "baselines": {},
+  "baselines": {
+    "ci-linux": {
+      "audit-regression": 29800,
+      "contract": 10200,
+      "integration": 20400,
+      "journey": 4200,
+      "unit": 7200
+    }
+  },
   "coverage": {
     "description": "Thresholds for `run-tests.mjs --coverage`. Set just below the measured figure (lines 96.9 / branches 75.8 / functions 96.3 at the time of writing) so they catch a real regression rather than chasing a round number. Enforced natively by Node 22+; on Node 20 the report still prints but the threshold is not applied, and run-tests says so rather than implying it passed.",
     "lines": 95,
