@@ -33,11 +33,25 @@ function releaseOf(raw, errors) {
   return raw;
 }
 
+/** `policyUpstream`: where the organization baseline comes from, and the key it is signed with. */
+function upstreamOf(raw, errors) {
+  if (raw === undefined) return undefined;
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw) || typeof raw.source !== 'string' || !raw.source) {
+    errors.push(`${PROJECT_CONFIG_PATH}: "policyUpstream" needs a "source" (https URL or file: path)`);
+    return undefined;
+  }
+  for (const k of Object.keys(raw)) if (!['source', 'publicKey'].includes(k)) errors.push(`${PROJECT_CONFIG_PATH}: unknown key "policyUpstream.${k}" (allowed: source, publicKey)`);
+  if (raw.publicKey !== undefined && (typeof raw.publicKey !== 'string' || /^[\\/]|^[A-Za-z]:/.test(raw.publicKey) || raw.publicKey.split(/[\\/]/).includes('..'))) {
+    errors.push(`${PROJECT_CONFIG_PATH}: "policyUpstream.publicKey" must be a repository-relative path`);
+  }
+  return raw;
+}
+
 // The schema (.eos/schemas/project.schema.json) lists the same keys; a test keeps the two equal.
 export const TOP_LEVEL_KEYS = new Set([
   '$schema', 'projectType', 'language', 'stacks', 'commands', 'productParadigms', 'evalRequired',
   'evalWaiver', 'rationale', 'workflowProfile', 'complianceProfile',
-  'evidencePolicy', 'evidencePolicyReason', 'templateDefault', 'release',
+  'evidencePolicy', 'evidencePolicyReason', 'templateDefault', 'release', 'policyUpstream',
 ]);
 // Prose language only (BCP-47). Deliberately not an enum: EOS must not ship a closed list of
 // languages a team is allowed to think in.
@@ -350,6 +364,7 @@ export function loadProjectConfig(root) {
     rationale: typeof parsed.rationale === 'string' ? parsed.rationale : '',
     templateDefault: parsed.templateDefault === true,
     release: releaseOf(parsed.release, errors),
+    policyUpstream: upstreamOf(parsed.policyUpstream, errors),
   };
   if (parsed.templateDefault !== undefined && typeof parsed.templateDefault !== 'boolean') {
     errors.push(`${PROJECT_CONFIG_PATH}: "templateDefault" must be true or false`);

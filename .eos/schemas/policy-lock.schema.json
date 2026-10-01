@@ -4,11 +4,19 @@
   "title": "EOS policy lock",
   "description": "Pins the policy in force (gates, profiles, state machines and the project declaration) by digest, and records every acknowledged change that weakens it. Written by `eos policy lock --write`; checked by `eos policy check`. A weakening needs a reason and an approver who is not the requester.",
   "type": "object",
-  "required": ["schemaVersion", "policyDigest", "acknowledged"],
+  "required": [
+    "schemaVersion",
+    "policyDigest",
+    "acknowledged"
+  ],
   "additionalProperties": false,
   "properties": {
-    "$schema": { "type": "string" },
-    "schemaVersion": { "const": 1 },
+    "$schema": {
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": 1
+    },
     "policyDigest": {
       "type": "string",
       "pattern": "^[0-9a-f]{64}$",
@@ -19,16 +27,81 @@
       "description": "Every policy change that needed sign-off. Kept, not pruned: this is the record of who agreed to weaken what, and why.",
       "items": {
         "type": "object",
-        "required": ["change", "kind", "reason", "requestedBy", "approver"],
+        "required": [
+          "change",
+          "kind",
+          "reason",
+          "requestedBy",
+          "approver"
+        ],
         "additionalProperties": false,
         "properties": {
-          "change": { "type": "string", "minLength": 1, "description": "The change id from `eos policy diff`, including the before and after values." },
-          "kind": { "enum": ["WEAKENING", "REVIEW", "BREAKING"] },
-          "detail": { "type": "string" },
-          "reason": { "type": "string", "description": "Why the change is acceptable. Fewer than 20 characters is treated as no reason." },
-          "requestedBy": { "type": "string" },
-          "approver": { "type": "string", "description": "Empty until a second person fills it in. EOS drafts acknowledgements; it never approves them." },
-          "recordedAt": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" }
+          "change": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The change id from `eos policy diff`, including the before and after values."
+          },
+          "kind": {
+            "enum": [
+              "WEAKENING",
+              "REVIEW",
+              "BREAKING"
+            ]
+          },
+          "detail": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Why the change is acceptable. Fewer than 20 characters is treated as no reason."
+          },
+          "requestedBy": {
+            "type": "string"
+          },
+          "approver": {
+            "type": "string",
+            "description": "Empty until a second person fills it in. EOS drafts acknowledgements; it never approves them."
+          },
+          "recordedAt": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          }
+        }
+      }
+    },
+    "upstream": {
+      "description": "The organization baseline this project follows, as `eos policy sync` vendored it into .eos/policy.upstream.json. `policy check` requires the vendored file to have this digest. (ADR-013)",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source",
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "source": {
+          "type": "string",
+          "minLength": 1
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "syncedAt": {
+          "type": "string"
+        },
+        "keyId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
         }
       }
     }

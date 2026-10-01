@@ -356,7 +356,29 @@ export function checkPolicy(root, { against = null } = {}) {
     }
   }
   if (!base) notes.push('no git history to compare against — only the lock digest was checked');
-  return { ok: problems.length === 0, problems, notes, changes, base };
+
+  // 2.0: the organization baseline, if the project follows one — checked against the VENDORED copy,
+  // so this stays offline. `eos policy sync` is the only thing that fetches. (ADR-013)
+  const up = upstreamChanges(root);
+  if (up.declared) {
+    if (!up.vendored.present) {
+      problems.push(`.eos/project.json follows ${up.declared.source}, but ${UPSTREAM_PATH} is missing — run \`eos policy sync\``);
+    } else if (!up.vendored.bundle) {
+      problems.push(...up.vendored.errors);
+    } else {
+      const label = `${up.vendored.bundle.name}@${up.vendored.bundle.version}`;
+      if (lock && lock.upstream?.digest !== up.digest) {
+        problems.push(`${UPSTREAM_PATH} does not match the baseline pinned in ${POLICY_LOCK_PATH} — run \`eos policy sync\`, then \`eos policy lock --write\``);
+      }
+      for (const c of up.changes.filter((x) => x.requiresAck)) {
+        const ack = (lock?.acknowledged || []).find((a) => a.change === c.id);
+        const problem = acknowledgementProblem(ack);
+        if (problem) problems.push(`${c.kind} ${c.id} — weaker than the organization baseline ${label}: ${c.detail}: ${problem}`);
+      }
+      notes.push(`follows the organization baseline ${label} (${up.changes.filter((x) => x.requiresAck).length} acknowledged deviation(s) checked)`);
+    }
+  }
+  return { ok: problems.length === 0, problems, notes, changes, base, upstream: up.declared ? { source: up.declared.source, digest: up.digest || null, changes: up.changes } : null };
 }
 
 /**
@@ -368,16 +390,74 @@ export function planLock(root, { against = null, reason = null, actor = null, wr
   const existing = readLock(root).lock;
   const acknowledged = [...(existing?.acknowledged || [])];
   const drafted = [];
-  for (const c of changes.filter((x) => x.requiresAck)) {
+  const up = upstreamChanges(root);
+  const lockable = [...changes, ...(up.changes || [])];
+  for (const c of lockable.filter((x) => x.requiresAck)) {
     if (acknowledged.some((a) => a.change === c.id)) continue;
     const entry = { change: c.id, kind: c.kind, detail: c.detail, reason: reason || '', requestedBy: actor || 'unknown', approver: '', recordedAt: now.toISOString().slice(0, 10) };
     acknowledged.push(entry);
     drafted.push(entry);
   }
-  const lock = { $schema: './schemas/policy-lock.schema.json', schemaVersion: 1, policyDigest: policyDigest(current), acknowledged };
+  const pinned = up.vendored?.bundle
+    ? { source: up.declared.source, name: up.vendored.bundle.name, version: up.vendored.bundle.version, digest: up.digest, syncedAt: existing?.upstream?.digest === up.digest ? existing.upstream.syncedAt : now.toISOString(), ...(up.vendored.bundle.signature ? { keyId: up.vendored.bundle.signature.keyId } : {}) }
+    : null;
+  const lock = { $schema: './schemas/policy-lock.schema.json', schemaVersion: 1, policyDigest: policyDigest(current), acknowledged, ...(pinned ? { upstream: pinned } : {}) };
   const refused = drafted.length && (!reason || reason.trim().length < 20)
     ? `${drafted.length} change(s) need acknowledgement: pass --reason "<why, 20+ characters>"`
     : null;
   if (write && !refused && !errors.length) writeFileAtomic(join(root, POLICY_LOCK_PATH), `${JSON.stringify(lock, null, 2)}\n`);
   return { base, changes, errors, lock, drafted, refused, written: write && !refused && !errors.length };
+}
+
+// --------------------------------------------------------------------------------- organization baseline
+// An organization publishes the minimum policy its projects follow: gates and workflow profiles,
+// never a project's own declaration (what one project is says nothing about another). A project
+// declares it as `policyUpstream`; `eos policy sync` vendors it into UPSTREAM_PATH; `policy check`
+// compares this project against the vendored copy, offline, with the same WEAKENING rules as a
+// change between commits. A deviation is allowed only with a reason and a second person's approval,
+// recorded in this project's lock. (ADR-013)
+export const UPSTREAM_PATH = '.eos/policy.upstream.json';
+
+/** The baseline `eos policy export` writes, from this repository's gates and workflow. */
+export function buildBaseline({ gates, workflow, name, version, now = new Date() }) {
+  return {
+    schemaVersion: 1,
+    kind: 'eos-policy-baseline',
+    name,
+    version,
+    issuedAt: now.toISOString(),
+    snapshot: policySnapshot({ gates, workflow, project: null }),
+  };
+}
+
+/** A baseline's identity: its canonical content, signature included (a re-signed baseline is a new one). */
+export const baselineDigest = (bundle) => createHash('sha256').update(canonical(bundle)).digest('hex');
+
+/** The vendored baseline, schema-checked. */
+export function readVendored(root) {
+  const full = join(root, UPSTREAM_PATH);
+  if (!existsSync(full)) return { present: false, bundle: null, errors: [] };
+  let bundle;
+  try { bundle = JSON.parse(readFileSync(full, 'utf8')); } catch (e) {
+    return { present: true, bundle: null, errors: [`${UPSTREAM_PATH}: invalid JSON (${e.message})`] };
+  }
+  const { schema, error } = loadSchema(root, 'policy-baseline.schema.json');
+  if (!schema) return { present: true, bundle: null, errors: [`${error} — ${UPSTREAM_PATH} cannot be validated`] };
+  const v = validate(schema, bundle, { label: UPSTREAM_PATH });
+  return v.valid ? { present: true, bundle, errors: [] } : { present: true, bundle: null, errors: v.errors.slice(0, 4) };
+}
+
+/**
+ * How this project differs from the baseline it follows. Each change is classified exactly as a change
+ * between commits would be, and gets an `upstream:` id so its acknowledgement cannot be confused with one.
+ */
+export function upstreamChanges(root) {
+  const { files } = readPolicy(root);
+  const declared = files.project?.policyUpstream || null;
+  if (!declared) return { declared: null, vendored: null, digest: null, changes: [] };
+  const vendored = readVendored(root);
+  if (!vendored.bundle) return { declared, vendored, digest: null, changes: [] };
+  const local = policySnapshot({ gates: files.gates, workflow: files.workflow, project: null });
+  const changes = diffPolicy(vendored.bundle.snapshot, local).map((c) => ({ ...c, id: `upstream:${c.id}` }));
+  return { declared, vendored, digest: baselineDigest(vendored.bundle), changes };
 }

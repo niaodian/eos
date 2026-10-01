@@ -15,8 +15,8 @@ import { readManifest, manifestPath, manifestDigest as computeManifestDigest, li
 import { loadProviders, consult } from '../adapters/contract.mjs';
 import { expiredWaivers } from '../lib/waivers.mjs';
 import { writeFileAtomic } from '../lib/atomic.mjs';
-import { EXIT, statusExit, emit, consultProviders } from './shared.mjs';
-import { generateSigningKey, loadPrivateKey, signDocument, keyId } from '../lib/signing.mjs';
+import { EXIT, statusExit, emit, consultProviders, privateKeyFromFile } from './shared.mjs';
+import { generateSigningKey, signDocument, keyId } from '../lib/signing.mjs';
 import { bindRelease, verifyRelease, releaseSigningKey, insideRoot } from '../lib/release-integrity.mjs';
 
 const CLI = 'node .github/eos/eos.mjs';
@@ -78,7 +78,7 @@ function releaseSign(snapshot, flags, id) {
   if (!declared.declared) { console.log(`EOS release sign · .eos/project.json declares no release.signing.publicKey — run \`${CLI} release keygen --write\` first`); return EXIT.FAIL; }
   if (declared.problem) { console.log(`EOS release sign · ${declared.problem}`); return EXIT.FAIL; }
   let privateKey;
-  try { privateKey = loadPrivateKey(readFileSync(resolve(flags.key), 'utf8')); } catch (e) {
+  try { privateKey = privateKeyFromFile(flags.key); } catch (e) {
     console.log(`EOS release sign · cannot use ${flags.key}: ${e.message}`);
     return EXIT.FAIL;
   }

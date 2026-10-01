@@ -168,18 +168,31 @@ test('ADR-005 D5: EOS is read-only against every external system', () => {
 });
 
 test('ADR-012: the one secret EOS reads is a signing key it is handed, in exactly one place', () => {
-  // ADR-005 D3 says EOS never reads a credential. Signing a release needs a private key, so ADR-012
-  // makes one scoped exception: `eos release sign --key <file>` reads it from that file, uses it in
-  // memory and writes nothing but the signature. Any second place that loads a private key widens
-  // the exception and must come with an ADR.
+  // ADR-005 D3 says EOS never reads a credential. Signing needs a private key, so ADR-012 makes one
+  // scoped exception: a file passed with --key, read by commands/shared.mjs privateKeyFromFile(),
+  // used in memory, never written. Only `release sign` and `policy export --sign` call it. A second
+  // reader, or a third caller, widens the exception and must come with an ADR.
   const loaders = [];
+  const callers = [];
   for (const rel of coreFiles()) {
     const text = readFileSync(join(REPO_ROOT, rel), 'utf8');
     for (const line of text.split(/\r?\n/)) {
       if (/^\s*(\/\/|\*|\/\*)/.test(line)) continue;
       if (/\bloadPrivateKey\(|\bcreatePrivateKey\(/.test(line) && !/export const loadPrivateKey/.test(line)) loaders.push(`${rel}: ${line.trim().slice(0, 90)}`);
+      if (/\bprivateKeyFromFile\(/.test(line) && !/export const privateKeyFromFile/.test(line)) callers.push(rel);
     }
   }
-  assert.equal(loaders.length, 1, `expected exactly one private-key read, found:\n${loaders.join('\n')}`);
-  assert.match(loaders[0], /^\.github\/eos\/commands\/release\.mjs: .*loadPrivateKey\(readFileSync\(resolve\(flags\.key\)/);
+  assert.deepEqual(loaders.map((l) => l.split(':')[0]), ['.github/eos/commands/shared.mjs'], loaders.join('\n'));
+  assert.deepEqual([...new Set(callers)].sort(), ['.github/eos/commands/maintenance.mjs', '.github/eos/commands/release.mjs']);
+});
+
+test('ADR-013: `policy sync` is the one command that reaches the network, through one adapter', () => {
+  const importers = coreFiles().filter((rel) => /from ['"]\.\.\/adapters\/policy-upstream\.mjs['"]/.test(readFileSync(join(REPO_ROOT, rel), 'utf8')));
+  assert.deepEqual(importers, ['.github/eos/commands/maintenance.mjs']);
+  const maintenance = readFileSync(join(REPO_ROOT, '.github/eos/commands/maintenance.mjs'), 'utf8');
+  const calls = maintenance.split('\n').filter((l) => /\bfetchBaseline\(/.test(l) && !/^\s*import/.test(l));
+  assert.equal(calls.length, 1, 'one call site');
+  const syncBody = maintenance.slice(maintenance.indexOf('async function policySync('), maintenance.indexOf('export const maintenanceCommands'));
+  assert.match(syncBody, /fetchBaseline\(/, 'and it is inside policy sync');
+  assert.match(readFileSync(join(REPO_ROOT, ADAPTER_DIR, 'policy-upstream.mjs'), 'utf8'), /redirect: 'error'/, 'a redirect can never move the source to plain http');
 });

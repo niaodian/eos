@@ -87,11 +87,17 @@ const EXAMPLES = {
   iteration: () => [bindDigests(produced().dir, ITERATION_RECORD)],
   'next-action': () => [produced().nextAction],
   'nfr-summary': () => [produced().nfr],
+  'policy-baseline': () => [{
+    schemaVersion: 1, kind: 'eos-policy-baseline', name: 'acme-engineering', version: '2026.10', issuedAt: NOW,
+    snapshot: { gates: { verified: { scope: 'story' } }, workflow: { profiles: {} }, project: null },
+    signature: { alg: 'ed25519', keyId: DIGEST, signedAt: NOW, value: 'A'.repeat(88) },
+  }],
   'policy-lock': () => [repoFile('.eos/policy.lock.json'), {
     schemaVersion: 1, policyDigest: DIGEST,
     acknowledged: [{ change: 'profile:standard-product:FEATURE:verified:required→waivable', kind: 'WEAKENING', detail: 'verified becomes waivable', reason: 'Pilot team, reviewed weekly by the platform group.', requestedBy: 'dev-a', approver: 'lead-b' }],
+    upstream: { source: 'https://policy.example.com/acme.json', name: 'acme-engineering', version: '2026.10', digest: DIGEST, syncedAt: NOW, keyId: DIGEST },
   }],
-  project: () => [repoFile('.eos/project.json'), { ...APP_PROJECT, workflowProfile: 'regulated', complianceProfile: 'regulated', evidencePolicy: 'ci', language: 'en', release: { artifacts: ['dist/*.tgz'], signing: { publicKey: '.eos/keys/release.pub' } } }],
+  project: () => [repoFile('.eos/project.json'), { ...APP_PROJECT, workflowProfile: 'regulated', complianceProfile: 'regulated', evidencePolicy: 'ci', language: 'en', release: { artifacts: ['dist/*.tgz'], signing: { publicKey: '.eos/keys/release.pub' } }, policyUpstream: { source: 'https://policy.example.com/acme.json', publicKey: '.eos/keys/org-policy.pub' } }],
   providers: () => [{ schemaVersion: 1, providers: [{ adapter: 'mock', subjects: ['enforcement-authority'], options: {} }] }],
   'release-manifest': () => [produced().manifest, {
     ...produced().manifest,

@@ -10,7 +10,7 @@ import { readLedgerSnapshot, transitionConflicts } from '../lib/ledger.mjs';
 import { listEvidence, evidenceFreshness, validateEvidenceShape } from '../lib/evidence.mjs';
 import { syncWorkspaceRule } from '../lib/workspace-rule.mjs';
 import { generateDocs } from '../lib/docgen.mjs';
-import { policyChanges, planLock, checkPolicy, readLock, readPolicy, policySnapshot, policyDigest, POLICY_LOCK_PATH } from '../lib/policy.mjs';
+import { policyChanges, planLock, checkPolicy, readLock, readPolicy, policySnapshot, policyDigest, POLICY_LOCK_PATH, UPSTREAM_PATH, buildBaseline, baselineDigest, readVendored } from '../lib/policy.mjs';
 import { planMigration, applyMigration } from '../lib/migrate.mjs';
 import { buildSbom, sbomFreshness, sbomDigest, SBOM_PATH } from '../lib/sbom.mjs';
 import { PACKS, packDeclaration, packIds } from '../lib/packs.mjs';
@@ -18,7 +18,10 @@ import { loadWaivers } from '../lib/waivers.mjs';
 import { writeFileAtomic } from '../lib/atomic.mjs';
 import { resolveAction } from '../lib/registry.mjs';
 import { TRACKS, TRACK_NAMES, trackOf, applyTrack } from '../lib/track.mjs';
-import { EXIT, emit } from './shared.mjs';
+import { EXIT, emit, privateKeyFromFile } from './shared.mjs';
+import { fetchBaseline } from '../adapters/policy-upstream.mjs';
+import { signDocument, verifyDocument, loadPublicKey, keyId } from '../lib/signing.mjs';
+import { loadSchema, validate } from '../lib/schema.mjs';
 
 const CLI = 'node .github/eos/eos.mjs';
 
@@ -151,6 +154,106 @@ function declareProject(snapshot, flags, verb) {
   if (!flags.write) lines.push('  Nothing was written. Re-run with --write to apply.', '');
   emit(flags, { pack: packId, track: chosen.name, written: !!flags.write, replaced: state, declaration, notes: PACKS[packId].notes, localFiles: files }, lines.join('\n'));
   return EXIT.OK;
+}
+
+// --------------------------------------------------------------------------------- policy baselines
+/** `eos policy export`: this repository's gates and profiles as a baseline others can follow. (ADR-013) */
+function policyExport(snapshot, flags) {
+  const { files, errors } = readPolicy(snapshot.root);
+  if (errors.length || !files.gates || !files.workflow) {
+    console.log(`EOS policy export · the policy cannot be read: ${errors.join('; ') || 'missing gates or workflow'}`);
+    return EXIT.ERROR;
+  }
+  const name = typeof flags.name === 'string' ? flags.name : null;
+  const version = typeof flags.version === 'string' ? flags.version : null;
+  if (!name || !/^[a-z0-9][a-z0-9._-]*$/.test(name) || !version) {
+    console.log('policy export requires --name <org-policy-name> (lowercase) and --version <version>');
+    return EXIT.FAIL;
+  }
+  let bundle = buildBaseline({ gates: files.gates, workflow: files.workflow, name, version });
+  if (flags.sign) {
+    if (typeof flags.key !== 'string') { console.log('policy export --sign requires --key <private-key-file>'); return EXIT.FAIL; }
+    let key;
+    try { key = privateKeyFromFile(flags.key); } catch (e) { console.log(`EOS policy export · cannot use ${flags.key}: ${e.message}`); return EXIT.FAIL; }
+    bundle = signDocument('policy', bundle, key);
+  }
+  const out = typeof flags.out === 'string' ? flags.out : `${name}-${version}.policy-baseline.json`;
+  writeFileSync(out, `${JSON.stringify(bundle, null, 2)}\n`);
+  const lines = [`EOS policy export · ${name}@${version}`, '',
+    `  written   ${out}`,
+    `  digest    ${baselineDigest(bundle)}`,
+    `  signed    ${bundle.signature ? `yes — key ${bundle.signature.keyId.slice(0, 12)}…` : 'no (add --sign --key <file>; followers then declare policyUpstream.publicKey)'}`, '',
+    '  Publish it where projects can fetch it (https, or a repository they check out). Each project declares',
+    '  "policyUpstream": { "source": "<url or file:path>", "publicKey": "<path>" } and runs `eos policy sync`.', ''];
+  emit(flags, { file: out, digest: baselineDigest(bundle), baseline: bundle }, lines.join('\n'));
+  return EXIT.OK;
+}
+
+/**
+ * `eos policy sync [--check]`: the ONE command that may reach the network. It fetches the declared
+ * baseline, verifies its signature, vendors it and pins it. With --check it only reports whether the
+ * vendored copy is still what upstream publishes. (ADR-013)
+ */
+async function policySync(snapshot, flags) {
+  const root = snapshot.root;
+  const declared = snapshot.project?.policyUpstream;
+  if (!declared) { console.log('EOS policy sync · .eos/project.json declares no policyUpstream — nothing to sync'); return EXIT.FAIL; }
+  const lines = [`EOS policy sync${flags.check ? ' --check' : ''} · ${declared.source}`, ''];
+  const done = (code, json) => { emit(flags, json, lines.join('\n')); return code; };
+
+  const fetched = await fetchBaseline(root, declared.source);
+  if (fetched.error) {
+    lines.push(`  ${fetched.blocked ? 'BLOCKED' : 'ERROR'}  ${fetched.error}`, '', '  Nothing was written; `eos policy check` keeps enforcing the copy already vendored.', '');
+    return done(fetched.blocked ? EXIT.BLOCKED : EXIT.FAIL, { synced: false, error: fetched.error, blocked: !!fetched.blocked });
+  }
+  let bundle;
+  try { bundle = JSON.parse(fetched.text); } catch (e) {
+    lines.push(`  ERROR  the baseline is not JSON (${e.message})`, '');
+    return done(EXIT.FAIL, { synced: false, error: 'not JSON' });
+  }
+  const { schema, error } = loadSchema(root, 'policy-baseline.schema.json');
+  const problems = schema ? validate(schema, bundle, { label: declared.source }).errors : [error];
+  if (problems.length) {
+    lines.push(...problems.slice(0, 4).map((p) => `  ERROR  ${p}`), '');
+    return done(EXIT.FAIL, { synced: false, errors: problems });
+  }
+  if (declared.publicKey) {
+    let key;
+    try { key = loadPublicKey(readFileSync(join(root, declared.publicKey), 'utf8')); } catch (e) {
+      lines.push(`  ERROR  the declared key ${declared.publicKey} cannot be used: ${e.message}`, '');
+      return done(EXIT.FAIL, { synced: false, error: 'key' });
+    }
+    const v = verifyDocument('policy', bundle, key);
+    if (!v.valid) {
+      lines.push(`  ERROR  the baseline cannot be trusted: ${v.problem}`, '', '  Nothing was written.', '');
+      return done(EXIT.FAIL, { synced: false, error: v.problem });
+    }
+    lines.push(`  signature verified — key ${keyId(key).slice(0, 12)}…`);
+  } else {
+    lines.push('  UNSIGNED  no policyUpstream.publicKey is declared, so integrity rests on the transport and the pinned digest');
+  }
+
+  const digest = baselineDigest(bundle);
+  const lock = readLock(root).lock;
+  const vendored = readVendored(root).bundle;
+  const pinned = lock?.upstream?.digest || (vendored ? baselineDigest(vendored) : null);
+  const was = vendored || (lock?.upstream ? { name: lock.upstream.name, version: lock.upstream.version } : null);
+  const now = `${bundle.name}@${bundle.version}`;
+  if (flags.check) {
+    if (pinned === digest) { lines.push(`  up to date — ${now}`, ''); return done(EXIT.OK, { current: true, digest }); }
+    lines.push(`  upstream moved: ${was ? `${was.version} → ${bundle.version}` : `(nothing pinned) → ${bundle.version}`} (${bundle.name})`,
+      '  Run `node .github/eos/eos.mjs policy sync`, then `node .github/eos/eos.mjs policy lock --write`, and review what changed.', '');
+    return done(EXIT.FAIL, { current: false, pinned, digest });
+  }
+  writeFileAtomic(join(root, UPSTREAM_PATH), `${JSON.stringify(bundle, null, 2)}\n`);
+  if (lock) {
+    const next = { ...lock, upstream: { source: declared.source, name: bundle.name, version: bundle.version, digest, syncedAt: new Date().toISOString(), ...(bundle.signature ? { keyId: bundle.signature.keyId } : {}) } };
+    writeFileAtomic(join(root, POLICY_LOCK_PATH), `${JSON.stringify(next, null, 2)}\n`);
+  }
+  lines.push(`  vendored  ${UPSTREAM_PATH} — ${now}${pinned && pinned !== digest && was ? ` (was ${was.name}@${was.version})` : ''}`,
+    lock ? `  pinned    ${POLICY_LOCK_PATH} → upstream ${digest.slice(0, 12)}…` : '  Next: `node .github/eos/eos.mjs policy lock --write` pins it.',
+    '  `eos policy check` enforces it from here on, offline.', '');
+  return done(EXIT.OK, { synced: true, digest, baseline: { name: bundle.name, version: bundle.version } });
 }
 
 export const maintenanceCommands = {
@@ -291,7 +394,7 @@ export const maintenanceCommands = {
    *   policy lock  [--against <ref>] [--write] [--reason "<why>"]
    *   policy check [--against <ref>]                   the CI gate (default subcommand)
    */
-  policy(snapshot, flags) {
+  async policy(snapshot, flags) {
     const sub = flags._[1] || 'check';
     const against = typeof flags.against === 'string' ? flags.against : null;
     const KIND_ORDER = { WEAKENING: 0, REVIEW: 1, STRENGTHENING: 2, INFO: 3 };
@@ -344,7 +447,10 @@ export const maintenanceCommands = {
       return r.ok ? EXIT.OK : EXIT.FAIL;
     }
 
-    console.log(`unknown policy subcommand "${sub}" — use diff, lock or check`);
+    if (sub === 'export') return policyExport(snapshot, flags);
+    if (sub === 'sync') return policySync(snapshot, flags);
+
+    console.log(`unknown policy subcommand "${sub}" — use diff, lock, check, export or sync`);
     return EXIT.FAIL;
   },
 
