@@ -19,7 +19,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname } from 'node:path';
-import { appendEvent, readEvents, verifyChain, LEDGER_PATH, LEDGER_HEAD_PATH, LEDGER_LOCK_PATH } from './lib/ledger.mjs';
+import { appendEvent, readEvents, verifyChain, readLedgerSnapshot, LEDGER_PATH, LEDGER_HEAD_PATH, LEDGER_LOCK_PATH } from './lib/ledger.mjs';
 import { writeFileAtomic, withLock, LockTimeoutError } from './lib/atomic.mjs';
 
 const EOS_DIR = dirname(fileURLToPath(import.meta.url));
@@ -194,4 +194,40 @@ test('a genuinely truncated ledger is still reported as truncation', () => {
   const v = verifyChain(readEvents(dir).events, { root: dir });
   assert.equal(v.ok, false);
   assert.match(v.problems.join(' '), /removed from the end/);
+});
+
+// --------------------------------------------------------------------------------- readers
+// Readers take no lock: every command reads the ledger, and serialising reads behind writers would
+// make a busy repository crawl. A reader can therefore read the ledger before an append and the
+// head record after it — and that pair used to read as "line(s) were removed from the end".
+// CI caught it under coverage. readLedgerSnapshot re-reads a disagreement before believing it.
+test('a reader racing a writer never mistakes a write in progress for truncation', { timeout: 120000 }, async () => {
+  const dir = sandbox();
+  appendEvent(dir, { type: 'note', detail: 'seed', scope: { type: 'product', id: 'product' } });
+  const writer = node(`
+    import { appendEvent } from ${JSON.stringify(LEDGER_MODULE)};
+    for (let i = 0; i < 300; i += 1) appendEvent(${JSON.stringify(dir)}, { type: 'note', detail: 'w' + i, scope: { type: 'product', id: 'product' } });
+  `);
+  let done = false;
+  writer.then(() => { done = true; });
+  let reads = 0;
+  const false_alarms = [];
+  while (!done) {
+    const { chain, errors } = readLedgerSnapshot(dir);
+    reads += 1;
+    if (chain.problems.length || errors.length) false_alarms.push([...errors, ...chain.problems].join(' | '));
+    await new Promise((r) => setImmediate(r));
+  }
+  assert.ok(reads > 10, `the reader must actually overlap the writer (read ${reads} times)`);
+  assert.deepEqual(false_alarms, [], 'an honest concurrent write must never read as tampering');
+  assert.equal(readLedgerSnapshot(dir).events.length, 301);
+});
+
+test('real truncation is still reported, after the re-reads', () => {
+  const dir = sandbox();
+  for (const d of ['a', 'b', 'c']) appendEvent(dir, { type: 'note', detail: d, scope: { type: 'product', id: 'product' } });
+  const lines = readFileSync(join(dir, LEDGER_PATH), 'utf8').trim().split('\n');
+  writeFileSync(join(dir, LEDGER_PATH), `${lines.slice(0, 2).join('\n')}\n`, 'utf8');
+  const { chain } = readLedgerSnapshot(dir, { attempts: 3, pauseMs: 1 });
+  assert.match(chain.problems.join(' '), /removed from the end/, 'patience must never become blindness');
 });

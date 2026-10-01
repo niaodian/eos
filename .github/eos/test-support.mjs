@@ -80,7 +80,12 @@ function buildProject(files, { withGovernance, withHooks, git }) {
     write(dir, 'docs/eos/activation.md', '# Activation\n\n- [x] Branch protection\n');
   }
   if (withHooks) {
-    cpSync(join(REPO_ROOT, '.github/hooks'), join(dir, '.github/hooks'), { recursive: true });
+    // EOS's OWN test files stay out. A sandbox's product test command is often a bare `node --test`,
+    // and Node 20 discovers test files in every directory, hidden ones included — so a sandbox that
+    // carried .github/hooks/*.test.mjs ran EOS's hook suite as if it were the sandbox's product, and
+    // failed on imports that only resolve inside the real repository. Only the hooks the gates
+    // actually shell out to are needed here.
+    cpSync(join(REPO_ROOT, '.github/hooks'), join(dir, '.github/hooks'), { recursive: true, filter: (src) => !/\.test\.mjs$/.test(src) });
   }
   for (const [rel, body] of Object.entries(files)) write(dir, rel, body);
   if (git) gitInit(dir);

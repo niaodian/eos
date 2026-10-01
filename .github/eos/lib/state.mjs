@@ -8,7 +8,7 @@ import { spawnSync } from 'node:child_process';
 import { loadProjectConfig } from '../../hooks/lib/project-config.mjs';
 import { loadWorkflow, loadGates, loadAgentMap, loadActiveWork, posix } from './registry.mjs';
 import { LEDGER_PATH } from './ledger.mjs';
-import { readEvents, stateOf, verifyChain } from './ledger.mjs';
+import { readLedgerSnapshot, stateOf } from './ledger.mjs';
 import { listStories, prdAcceptanceCriteria } from './story.mjs';
 import { SUMMARY_PATHS } from './machine-summary.mjs';
 import { manifestPath, readManifest } from './release.mjs';
@@ -96,11 +96,12 @@ export function readSnapshot(root, { withGit = true } = {}) {
   if (am.present && am.agentMap === null) warnings.push(...am.errors);
   warnings.push(...aw.errors);
 
-  const { events, errors: ledgerErrors } = readEvents(root);
+  // One consistent read of the ledger and its head record: a reader racing a writer must not mistake
+  // a write in progress for truncation (see readLedgerSnapshot).
+  const { events, errors: ledgerErrors, chain } = readLedgerSnapshot(root);
   errors.push(...ledgerErrors);
   // Story and release state come from this file, so trusting it without verifying the chain would
   // make the whole tamper-evidence story decorative. A broken chain is an ERROR for every consumer.
-  const chain = verifyChain(events, { root });
   for (const p of chain.problems) errors.push(`${LEDGER_PATH}: ${p} — run \`node .github/eos/eos.mjs ledger --verify\` and restore the file from version control`);
   for (const w of chain.warnings) warnings.push(`${LEDGER_PATH}: ${w}`);
 

@@ -16,7 +16,7 @@ import { prepareGateRun, evaluateGate, recordedGateStatus, evidenceIntegrity, is
 import { recordGateRun, readIntent } from './lib/record.mjs';
 import { crossBranchActivity, crossBranchLines } from './lib/cross-branch.mjs';
 import { checkTransition, deriveProductState, legalTransitions } from './lib/transitions.mjs';
-import { appendEvent, withLedger, readEvents, verifyChain, parseConflicted, reconcileEvents, writeLedger, divergence, transitionConflicts, stateOf, LEDGER_PATH } from './lib/ledger.mjs';
+import { appendEvent, withLedger, readEvents, readLedgerSnapshot, verifyChain, parseConflicted, reconcileEvents, writeLedger, divergence, transitionConflicts, stateOf, LEDGER_PATH } from './lib/ledger.mjs';
 import { route, activeScope } from './lib/router.mjs';
 import { renderCard, renderGate, renderExplain } from './lib/render.mjs';
 import { buildHandoff, writeHandoff, readHandoff, verifyHandoff, handoffPath } from './lib/handoff.mjs';
@@ -1070,8 +1070,7 @@ const commands = {
 
   ledger(snapshot, flags) {
     if (flags.resolve) return resolveLedger(snapshot, flags);
-    const { events, errors } = readEvents(snapshot.root);
-    const chain = verifyChain(events, { root: snapshot.root });
+    const { events, errors, chain } = readLedgerSnapshot(snapshot.root);
     const problems = [...errors, ...chain.problems];
     // A valid chain can still carry a history that does not follow from itself: two branches
     // moved the same story and the merge replayed both. Not tampering — but the derived state
@@ -1231,7 +1230,7 @@ const commands = {
       });
       if (f.status === 'STALE') notes.push(`${file} is STALE: ${f.reasons[0]}`);
     }
-    const chain = verifyChain(readEvents(snapshot.root).events, { root: snapshot.root });
+    const { chain } = readLedgerSnapshot(snapshot.root);
     for (const p of chain.problems) problems.push({ level: 'ERROR', detail: `ledger: ${p}` });
     // An unverifiable ledger is BLOCKED, not a note: "PASS (1 note)" would be the same
     // absence-of-proof-as-proof that this layer exists to refuse.

@@ -22,7 +22,7 @@ import { randomBytes } from 'node:crypto';
 import { dirname } from 'node:path';
 
 /** Synchronous sleep with no dependency and no busy-wait. */
-function sleep(ms) {
+export function sleep(ms) {
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 }
 

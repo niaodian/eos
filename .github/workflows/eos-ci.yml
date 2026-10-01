@@ -251,6 +251,13 @@ jobs:
         # another platform, and the Linux `verify` job asserts they pass FAST, at scale 1, where a
         # regression is visible. Timings are still printed here — they are useful data, they just
         # do not gate.
+        #
+        # The per-test limit needs the same care. Node 20 applies --test-timeout to each test FILE
+        # (it wraps a file as one top-level test), and on Windows a whole file can legitimately take
+        # longer than the 120s default (cli.test.mjs: ~9s on Linux). Windows gets a longer limit by
+        # explicit override; macOS keeps the default, so a hang there is still caught early.
+        env:
+          EOS_TEST_TIMEOUT_MS: ${{ matrix.os == 'windows-latest' && '900000' || '120000' }}
         run: node .github/eos/run-tests.mjs unit contract --no-budget
 
   # ---------------------------------------------------------------------------------------------

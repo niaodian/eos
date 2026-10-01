@@ -6,7 +6,7 @@ import { createHash } from 'node:crypto';
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
-import { withLock, writeFileAtomic } from './atomic.mjs';
+import { withLock, writeFileAtomic, sleep } from './atomic.mjs';
 
 export const LEDGER_PATH = '.eos/ledger/events.jsonl';
 // A forward-only chain cannot notice that the TAIL was cut off: deleting the last lines leaves
@@ -270,6 +270,39 @@ export function appendEvent(root, event) {
  */
 export function withLedger(root, fn) {
   return withLock(join(root, LEDGER_LOCK_PATH), () => fn({ append: (event) => appendUnlocked(root, event) }));
+}
+
+/**
+ * Read the events AND judge them against the head record as one consistent snapshot.
+ *
+ * A writer appends the line and then rewrites head.json, under the lock. A reader takes no lock —
+ * every EOS command reads the ledger, and serialising all reads behind writers would make a busy
+ * repository crawl — so it can read the ledger BEFORE an append and head.json AFTER it. That pair
+ * disagrees, and verifyChain then reports "line(s) were removed from the end": truncation, for a
+ * ledger nobody touched. CI caught exactly this, under coverage, with eight concurrent writers.
+ *
+ * So a disagreement involving the head record, or a line that does not parse yet, is re-read
+ * after a short pause before it is believed. A write settles in milliseconds; real truncation or
+ * corruption is still there on every attempt and is reported exactly as before.
+ *
+ * @returns {{events:object[], errors:string[], conflicted:boolean, chain:{ok:boolean, problems:string[], warnings:string[]}}}
+ */
+export function readLedgerSnapshot(root, { attempts = 40, pauseMs = 25 } = {}) {
+  let last = null;
+  for (let i = 0; i < attempts; i += 1) {
+    const read = readEvents(root);
+    const chain = read.conflicted ? { ok: false, problems: [], warnings: [] } : verifyChain(read.events, { root });
+    last = { ...read, chain };
+    const settling = chain.problems.some((p) => p.includes(LEDGER_HEAD_PATH))
+      || (!read.conflicted && read.errors.some((e) => /not valid JSON/.test(e)));
+    if (!settling) return last;
+    // Patience is only owed to a write that is actually happening. With no writer holding the lock,
+    // three quick reads are enough to tell a just-finished write from real damage — so a genuinely
+    // truncated ledger is reported in ~75ms instead of making every command wait a full second.
+    if (i >= 2 && !existsSync(join(root, LEDGER_LOCK_PATH))) return last;
+    sleep(pauseMs);
+  }
+  return last;
 }
 
 /** Current state of a scope from the ledger, falling back to the machine's initial state. */

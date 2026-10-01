@@ -61,7 +61,11 @@ const budget = loadBudget();
 // ratio a breach represents stays the same everywhere.
 const scale = Number(process.env.EOS_TEST_BUDGET_SCALE || budget.defaultScale || 1);
 const layers = Object.entries(budget.layers);
-const TEST_TIMEOUT_MS = budget.testTimeoutMs ?? 120000;
+// EOS_TEST_TIMEOUT_MS overrides it for one environment. Node 20 wraps each test FILE as a single
+// top-level test, so there the limit bounds a whole file rather than one test — which on a runner
+// as slow as GitHub's Windows one (spawns ~15x Linux) means a file legitimately needs longer. Raise
+// it there by override; the default stays tight everywhere else.
+const TEST_TIMEOUT_MS = Number(process.env.EOS_TEST_TIMEOUT_MS || budget.testTimeoutMs || 120000);
 const LAYER_TIMEOUT_MS = budget.layerTimeoutMs ?? 900000;
 const COVERAGE_TIMEOUT_MS = budget.coverageTimeoutMs ?? 1800000;
 const BASELINE_ENV = process.env.EOS_TEST_BASELINE_ENV || null;
