@@ -231,3 +231,45 @@ test('real truncation is still reported, after the re-reads', () => {
   const { chain } = readLedgerSnapshot(dir, { attempts: 3, pauseMs: 1 });
   assert.match(chain.problems.join(' '), /removed from the end/, 'patience must never become blindness');
 });
+
+// The states a reader can meet mid-write, built directly so they do not depend on a platform's
+// timing. On Windows the gap between append and head update is most of every write (fsync is
+// slow), so a reader lands in it constantly — waiting it out is not an answer; the commit point is.
+/** A ledger with three committed events, then a fourth appended but not yet committed by head.json. */
+function midWrite(dir, { torn = false } = {}) {
+  for (const d of ['a', 'b', 'c']) appendEvent(dir, { type: 'note', detail: d, scope: { type: 'product', id: 'product' } });
+  const head = readFileSync(join(dir, LEDGER_HEAD_PATH), 'utf8');
+  appendEvent(dir, { type: 'note', detail: 'd', scope: { type: 'product', id: 'product' } });
+  writeFileSync(join(dir, LEDGER_HEAD_PATH), head, 'utf8'); // head back at 3: the 4th is in flight
+  if (torn) {
+    const text = readFileSync(join(dir, LEDGER_PATH), 'utf8');
+    writeFileSync(join(dir, LEDGER_PATH), text.slice(0, text.length - 20), 'utf8'); // half-written line
+  }
+}
+
+test('while a writer holds the lock, a reader sees the last committed state at once', () => {
+  const dir = sandbox();
+  midWrite(dir);
+  closeSync(openSync(join(dir, LEDGER_LOCK_PATH), 'wx')); // a writer is mid-way
+  const started = Date.now();
+  const s = readLedgerSnapshot(dir);
+  assert.deepEqual([...s.errors, ...s.chain.problems], [], 'an in-flight append is not damage');
+  assert.equal(s.events.length, 3, 'the snapshot is the committed history');
+  assert.ok(Date.now() - started < 500, 'and it needs no waiting');
+});
+
+test('a half-written final line during a write is not corruption', () => {
+  const dir = sandbox();
+  midWrite(dir, { torn: true });
+  closeSync(openSync(join(dir, LEDGER_LOCK_PATH), 'wx'));
+  const s = readLedgerSnapshot(dir);
+  assert.deepEqual([...s.errors, ...s.chain.problems], []);
+  assert.equal(s.events.length, 3);
+});
+
+test('the same state with NO writer is reported — an interrupted write is still visible', () => {
+  const dir = sandbox();
+  midWrite(dir);
+  const s = readLedgerSnapshot(dir, { attempts: 3, pauseMs: 1 });
+  assert.match(s.chain.problems.join(' '), /interrupted write/);
+});
