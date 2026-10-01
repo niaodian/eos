@@ -231,29 +231,45 @@ export function verifyChain(events, { root = null } = {}) {
   return { ok: problems.length === 0, problems, warnings };
 }
 
+/** Append one event. The caller MUST hold the ledger lock (see appendEvent / withLedger). */
+function appendUnlocked(root, event) {
+  const { events, errors } = readEvents(root);
+  if (errors.length) throw new Error(errors.join('; '));
+  const prev = events.at(-1) || null;
+  const body = {
+    seq: events.length + 1,
+    ts: new Date().toISOString(),
+    actor: process.env.EOS_ACTOR || process.env.USER || process.env.USERNAME || 'unknown',
+    ...event,
+    prevHash: prev ? prev.hash : null,
+  };
+  body.hash = hashEvent(body);
+  const full = join(root, LEDGER_PATH);
+  mkdirSync(dirname(full), { recursive: true });
+  appendFileSync(full, JSON.stringify(body) + '\n', 'utf8');
+  writeHead(root, [...events, body]);
+  return body;
+}
+
 export function appendEvent(root, event) {
   // The ENTIRE read-modify-write is the critical section. `seq` and `prevHash` are derived from the
   // events already on disk, so two concurrent appenders that both read N events would both write
   // seq N+1 with the same prevHash — a forked chain that `verifyChain` reports as tampering. The
   // lock is what makes "append-only" true under concurrency rather than only in the happy path.
-  return withLock(join(root, LEDGER_LOCK_PATH), () => {
-    const { events, errors } = readEvents(root);
-    if (errors.length) throw new Error(errors.join('; '));
-    const prev = events.at(-1) || null;
-    const body = {
-      seq: events.length + 1,
-      ts: new Date().toISOString(),
-      actor: process.env.EOS_ACTOR || process.env.USER || process.env.USERNAME || 'unknown',
-      ...event,
-      prevHash: prev ? prev.hash : null,
-    };
-    body.hash = hashEvent(body);
-    const full = join(root, LEDGER_PATH);
-    mkdirSync(dirname(full), { recursive: true });
-    appendFileSync(full, JSON.stringify(body) + '\n', 'utf8');
-    writeHead(root, [...events, body]);
-    return body;
-  });
+  return withLock(join(root, LEDGER_LOCK_PATH), () => appendUnlocked(root, event));
+}
+
+/**
+ * Hold the ledger lock across several writes that only make sense together.
+ *
+ * Appending under the lock made the CHAIN safe; it did not make a gate run safe, because a gate run
+ * is two writes — the evidence file and the entry pinning its digest — and two runs could still
+ * interleave between them. Everything that pairs a file with a ledger entry goes through here, so
+ * the pair is written as one unit. The lock is not re-entrant: inside `fn`, append with the
+ * `append` it is given, never with appendEvent.
+ */
+export function withLedger(root, fn) {
+  return withLock(join(root, LEDGER_LOCK_PATH), () => fn({ append: (event) => appendUnlocked(root, event) }));
 }
 
 /** Current state of a scope from the ledger, falling back to the machine's initial state. */

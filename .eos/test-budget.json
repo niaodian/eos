@@ -56,6 +56,7 @@
         ".github/eos/ledger-merge.test.mjs",
         ".github/eos/policy.test.mjs",
         ".github/eos/router.test.mjs",
+        ".github/eos/transaction.test.mjs",
         ".github/hooks/eos-doctor.test.mjs",
         ".github/hooks/project-gate.test.mjs"
       ]

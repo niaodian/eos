@@ -12,9 +12,10 @@ import { existsSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { readSnapshot, gatePolicy, changeTypeOf, scopeState, gateInputs, gateCollections } from './lib/state.mjs';
-import { runGate, evaluateGate, recordedGateStatus, evidenceIntegrity, isBlocking } from './lib/gates.mjs';
+import { prepareGateRun, evaluateGate, recordedGateStatus, evidenceIntegrity, isBlocking } from './lib/gates.mjs';
+import { recordGateRun, readIntent } from './lib/record.mjs';
 import { checkTransition, deriveProductState, legalTransitions } from './lib/transitions.mjs';
-import { appendEvent, readEvents, verifyChain, parseConflicted, reconcileEvents, writeLedger, divergence, LEDGER_PATH } from './lib/ledger.mjs';
+import { appendEvent, withLedger, readEvents, verifyChain, parseConflicted, reconcileEvents, writeLedger, divergence, LEDGER_PATH } from './lib/ledger.mjs';
 import { route, activeScope } from './lib/router.mjs';
 import { renderCard, renderGate, renderExplain } from './lib/render.mjs';
 import { buildHandoff, writeHandoff, readHandoff, verifyHandoff, handoffPath } from './lib/handoff.mjs';
@@ -252,18 +253,13 @@ const commands = {
       ? { type: 'product', id: 'product' }
       : { type: def.scope, id: resolveScope(snapshot, flags, def.scope).id };
     const providerVerdicts = await consultProviders(snapshot, def.id);
-    const { result, evidenceFile } = runGate(snapshot, def.id, scope.type, scope.id, { providerVerdicts });
-    appendEvent(snapshot.root, {
-      type: 'gate',
-      scope: { type: scope.type, id: String(scope.id) },
-      changeType: result.changeType,
-      gate: result.gate,
-      status: result.status,
-      // The digest goes INTO the hashed body, so regenerating or editing the evidence file after
-      // the fact no longer matches what the chain says was verified.
-      evidenceSha256: evidenceFile ? sha256File(snapshot.root, evidenceFile) : null,
-      commit: snapshot.commit,
-      detail: evidenceFile || '',
+    const { result, evidence, evidenceFile } = prepareGateRun(snapshot, def.id, scope.type, scope.id, { providerVerdicts });
+    // Evidence and its ledger entry are written as ONE unit (record.mjs). The digest goes INTO the
+    // hashed entry, so regenerating or editing the evidence afterwards no longer matches the chain.
+    recordGateRun(snapshot.root, {
+      evidence,
+      evidenceFile,
+      event: { type: 'gate', scope: { type: scope.type, id: String(scope.id) }, changeType: result.changeType, gate: result.gate, status: result.status, commit: snapshot.commit },
     });
     emit(flags, { ...result, evidence: { file: evidenceFile, inputs: (listEvidence(snapshot.root).find((e) => e.file === evidenceFile)?.evidence?.inputs) || [] } }, renderGate(result, { evidenceFile }));
     return statusExit(result.status);
@@ -335,16 +331,11 @@ const commands = {
     const results = [];
     for (const p of selected) {
       const providerVerdicts = await consultProviders(snapshot, p.def.id);
-      const { result, evidenceFile } = runGate(snapshot, p.def.id, p.scopeType, p.scopeId, { providerVerdicts });
-      appendEvent(snapshot.root, {
-        type: 'gate',
-        scope: { type: p.scopeType, id: String(p.scopeId) },
-        changeType: result.changeType,
-        gate: result.gate,
-        status: result.status,
-        evidenceSha256: evidenceFile ? sha256File(snapshot.root, evidenceFile) : null,
-        commit: snapshot.commit,
-        detail: evidenceFile || '',
+      const { result, evidence, evidenceFile } = prepareGateRun(snapshot, p.def.id, p.scopeType, p.scopeId, { providerVerdicts });
+      recordGateRun(snapshot.root, {
+        evidence,
+        evidenceFile,
+        event: { type: 'gate', scope: { type: p.scopeType, id: String(p.scopeId) }, changeType: result.changeType, gate: result.gate, status: result.status, commit: snapshot.commit },
       });
       results.push({ gate: p.def.id, scopeType: p.scopeType, scopeId: p.scopeId, status: result.status, reason: p.reason, rerunCommand: result.rerunCommand });
     }
@@ -971,23 +962,19 @@ const commands = {
     const id = flags.release === true || !flags.release ? null : flags.release;
     if (!id) { console.log('verify-release requires --release <id>'); return EXIT.FAIL; }
     const providerVerdicts = await consultProviders(snapshot, 'release-ready');
-    const { result, evidenceFile } = runGate(snapshot, 'release-ready', 'release', id, { providerVerdicts });
-    const recorded = recordedGateStatus(snapshot, 'release-ready', 'release', id);
-    const boundToCandidate = !!snapshot.commit && recorded.evidence?.commit === snapshot.commit;
+    const { result, evidence, evidenceFile } = prepareGateRun(snapshot, 'release-ready', 'release', id, { providerVerdicts });
+    // Bound to the candidate when the evidence names the commit being released. Read from the
+    // prepared evidence rather than re-read from disk: it is the same object that gets written.
+    const boundToCandidate = !!snapshot.commit && evidence?.commit === snapshot.commit;
     const expired = expiredWaivers(snapshot.root);
     const status = result.status === 'PASS' && !boundToCandidate ? 'BLOCKED' : result.status;
     // The SAME event shape `check` writes. Recording a different type here left the release
     // evidence with no matching gate entry, so the very next transition rejected it as
     // "evidence without a ledger entry" — verify-release could never promote anything.
-    appendEvent(snapshot.root, {
-      type: 'gate',
-      scope: { type: 'release', id: String(id) },
-      changeType: result.changeType,
-      gate: 'release-ready',
-      status,
-      evidenceSha256: evidenceFile ? sha256File(snapshot.root, evidenceFile) : null,
-      commit: snapshot.commit,
-      detail: evidenceFile || '',
+    recordGateRun(snapshot.root, {
+      evidence,
+      evidenceFile,
+      event: { type: 'gate', scope: { type: 'release', id: String(id) }, changeType: result.changeType, gate: 'release-ready', status, commit: snapshot.commit },
     });
     appendEvent(snapshot.root, { type: 'release', scope: { type: 'release', id }, gate: 'release-ready', status, commit: snapshot.commit, detail: evidenceFile || '' });
     const lines = [renderGate(result, { evidenceFile }),
@@ -1029,8 +1016,11 @@ const commands = {
     if (!waiver.riskOwner) { console.log('waive requires --risk-owner'); return EXIT.FAIL; }
     const rel = `.eos/waivers/${def.id}__${scopeType}__${String(scopeId).replace(/[^A-Za-z0-9._-]/g, '_')}.json`;
     mkdirSync(join(snapshot.root, '.eos/waivers'), { recursive: true });
-    writeFileAtomic(join(snapshot.root, rel), JSON.stringify(waiver, null, 2) + '\n');
-    appendEvent(snapshot.root, { type: 'waiver', scope: { type: scopeType, id: String(scopeId) }, gate: def.id, status: 'DRAFT', detail: rel });
+    // The draft file and its ledger entry are one unit, entry first — the same rule as a gate run.
+    withLedger(snapshot.root, ({ append }) => {
+      append({ type: 'waiver', scope: { type: scopeType, id: String(scopeId) }, gate: def.id, status: 'DRAFT', detail: rel });
+      writeFileAtomic(join(snapshot.root, rel), JSON.stringify(waiver, null, 2) + '\n');
+    });
     emit(flags, { drafted: rel, waiver, honored: false }, [
       `EOS waive · DRAFTED ${rel}`, '',
       '  This waiver is NOT in effect: "approver" is empty. EOS drafts waivers and never approves them.',
@@ -1187,6 +1177,11 @@ const commands = {
     if (policyLock.lock && policyLock.lock.policyDigest !== policyDigest(policySnapshot(readPolicy(snapshot.root).files))) {
       problems.push({ level: 'ERROR', detail: `the policy changed since ${POLICY_LOCK_PATH} was written — run \`eos policy lock\` to see what changed` });
     }
+    // A gate run that stopped between its ledger entry and its evidence. BLOCKED, not ERROR: nothing
+    // is corrupt and nobody tampered with anything — one re-run completes it.
+    const intent = readIntent(snapshot.root);
+    if (intent.present && intent.interrupted) problems.push({ level: 'BLOCKED', detail: intent.detail });
+    if (intent.present && !intent.interrupted) notes.push(intent.detail);
     // Doctor's verdict covers EOS's own wiring. Saying so matters most when it is green: a PASS
     // here has never meant "the product is tested", and on a config-only repository nothing about
     // a product is executed at all. [audit: config-only false PASS]

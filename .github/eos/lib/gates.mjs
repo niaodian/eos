@@ -135,8 +135,15 @@ function diagnosticContext(snapshot, def, scopeType, scopeId, changeType, policy
   };
 }
 
-/** Run a gate for real and persist the evidence. */
-export function runGate(snapshot, gateId, scopeType, scopeId, { now = new Date(), providerVerdicts = null } = {}) {
+/**
+ * Run a gate for real and BUILD its evidence — without writing anything.
+ *
+ * Writing is deliberately not done here. A gate run produces two things that are only meaningful
+ * together, the evidence file and the ledger entry pinning its digest, and they must be written as
+ * one unit (record.mjs). Evaluating here, outside the ledger lock, keeps the slow part — running the
+ * project's tests — from blocking every other EOS command for as long as the tests take.
+ */
+export function prepareGateRun(snapshot, gateId, scopeType, scopeId, { now = new Date(), providerVerdicts = null } = {}) {
   const result = evaluateGate(snapshot, gateId, scopeType, scopeId, { mode: 'all', now, providerVerdicts });
   if (result.status === 'ERROR' && !result.checks.length) return { result, evidenceFile: null };
   const def = snapshot.gates?.gates.find((g) => g.id === result.gate);
@@ -166,8 +173,7 @@ export function runGate(snapshot, gateId, scopeType, scopeId, { now = new Date()
     checks: result.checks.map((c) => ({ id: c.id, status: c.status, ...(c.detail ? { detail: String(c.detail).slice(0, 600) } : {}), ...(c.fix ? { fix: c.fix } : {}) })),
     generatedAt: now.toISOString(),
   };
-  const evidenceFile = writeEvidence(snapshot.root, evidence);
-  return { result, evidence, evidenceFile };
+  return { result, evidence, evidenceFile: evidenceFile(evidence.gate, scopeType, scopeId) };
 }
 
 /** The recorded (not live) status of a gate — what a transition guard is allowed to trust. */

@@ -53,3 +53,6 @@ docs/zh/.*.html
 .eos/ledger/.lock
 # Interrupted atomic writes (write-temp-then-rename). Never authoritative.
 .eos/**/*.tmp
+# A gate run's intent record: written before the ledger entry, removed once the evidence is on
+# disk. Transient by design — it only ever exists while a run is in progress or after a crash.
+.eos/ledger/pending.json
