@@ -383,20 +383,26 @@ and reports `STALE` rather than letting an agent act on a stale package.
 ## 10. CLI contract
 
 ```
-node .github/eos/eos.mjs <command> [flags]
+node .github/eos/eos.mjs <command> [flags]      (same CLI: npx --offline eos <command>, npm 10.9+)
 
-  status [--changed]        where the project and the active scope are
+  status [--changed]        where the project and the active scope are, and the governance track
   next [--why] [--all]      the single recommended next action
   resume                    restore the local focus in a new session
   check --gate <id> [--scope <id>]      run one gate, write evidence
+  verify [--full] [--plan]  run the gates this change can have affected
   transition --scope <type> --id <id> --to <STATE>
+  approve --scope <type> --id <id>      record an approval (a second person, never the requester)
   explain <gate>            the full rule set for one gate
+  release init|bind|list|keygen|sign|verify [--release <id>]   manifests, signatures, provenance
   release-status            aggregate release readiness
   verify-release --release <tag>        candidate-bound verification
   waive --gate <id> --scope <id> ...    draft a waiver (never approves)
   handoff --scope <type> --id <id> [--verify]
   ledger [--verify] [--against <ref>]   append-only chain verification
-  init [--write]            report/create local, non-destructive integration files
+  init [<pack>] [--track standard|regulated] [--write] [--force]
+                            declare the project and its track; create local integration files
+  policy [diff|lock|check|export|sync]  governance changes, the lock, the organisation baseline
+  report [--format json|markdown] [--org <report.json>…]   governance report
   doctor                    is EOS itself wired correctly?
 
   global: --json  --why  --all  --no-color
@@ -405,7 +411,7 @@ node .github/eos/eos.mjs <command> [flags]
 Default (human) output is always these six blocks and nothing else:
 
 ```
-EOS · STORY-012
+EOS · STORY-012 · Standard track
 
 Current
   IN_REVIEW · FEATURE
@@ -433,8 +439,8 @@ Done when
 | Code | Meaning | Emitted by |
 |---|---|---|
 | 0 | PASS / nothing blocking | any command |
-| 1 | FAIL — a check failed, or a transition was rejected | `check`, `transition`, `verify-release` |
-| 2 | BLOCKED / PENDING / STALE — action required first | `next`, `resume`, `check`, `release-status` |
+| 1 | FAIL — a check failed, or a transition was rejected | `check`, `transition`, `verify-release`, `release verify`, `policy check` |
+| 2 | BLOCKED / PENDING / STALE — action required first | `next`, `resume`, `check`, `release-status`, `policy sync` (upstream unreachable) |
 | 3 | ERROR — EOS could not evaluate (bad config, crashed evaluator) | any command |
 
 `next` and `resume` deliberately exit 2 while a blocker exists, so a script or a task can tell

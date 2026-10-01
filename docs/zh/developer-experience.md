@@ -350,20 +350,26 @@ Agent/Prompt/Skills、`doneWhen`，以及返回时执行的命令。它绝不包
 ## 10. CLI 契约
 
 ```
-node .github/eos/eos.mjs <command> [flags]
+node .github/eos/eos.mjs <command> [flags]      （同一个 CLI：npx --offline eos <command>，需 npm 10.9+）
 
-  status [--changed]        项目与当前 Scope 处在哪里
+  status [--changed]        项目与当前 Scope 处在哪里，以及治理轨道
   next [--why] [--all]      唯一的推荐下一步
   resume                    在新 Session 中恢复本机焦点
   check --gate <id> [--scope <id>]      运行一个门禁并写入证据
+  verify [--full] [--plan]  运行这次改动可能影响到的门禁
   transition --scope <type> --id <id> --to <STATE>
+  approve --scope <type> --id <id>      记录一次批准（必须是第二个人，绝不是请求者）
   explain <gate>            某个门禁的完整规则
+  release init|bind|list|keygen|sign|verify [--release <id>]   发布清单、签名、来源证明
   release-status            聚合的发布就绪度
   verify-release --release <tag>        绑定候选 Commit 的验证
   waive --gate <id> --scope <id> ...    起草 Waiver（绝不批准）
   handoff --scope <type> --id <id> [--verify]
   ledger [--verify] [--against <ref>]   append-only 链校验
-  init [--write]            报告/创建本地的、非破坏性的集成文件
+  init [<pack>] [--track standard|regulated] [--write] [--force]
+                            声明项目及其轨道；创建本地集成文件
+  policy [diff|lock|check|export|sync]  治理变更、策略锁、组织基线
+  report [--format json|markdown] [--org <report.json>…]   治理报告
   doctor                    EOS 自身接线是否正确
 
   全局： --json  --why  --all  --no-color
@@ -372,7 +378,7 @@ node .github/eos/eos.mjs <command> [flags]
 默认（面向人类的）输出永远是这六个块，不多不少：
 
 ```
-EOS · STORY-012
+EOS · STORY-012 · Standard track
 
 Current
   IN_REVIEW · FEATURE
@@ -400,8 +406,8 @@ Done when
 | 退出码 | 含义 | 由哪些命令产生 |
 |---|---|---|
 | 0 | PASS / 无阻断 | 任意命令 |
-| 1 | FAIL —— 某项检查失败，或迁移被拒绝 | `check`、`transition`、`verify-release` |
-| 2 | BLOCKED / PENDING / STALE —— 需要先处理 | `next`、`resume`、`check`、`release-status` |
+| 1 | FAIL —— 某项检查失败，或迁移被拒绝 | `check`、`transition`、`verify-release`、`release verify`、`policy check` |
+| 2 | BLOCKED / PENDING / STALE —— 需要先处理 | `next`、`resume`、`check`、`release-status`、`policy sync`（上游不可达） |
 | 3 | ERROR —— EOS 无法评估（配置损坏、Evaluator 崩溃） | 任意命令 |
 
 `next` 与 `resume` 在存在 Blocker 时刻意退出 2，这样脚本或任务无需解析文本就能区分

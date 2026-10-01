@@ -12,6 +12,11 @@
 
 ## 怎么用（3 步）
 
+> **最快路径（eos-2.0.0）：** `node .github/eos/eos.mjs init` 会列出所有起步包，并点名与你的代码
+> 相匹配的那些；`init <pack> --write` 为你的技术栈与轨道写出正确的 `.eos/project.json`，再用
+> `stack sync --write` 把它的命令渲染进 `00-workspace`。下面的步骤就是这些命令替你做的事，以及如何
+> 手工调整。
+
 1. 打开 `.github/instructions/00-workspace.instructions.md`，把 `## Local commands` 那一行换成下面你这个栈的成品行。
 2. 启用对应的 **R3 栈规则文件**（六大后端栈 Node/Python/Go/Java/Rust/.NET + 前端 React 均随模板发布，留着即可）。其余不用的栈规则文件是**惰性的**——只有当仓库里真有对应后缀文件时才生效，留着无害，想删也行。
 3. **把同一套命令写进 `.eos/project.json`**（见下一节）——这是 CI 和 `project-gate` 真正执行的那一份，
@@ -20,6 +25,23 @@
 4.（可选）若用非 Node 栈又想让**编辑时**的质量门禁生效，按下表替换 `.github/hooks/quality.json` 里 `PostToolUse` 的命令（现有那条是 Node 专用：探测 `npm`+`package.json`，非 Node 自动 no-op）。注意 PostToolUse 只是**提示性**的，权威门禁是 CI 里的 `project-gate`。
 
 > **互斥提醒**：每个 R3 文件的 `applyTo` glob 必须互不重叠（`**/*.ts` / `**/*.py` / `**/*.go` / `**/*.java` / `**/*.rs` / `**/*.cs` / `**/*.{tsx,jsx}`）。改完跑 `node .github/hooks/validate-config.mjs` 验 S3。
+
+---
+
+## 选择你的治理轨道
+
+技术栈决定产品*如何*被验证；轨道决定*一次发布必须证明多少*。两者相互独立：每个包都能用于任一条
+轨道，而轨道就写在同一个 `.eos/project.json` 里。
+
+| | Standard（默认） | Regulated |
+|---|---|---|
+| 如何声明 | `eos init <pack> --write` | `eos init <pack> --track regulated --write` |
+| 它设置什么 | 不额外设置 | `workflowProfile` 与 `complianceProfile` 为 `"regulated"`，`evidencePolicy` 为 `"ci"` |
+| 一次发布需要 | 声明的质量命令，在候选提交上重新运行 | 同左，外加签名的发布清单、由 CI 产出的证据，以及每个制品的来源证明 |
+
+还没有代码？`eos init config-only --write`（适用时加 `--track`）——技术栈在架构阶段决定，之后
+`eos init <pack> --write` 会保留这条轨道。细节、签名与 CI 来源证明见
+[用户手册 §10.6](user-manual.md#106-治理轨道签名发布与中心策略)。
 
 ---
 
@@ -43,6 +65,8 @@ EOS 的 CI 曾经只有一句 `if [ -f package.json ]`，于是 **Python/Go/Java
 - 声明了却跑不通 => **FAIL**；工具链没装（命令不在 PATH）=> **BLOCKED + 退出码 1**，绝不伪装成 PASS。
 - `application`/`library` 没有 `commands.test` => **FAIL**（拒绝空跑成绿）。
 - `config-only` 但扫到 `package.json`/`pyproject.toml`/`go.mod`/`Cargo.toml`/`pom.xml`/`*.csproj` => **FAIL**。
+  EOS 自带的根目录 `package.json` 只要还只承载 EOS（`.github/` 下的 bin、只运行 `node .github/…` 或
+  `npm run …` 的脚本、没有依赖或入口文件），就算工具而不是产品代码；第一个依赖或产品脚本会让它成为 Node 项目。
 - `config-only` 却写了 `commands` => **FAIL**（这些命令根本不会执行，不允许"假装有门"）。
   代码所在的栈没有清单文件？用 `"projectType": "application"` + `"stacks": ["other"]`。
 - 没有 `.eos/project.json`：纯 Node 仓库退回旧的 npm 脚本默认值
@@ -91,7 +115,7 @@ EOS 的 CI 曾经只有一句 `if [ -f package.json ]`，于是 **Python/Go/Java
 { "projectType": "application", "stacks": ["python"], "productParadigms": ["deterministic", "agentic"],
   "commands": { "lint": "ruff check .", "test": "pytest -q", "eval": "pytest evals/ -q" } }
 
-// 干净的 EOS 模板本身（还没有产品代码）
+// 还没有产品代码——`eos init config-only --write`（技术栈在架构阶段决定）
 { "projectType": "config-only", "stacks": [], "productParadigms": ["deterministic"] }
 ```
 

@@ -19,6 +19,7 @@
 | Want to look up a slash command / agent / rule | [Chapter 7 Complete reference](#chapter-7-complete-reference-quick-reference) |
 | Configuration is broken / Agent is not working as expected | [Chapter 9 Failure localization](#chapter-9-failure-localization-and-troubleshooting) |
 | Want to move this system to another project/team | [Chapter 10 Cross-project reuse and distribution](#chapter-10-cross-project-reuse-and-distribution) |
+| Upgrading to `eos-2.0.0`, choosing a governance track, or signing releases | [§10.5 Upgrading](#105-upgrading-from-eos-122x-to-eos-200) · [§10.6 Tracks and signed releases](#106-governance-tracks-signed-releases-and-central-policy) |
 
 ---
 
@@ -75,7 +76,13 @@ you want a script or an exit code:
 node .github/eos/eos.mjs resume
 node .github/eos/eos.mjs next
 node .github/eos/eos.mjs check --gate <id> --scope <id>   # prove the step, record the evidence
-``` The router names the agent, the prompt and the minimal
+```
+
+**Shorter, same command:** `npx --offline eos next` (npm 10.9+, bundled with Node 22) or
+`npm run -s eos -- next` (any npm). Keep `--offline`: the public registry has an unrelated package
+named `eos`, and the flag guarantees that only this checkout runs.
+
+The router names the agent, the prompt and the minimal
 BMAD skills for each step, so you never choose from the 73 installed skills yourself. The full
 contract (state model, gates, evidence, exit codes) is
 [developer-experience.md](developer-experience.md).
@@ -185,6 +192,10 @@ Seeing `PASS` means the rule layers, prompts, agents, and hooks are healthy, and
 
 ## 3.3 Fill project-specific facts
 
+**Declare the project first.** `node .github/eos/eos.mjs init` shows the two governance tracks and the
+starter packs. Stack not decided yet (most 0-1 projects)? `init config-only --write`. Stack known?
+`init <pack> --write`, then `stack sync --write` renders its commands into the workspace rule below.
+
 Open `.github/instructions/00-workspace.instructions.md` and change it to the real facts of **your project**:
 - `Local commands`: if the stack is **already decided**, replace this with the install/lint/test/typecheck commands for your stack--**copy the finished line directly** from `docs/eos/stack-presets.md` (a recipe book for Node/Python/Go/Java/Rust/.NET full stacks; copy the matching block). If the stack is **not decided yet** (most 0-1 projects are not before architecture), **keep the Node placeholder**--this is a ⛳ PROVISIONAL value, and the authoritative lock happens in **Phase 4 (Architecture)** together with `docs/adr/00X-tech-stack.md`, avoiding conflict between always-on rules and the future real stack.
 - `Layout`: update it if the directory structure differs.
@@ -196,6 +207,8 @@ Open `.github/instructions/00-workspace.instructions.md` and change it to the re
 npx degit niaodian/eos#eos-1.22.0 my-new-app && cd my-new-app
 git init && git add -A && git commit -q -m "chore: scaffold from eos"
 node .github/hooks/validate-config.mjs
+node .github/eos/eos.mjs init config-only --write   # declare it: no code yet (or init <pack> [--track regulated])
+node .github/eos/eos.mjs next                       # the one next action
 # Key: run `code .` from inside the project directory so my-new-app becomes the workspace root (including .github/).
 # Do not open its parent directory, or custom agents / instructions / hooks will not be discovered.
 code .
@@ -312,7 +325,7 @@ So EOS **never depends on "Rule A overriding Rule B"**. The only reliable contro
 | Item | Content |
 |---|---|
 | **Goal** | Get an empty project with healthy configuration from the template |
-| **How to start** | `npx degit niaodian/eos#eos-1.22.0 my-app && cd my-app` |
+| **How to start** | `npx degit niaodian/eos#eos-1.22.0 my-app && cd my-app`, then declare it: `node .github/eos/eos.mjs init config-only --write` (stack undecided) or `init <pack> --write` |
 | **Output** | Complete `.github/` + `docs/` skeleton |
 | **Gate** | `node .github/hooks/validate-config.mjs` → **PASS** |
 | **Must check** | PASS 0 errors. **If the stack is undecided, do not change** `00-workspace` yet--keep the Node placeholder; the stack is an irreversible decision, and the authority is locked in **Phase 4 (ADR)**. If the stack is known, copy `docs/eos/stack-presets.md` directly (fast path). |
@@ -577,9 +590,10 @@ So EOS **never depends on "Rule A overriding Rule B"**. The only reliable contro
 ```sh
 npx degit niaodian/eos#eos-1.22.0 todo-api && cd todo-api
 node .github/hooks/validate-config.mjs          # expect PASS
+node .github/eos/eos.mjs init node-service --write   # declare the stack (or python-service, go-service… — `eos init` lists them)
 ```
-**Stack already decided?** Open `.github/instructions/00-workspace.instructions.md` and copy `Local commands` from your stack block (`docs/eos/stack-presets.md`, fast path).
-**Not decided yet?** Keep the Node placeholder--the **authoritative stack lock happens in Step 4 Architecture** (together with ADR). SaaS projects usually know the stack at Step 0, so they can copy directly.
+**Stack already decided?** `eos init <pack> --write` declares it; `node .github/eos/eos.mjs stack sync --write` then renders its `Local commands` into `.github/instructions/00-workspace.instructions.md`.
+**Not decided yet?** Declare `eos init config-only --write` instead--the **authoritative stack lock happens in Step 4 Architecture** (together with ADR), and `eos init <pack> --write` then keeps your track. SaaS projects usually know the stack at Step 0.
 
 ### Step 1–3: Clarify what to build (enter one by one in Chat)
 ```
@@ -637,8 +651,9 @@ SaaS **G7** requires: every AC has ≥1 test, **API contract tests** (against op
 npx degit niaodian/eos#eos-1.22.0 cs-agent && cd cs-agent
 mkdir -p ai/prompts evals                       # AI code goes here; Agentic rules overlay automatically
 node .github/hooks/validate-config.mjs          # expect PASS
+node .github/eos/eos.mjs init rag-app --write    # the Python LLM pack: agentic paradigm + an eval command
 ```
-Choose Python as the stack (most common for LLM products): copy the two blocks **Python + AI/LLM additional layer** from stack-presets.
+Choose Python as the stack (most common for LLM products): `rag-app` is the Python LLM pack--adjust its commands to your project, and add the **AI/LLM additional layer** from stack-presets.
 
 ### Step 1–3: Same as Path A (discovery → requirements → spec)
 ```
@@ -996,11 +1011,16 @@ Agent output does not match expectation
 ```sh
 # Method A: degit (public repository — no auth needed)
 # Pin the release tag: the default branch moves, a tag does not.
-npx degit niaodian/eos#eos-1.22.0 my-app
+npx degit niaodian/eos#eos-2.0.0 my-app
+cd my-app && git init
 
 # Method B: git clone at the tag, into a fresh history
-git clone --depth 1 --branch eos-1.22.0 https://github.com/niaodian/eos.git my-app
-cd my-app && git checkout --orphan main && git commit -m "chore: start from eos-1.22.0"
+git clone --depth 1 --branch eos-2.0.0 https://github.com/niaodian/eos.git my-app
+cd my-app && git checkout --orphan main && git commit -m "chore: start from eos-2.0.0"
+
+# Either way, declare the project: the template's own declaration describes EOS, not you
+node .github/eos/eos.mjs init                       # the tracks, the packs, and what is declared
+node .github/eos/eos.mjs init config-only --write   # no code yet — or <pack>, with --track regulated if it applies
 ```
 
 ## 10.3 Distribution to a team (purely local, no enterprise dependency)
@@ -1265,6 +1285,162 @@ because a tool that can grant itself enforcement authority can also remove it.
 See [ADR-005](../adr/005-external-authority-boundary.md) and
 [ADR-006](../adr/006-provider-adapters.md).
 
+## 10.5 Upgrading from `eos-1.22.x` to `eos-2.0.0`
+
+`eos-2.0.0` is a major release. It adds the two governance tracks, signed release manifests, attested
+CI releases, central policy distribution and governance reports (all in §10.6), and it changes how a
+project is declared. Everything else — the CLI, exit codes, evidence, ledger and waiver formats — is
+unchanged.
+
+**What changes for an existing project**
+
+1. **The template's declaration is marked as the template's.** EOS ships its own `.eos/project.json`
+   with `"templateDefault": true`. Keep your own declaration when you merge — never take the
+   template's. If a project still has the template's declaration, the `project-declaration`
+   activation check fails and `eos next` sends you to `eos init`.
+2. **`eos init` declares the project.** In 1.x, `init` only created local VS Code tasks. Now
+   `eos init` shows what is declared, the two tracks and the starter packs; `eos init <pack> --write`
+   writes the declaration; `eos init --write` still creates the local files. A declaration your
+   project already made is never replaced without `--force` — except `config-only`, which takes a pack
+   when code lands and keeps its track. `eos new <pack>` still works.
+3. **`release-ready` is now version 4.0.0**, with two new checks: `manifest-signature` and
+   `release-integrity`. On the Standard track a missing signature or artifact list is
+   `NOT_APPLICABLE`; on both tracks, anything present must verify. Release evidence recorded by
+   release-ready 3.x is stale, so re-run the gate before you release.
+4. **A Regulated project needs a release key and provenance.** Under `complianceProfile: "regulated"`
+   the release gate requires a signed manifest and provenance for every shipped artifact (§10.6.2,
+   §10.6.3). Generate the key once and store its private half as the `EOS_RELEASE_SIGNING_KEY`
+   repository secret if CI signs your releases.
+5. **The policy lock must be re-recorded.** The upgrade strengthens `release-ready`, so
+   `eos policy check` reports that the policy changed since the lock was written. Nothing gets weaker,
+   so no reason or second approver is needed.
+
+**Upgrade steps**
+
+```sh
+# 1. Merge the new template's .github/ and .eos/ (gates.json, workflow.json, agent-map.json,
+#    schemas/) — keep your own .eos/project.json, evidence, waivers, ledger and releases
+# 2. Check the declaration and the track
+node .github/eos/eos.mjs init
+# 3. See what the upgrade changed in the policy, record it, and regenerate the derived docs
+node .github/eos/eos.mjs policy lock
+node .github/eos/eos.mjs policy lock --write
+node .github/eos/eos.mjs docs --write
+# 4. Re-verify: evidence recorded under the previous gate versions is stale
+node .github/eos/eos.mjs verify --full
+```
+
+> If the template's package.json reaches your repository root, EOS treats it as tooling, not as a
+> Node project: it becomes product code as soon as it has a dependency, an entry point or a script
+> that runs something other than EOS — and `eos next` then sends you to `eos init` to declare the stack.
+
+## 10.6 Governance tracks, signed releases and central policy
+
+### 10.6.1 Choosing a governance track
+
+A project is on one of two tracks. The track is derived from the declaration — the Regulated track is
+exactly `complianceProfile: "regulated"` — so there is no third setting that could disagree with what
+is enforced. `eos status` and `eos next` show the track and what a release on it must carry.
+
+| | Standard (default) | Regulated |
+|---|---|---|
+| Choose it | `eos init <pack> --write` | `eos init <pack> --track regulated --write` |
+| Release evidence | may be recorded locally | must come from CI (`evidencePolicy` `ci` or `attested`) |
+| Signed release manifest | verified when present, never required | required |
+| Provenance for every artifact | verified when present, never required | required |
+| Missing signature at release | `NOT_APPLICABLE`, with the command that adds it | `FAIL` — the release is blocked |
+
+**Day one, no code yet:** `eos init config-only --write` (add `--track regulated` if it applies). The
+product gate then reports `NOT_APPLICABLE`, never `PASS`. When code lands, `eos next` sends you to
+`eos init`, which names the packs that match the code it finds; `eos init <pack> --write` replaces the
+config-only declaration without `--force` and keeps your track.
+
+**Changing track later** is deliberate: `eos init <pack> --track <track> --force`. Moving from
+Regulated to Standard weakens the policy, so `eos next` and `eos status` show it until
+`eos policy lock --write --reason "<why>"` records it and a second person signs it off as the approver
+in `.eos/policy.lock.json` — EOS records that approval; it never grants it.
+
+### 10.6.2 Signed release manifests
+
+```sh
+node .github/eos/eos.mjs release keygen --write                # once per project
+node .github/eos/eos.mjs release init --release v1.4.0         # scaffold the manifest
+node .github/eos/eos.mjs release bind --release v1.4.0         # bind artifacts, SBOM and ledger head
+node .github/eos/eos.mjs release sign --release v1.4.0 --key ~/.config/eos/keys/my-app-release.pem
+node .github/eos/eos.mjs release verify --release v1.4.0       # signature, artifact digests, provenance
+```
+
+- `release keygen` writes the public key to `.eos/keys/release.pub`, declares it in
+  `.eos/project.json` → `release.signing.publicKey`, and writes the private key outside the repository
+  (`~/.config/eos/keys/<repo>-release.pem`, mode 600). It refuses any private-key path inside the
+  repository, even through a symlink, and `secret-scan` catches one that gets committed anyway.
+- `release bind` records what ships — the files listed in `release.artifacts` (for example
+  `"dist/*.tgz"`) with their SHA-256 digests — plus the SBOM and the committed ledger head. It appends
+  nothing to the ledger.
+- The signature is Ed25519 over the manifest's canonical JSON, so a CRLF checkout or a re-indented
+  file still verifies, while any change to the content does not. Signing never changes the digest
+  approvals are bound to.
+- The release gate checks both on the candidate commit: `manifest-signature` (a wrong signature always
+  fails; a missing one fails only on Regulated) and `release-integrity` (every listed artifact matches
+  its digest, and on Regulated is covered by provenance).
+
+### 10.6.3 Attested releases in CI
+
+`.github/workflows/eos-release.yml` builds and attests your releases. Pushing a `v*` or `eos-*` tag runs
+it; a pull request that touches it runs a dry run that attests but publishes nothing.
+
+1. **plan** — reads the track from `.eos/project.json` (the workflow keeps no copy of the rule).
+2. **build** — replace this step with your real build; everything in `dist/` is attested. The default
+   ships the repository as a source archive with its SBOM and `SHA256SUMS`.
+3. **attest** — GitHub artifact attestations (SLSA v1 provenance), on both tracks.
+4. **slsa** — Regulated only: the SLSA Build Level 3 generator, pinned to a release tag.
+5. **manifest** — binds and, with the `EOS_RELEASE_SIGNING_KEY` secret, signs the release manifest.
+6. **publish** — a draft GitHub release with every asset; nothing is published until every job the
+   track requires has succeeded.
+
+Only the jobs that need it get `id-token: write`; `eos-ci.yml` gets none. Verify a release with
+`gh attestation verify <file> --repo <owner>/<repo>`, and bind the provenance to the manifest offline
+with `eos release verify --release <id> --provenance <file>`. To exercise the Regulated path without
+publishing, dispatch the workflow on your default branch with `track=regulated`.
+
+### 10.6.4 Central policy distribution
+
+An organisation publishes one policy baseline; every repository vendors it and enforces it offline.
+
+```sh
+# In the organisation's policy repository
+node .github/eos/eos.mjs policy export --name acme-baseline --version 2026.10 --sign --key <private-key>
+# In each project: declare "policyUpstream" in .eos/project.json, then
+node .github/eos/eos.mjs policy sync --check    # what would change — writes nothing
+node .github/eos/eos.mjs policy sync            # vendor .eos/policy.upstream.json and pin its digest
+node .github/eos/eos.mjs policy check           # offline, in CI: is anything weaker than the baseline?
+```
+
+- `policyUpstream.source` is an `https://` URL (plain `http` only on loopback, redirects refused) or a
+  `file:` path to a checkout of the policy repository; `policyUpstream.publicKey` is the key a signed
+  baseline must verify against.
+- `policy sync` is the only command that fetches policy. `policy check` stays offline: it compares
+  your policy with the vendored baseline, and anything weaker is a `WEAKENING` with an `upstream:` id,
+  which needs a reason and a second person like any other weakening.
+- The floor cannot be removed quietly: re-locking keeps the digest `policy sync` pinned, a signed
+  baseline is re-verified on every `policy check`, and removing `policyUpstream` — or pointing it
+  elsewhere — is itself a `WEAKENING`.
+
+### 10.6.5 Governance reports
+
+```sh
+node .github/eos/eos.mjs report --format markdown --out governance.md
+node .github/eos/eos.mjs report --org team-a.json team-b.json --format markdown
+```
+
+One repository's report covers the track, every gate's latest verdict and pass rate from the ledger,
+waivers, the policy lock, the SBOM and its freshness, release signatures and an `attention` list. `--org` aggregates
+the JSON reports of many repositories. Every report is validated against its published schema
+(`governance-report`, `governance-org-report`) before it is written.
+
+See [ADR-012](../adr/012-supply-chain-trust-model.md) and
+[ADR-013](../adr/013-central-policy-distribution.md).
+
 ---
 
 # Chapter 11 Adding a technology stack
@@ -1340,12 +1516,19 @@ EOS stack rules are **pluggable**. Adding a stack = add one `*.instructions.md` 
 ```
 # ── Terminal — the loop (this is all you need day to day) ──
 npx degit niaodian/eos#eos-1.22.0 my-app   # create new project
+node .github/eos/eos.mjs init                       # what is declared, the two tracks, the starter packs
+node .github/eos/eos.mjs init <pack> --write        # declare it (config-only until the stack is decided; --track regulated)
 node .github/eos/eos.mjs init --write               # local VS Code tasks (never overwrites)
 node .github/eos/eos.mjs next                       # the ONE next action, why, how to start it
 node .github/eos/eos.mjs resume                     # new session? pick up where you stopped
 node .github/eos/eos.mjs check --gate <id> --scope <id>   # prove a step, record the evidence
 node .github/eos/eos.mjs transition --scope story --id <id> --to <STATE>
 node .github/eos/eos.mjs explain <gate>             # the full rule set for one gate, on demand
+node .github/eos/eos.mjs release keygen --write     # once: the release signing key (private half stays outside the repo)
+node .github/eos/eos.mjs release bind|sign|verify --release <id>   # bind artifacts + SBOM + ledger head; sign; verify
+node .github/eos/eos.mjs policy sync --check        # what the organisation baseline would change
+node .github/eos/eos.mjs report --format markdown   # governance report: gates, waivers, SBOM, signatures
+npx --offline eos <command>                         # the same CLI, shorter (npm 10.9+)
 node .github/hooks/validate-config.mjs              # config self-check (expect PASS)
 npm test                                            # run tests (same as quality gate)
 npm audit                                           # dependency audit before release
