@@ -24,6 +24,7 @@ import { readManifest, manifestPath, manifestDigest as computeManifestDigest, li
 import { loadProviders, consult } from './adapters/contract.mjs';
 import { syncWorkspaceRule } from './lib/workspace-rule.mjs';
 import { generateDocs } from './lib/docgen.mjs';
+import { testDurationTrend } from './lib/test-history.mjs';
 import { planMigration, applyMigration, compatibilityErrors } from './lib/migrate.mjs';
 import { buildSbom, sbomFreshness, sbomDigest, SBOM_PATH } from './lib/sbom.mjs';
 import { PACKS, packDeclaration, packIds } from './lib/packs.mjs';
@@ -419,6 +420,9 @@ const commands = {
     const recent = gateEvents.slice(-20);
     const rate = (list) => (list.length ? Math.round((list.filter((e) => e.status === 'PASS').length / list.length) * 100) : null);
     const trend = { total: gateEvents.length, allTimePassRate: rate(gateEvents), recentPassRate: rate(recent), recentWindow: recent.length };
+    // Local only: this machine's suite timings, from run-tests.mjs. The enforced number is the CI
+    // baseline; this answers "is it getting slower here, and since when?".
+    const testDurations = testDurationTrend(snapshot.root);
 
     // --- remote governance: what EOS could not verify by itself
     const { providers, errors: providerErrors } = loadProviders(snapshot.root);
@@ -444,6 +448,7 @@ const commands = {
       remoteGovernance: remote,
       releases,
       trend,
+      testDurations,
       stories: snapshot.stories.map((s) => ({ id: s.id, state: scopeState(snapshot, 'story', s.id) })),
     };
 
@@ -481,6 +486,15 @@ const commands = {
     lines.push('');
     lines.push('Gate trend',
       trend.total ? `  ${trend.total} gate run(s) recorded · first-pass rate ${trend.allTimePassRate}% all time · ${trend.recentPassRate}% over the last ${trend.recentWindow}` : '  no gate has been run yet');
+    lines.push('');
+    lines.push('Test duration trend (this machine)');
+    if (!testDurations.runs) lines.push('  no local history yet — run `node .github/eos/run-tests.mjs` to start one');
+    for (const [name, d] of Object.entries(testDurations.layers)) {
+      const change = d.changePct === null
+        ? `${d.samples} run(s) so far — a trend needs 6`
+        : `${d.changePct >= 0 ? '+' : ''}${d.changePct}% vs the previous 5 runs`;
+      lines.push(`  ${name.padEnd(18)} latest ${String(d.latestMs).padStart(6)}ms · median ${String(d.recentMedianMs).padStart(6)}ms · ${change}`);
+    }
     lines.push('');
     emit(flags, json, lines.join('\n'));
     // Health REPORTS; it does not gate. Exit stays 0 unless the state source itself is broken, so

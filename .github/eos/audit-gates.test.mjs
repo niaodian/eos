@@ -12,7 +12,6 @@ import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, rmSync, existsSync, symlinkSync, chmodSync, realpathSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { spawnSync } from 'node:child_process';
 import {
   project, write, run, runJson, cleanup, git, commitAll, story, releaseFiles,
   APP_PROJECT, PRD_2AC, baselineFiles, storyFiles, testRun, treeDigest, DISCOVERY_RECORD,
@@ -26,6 +25,7 @@ import {
   prdAcceptanceCriteria, parseOpsDecision, opsDecisionProblem,
   verifiedStory, mergeRefused,
 } from './audit-support.mjs';
+import { boundedSpawnSync } from './test-spawn.mjs';
 
 after(cleanup);
 
@@ -64,7 +64,7 @@ test('EOS-AUD-002: DEGRADED warns but does not fail; only a skill that cannot ac
   // happens to have skills installed — the coupling that turned a green tree red in CI once already.
   const doctor = (dir) => {
     const home = mkdtempSync(join(tmpdir(), 'eos-nohome-'));
-    const r = spawnSync(process.execPath, [join(REPO_ROOT, '.github/hooks/eos-doctor.mjs'), '--deep'], {
+    const r = boundedSpawnSync(process.execPath, [join(REPO_ROOT, '.github/hooks/eos-doctor.mjs'), '--deep'], {
       cwd: dir, encoding: 'utf8', env: { ...process.env, HOME: home, USERPROFILE: home },
     });
     rmSync(home, { recursive: true, force: true });

@@ -48,6 +48,11 @@ jobs:
     timeout-minutes: 20
     permissions:
       contents: read
+    env:
+      # Which recorded baseline in .eos/test-budget.json this runner is compared against. A layer
+      # more than baselineTolerance slower than it fails as DRIFT — the slow creep an absolute budget
+      # cannot see. Baselines are per environment because a laptop's timings say nothing about CI's.
+      EOS_TEST_BASELINE_ENV: ci-linux
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

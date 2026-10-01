@@ -7,16 +7,16 @@
 //  visible + machine-enforced instead of relying on ad-hoc manual verification.]
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { boundedSpawnSync } from '../eos/test-spawn.mjs';
 
 const HOOK = join(dirname(fileURLToPath(import.meta.url)), 'deny-dangerous.js');
 
 // Run the REAL hook with a crafted PreToolUse payload and return its permission decision.
 function decision(command) {
   const input = JSON.stringify({ tool_name: 'runInTerminal', tool_input: { command } });
-  const r = spawnSync(process.execPath, [HOOK], { input, encoding: 'utf8' });
+  const r = boundedSpawnSync(process.execPath, [HOOK], { input, encoding: 'utf8' });
   assert.equal(r.status, 0, `hook process exited ${r.status}: ${r.stderr}`);
   const out = JSON.parse(r.stdout || '{}');
   return out?.hookSpecificOutput?.permissionDecision ?? 'allow';

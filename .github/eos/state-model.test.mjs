@@ -10,6 +10,7 @@ import { project, write, run, runJson, cleanup, APP_PROJECT, PRD_2AC, story, EOS
 import { validate } from './lib/schema.mjs';
 import { loadWorkflow, loadGates, loadAgentMap } from './lib/registry.mjs';
 import { readSnapshot, gateCollections, parsePorcelain } from './lib/state.mjs';
+import { testDurationTrend } from './lib/test-history.mjs';
 import { legalTransitions, planTransition } from './lib/transitions.mjs';
 import { readEvents, appendEvent, verifyChain, stateOf } from './lib/ledger.mjs';
 import { evidenceFreshness } from './lib/evidence.mjs';
@@ -405,4 +406,25 @@ test('a real modified governance file is detected end to end', () => {
   writeFileSync(join(dir, 'docs/prd.md'), PRD_2AC + '\nedited\n', 'utf8');
   const snap = readSnapshot(dir);
   assert.ok(snap.changedFiles.includes('docs/prd.md'), JSON.stringify(snap.changedFiles));
+});
+
+// ---------------------------------------------------------------- local test-duration trend (#14)
+test('the test-duration trend compares medians of the last five runs with the five before', () => {
+  const dir = project({ '.eos/project.json': APP_PROJECT }, { git: false });
+  const lines = [];
+  for (let i = 0; i < 10; i += 1) lines.push(JSON.stringify({ ts: `2026-01-0${i}`, layers: { unit: i < 5 ? 1000 : 1500 } }));
+  write(dir, '.eos/local/test-history.jsonl', `${lines.join('\n')}\n`);
+  const t = testDurationTrend(dir);
+  assert.equal(t.runs, 10);
+  assert.equal(t.layers.unit.previousMedianMs, 1000);
+  assert.equal(t.layers.unit.recentMedianMs, 1500);
+  assert.equal(t.layers.unit.changePct, 50);
+});
+
+test('with too little history the trend says so instead of inventing a change', () => {
+  const dir = project({ '.eos/project.json': APP_PROJECT }, { git: false });
+  write(dir, '.eos/local/test-history.jsonl', `${JSON.stringify({ layers: { unit: 900 } })}\nnot json\n`);
+  const t = testDurationTrend(dir);
+  assert.equal(t.layers.unit.changePct, null, 'one run is not a trend');
+  assert.equal(t.runs, 1, 'a torn line is skipped, never fatal');
 });

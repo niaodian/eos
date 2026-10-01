@@ -6,17 +6,17 @@ import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync, cpSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { spawnSync } from 'node:child_process';
 import { project, baselineFiles, cleanup } from './test-support.mjs';
 import { renderCommandsLine, WORKSPACE_RULE } from './lib/workspace-rule.mjs';
 import { loadProjectConfig, stacksInProse } from '../hooks/lib/project-config.mjs';
+import { boundedSpawnSync } from './test-spawn.mjs';
 
 after(cleanup);
 
 const CLI = join(process.cwd(), '.github/eos/eos.mjs');
 const SHIPPED_RULE = join(process.cwd(), WORKSPACE_RULE);
 const run = (dir, args) => {
-  const r = spawnSync(process.execPath, [CLI, ...args], { cwd: dir, encoding: 'utf8' });
+  const r = boundedSpawnSync(process.execPath, [CLI, ...args], { cwd: dir, encoding: 'utf8' });
   return { code: r.status, out: (r.stdout || '') + (r.stderr || '') };
 };
 
@@ -70,7 +70,7 @@ test('stack sync: what it writes satisfies the checks that complain about this f
   for (const stack of stacksInProse(ruleText(dir)).keys()) {
     assert.ok(declared.includes(stack), `S14 would reject a rendered ${stack} command`);
   }
-  const validator = spawnSync(process.execPath, [join(process.cwd(), '.github/hooks/validate-config.mjs')], { cwd: dir, encoding: 'utf8' });
+  const validator = boundedSpawnSync(process.execPath, [join(process.cwd(), '.github/hooks/validate-config.mjs')], { cwd: dir, encoding: 'utf8' });
   assert.doesNotMatch((validator.stdout || '') + (validator.stderr || ''), /S14/);
 });
 

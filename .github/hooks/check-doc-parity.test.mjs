@@ -6,11 +6,11 @@
 // the "verify-don't-trust" proof (a green-but-never-red gate is worse than no gate).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { boundedSpawnSync } from '../eos/test-spawn.mjs';
 
 const GATE = join(dirname(fileURLToPath(import.meta.url)), 'check-doc-parity.mjs');
 const BANNER = '> 🌐 英文为参照语言 (English is the reference language).';
@@ -39,7 +39,7 @@ function makeFixture(mutate) {
 function runGate(mutate) {
   const dir = makeFixture(mutate);
   try {
-    const r = spawnSync(process.execPath, [GATE], { cwd: dir, encoding: 'utf8' });
+    const r = boundedSpawnSync(process.execPath, [GATE], { cwd: dir, encoding: 'utf8' });
     return { status: r.status, out: (r.stdout || '') + (r.stderr || '') };
   } finally {
     rmSync(dir, { recursive: true, force: true });

@@ -5,12 +5,12 @@
 //  (or go test / cargo test / dotnet test) could never turn EOS CI red.]
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { parseCommand, commandList, detectStacks, loadProjectConfig } from './lib/project-config.mjs';
+import { boundedSpawnSync } from '../eos/test-spawn.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const HOOK = join(HERE, 'project-gate.mjs');
@@ -27,7 +27,7 @@ function project(files) {
   return dir;
 }
 const run = (dir, args = []) => {
-  const r = spawnSync(process.execPath, [HOOK, ...args], { cwd: dir, encoding: 'utf8' });
+  const r = boundedSpawnSync(process.execPath, [HOOK, ...args], { cwd: dir, encoding: 'utf8' });
   return { code: r.status, out: (r.stdout || '') + (r.stderr || '') };
 };
 
@@ -280,7 +280,7 @@ test('validate-config S12 mirrors project-gate: node-only WARNs, other stacks ER
     'docs/eos/activation.md': '# ledger\n',
   };
   const runValidator = (files) => {
-    const r = spawnSync(process.execPath, [VALIDATOR], { cwd: project({ ...base, ...files }), encoding: 'utf8' });
+    const r = boundedSpawnSync(process.execPath, [VALIDATOR], { cwd: project({ ...base, ...files }), encoding: 'utf8' });
     return { code: r.status, out: (r.stdout || '') + (r.stderr || '') };
   };
 

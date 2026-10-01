@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { SPAWN_TIMEOUT_MS, assertNotTimedOut, cleanEnv } from './test-spawn.mjs';
 
 export const EOS_DIR = dirname(fileURLToPath(import.meta.url));
 export const REPO_ROOT = join(EOS_DIR, '..', '..');
@@ -21,10 +22,10 @@ const sandboxes = [];
 // WHERE (the sandbox is preserved for inspection), and WHY it was killed, because a bare
 // "ETIMEDOUT" makes the next person reproduce the hang before they can even start debugging.
 //
-// EOS_TEST_SPAWN_TIMEOUT_MS overrides the per-process budget (slow CI runners, a debugger attached).
-// EOS_TEST_PROFILE=1 prints where the suite's wall time actually went, so a performance
+// The timeout itself and the diagnosis on expiry live in test-spawn.mjs, shared with the hook
+// suites. EOS_TEST_PROFILE=1 prints where the suite's wall time actually went, so a performance
 // regression is a number someone can point at rather than an impression.
-export const SPAWN_TIMEOUT_MS = Number(process.env.EOS_TEST_SPAWN_TIMEOUT_MS || 60000);
+export { SPAWN_TIMEOUT_MS };
 
 const profile = { git: { n: 0, ms: 0 }, cli: { n: 0, ms: 0 }, fixture: { n: 0, ms: 0 } };
 
@@ -34,20 +35,6 @@ function timed(bucket, fn) {
     profile[bucket].n += 1;
     profile[bucket].ms += Date.now() - started;
   }
-}
-
-/** Turn a timed-out subprocess into a diagnosis instead of an opaque failure. */
-function assertNotTimedOut(r, { what, cwd }) {
-  if (!r.error) return r;
-  if (r.error.code === 'ETIMEDOUT' || r.signal === 'SIGTERM') {
-    throw new Error(
-      `EOS test harness: \`${what}\` exceeded ${SPAWN_TIMEOUT_MS}ms and was killed.\n` +
-      `  sandbox : ${cwd}   (kept on disk for inspection)\n` +
-      '  raise the budget with EOS_TEST_SPAWN_TIMEOUT_MS if the runner is simply slow;\n' +
-      '  otherwise this is a real hang — run the command above in that directory to reproduce it.',
-    );
-  }
-  return r;
 }
 
 if (process.env.EOS_TEST_PROFILE) {
@@ -109,7 +96,7 @@ const GIT_ENV = {
 };
 
 export function git(dir, args) {
-  const r = timed('git', () => spawnSync('git', args, { cwd: dir, encoding: 'utf8', timeout: SPAWN_TIMEOUT_MS, env: { ...process.env, ...GIT_ENV } }));
+  const r = timed('git', () => spawnSync('git', args, { cwd: dir, encoding: 'utf8', timeout: SPAWN_TIMEOUT_MS, env: cleanEnv({ ...process.env, ...GIT_ENV }) }));
   assertNotTimedOut(r, { what: `git ${args.join(' ')}`, cwd: dir });
   return { code: r.status, out: (r.stdout || '') + (r.stderr || '') };
 }
@@ -139,7 +126,7 @@ export function run(dir, args = [], env = {}) {
     cwd: dir,
     encoding: 'utf8',
     timeout: SPAWN_TIMEOUT_MS,
-    env: { ...process.env, EOS_ACTOR: 'tester', ...env },
+    env: cleanEnv({ ...process.env, EOS_ACTOR: 'tester', ...env }),
   }));
   assertNotTimedOut(r, { what: `eos ${args.join(' ')}`, cwd: dir });
   return { code: r.status, out: (r.stdout || '') + (r.stderr || ''), stdout: r.stdout || '' };
