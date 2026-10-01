@@ -48,6 +48,8 @@ usage: node .github/eos/eos.mjs <command> [flags]
   sbom [--write] [--check]                software bill of materials, bound to the tree
   policy [diff|lock|check] [--against <ref>] [--write] [--reason <text>]
                                           no gate gets weaker without a reason and a second person
+  policy export --name <org> --version <v> [--sign --key <file>] [--out <file>] | policy sync [--check]
+                                          publish an organisation baseline / vendor it (the only networked command)
   migrate [--apply]                       governance file versions; plan first, then apply
   docs [--write] [--check]                regenerate the docs that restate the policy
   health                                  blockers, stale evidence, waivers, trend — one screen
