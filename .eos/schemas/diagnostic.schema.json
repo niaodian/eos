@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/niaodian/eos/.eos/schemas/diagnostic.schema.json",
+  "title": "EOS diagnostic report",
+  "description": "What an EOS tool writes to stdout with --json: one verdict, the problems behind it, and the command that reproduces it. The problem item is the same one `eos check --json` uses for a gate's failing checks, so every EOS verdict is read the same way. (ADR-010)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "tool", "status", "exitCode", "summary", "problems", "rerunCommand"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "tool": { "enum": ["project-gate", "eos-doctor"], "description": "The tool that produced the report." },
+    "status": {
+      "enum": ["PASS", "NOT_APPLICABLE", "FAIL", "BLOCKED", "ERROR"],
+      "description": "PASS: verified. NOT_APPLICABLE: nothing was verified because there is nothing to verify — never read it as PASS. FAIL: checked, and wrong. BLOCKED: could not be checked because a precondition is missing (for example a toolchain). ERROR: the configuration itself could not be evaluated. Worst first: ERROR > BLOCKED > FAIL, the gate engine's order."
+    },
+    "exitCode": { "type": "integer", "minimum": 0, "description": "The process exit code. --json never changes it: 0 for PASS and NOT_APPLICABLE, 1 otherwise." },
+    "summary": { "type": "string", "minLength": 1, "description": "The verdict line the human mode prints." },
+    "scope": { "$ref": "#/$defs/scope" },
+    "problems": { "type": "array", "items": { "$ref": "#/$defs/problem" } },
+    "notes": { "type": "array", "items": { "type": "string" }, "description": "Facts that are neither problems nor the verdict (steps not declared, what was skipped)." },
+    "rerunCommand": { "type": "string", "minLength": 1, "description": "The command that reproduces this verdict." },
+    "details": { "type": "object", "description": "Tool-specific facts. Open by design: everything a consumer needs to act on is in the fields above." }
+  },
+  "$defs": {
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "id"],
+      "properties": {
+        "type": { "enum": ["product", "story", "release"] },
+        "id": { "type": "string", "minLength": 1 }
+      }
+    },
+    "problem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["level", "code", "message"],
+      "properties": {
+        "level": { "enum": ["error", "warning"], "description": "error: this problem decides the verdict. warning: reported, never blocking." },
+        "code": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9-]*$", "description": "A stable identifier: a validator code (P3, D5, S13) or a gate check id (tests-executed)." },
+        "message": { "type": "string", "minLength": 1 },
+        "status": { "enum": ["FAIL", "BLOCKED", "PENDING", "STALE", "DEFERRED", "ERROR"], "description": "The verdict this problem implies. Present on every error." },
+        "gate": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$", "description": "The gate whose check this is, when the problem comes from a gate." },
+        "scope": { "$ref": "#/$defs/scope" },
+        "artifact": { "type": ["string", "null"], "description": "The file the problem is about, when there is one." },
+        "fix": { "type": "string", "minLength": 1, "description": "The minimum corrective action." },
+        "rerunCommand": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

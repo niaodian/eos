@@ -30,6 +30,7 @@ import { lastGateEvent } from './ledger.mjs';
 import { readIntent } from './record.mjs';
 import { findWaiver, expiredWaivers } from './waivers.mjs';
 import { AC_ID, opsDecisionProblem } from './story.mjs';
+import { loadSchema, validate } from './schema.mjs';
 
 export const STATUSES = ['PASS', 'FAIL', 'BLOCKED', 'PENDING', 'WAIVED', 'NOT_APPLICABLE', 'STALE', 'DEFERRED', 'ERROR'];
 export const SEVERITY = { ERROR: 7, BLOCKED: 6, FAIL: 5, STALE: 4, DEFERRED: 3, PENDING: 2, WAIVED: 1, NOT_APPLICABLE: 0, PASS: 0 };
@@ -71,16 +72,51 @@ export const repoFileExists = (root, rel) => insideRepo(root, rel) && existsSync
 export const WORKSPACE_RULE = '.github/instructions/00-workspace.instructions.md';
 export const PROVISIONAL_STACK = /⛳\s*PROVISIONAL/;
 
+// Bounded, but far above what a real test suite prints.
+const HOOK_MAX_BUFFER = 64 * 1024 * 1024;
+
 /** Run a bundled validator, recording the real argv + exit code into the evidence. */
 export function runHook(ctx, relScript, args = []) {
   const full = join(ctx.root, relScript);
   if (!existsSync(full)) return { status: 'BLOCKED', detail: `${relScript} is not present in this repository — the check cannot be proven`, command: null };
   const argv = [process.execPath, full, ...args];
-  const r = spawnSync(argv[0], argv.slice(1), { cwd: ctx.root, encoding: 'utf8' });
+  // Node buffers 1 MB per stream by default and kills the child past it (ENOBUFS). A hook that runs
+  // the product's tests carries their output, so a verbose suite turned its own PASS into ERROR.
+  const r = spawnSync(argv[0], argv.slice(1), { cwd: ctx.root, encoding: 'utf8', maxBuffer: HOOK_MAX_BUFFER });
   const out = (r.stdout || '') + (r.stderr || '');
   const command = { argv: [posix(relScript), ...args], exitCode: r.status ?? null, detail: out.split('\n').filter(Boolean).slice(-3).join(' / ').slice(0, 400) };
   if (r.error) return { status: 'ERROR', detail: `${relScript} could not be executed: ${r.error.message}`, command };
-  return { status: r.status === 0 ? 'PASS' : 'FAIL', detail: command.detail, out, command, exitCode: r.status };
+  return { status: r.status === 0 ? 'PASS' : 'FAIL', detail: command.detail, out, stdout: r.stdout || '', command, exitCode: r.status };
+}
+
+export const PROJECT_GATE = '.github/hooks/project-gate.mjs';
+
+/**
+ * Run the product-quality gate and read its VERDICT, not its prose. (ADR-010)
+ *
+ * BLOCKED vs FAIL used to be decided by searching the hook's output for the word "BLOCKED". That
+ * output includes the product's own tests, so a failing test that printed "BLOCKED" was reported as
+ * a missing toolchain, and the developer was sent to install something instead of fixing a test.
+ * --json returns the verdict as data. Anything that is not a valid report is ERROR: a hook too old
+ * to speak the contract must not be read as a pass.
+ *
+ * @returns {{status: string, detail: string, command: object|null, exitCode?: number, report?: object}}
+ */
+export function runProjectGate(ctx) {
+  const r = runHook(ctx, PROJECT_GATE, ['--skip-install', '--json']);
+  if (!r.command || r.status === 'ERROR') return r;
+  let report = null;
+  try { report = JSON.parse(r.stdout); } catch { /* not a report — handled below */ }
+  const { schema, error } = loadSchema(ctx.root, 'diagnostic.schema.json');
+  const problems = !report
+    ? [`its output is not a JSON report — is ${PROJECT_GATE} older than the engine? Upgrade .github/hooks/ together with .github/eos/`]
+    : error ? [error] : validate(schema, report, { label: 'project-gate --json' }).errors;
+  if (!problems.length && report.exitCode !== r.exitCode) problems.push(`it reported exit code ${report.exitCode} but exited ${r.exitCode}`);
+  if (problems.length) {
+    return { status: 'ERROR', detail: `${PROJECT_GATE} did not produce a valid diagnostic report: ${problems.slice(0, 3).join('; ')}`, command: r.command, exitCode: r.exitCode };
+  }
+  const first = report.problems.find((p) => p.level === 'error');
+  return { status: report.status, detail: first ? first.message : report.summary, command: r.command, exitCode: r.exitCode, report };
 }
 
 /**

@@ -136,6 +136,29 @@ function diagnosticContext(snapshot, def, scopeType, scopeId, changeType, policy
 }
 
 /**
+ * A gate's failing checks as diagnostic problems (.eos/schemas/diagnostic.schema.json), so a gate
+ * and a hook report what is wrong in one shape: the check id is the code, its detail the message,
+ * its fix the minimum corrective action. A check that passed, or does not apply, is not a problem.
+ * (ADR-010)
+ */
+export function gateProblems(result) {
+  const scope = { type: result.scopeType, id: String(result.scopeId) };
+  return (result.checks || [])
+    .filter((c) => !['PASS', 'NOT_APPLICABLE'].includes(c.status))
+    .map((c) => ({
+      level: 'error',
+      code: c.id,
+      status: c.status,
+      message: c.detail || c.title || c.id,
+      gate: result.gate,
+      scope,
+      ...(c.artifact !== undefined ? { artifact: c.artifact } : {}),
+      ...(c.fix ? { fix: c.fix } : {}),
+      ...(result.rerunCommand ? { rerunCommand: result.rerunCommand } : {}),
+    }));
+}
+
+/**
  * Run a gate for real and BUILD its evidence — without writing anything.
  *
  * Writing is deliberately not done here. A gate run produces two things that are only meaningful

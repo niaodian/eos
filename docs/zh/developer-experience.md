@@ -331,8 +331,11 @@ BMAD Skill 链。开发者永远不需要从 73 个已安装 Skill 中挑选。
 ```
 
 规则：一个动作 → 一个主 Agent；Skill 列表保持最小；被引用的 Agent 文件或 Prompt 文件不存在时，该动作
-变为 `BLOCKED` 并给出安装/替代路径（由 `eos doctor` 报告），而不是静默推荐一个用不了的东西。这张映射表
-面向人类的投影是 [agent-map.md](agent-map.md)；Router 读取的是 JSON。
+变为 `BLOCKED` 并给出安装/替代路径（由 `eos doctor` 报告），而不是静默推荐一个用不了的东西。Router 读取的
+是 JSON；[generated/actions.md](generated/actions.md) 是它的投影，由 `eos docs` 以中英文生成并在 CI
+中校验；[agent-map.md](agent-map.md) 是按阶段人工整理的概览。Prompt、Agent 文件、Instructions 与交接
+说明中引用的每个门禁、命令、状态、迁移、Prompt、Agent 和脚本都必须在策略中存在，否则
+`validate-config` S15 会让构建失败（[ADR-011](../adr/011-prompts-cite-only-the-policy.md)）。
 
 ## 9. 交接上下文包
 
@@ -403,6 +406,43 @@ Done when
 
 `next` 与 `resume` 在存在 Blocker 时刻意退出 2，这样脚本或任务无需解析文本就能区分
 "有东西要解除阻断"和"可以继续前进"。
+
+### 10.2 诊断报告（`--json`）
+
+EOS 的每个判定都能以数据形式读取，而且只有一种形状（[ADR-010](../adr/010-one-diagnostic-contract.md)）：
+
+- `eos check --json` 与 `eos verify-release --json` 在 `problems[]` 中列出门禁未通过的检查项。
+- `node .github/hooks/project-gate.mjs --json` 与 `node .github/hooks/eos-doctor.mjs --json` 向 stdout
+  写出一份符合 `.eos/schemas/diagnostic.schema.json` 的报告。所有给人读的内容，包括产品自身的测试输出，
+  都改写到 stderr。
+
+```json
+{
+  "schemaVersion": 1,
+  "tool": "project-gate",
+  "status": "FAIL",
+  "exitCode": 1,
+  "summary": "FAIL: 1 error(s), 0 warning(s)",
+  "scope": { "type": "product", "id": "product" },
+  "problems": [
+    { "level": "error", "code": "P3", "status": "FAIL", "message": "test FAIL: npm test exited 1" }
+  ],
+  "rerunCommand": "node .github/hooks/project-gate.mjs --skip-install"
+}
+```
+
+| `status` | 含义 | Hook 退出码 |
+|---|---|---|
+| `PASS` | 已验证 | 0 |
+| `NOT_APPLICABLE` | 没有可验证的内容——绝不能当作 PASS | 0 |
+| `FAIL` | 已检查，且不合格 | 1 |
+| `BLOCKED` | 无法检查：缺少前置条件（工具链、技能） | 1 |
+| `ERROR` | 配置本身无法评估 | 1 |
+
+`--json` 从不改变 Hook 的退出码；由 status 说明是哪一种非零。编码：project-gate 的 `P0` 声明无效 ·
+`P1` 仓库内容与声明不符 · `P2` 缺少 eval 命令 · `P3` 命令执行失败 · `P4` 命令无法运行。eos-doctor 沿用
+`D0`–`D6`。每个 problem 都带有 `level`、`code`、`message`，并在适用时带上 `status`、`gate`、`scope`、
+`artifact`、`fix` 与 `rerunCommand`。
 
 ## 11. 诚实的能力边界（VS Code + Copilot）
 

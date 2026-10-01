@@ -11,7 +11,7 @@ tools: ['search', 'runCommands']
    `node .github/eos/eos.mjs next --all`.
 2. Print the six blocks — `Current`, `Blockers`, `Recommended next`, `Why`, `Start`, `Done when` —
    using **only** values from the JSON. Do not add advice the machine did not produce.
-3. Offer the handoff that matches `recommendedAction.copilotAgent`, or name the `/prompt` to run,
+3. Offer the handoff that matches `recommendedAction.copilotAgent`, or name the slash command to run (`/<prompt>`),
    or print `recommendedAction.command` verbatim. Say plainly that EOS cannot switch the agent for
    you — that click is the developer's.
 4. If `blockers` is non-empty, list each as `gate/check — detail` with its `fix`, in that order.

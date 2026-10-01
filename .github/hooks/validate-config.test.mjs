@@ -303,3 +303,86 @@ test('the requirement is data, so any profile can declare it', () => {
   assert.equal(wf.profiles.regulated.requiresCompliance, true, 'the shipped regulated profile declares it');
   for (const name of ['prototype', 'standard-product', 'controlled']) assert.notEqual(wf.profiles[name].requiresCompliance, true, `${name} must not demand it`);
 });
+
+// ---------------------------------------------------------------- S15 prompts cite only the policy
+// Prompts, agents and instructions tell agents what to run. A name they cite that the policy does
+// not define sends an agent to nothing, while every other check stays green. [#10, ADR-011]
+const S15 = (out) => out.split('\n').filter((l) => l.includes('S15'));
+
+test('S15: a prompt citing a gate that does not exist fails, and says what does', () => {
+  const { code, out } = run(repo(({ write }) => write('.github/prompts/drift.prompt.md',
+    '---\ndescription: drifted\n---\nRun `node .github/eos/eos.mjs check --gate design-ready --scope STORY-001`.\n')));
+  assert.equal(code, 1, out);
+  assert.match(S15(out).join('\n'), /drift\.prompt\.md:4: cites gate "design-ready", which \.eos\/gates\.json does not define/);
+});
+
+test('S15: unknown commands, states, transitions, prompts, agents and scripts are each named', () => {
+  const { code, out } = run(repo(({ write }) => write('.github/instructions/drift.instructions.md', [
+    '---', 'applyTo: "**/*.drift"', '---',
+    'Then run `eos frobnicate`.',
+    'Move it with `eos transition --scope story --id STORY-001 --to SHIPPED`.',
+    'A story goes DRAFT → MERGED once reviewed.',
+    'Use /ghost-prompt for the rest, and hand off to the `eos-ghost` agent.',
+    'The validator is `node .github/hooks/ghost.mjs`. Release at G42.',
+    '',
+  ].join('\n'))));
+  assert.equal(code, 1, out);
+  const lines = S15(out).join('\n');
+  assert.match(lines, /drift\.instructions\.md:4: cites `eos frobnicate`, which is not an EOS command/);
+  assert.match(lines, /:5: cites --to SHIPPED for a story, which is not a state of the story machine/);
+  assert.match(lines, /:6: describes DRAFT → MERGED, which is not a transition/);
+  assert.match(lines, /:7: cites \/ghost-prompt, but \.github\/prompts\/ghost-prompt\.prompt\.md does not exist/);
+  assert.match(lines, /:7: hands off to agent "eos-ghost"/);
+  assert.match(lines, /:8: cites \.github\/hooks\/ghost\.mjs, which does not exist/);
+  assert.match(lines, /:8: cites G42, which is neither a gate code/);
+});
+
+test('S15: renaming a gate in the policy fails every prompt that still cites the old name', () => {
+  // The drift this check exists for: the policy moves, the prose does not.
+  const { code, out } = run(repo(({ read, write }) => {
+    const gates = read('.eos/gates.json');
+    gates.gates.find((g) => g.id === 'story-ready').id = 'story-approved';
+    write('.eos/gates.json', gates);
+    const wf = read('.eos/workflow.json');
+    write('.eos/workflow.json', JSON.parse(JSON.stringify(wf).replaceAll('"story-ready"', '"story-approved"')));
+  }));
+  assert.equal(code, 1, out);
+  // Not a typo, so no "did you mean": story-approved is too far from story-ready to guess.
+  assert.match(S15(out).join('\n'), /eos-plan\.agent\.md:\d+: cites gate "story-ready", which \.eos\/gates\.json does not define/);
+});
+
+test('S15: a gate code the method uses is valid only while a gate declares it enforces it', () => {
+  // G6 and G-EVAL have no gate of their own: `verified` declares them. Remove the declaration and
+  // every prompt citing them is citing nothing.
+  const { code, out } = run(repo(({ read, write }) => {
+    const gates = read('.eos/gates.json');
+    delete gates.gates.find((g) => g.id === 'verified').enforces;
+    write('.eos/gates.json', gates);
+  }));
+  assert.equal(code, 1, out);
+  const lines = S15(out).join('\n');
+  assert.match(lines, /cites G6, which is neither a gate code/);
+  assert.match(lines, /cites G-EVAL, which is neither a gate code/);
+});
+
+test('S13: a gate cannot claim to enforce a code through a check it does not have', () => {
+  const { code, out } = run(repo(({ read, write }) => {
+    const gates = read('.eos/gates.json');
+    gates.gates.find((g) => g.id === 'verified').enforces[0].checks = ['no-such-check'];
+    gates.gates.find((g) => g.id === 'release-ready').enforces = [{ code: 'G7', title: 'a gate code that is already a gate', checks: ['secret-scan'] }];
+    write('.eos/gates.json', gates);
+  }));
+  assert.equal(code, 1, out);
+  assert.match(out, /S13 \.eos\/gates\.json: gate "verified" enforces G6 through check "no-such-check", which it does not have/);
+  assert.match(out, /S13 \.eos\/gates\.json: gate "release-ready" declares it enforces G7, which is already the code of gate "verified"/);
+});
+
+test('S15: an agent-map handoff that cites a command that does not exist fails', () => {
+  const { code, out } = run(repo(({ read, write }) => {
+    const am = read('.eos/agent-map.json');
+    am.actions['write-prd'].handoff = 'Write the PRD, then run `eos chekc --gate prd-ready`.';
+    write('.eos/agent-map.json', am);
+  }));
+  assert.equal(code, 1, out);
+  assert.match(S15(out).join('\n'), /\.eos\/agent-map\.json#write-prd: cites `eos chekc`, which is not an EOS command — did you mean "check"\?/);
+});

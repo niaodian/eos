@@ -5,6 +5,7 @@ import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { loadProjectConfig, detectStacks, stacksInProse, complianceRequirementProblem, PROJECT_CONFIG_PATH } from './lib/project-config.mjs';
 import { loadWorkflow, loadGates, loadAgentMap } from '../eos/lib/registry.mjs';
+import { alignmentVocabulary, checkAlignment } from '../eos/lib/alignment.mjs';
 
 const root = process.cwd();
 const errors = [];
@@ -209,6 +210,22 @@ if (wf.workflow && gt.gates) {
     }
   }
 }
+// S13 a code a gate declares it `enforces` must be enforced by a check that gate has, and must not
+// collide with a real gate's code or another gate's claim — otherwise S15 would accept a citation
+// of a gate that nothing runs. [#10, ADR-011]
+if (gt.gates) {
+  const owner = new Map(gt.gates.gates.map((g) => [g.code, `the code of gate "${g.id}"`]));
+  for (const g of gt.gates.gates) {
+    const checks = new Set((g.checks || []).map((c) => c.id));
+    for (const e of g.enforces || []) {
+      if (owner.has(e.code)) errors.push(`S13 .eos/gates.json: gate "${g.id}" declares it enforces ${e.code}, which is already ${owner.get(e.code)}`);
+      else owner.set(e.code, `enforced by gate "${g.id}"`);
+      for (const c of e.checks) {
+        if (!checks.has(c)) errors.push(`S13 .eos/gates.json: gate "${g.id}" enforces ${e.code} through check "${c}", which it does not have`);
+      }
+    }
+  }
+}
 // S13 a profile that requires the compliance boundary cannot be selected without it. [#12]
 if (wf.workflow && proj.present && proj.config) {
   const problem = complianceRequirementProblem(proj.config, wf.workflow);
@@ -241,6 +258,25 @@ if (proj.present && proj.config && proj.config.projectType !== 'config-only') {
     for (const [stack, command] of stacksInProse(readFileSync(full, 'utf8'))) {
       if (declared.includes(stack)) continue;
       errors.push(`S14 ${rel}: the commands describe a ${stack} project (\`${command}\`) but ${PROJECT_CONFIG_PATH} declares ${declared.join(' + ')} — every agent reads this always-on rule instead of your ADR, so stale prose misdirects every session. Run \`node .github/eos/eos.mjs stack sync --write\` to render it from the declaration.`);
+    }
+  }
+}
+
+// S15 prompts, agents and instructions may cite only what the policy defines. They tell agents
+// what to run; a gate, command, state, transition, prompt, agent or script they name that does not
+// exist sends an agent to nothing while every other check stays green. The vocabulary is read from
+// the policy and the command registry, never restated. [#10, ADR-011]
+if (wf.workflow && gt.gates) {
+  let commandNames = null;
+  try {
+    commandNames = Object.keys((await import('../eos/commands/index.mjs')).commands);
+  } catch (e) {
+    errors.push(`S15 the EOS command registry (.github/eos/commands/index.mjs) could not be loaded, so command citations cannot be checked: ${e.message}`);
+  }
+  if (commandNames) {
+    const vocab = alignmentVocabulary(root, { gates: gt.gates, workflow: wf.workflow, commands: commandNames });
+    for (const p of checkAlignment(root, vocab, { agentMap: am.agentMap })) {
+      errors.push(`S15 ${p.file}${p.line ? `:${p.line}` : ''}: ${p.message}`);
     }
   }
 }

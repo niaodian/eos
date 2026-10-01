@@ -4,7 +4,7 @@
 import { mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { scopeState } from '../lib/state.mjs';
-import { prepareGateRun, evaluateGate, isBlocking } from '../lib/gates.mjs';
+import { prepareGateRun, evaluateGate, isBlocking, gateProblems } from '../lib/gates.mjs';
 import { recordGateRun } from '../lib/record.mjs';
 import { appendEvent } from '../lib/ledger.mjs';
 import { route } from '../lib/router.mjs';
@@ -185,7 +185,7 @@ export const releaseCommands = {
     const lines = [renderGate(result, { evidenceFile }),
       boundToCandidate ? `  evidence is bound to the candidate commit ${String(snapshot.commit).slice(0, 8)}` : '  BLOCKED: the evidence is not bound to a candidate commit (no git repository, or HEAD moved)',
       expired.length ? `  BLOCKED: ${expired.length} expired waiver(s)` : '', ''];
-    emit(flags, { release: id, status, boundToCandidate, expiredWaivers: expired.map((w) => w.file), result }, lines.filter(Boolean).join('\n'));
+    emit(flags, { release: id, status, boundToCandidate, expiredWaivers: expired.map((w) => w.file), result, problems: gateProblems(result) }, lines.filter(Boolean).join('\n'));
     return statusExit(status);
   },
 };
