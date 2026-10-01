@@ -312,6 +312,28 @@ export function acknowledgementProblem(ack) {
 }
 
 /**
+ * Has the policy moved since .eos/policy.lock.json was written, and what would recording it take?
+ *
+ * `policy check` answers this in CI, after the push. The developer who just switched a project
+ * from Regulated to Standard should hear it where they work: `eos next` and `eos status` call
+ * this. One digest in the common case; git is consulted only when the digest differs.
+ *
+ * @returns {null | {lockDigest:string, currentDigest:string, base:string|null, weakenings:string[], otherChanges:number}}
+ */
+export function policyDrift(root) {
+  const { present, lock } = readLock(root);
+  if (!present || !lock?.policyDigest) return null;
+  const current = readPolicy(root);
+  if (current.errors.length) return null;
+  const currentDigest = policyDigest(policySnapshot(current.files));
+  if (currentDigest === lock.policyDigest) return null;
+  const { changes, base } = policyChanges(root);
+  const covered = new Set((lock.acknowledged || []).filter((a) => !acknowledgementProblem(a)).map((a) => a.change));
+  const weakenings = changes.filter((c) => c.requiresAck && !covered.has(c.id)).map((c) => c.id);
+  return { lockDigest: lock.policyDigest, currentDigest, base: base?.label || null, weakenings, otherChanges: changes.length - weakenings.length };
+}
+
+/**
  * The CI check.
  * @returns {{ok:boolean, problems:string[], notes:string[], changes:object[], base:object|null}}
  */

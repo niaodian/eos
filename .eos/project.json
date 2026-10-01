@@ -1,5 +1,6 @@
 {
   "$schema": "./schemas/project.schema.json",
+  "templateDefault": true,
   "projectType": "application",
   "language": "en",
   "stacks": [
@@ -12,5 +13,5 @@
   "commands": {
     "test": "node .github/eos/run-tests.mjs"
   },
-  "rationale": "THIS REPOSITORY'S declaration, not a blank template line. EOS's product IS its engine: .github/eos/ is a zero-dependency Node program with a real test suite, so declaring \"config-only\" understated what lives here — and it meant EOS's own product-quality gate executed nothing while reporting green, the exact failure mode EOS exists to prevent. Declaring it honestly makes EOS run its own gate against its own code. IF YOU COPIED THIS TEMPLATE: this is the first file to edit. Set \"language\" to the BCP-47 tag you want agents to answer in (e.g. \"zh-CN\"), or remove it to mirror whatever language you write in. Replace \"stacks\" and \"commands\" with your own (see docs/eos/stack-presets.md) — commands.test is what the product-quality gate actually executes, and an \"application\" without it fails closed rather than passing vacuously. If your repo genuinely has no product code yet, set projectType to \"config-only\" and drop \"commands\"; the gate then reports NOT_APPLICABLE instead of PASS, so nobody reads governance-only green as \"the code is verified\". Building an LLM/agent product? Add \"agentic\" to productParadigms so the G-EVAL gate turns on. \"workflowProfile\" selects the gate policy in .eos/workflow.json; \"complianceProfile\": \"regulated\" turns the compliance boundary on early (docs/compliance-profile.json stays authoritative)."
+  "rationale": "THIS REPOSITORY'S declaration — EOS's own, not a blank template line. EOS's product IS its engine: .github/eos/ is a zero-dependency Node program with a real test suite, so EOS runs its own product-quality gate against its own code. IF YOU COPIED THIS TEMPLATE, this file describes EOS, not your project, and \"templateDefault\": true says so: run `node .github/eos/eos.mjs init` to see the governance tracks and starter packs, then `node .github/eos/eos.mjs init <pack> [--track standard|regulated] --write` to replace it with yours. Until you do, `eos next` asks for exactly that. \"workflowProfile\" selects the gate policy in .eos/workflow.json; \"complianceProfile\": \"regulated\" puts the project on the Regulated track (docs/compliance-profile.json stays authoritative for which regime applies)."
 }

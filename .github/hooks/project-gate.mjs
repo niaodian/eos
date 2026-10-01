@@ -148,6 +148,9 @@ function main() {
   let plan = null; // { mode, commands }
   let executed = 0; // quality steps actually run — 0 means nothing about the product was proven
 
+  if (present && config.templateDefault === true) {
+    warn('P1', `${PROJECT_CONFIG_PATH} is still the EOS template's own declaration — the commands below are EOS's, not your product's. Run \`node .github/eos/eos.mjs init\` to declare your project.`);
+  }
   if (present) {
     const mode = config.projectType;
     details.stacks = config.stacks;

@@ -17,7 +17,10 @@ import { PACKS, packDeclaration, packIds } from '../lib/packs.mjs';
 import { loadWaivers } from '../lib/waivers.mjs';
 import { writeFileAtomic } from '../lib/atomic.mjs';
 import { resolveAction } from '../lib/registry.mjs';
+import { TRACKS, TRACK_NAMES, trackOf, applyTrack } from '../lib/track.mjs';
 import { EXIT, emit } from './shared.mjs';
+
+const CLI = 'node .github/eos/eos.mjs';
 
 const VSCODE_TASKS = JSON.stringify({
   version: '2.0.0',
@@ -33,6 +36,122 @@ const VSCODE_TASKS = JSON.stringify({
     { id: 'eosScope', type: 'promptString', description: 'Scope id (for example STORY-012)', default: 'product' },
   ],
 }, null, 2) + '\n';
+
+// --------------------------------------------------------------------------------- declaring a project
+// The first thing a copy of the template does. The template ships EOS's own declaration (its test
+// command is EOS's own suite), marked "templateDefault": true; until it is replaced, `eos next`
+// asks for it. `init` shows the governance tracks and the starter packs and writes the choice.
+// (2.0, ADR-012)
+//
+// Deliberately not an application skeleton: EOS does not scaffold product code, and a half-maintained
+// app template inside a governance repository rots faster than anything else in it. What a newcomer
+// gets wrong is the declaration — an `application` with no `commands.test`, or a `config-only` that
+// should not be one — and both are silent. A declaration the project made is never overwritten
+// without --force; the template's own may be replaced, because it was never this project's.
+const LOCAL_FILES = [
+  { path: '.vscode/tasks.json', body: VSCODE_TASKS },
+  { path: '.eos/local/.gitkeep', body: '' },
+];
+
+function localFiles(root, write) {
+  const rows = [];
+  for (const f of LOCAL_FILES) {
+    const full = join(root, f.path);
+    if (existsSync(full)) { rows.push({ path: f.path, action: 'kept' }); continue; }
+    if (write) { mkdirSync(dirname(full), { recursive: true }); writeFileSync(full, f.body, 'utf8'); }
+    rows.push({ path: f.path, action: write ? 'created' : 'would create' });
+  }
+  return rows;
+}
+
+function currentDeclaration(root) {
+  const full = join(root, PROJECT_PATH);
+  if (!existsSync(full)) return { state: 'missing', declaration: null };
+  let declaration = null;
+  try { declaration = JSON.parse(readFileSync(full, 'utf8')); } catch { return { state: 'declared', declaration: null }; }
+  return { state: declaration?.templateDefault === true ? 'template' : 'declared', declaration };
+}
+
+const PROJECT_PATH = '.eos/project.json';
+const describe = (d) => `${d.projectType} · ${(d.stacks || []).join(', ') || 'no stack'} · ${trackOf(d).title} track (${d.workflowProfile || 'standard-product'})`;
+
+/**
+ *   eos init                                   what is declared, the tracks, the packs, the local files
+ *   eos init <pack> [--track standard|regulated] [--write] [--force]
+ *   eos new <pack> [--track …] [--write]       the same declaration, without the local files
+ */
+function declareProject(snapshot, flags, verb) {
+  const packId = flags._[1];
+  const track = typeof flags.track === 'string' ? flags.track : null;
+  if (flags.track !== undefined && !TRACK_NAMES.includes(track)) {
+    console.log(`unknown track "${flags.track === true ? '' : flags.track}" — choose standard | regulated`);
+    return EXIT.FAIL;
+  }
+  const { state, declaration: existing } = currentDeclaration(snapshot.root);
+
+  if (!packId) {
+    const files = verb === 'init' ? localFiles(snapshot.root, !!flags.write) : [];
+    const lines = [`EOS ${verb}`, '', 'Your project'];
+    if (state === 'missing') lines.push(`  ${PROJECT_PATH} does not exist yet — choose a track and a pack below.`);
+    else if (state === 'template') lines.push(`  ${PROJECT_PATH} is still the EOS template's own declaration — choose a track and a pack below.`);
+    else lines.push(`  declared — ${existing ? describe(existing) : 'unreadable; run eos doctor'}`);
+    lines.push('', 'Governance tracks');
+    for (const t of Object.values(TRACKS)) lines.push(`  ${t.name.padEnd(10)} ${t.title} — ${t.summary}`);
+    lines.push('', 'Starter packs (each writes a correct .eos/project.json; none scaffolds application code)');
+    for (const id of packIds()) lines.push(`  ${id.padEnd(16)} ${PACKS[id].title}`);
+    if (files.length) { lines.push('', 'Local files'); for (const r of files) lines.push(`  ${r.action.padEnd(12)} ${r.path}${r.action === 'kept' ? ' (already exists — never overwritten)' : ''}`); }
+    lines.push('');
+    if (state !== 'declared') lines.push(`  Declare it:  ${CLI} ${verb} <pack> --track standard|regulated --write`);
+    if (verb === 'init' && !flags.write) lines.push('  Nothing was written. Re-run with --write to create the local files.');
+    lines.push(`  Next:        ${CLI} next`, '');
+    emit(flags, {
+      declaration: state, tracks: Object.values(TRACKS).map(({ name, title, summary }) => ({ name, title, summary })),
+      packs: packIds().map((p) => ({ id: p, title: PACKS[p].title })),
+      ...(verb === 'init' ? { wrote: files.filter((r) => r.action === 'created').length, planned: LOCAL_FILES.map((p) => p.path) } : {}),
+    }, lines.join('\n'));
+    return EXIT.OK;
+  }
+
+  const pack = packDeclaration(packId);
+  if (!pack) { console.log(`unknown pack "${packId}" — known packs: ${packIds().join(', ')}`); return EXIT.FAIL; }
+  const declaration = applyTrack(pack, track);
+  const chosen = trackOf(declaration);
+  const lines = [`EOS ${verb} · ${packId} — ${PACKS[packId].title} · ${chosen.title} track`, ''];
+  if (state === 'declared' && !flags.force) {
+    lines.push(`  refused  ${PROJECT_PATH} already exists and declares this project (${existing ? describe(existing) : 'unreadable'}).`,
+      '  A project declaration is a decision this project has already made; replacing it would silently',
+      '  change which gates apply. Edit it by hand, or re-run with --force if you really mean to start over.', '');
+    emit(flags, { pack: packId, track: chosen.name, written: false, reason: 'declaration already exists', declaration }, lines.join('\n'));
+    return EXIT.FAIL;
+  }
+  const full = join(snapshot.root, PROJECT_PATH);
+  if (flags.write) { mkdirSync(dirname(full), { recursive: true }); writeFileAtomic(full, `${JSON.stringify(declaration, null, 2)}\n`); }
+  const files = verb === 'init' ? localFiles(snapshot.root, !!flags.write) : [];
+  lines.push(`  ${flags.write ? 'written' : 'would write'}  ${PROJECT_PATH}${state === 'template' ? '  (replaces the EOS template\'s own declaration)' : ''}`, '',
+    `  projectType      ${declaration.projectType}`,
+    `  stacks           ${declaration.stacks.join(', ')}`,
+    `  paradigms        ${declaration.productParadigms.join(', ')}`,
+    `  workflowProfile  ${declaration.workflowProfile}${declaration.complianceProfile ? `\n  complianceProfile ${declaration.complianceProfile} · evidencePolicy ${declaration.evidencePolicy}` : ''}`,
+    `  commands         ${Object.entries(declaration.commands).map(([k, v]) => `${k}: ${v}`).join('\n                   ')}`, '',
+    ...['Track', `  ${chosen.title} — ${chosen.summary}`, '  A release needs:', ...chosen.releaseRequires.map((r) => `    · ${r}`), '']);
+  for (const r of files) lines.push(`  ${r.action.padEnd(12)} ${r.path}`);
+  if (files.length) lines.push('');
+  if (PACKS[packId].notes.length) { lines.push('Before you rely on this'); for (const n of PACKS[packId].notes) lines.push(`  · ${n}`); lines.push(''); }
+  lines.push('Next',
+    '  1. Replace the commands above with what CI actually runs — an unrunnable command fails closed.',
+    `  2. ${CLI} stack sync --write   (put the stack in the always-on rule)`);
+  if (chosen.name === 'regulated') {
+    lines.push(`  3. ${CLI} release keygen       (the key your releases will be signed with)`,
+      '     node .github/hooks/eos-doctor.mjs        (release pre-flight: what a regulated release still lacks)',
+      `  4. ${CLI} next`);
+  } else {
+    lines.push(`  3. ${CLI} next                 (start the guided loop)`);
+  }
+  lines.push('');
+  if (!flags.write) lines.push('  Nothing was written. Re-run with --write to apply.', '');
+  emit(flags, { pack: packId, track: chosen.name, written: !!flags.write, replaced: state, declaration, notes: PACKS[packId].notes, localFiles: files }, lines.join('\n'));
+  return EXIT.OK;
+}
 
 export const maintenanceCommands = {
   /**
@@ -160,59 +279,9 @@ export const maintenanceCommands = {
     return EXIT.OK;
   },
 
-  /**
-   * Scaffold the project DECLARATION for a known shape of project.
-   *
-   * Deliberately not an application skeleton: EOS does not scaffold product code, and a
-   * half-maintained app template inside a governance repository rots faster than anything else in
-   * it. What a newcomer actually gets wrong is the declaration — an `application` with no
-   * `commands.test`, or a `config-only` that should not be one — and both of those are silent.
-   *
-   * Never overwrites. A declaration that already exists is the project's own decision.
-   */
+  /** The pack half of `eos init`: the declaration, without the local files. Kept for scripts. */
   new(snapshot, flags) {
-    const id = flags._[1];
-    if (!id) {
-      const lines = ['EOS starter packs', '', '  Each pack writes a correct .eos/project.json for a known shape of project.', '  It does NOT scaffold application code — use your ecosystem\'s own tool for that.', ''];
-      for (const packId of packIds()) lines.push(`  ${packId.padEnd(16)} ${PACKS[packId].title}`);
-      lines.push('', '  node .github/eos/eos.mjs new <pack> --write', '');
-      emit(flags, { packs: packIds().map((p) => ({ id: p, title: PACKS[p].title })) }, lines.join('\n'));
-      return EXIT.OK;
-    }
-    const declaration = packDeclaration(id);
-    if (!declaration) {
-      console.log(`unknown pack "${id}" — known packs: ${packIds().join(', ')}`);
-      return EXIT.FAIL;
-    }
-    const rel = '.eos/project.json';
-    const full = join(snapshot.root, rel);
-    const exists = existsSync(full);
-    const body = `${JSON.stringify(declaration, null, 2)}\n`;
-
-    const lines = [`EOS new · ${id} — ${PACKS[id].title}`, ''];
-    if (exists) {
-      lines.push(`  refused  ${rel} already exists.`,
-        '  A project declaration is a decision this project has already made; overwriting it would',
-        '  silently change which gates apply. Edit it by hand, or delete it first if you meant to',
-        '  start over.', '');
-      emit(flags, { pack: id, written: false, reason: 'declaration already exists', declaration }, lines.join('\n'));
-      return EXIT.FAIL;
-    }
-    if (flags.write) { mkdirSync(dirname(full), { recursive: true }); writeFileAtomic(full, body); }
-    lines.push(`  ${flags.write ? 'written' : 'would write'}  ${rel}`, '',
-      `  projectType      ${declaration.projectType}`,
-      `  stacks           ${declaration.stacks.join(', ')}`,
-      `  paradigms        ${declaration.productParadigms.join(', ')}`,
-      `  workflowProfile  ${declaration.workflowProfile}${declaration.complianceProfile ? `\n  complianceProfile ${declaration.complianceProfile}` : ''}`,
-      `  commands         ${Object.entries(declaration.commands).map(([k, v]) => `${k}: ${v}`).join('\n                   ')}`, '');
-    if (PACKS[id].notes.length) { lines.push('Before you rely on this'); for (const n of PACKS[id].notes) lines.push(`  · ${n}`); lines.push(''); }
-    lines.push('Next',
-      '  1. Replace the commands above with what CI actually runs — an unrunnable command fails closed.',
-      '  2. node .github/eos/eos.mjs stack sync --write   (put the stack in the always-on rule)',
-      '  3. node .github/eos/eos.mjs next                 (start the guided loop)', '');
-    if (!flags.write) lines.push('  Nothing was written. Re-run with --write to apply.', '');
-    emit(flags, { pack: id, written: !!flags.write, declaration, notes: PACKS[id].notes }, lines.join('\n'));
-    return EXIT.OK;
+    return declareProject(snapshot, flags, 'new');
   },
 
   /**
@@ -279,26 +348,9 @@ export const maintenanceCommands = {
     return EXIT.FAIL;
   },
 
+  /** Declare the project and choose its governance track; create the local integration files. */
   init(snapshot, flags) {
-    const planned = [
-      { path: '.vscode/tasks.json', body: VSCODE_TASKS },
-      { path: '.eos/local/.gitkeep', body: '' },
-    ];
-    const lines = ['EOS init', ''];
-    let created = 0;
-    for (const f of planned) {
-      const full = join(snapshot.root, f.path);
-      if (existsSync(full)) { lines.push(`  kept    ${f.path} (already exists — never overwritten)`); continue; }
-      if (!flags.write) { lines.push(`  would create ${f.path}`); continue; }
-      mkdirSync(dirname(full), { recursive: true });
-      writeFileSync(full, f.body, 'utf8');
-      created++;
-      lines.push(`  created ${f.path}`);
-    }
-    if (!flags.write) lines.push('', '  Nothing was written. Re-run with --write to create the missing files.');
-    lines.push('', '  Next: node .github/eos/eos.mjs next', '');
-    emit(flags, { wrote: flags.write ? created : 0, planned: planned.map((p) => p.path) }, lines.join('\n'));
-    return EXIT.OK;
+    return declareProject(snapshot, flags, 'init');
   },
 
   /**

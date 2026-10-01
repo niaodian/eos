@@ -121,6 +121,10 @@
     },
     "rationale": {
       "type": "string"
+    },
+    "templateDefault": {
+      "type": "boolean",
+      "description": "true = this declaration is the EOS template's own (it describes EOS, not your project). A copy of the template inherits it; `eos next` asks for `eos init <pack>` until it is replaced, and `eos init` may replace it without --force."
     }
   },
   "$defs": {

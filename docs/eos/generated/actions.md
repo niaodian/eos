@@ -8,12 +8,13 @@
 
 # Action map
 
-27 actions. `eos next` names one of them and hands it to the agent or prompt below. This page is a projection of `.eos/agent-map.json` — the file the router reads — so it cannot disagree with what `eos next` recommends. The curated, phase-by-phase overview is [agent-map.md](../agent-map.md).
+28 actions. `eos next` names one of them and hands it to the agent or prompt below. This page is a projection of `.eos/agent-map.json` — the file the router reads — so it cannot disagree with what `eos next` recommends. The curated, phase-by-phase overview is [agent-map.md](../agent-map.md).
 
 | Action | Copilot agent | Prompt | Skills | Handoff |
 |---|---|---|---|---|
 | `fix-eos-configuration` | — | `/validate-config` | — | EOS's own configuration does not load. Fix only the reported file(s); change nothing else. |
 | `complete-local-activation` | — | `/eos-init` | — | Walk the one-time activation: declare .eos/project.json, branch protection, CODEOWNERS, approval baseline. |
+| `declare-project` | — | — | — | Run `eos init` to see the tracks and starter packs, pick the pack closest to this product, then `eos init <pack> --track standard\|regulated --write`. Edit stacks and commands to what CI really runs; change nothing else. |
 | `frame-the-problem` | `eos-discovery` | — | `bmad-brainstorming`, `bmad-agent-analyst` | Converge the idea into one falsifiable problem statement with a measurable success metric, and record it in docs/discovery.md + docs/discovery.json. |
 | `expand-requirements` | — | `/requirements` | `bmad-agent-pm`, `eos-operational-readiness` | Expand the approved problem into functional + NFR + operational-readiness requirements in docs/requirements.md + docs/requirements.json. Every operational concern is ADOPT / SKIP+reason / DEFER+owner+trigger. |
 | `write-prd` | — | `/spec` | `bmad-prd` | Turn docs/requirements.md into docs/prd.md; every requirement gets addressable AC<n>.<n> ids that the PRD DEFINES, not merely mentions. |

@@ -5,7 +5,7 @@ const line = (indent, text) => `${' '.repeat(indent)}${text}`;
 export function renderCard(result, { why = false, all = false } = {}) {
   const out = [];
   const { current, recommendedAction: a, blockers, alternatives } = result;
-  out.push(`EOS · ${current.scopeId}`, '');
+  out.push(`EOS · ${current.scopeId}${result.track ? ` · ${result.track.title} track` : ''}`, '');
 
   out.push('Current');
   out.push(line(2, `${current.state}${current.changeType ? ` · ${current.changeType}` : ''}${current.scopeType !== 'story' ? ` · ${current.scopeType}` : ''}`));

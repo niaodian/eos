@@ -39,9 +39,10 @@ usage: node .github/eos/eos.mjs <command> [flags]
   handoff --scope <type> --id <id> [--verify]
   ledger [--verify] [--against <ref>] [--resolve [--write]]
   focus --scope <type> --id <id>          set this machine's local focus (no authority)
-  init [--write]                          write .vscode/tasks.json only (NOT the /eos-init hardening walkthrough)
+  init [<pack>] [--track standard|regulated] [--write] [--force]
+                                          declare the project, choose its governance track, create local files
   stack sync [--write]                    render the always-on workspace rule from .eos/project.json
-  new [<pack>] [--write]                  scaffold .eos/project.json from a starter pack
+  new <pack> [--track …] [--write]        the pack half of init (the declaration only)
   sbom [--write] [--check]                software bill of materials, bound to the tree
   policy [diff|lock|check] [--against <ref>] [--write] [--reason <text>]
                                           no gate gets weaker without a reason and a second person

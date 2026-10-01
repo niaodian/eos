@@ -36,6 +36,11 @@ export const evaluators = {
   projectDeclaration(ctx) {
     if (!ctx.snapshot.projectPresent) return fail('.eos/project.json does not exist — EOS cannot tell what this project is or how it is verified');
     if (ctx.snapshot.projectErrors.length) return fail(ctx.snapshot.projectErrors.join(' · '));
+    // A copy of the template inherits EOS's own declaration, whose test command is EOS's own suite.
+    // Green on that would be EOS verifying itself inside someone else's repository.
+    if (ctx.snapshot.project?.templateDefault === true) {
+      return fail('.eos/project.json is still the EOS template\'s own declaration — it describes EOS, not your project. Run `node .github/eos/eos.mjs init` to choose a governance track and a starter pack.');
+    }
     return ok(`declared ${ctx.snapshot.project.projectType}${ctx.snapshot.project.stacks.length ? ` · ${ctx.snapshot.project.stacks.join(', ')}` : ''}`);
   },
   declarationMatchesRepo(ctx) {

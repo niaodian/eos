@@ -132,6 +132,85 @@
         3
       ]
     },
+    "track": {
+      "type": "object",
+      "description": "The governance track the project is on, derived from its declaration (complianceProfile \"regulated\" = Regulated), and what a release on it requires. (ADR-012)",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "title",
+        "summary",
+        "releaseRequires"
+      ],
+      "properties": {
+        "name": {
+          "enum": [
+            "standard",
+            "regulated"
+          ]
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "profile": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "releaseRequires": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "policyDrift": {
+      "type": "object",
+      "description": "Present only when the policy differs from .eos/policy.lock.json. `weakenings` lists the changes that still need an acknowledgement (`eos policy lock --write --reason`) and a second person's approval.",
+      "additionalProperties": false,
+      "required": [
+        "lockDigest",
+        "currentDigest",
+        "weakenings",
+        "otherChanges"
+      ],
+      "properties": {
+        "lockDigest": {
+          "type": "string",
+          "minLength": 64
+        },
+        "currentDigest": {
+          "type": "string",
+          "minLength": 64
+        },
+        "base": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "weakenings": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "otherChanges": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
     "crossBranch": {
       "type": "object",
       "description": "Present only when the base branch has moved a story or release this branch is also working on, since the branch left it. Compared with LOCAL refs only; EOS never fetches.",

@@ -14,6 +14,12 @@
       "skills": [],
       "handoff": "Walk the one-time activation: declare .eos/project.json, branch protection, CODEOWNERS, approval baseline."
     },
+    "declare-project": {
+      "agent": null,
+      "prompt": null,
+      "skills": [],
+      "handoff": "Run `eos init` to see the tracks and starter packs, pick the pack closest to this product, then `eos init <pack> --track standard|regulated --write`. Edit stacks and commands to what CI really runs; change nothing else."
+    },
     "frame-the-problem": {
       "agent": "eos-discovery",
       "prompt": null,

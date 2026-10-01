@@ -18,10 +18,11 @@ export const PROJECT_TYPES = ['application', 'library', 'config-only'];
 export const PARADIGMS = ['deterministic', 'agentic'];
 export const STACKS = ['node', 'python', 'go', 'java', 'rust', 'dotnet', 'other'];
 export const STEPS = ['install', 'lint', 'typecheck', 'test', 'eval', 'audit'];
-const TOP_LEVEL_KEYS = new Set([
+// The schema (.eos/schemas/project.schema.json) lists the same keys; a test keeps the two equal.
+export const TOP_LEVEL_KEYS = new Set([
   '$schema', 'projectType', 'language', 'stacks', 'commands', 'productParadigms', 'evalRequired',
   'evalWaiver', 'rationale', 'workflowProfile', 'complianceProfile',
-  'evidencePolicy', 'evidencePolicyReason',
+  'evidencePolicy', 'evidencePolicyReason', 'templateDefault',
 ]);
 // Prose language only (BCP-47). Deliberately not an enum: EOS must not ship a closed list of
 // languages a team is allowed to think in.
@@ -332,7 +333,11 @@ export function loadProjectConfig(root) {
     evalRequired: parsed.evalRequired,
     evalWaiver,
     rationale: typeof parsed.rationale === 'string' ? parsed.rationale : '',
+    templateDefault: parsed.templateDefault === true,
   };
+  if (parsed.templateDefault !== undefined && typeof parsed.templateDefault !== 'boolean') {
+    errors.push(`${PROJECT_CONFIG_PATH}: "templateDefault" must be true or false`);
+  }
   return { present: true, path, config: errors.length ? null : config, errors, warnings };
 }
 

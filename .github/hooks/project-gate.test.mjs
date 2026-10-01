@@ -317,3 +317,12 @@ test('loadProjectConfig accepts a BCP-47 language and rejects prose', () => {
   assert.deepEqual(absent.errors, []);
   assert.equal(absent.config.language, undefined);
 });
+
+test('the template\'s own declaration warns that the commands it runs are EOS\'s, not yours', () => {
+  const { code, out } = run(project({
+    '.eos/project.json': { templateDefault: true, projectType: 'application', stacks: ['other'], commands: { test: passingCmd } },
+  }));
+  assert.equal(code, 0, out);
+  assert.match(out, /WARN {2}\.eos\/project\.json is still the EOS template's own declaration/);
+  assert.match(out, /eos\.mjs init/);
+});

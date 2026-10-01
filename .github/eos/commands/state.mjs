@@ -16,7 +16,32 @@ import { loadProviders } from '../adapters/contract.mjs';
 import { testDurationTrend } from '../lib/test-history.mjs';
 import { loadWaivers, expiredWaivers, waiverStatus } from '../lib/waivers.mjs';
 import { activeWorkPath } from '../lib/registry.mjs';
+import { trackSummary } from '../lib/track.mjs';
+import { policyDrift } from '../lib/policy.mjs';
 import { EXIT, emit } from './shared.mjs';
+
+const CLI = 'node .github/eos/eos.mjs';
+
+/** The governance track and what a release on it will require — said up front, not at tag time. */
+function trackLines(track) {
+  return ['Track', `  ${track.title} track · ${track.profile || '—'} — ${track.summary}`, '  A release needs:',
+    ...track.releaseRequires.map((r) => `    · ${r}`), ''];
+}
+
+/** A policy that moved since the lock, with the exact command that records it. */
+function policyDriftLines(drift) {
+  if (!drift) return [];
+  const out = ['Policy changed since .eos/policy.lock.json'];
+  if (drift.weakenings.length) {
+    for (const w of drift.weakenings) out.push(`  WEAKENING  ${w}`);
+    out.push(`  Record it:  ${CLI} policy lock --write --reason "<why>"`,
+      '              then a second person fills in "approver" — weakening a control is never self-approved');
+  } else {
+    out.push('  Nothing here weakens a gate.', `  Record it:  ${CLI} policy lock --write`);
+  }
+  out.push(`  See all:    ${CLI} policy diff`, '');
+  return out;
+}
 
 export const stateCommands = {
   status(snapshot, flags) {
@@ -45,6 +70,7 @@ export const stateCommands = {
       projectType: declaredType,
       productCodeVerified,
       profile: snapshot.profileName,
+      track: snapshot.workflow ? trackSummary(snapshot) : null,
       stories,
       active: decision.current,
       blockers: decision.blockers,
@@ -69,6 +95,7 @@ export const stateCommands = {
       lines.push('');
     }
     lines.push('Product', `  ${product.state}${product.blockedBy ? ` — next guard: ${product.blockedBy.reason}` : ''}`, '');
+    if (json.track) lines.push(...trackLines(json.track));
     if (!productCodeVerified) {
       lines.push('Scope of this verdict',
         snapshot.projectPresent
@@ -98,6 +125,9 @@ export const stateCommands = {
     });
     json.crossBranch = { checked: cross.checked, base: cross.base?.ref ?? null, overlaps: cross.overlaps };
     lines.push(...crossBranchLines(cross));
+    const drift = policyDrift(snapshot.root);
+    if (drift) json.policyDrift = drift;
+    lines.push(...policyDriftLines(drift));
     lines.push(`Recommended next`, `  ${decision.recommendedAction?.title || '—'}`, '', `  ${decision.recommendedAction?.command || ''}`, '');
     emit(flags, json, lines.join('\n'));
     return snapshot.errors.length ? EXIT.ERROR : EXIT.OK;
@@ -109,7 +139,9 @@ export const stateCommands = {
     const cross = crossBranchActivity(snapshot.root, { focus });
     // Only present when there is something to say, so the common case's JSON is unchanged.
     if (cross.overlaps.length) decision.crossBranch = { base: cross.base.ref, overlaps: cross.overlaps };
-    const extra = crossBranchLines(cross);
+    const drift = policyDrift(snapshot.root);
+    if (drift) decision.policyDrift = drift;
+    const extra = [...crossBranchLines(cross), ...policyDriftLines(drift)];
     emit(flags, decision, renderCard(decision, { why: !!flags.why, all: !!flags.all }) + (extra.length ? `\n${extra.join('\n')}` : ''));
     return decision.exitCode;
   },
