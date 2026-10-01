@@ -1207,7 +1207,7 @@ node .github/eos/eos.mjs check --gate release-ready --scope <id>
 | **策略锁记录合规要求** | 从 Profile 中删除 `requiresCompliance` 会在 `eos policy diff` 中被判为 `WEAKENING` | 如果你提交过 `.eos/policy.lock.json`：合并新的 `.eos/workflow.json` 后，`policy check` 会因锁已过期而失败，即使这次变更只是收紧。运行一次 `node .github/eos/eos.mjs policy lock --write` 并提交即可，无需确认。 |
 | **未知命令名一律视为未知** | `eos constructor`、`eos toString` 过去会崩溃并以 1 退出；现在它们和任何拼写错误一样，是未知命令（退出码 3） | 无需动作。 |
 | **管道输出完整送达** | 在 macOS 和 Windows 上，通过管道交给其他程序的较大 `--json` 文档可能被截断（Node 20 下截在 8 KB 处）：CLI 在管道排空之前就退出了 | 无需动作。若你的脚本曾为无法解析的 EOS 输出做重试或跳过处理，现在可以去掉。 |
-| **所有测试层都在 Windows 和 macOS 上运行** | `cross-platform` CI 作业运行全部五层测试，而不只是 unit 和 contract | 无需动作。若你的 CI 复制了该作业，请像它一样在慢速 runner 上设置 `EOS_LAYER_TIMEOUT_MS`。 |
+| **所有测试层都在 Windows 和 macOS 上运行** | `cross-platform` CI 作业运行全部五层测试，而不只是 unit 和 contract | 无需动作。在比 GitHub 更慢的 runner 上，可用 `EOS_LAYER_TIMEOUT_MS` 放宽每层的兜底时限，就像 `EOS_TEST_TIMEOUT_MS` 放宽单个测试的时限一样。 |
 
 合并 `.eos/workflow.json` 时请连同 `.eos/schemas/` 一起合并：旧的 Schema 不认识
 `requiresCompliance`，会把新的 workflow 文件判为无效。

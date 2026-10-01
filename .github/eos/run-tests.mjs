@@ -66,8 +66,9 @@ const layers = Object.entries(budget.layers);
 // as slow as GitHub's Windows one (spawns ~15x Linux) means a file legitimately needs longer. Raise
 // it there by override; the default stays tight everywhere else.
 const TEST_TIMEOUT_MS = Number(process.env.EOS_TEST_TIMEOUT_MS || budget.testTimeoutMs || 120000);
-// The layer backstop takes the same per-environment override (EOS_LAYER_TIMEOUT_MS), for the same
-// reason: on the Windows runner a whole layer can legitimately outlive a limit sized for Linux.
+// The layer backstop takes the same per-environment override (EOS_LAYER_TIMEOUT_MS), for a runner
+// slow enough that a whole layer legitimately outlives it. GitHub's Windows runner is not one: its
+// slowest layer measured ~155s against the 15-minute default.
 const LAYER_TIMEOUT_MS = Number(process.env.EOS_LAYER_TIMEOUT_MS || budget.layerTimeoutMs || 900000);
 const COVERAGE_TIMEOUT_MS = budget.coverageTimeoutMs ?? 1800000;
 const BASELINE_ENV = process.env.EOS_TEST_BASELINE_ENV || null;

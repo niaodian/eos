@@ -230,8 +230,9 @@ jobs:
       matrix:
         os: [windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
-    # Windows spawns run ~15x slower than on Linux. All five layers there take minutes, not seconds.
-    timeout-minutes: 60
+    # Measured on Node 20: all five layers take ~8 min on Windows and ~2.5 min on macOS. 30 min is
+    # ~3.5x the slower of the two — room for a slow runner, not for a hang.
+    timeout-minutes: 30
     permissions:
       contents: read
     # Budgets are NOT enforced here, and that is deliberate rather than a concession.
@@ -247,12 +248,13 @@ jobs:
     # not gate.
     #
     # The limits need the same care. Node 20 applies --test-timeout to each test FILE (it wraps a
-    # file as one top-level test), and on Windows a whole file — or a whole layer — can legitimately
-    # take longer than the defaults sized for Linux. Windows gets longer limits by explicit
-    # override; macOS keeps the defaults, so a hang there is still caught early.
+    # file as one top-level test), and on Windows a whole file can legitimately take longer than the
+    # 120s default sized for Linux, so Windows gets a longer per-test limit by explicit override.
+    # The layer backstop needs no override: the slowest layer measured on Windows takes ~155s, and
+    # the 15-minute default leaves ~6x headroom. EOS_LAYER_TIMEOUT_MS exists for a slower runner.
+    # macOS keeps every default, so a hang there is still caught early.
     env:
       EOS_TEST_TIMEOUT_MS: ${{ matrix.os == 'windows-latest' && '900000' || '120000' }}
-      EOS_LAYER_TIMEOUT_MS: ${{ matrix.os == 'windows-latest' && '2400000' || '900000' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

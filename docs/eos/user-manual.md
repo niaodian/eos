@@ -1170,7 +1170,7 @@ CLI's files moved.
 | **The policy lock records the compliance requirement** | Dropping `requiresCompliance` from a profile is a `WEAKENING` in `eos policy diff` | If you committed `.eos/policy.lock.json`: after merging the new `.eos/workflow.json`, `policy check` fails because the lock is out of date, even though the change only strengthens. Run `node .github/eos/eos.mjs policy lock --write` once and commit it; no acknowledgement is needed. |
 | **Unknown command names are always unknown** | `eos constructor` or `eos toString` used to crash with exit 1; now they are unknown commands (exit 3), like any typo | Nothing. |
 | **Piped output arrives whole** | On macOS and Windows a large `--json` document piped to another program could arrive cut off (at 8 KB on Node 20): the CLI exited before the pipe had drained | Nothing. A script that retried or skipped unparseable EOS output no longer needs to. |
-| **Every test layer runs on Windows and macOS** | The `cross-platform` CI job runs all five layers, not only unit and contract | Nothing. If your CI copies that job, set `EOS_LAYER_TIMEOUT_MS` on slow runners the way it does. |
+| **Every test layer runs on Windows and macOS** | The `cross-platform` CI job runs all five layers, not only unit and contract | Nothing. On a runner slower than GitHub's, `EOS_LAYER_TIMEOUT_MS` raises the per-layer backstop, as `EOS_TEST_TIMEOUT_MS` already does per test. |
 
 Merge `.eos/schemas/` together with `.eos/workflow.json`: the old schema does not know
 `requiresCompliance` and would reject the new workflow file.
