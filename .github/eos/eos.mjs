@@ -25,6 +25,7 @@ import { loadProviders, consult } from './adapters/contract.mjs';
 import { syncWorkspaceRule } from './lib/workspace-rule.mjs';
 import { generateDocs } from './lib/docgen.mjs';
 import { testDurationTrend } from './lib/test-history.mjs';
+import { policyChanges, planLock, checkPolicy, readLock, readPolicy, policySnapshot, policyDigest, POLICY_LOCK_PATH } from './lib/policy.mjs';
 import { planMigration, applyMigration, compatibilityErrors } from './lib/migrate.mjs';
 import { buildSbom, sbomFreshness, sbomDigest, SBOM_PATH } from './lib/sbom.mjs';
 import { PACKS, packDeclaration, packIds } from './lib/packs.mjs';
@@ -60,6 +61,8 @@ usage: node .github/eos/eos.mjs <command> [flags]
   stack sync [--write]                    render the always-on workspace rule from .eos/project.json
   new [<pack>] [--write]                  scaffold .eos/project.json from a starter pack
   sbom [--write] [--check]                software bill of materials, bound to the tree
+  policy [diff|lock|check] [--against <ref>] [--write] [--reason <text>]
+                                          no gate gets weaker without a reason and a second person
   migrate [--apply]                       governance file versions; plan first, then apply
   docs [--write] [--check]                regenerate the docs that restate the policy
   health                                  blockers, stale evidence, waivers, trend — one screen
@@ -682,6 +685,70 @@ const commands = {
     return EXIT.OK;
   },
 
+  /**
+   * Policy integrity: no gate gets weaker without a reason and a second person's sign-off.
+   *
+   *   policy diff  [--against <ref>]                   every change since the base, classified
+   *   policy lock  [--against <ref>] [--write] [--reason "<why>"]
+   *   policy check [--against <ref>]                   the CI gate (default subcommand)
+   */
+  policy(snapshot, flags) {
+    const sub = flags._[1] || 'check';
+    const against = typeof flags.against === 'string' ? flags.against : null;
+    const KIND_ORDER = { WEAKENING: 0, REVIEW: 1, STRENGTHENING: 2, INFO: 3 };
+    const listChanges = (changes) => [...changes]
+      .sort((x, y) => KIND_ORDER[x.kind] - KIND_ORDER[y.kind])
+      .map((c) => `  ${c.kind.padEnd(13)} ${c.id}\n                ${c.detail}`);
+
+    if (sub === 'diff') {
+      const { base, changes, errors } = policyChanges(snapshot.root, against);
+      const lines = [`EOS policy diff · against ${base ? base.label : '(nothing to compare with)'}`, ''];
+      if (!changes.length) lines.push('  no policy change');
+      lines.push(...listChanges(changes), '', ...errors.map((e) => `  ERROR ${e}`));
+      const needing = changes.filter((c) => c.requiresAck).length;
+      if (needing) lines.push(`  ${needing} change(s) need acknowledgement: \`eos policy lock --write --reason "<why>"\`, then a second person fills in "approver".`, '');
+      emit(flags, { base, changes, errors }, lines.join('\n'));
+      return errors.length ? EXIT.ERROR : EXIT.OK;
+    }
+
+    if (sub === 'lock') {
+      const actor = process.env.EOS_ACTOR || process.env.USER || process.env.USERNAME || 'unknown';
+      const reason = typeof flags.reason === 'string' ? flags.reason : null;
+      const plan = planLock(snapshot.root, { against, reason, actor, write: !!flags.write });
+      const lines = [`EOS policy lock · against ${plan.base ? plan.base.label : '(nothing to compare with)'}`, ''];
+      lines.push(...listChanges(plan.changes.filter((c) => c.requiresAck)));
+      if (!plan.changes.some((c) => c.requiresAck)) lines.push('  no change needs acknowledgement');
+      lines.push('', `  digest  ${plan.lock.policyDigest.slice(0, 16)}…`, ...plan.errors.map((e) => `  ERROR ${e}`));
+      if (plan.refused) {
+        lines.push('', `  REFUSED — ${plan.refused}`, '');
+        emit(flags, { ...plan, written: false }, lines.join('\n'));
+        return EXIT.FAIL;
+      }
+      if (plan.drafted.length) {
+        lines.push('', `  ${plan.drafted.length} acknowledgement(s) drafted with an EMPTY approver. A second person must fill in`,
+          `  "approver" in ${POLICY_LOCK_PATH} and commit it; until then \`eos policy check\` fails.`);
+      }
+      lines.push('', plan.written ? `  written ${POLICY_LOCK_PATH}` : '  Nothing was written. Re-run with --write to apply.', '');
+      emit(flags, plan, lines.join('\n'));
+      return plan.errors.length ? EXIT.ERROR : EXIT.OK;
+    }
+
+    if (sub === 'check') {
+      const r = checkPolicy(snapshot.root, { against });
+      const lines = [`EOS policy check · against ${r.base ? r.base.label : '(nothing to compare with)'}`, ''];
+      const shown = r.changes.filter((c) => c.requiresAck);
+      lines.push(shown.length ? `  ${shown.length} change(s) needing acknowledgement, ${r.changes.length - shown.length} other change(s)` : `  ${r.changes.length} policy change(s), none weakening`);
+      for (const n of r.notes) lines.push(`  NOTE  ${n}`);
+      for (const p of r.problems) lines.push(`  ERROR ${p}`);
+      lines.push('', r.ok ? 'PASS' : 'FAIL', '');
+      emit(flags, r, lines.join('\n'));
+      return r.ok ? EXIT.OK : EXIT.FAIL;
+    }
+
+    console.log(`unknown policy subcommand "${sub}" — use diff, lock or check`);
+    return EXIT.FAIL;
+  },
+
   transition(snapshot, flags) {    const scopeType = flags.scope === true || !flags.scope ? 'story' : flags.scope;
     const scopeId = flags.id;
     const to = flags.to;
@@ -1113,6 +1180,13 @@ const commands = {
     }
     const { errors: waiverErrors } = loadWaivers(snapshot.root);
     for (const e of waiverErrors) problems.push({ level: 'ERROR', detail: e });
+    // A policy edited after it was locked is exactly the drift the lock exists to catch. Doctor does
+    // not compare with a base branch (that is `eos policy check`); it only says the pin is stale.
+    const policyLock = readLock(snapshot.root);
+    for (const e of policyLock.errors) problems.push({ level: 'ERROR', detail: e });
+    if (policyLock.lock && policyLock.lock.policyDigest !== policyDigest(policySnapshot(readPolicy(snapshot.root).files))) {
+      problems.push({ level: 'ERROR', detail: `the policy changed since ${POLICY_LOCK_PATH} was written — run \`eos policy lock\` to see what changed` });
+    }
     // Doctor's verdict covers EOS's own wiring. Saying so matters most when it is green: a PASS
     // here has never meant "the product is tested", and on a config-only repository nothing about
     // a product is executed at all. [audit: config-only false PASS]
