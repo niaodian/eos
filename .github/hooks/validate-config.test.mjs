@@ -267,8 +267,39 @@ test('regulated records a reason for every classification', () => {
 
 test('every profile passes the config validator it ships with', () => {
   const base = JSON.parse(readFileSync(join(ROOT, '.eos/project.json'), 'utf8'));
+  const wf = JSON.parse(readFileSync(join(ROOT, '.eos/workflow.json'), 'utf8'));
   for (const workflowProfile of ['prototype', 'standard-product', 'controlled', 'regulated']) {
-    const { code, out } = run(repo(({ write }) => write('.eos/project.json', { ...base, workflowProfile })));
+    // Selected the way the profile itself declares it must be: a profile that requires the
+    // compliance boundary is only valid WITH it (#12).
+    const declaration = wf.profiles[workflowProfile].requiresCompliance
+      ? { ...base, workflowProfile, complianceProfile: 'regulated', evidencePolicy: 'ci' }
+      : { ...base, workflowProfile };
+    const { code, out } = run(repo(({ write }) => write('.eos/project.json', declaration)));
     assert.equal(code, 0, `${workflowProfile}\n${out}`);
   }
+});
+
+// ---------------------------------------------------------------- regulated needs the boundary [#12]
+// A project could select the "regulated" profile without turning the compliance boundary on, and
+// then pass releases on evidence the boundary would refuse: a mode NAMED for regulated work, green
+// without regulated controls. The profile now declares it, and selecting it alone is an error.
+test('S13: the regulated profile without complianceProfile "regulated" fails', () => {
+  const base = JSON.parse(readFileSync(join(ROOT, '.eos/project.json'), 'utf8'));
+  const { code, out } = run(repo(({ write }) => write('.eos/project.json', { ...base, workflowProfile: 'regulated' })));
+  assert.equal(code, 1, out);
+  assert.match(out, /S13 .*workflowProfile "regulated" requires "complianceProfile": "regulated"/);
+});
+
+test('S13: the regulated profile WITH the compliance boundary passes', () => {
+  const base = JSON.parse(readFileSync(join(ROOT, '.eos/project.json'), 'utf8'));
+  const { code, out } = run(repo(({ write }) => write('.eos/project.json', {
+    ...base, workflowProfile: 'regulated', complianceProfile: 'regulated', evidencePolicy: 'ci',
+  })));
+  assert.equal(code, 0, out);
+});
+
+test('the requirement is data, so any profile can declare it', () => {
+  const wf = JSON.parse(readFileSync(join(ROOT, '.eos/workflow.json'), 'utf8'));
+  assert.equal(wf.profiles.regulated.requiresCompliance, true, 'the shipped regulated profile declares it');
+  for (const name of ['prototype', 'standard-product', 'controlled']) assert.notEqual(wf.profiles[name].requiresCompliance, true, `${name} must not demand it`);
 });

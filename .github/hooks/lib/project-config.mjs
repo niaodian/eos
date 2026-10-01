@@ -335,3 +335,26 @@ export function loadProjectConfig(root) {
   };
   return { present: true, path, config: errors.length ? null : config, errors, warnings };
 }
+
+/**
+ * A workflow profile can REQUIRE the compliance boundary (`requiresCompliance: true`, set on the
+ * shipped `regulated` profile). Selecting such a profile without `complianceProfile: "regulated"`
+ * gave a project a mode NAMED for regulated work that still accepted release evidence the compliance
+ * boundary would refuse — a green that reads as "regulated controls applied" when they were not.
+ * The same class as the config-only PASS: the label promised more than the check did.
+ *
+ * Data-driven rather than keyed on the name, so a custom profile can opt in the same way.
+ * Shared by the engine snapshot (every command fails closed) and validate-config (CI), so the two
+ * can never disagree about it.
+ *
+ * @returns {string|null} the problem, or null when the declaration is consistent
+ */
+export function complianceRequirementProblem(project, workflow) {
+  if (!project || !workflow) return null;
+  const selected = project.workflowProfile || workflow.defaultProfile || 'standard-product';
+  const profile = workflow.profiles?.[selected];
+  if (!profile?.requiresCompliance || project.complianceProfile === 'regulated') return null;
+  return `${PROJECT_CONFIG_PATH}: workflowProfile "${selected}" requires "complianceProfile": "regulated" — `
+    + 'a profile for regulated work must not pass on release evidence the compliance boundary would refuse. '
+    + 'Add "complianceProfile": "regulated" with an "evidencePolicy" (ci or attested), or choose a different profile.';
+}

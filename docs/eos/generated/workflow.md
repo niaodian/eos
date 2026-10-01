@@ -105,7 +105,7 @@ Enterprise and business-critical systems. Everything Standard requires, plus: no
 
 ### `regulated`
 
-Compliance and audit-sensitive systems (HIPAA / PCI-DSS / SOC2 / SOX / GDPR and friends). Everything Controlled requires, plus: every change is classified with a recorded reason, a spike may not be merged, the iteration write-back is required so the loop is closed in the record, and DOC_ONLY no longer switches the activation gate off — in an audited environment "it was only documentation" is a claim that still has to be verifiable.
+Compliance and audit-sensitive systems (HIPAA / PCI-DSS / SOC2 / SOX / GDPR and friends). Everything Controlled requires, plus: every change is classified with a recorded reason, a spike may not be merged, the iteration write-back is required so the loop is closed in the record, and DOC_ONLY no longer switches the activation gate off — in an audited environment "it was only documentation" is a claim that still has to be verifiable. Selecting it requires "complianceProfile": "regulated" in .eos/project.json, so the release evidence it accepts is held to the compliance boundary rather than to the label.
 
 | Change type | `activation` | `discovery-ready` | `requirements-ready` | `prd-ready` | `ux-ready` | `architecture-ready` | `story-ready` | `verified` | `release-ready` | `telemetry-ready` | `iteration-ready` |
 |---|---|---|---|---|---|---|---|---|---|---|---|
