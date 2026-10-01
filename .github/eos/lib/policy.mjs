@@ -17,6 +17,7 @@
 //   3. A LOCK (.eos/policy.lock.json) recording the digest of the policy in force plus every
 //      acknowledgement. A policy edit without regenerating the lock fails the check; a weakening
 //      needs a reason and an approver who is not the requester — the same rule waivers already use.
+import { canonicalJson } from './canonical.mjs';
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -33,13 +34,7 @@ const EVIDENCE_RANK = { local: 0, ci: 1, attested: 2 };
 const rankOf = (policy) => POLICY_RANK[policy ?? 'not_applicable'] ?? 0;
 
 /** Stable serialization, so the digest depends on content and never on key order. */
-function canonical(value) {
-  if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
-  if (value && typeof value === 'object') {
-    return `{${Object.keys(value).sort().map((k) => `${JSON.stringify(k)}:${canonical(value[k])}`).join(',')}}`;
-  }
-  return JSON.stringify(value ?? null);
-}
+const canonical = canonicalJson;
 
 /**
  * Everything that decides how strictly work is verified, and nothing that merely describes it.

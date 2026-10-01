@@ -18,11 +18,26 @@ export const PROJECT_TYPES = ['application', 'library', 'config-only'];
 export const PARADIGMS = ['deterministic', 'agentic'];
 export const STACKS = ['node', 'python', 'go', 'java', 'rust', 'dotnet', 'other'];
 export const STEPS = ['install', 'lint', 'typecheck', 'test', 'eval', 'audit'];
+/** `release`: what ships and the key it is signed with. Paths stay inside the repository. */
+function releaseOf(raw, errors) {
+  if (raw === undefined) return undefined;
+  const inside = (p) => typeof p === 'string' && p.length > 0 && !/^[\\/]/.test(p) && !/^[A-Za-z]:/.test(p) && !p.split(/[\\/]/).includes('..');
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) { errors.push(`${PROJECT_CONFIG_PATH}: "release" must be an object`); return undefined; }
+  for (const k of Object.keys(raw)) if (!['artifacts', 'signing'].includes(k)) errors.push(`${PROJECT_CONFIG_PATH}: unknown key "release.${k}" (allowed: artifacts, signing)`);
+  if (raw.artifacts !== undefined && (!Array.isArray(raw.artifacts) || !raw.artifacts.every(inside))) {
+    errors.push(`${PROJECT_CONFIG_PATH}: "release.artifacts" must be repository-relative paths (no "..", not absolute)`);
+  }
+  if (raw.signing !== undefined && !inside(raw.signing?.publicKey)) {
+    errors.push(`${PROJECT_CONFIG_PATH}: "release.signing.publicKey" must be a repository-relative path to the release public key`);
+  }
+  return raw;
+}
+
 // The schema (.eos/schemas/project.schema.json) lists the same keys; a test keeps the two equal.
 export const TOP_LEVEL_KEYS = new Set([
   '$schema', 'projectType', 'language', 'stacks', 'commands', 'productParadigms', 'evalRequired',
   'evalWaiver', 'rationale', 'workflowProfile', 'complianceProfile',
-  'evidencePolicy', 'evidencePolicyReason', 'templateDefault',
+  'evidencePolicy', 'evidencePolicyReason', 'templateDefault', 'release',
 ]);
 // Prose language only (BCP-47). Deliberately not an enum: EOS must not ship a closed list of
 // languages a team is allowed to think in.
@@ -334,6 +349,7 @@ export function loadProjectConfig(root) {
     evalWaiver,
     rationale: typeof parsed.rationale === 'string' ? parsed.rationale : '',
     templateDefault: parsed.templateDefault === true,
+    release: releaseOf(parsed.release, errors),
   };
   if (parsed.templateDefault !== undefined && typeof parsed.templateDefault !== 'boolean') {
     errors.push(`${PROJECT_CONFIG_PATH}: "templateDefault" must be true or false`);

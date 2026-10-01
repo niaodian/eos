@@ -37,6 +37,11 @@ export function manifestDigest(manifest) {
       .sort((a, b) => a.name.localeCompare(b.name)),
     requiredEvidence: [...(manifest.requiredEvidence || [])].map(String).sort(),
     requiredApprovals: manifest.requiredApprovals?.count ?? 1,
+    // 2.0: WHAT ships, by digest. Only when present, so a manifest written by 1.x keeps the digest its
+    // approvals are bound to. Signature, ledger head and provenance are evidence ABOUT the release,
+    // not decisions in it: attaching them must not void an approval.
+    ...(manifest.artifacts?.length ? { artifacts: [...manifest.artifacts].map((a) => ({ path: String(a.path), sha256: String(a.sha256) })).sort((a, b) => a.path.localeCompare(b.path)) } : {}),
+    ...(manifest.sbom ? { sbom: String(manifest.sbom.sha256) } : {}),
   };
   return createHash('sha256').update(JSON.stringify(canonical)).digest('hex');
 }

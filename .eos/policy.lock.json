@@ -1,6 +1,6 @@
 {
   "$schema": "./schemas/policy-lock.schema.json",
   "schemaVersion": 1,
-  "policyDigest": "f81ed343af3b473f809693bc17e739e9227d311e60bc3ce6be39d9fe2046e4ae",
+  "policyDigest": "6afcdc1f09c1c4a3a97c8063ecd6e7005823162fa84eabae3e9fb763b263db4f",
   "acknowledged": []
 }

@@ -30,7 +30,9 @@ usage: node .github/eos/eos.mjs <command> [flags]
   transition --scope <type> --id <id> --to <STATE>
   approve --scope <type> --id <id>        record an approval (a second person, never the requester)
   explain <gate>                          the full rule set for one gate
-  release init|bind|list [--release <id>]  scaffold / re-bind / list release manifests
+  release init|bind|list [--release <id>]  scaffold / re-bind (artifacts, SBOM, ledger) / list manifests
+  release keygen [--out <file>] [--write]   the Ed25519 key release manifests are signed with
+  release sign|verify --release <id>      sign a manifest (--key <file>) / verify it (--provenance <file>)
   providers                               what external authorities this project consults
   release-status                          aggregate release readiness
   verify-release --release <id>           candidate-bound release verification

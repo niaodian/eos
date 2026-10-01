@@ -24,6 +24,7 @@ import { resolve as applyProviderVerdict } from '../adapters/contract.mjs';
 import { lastGateEvent } from './ledger.mjs';
 import { findWaiver, expiredWaivers } from './waivers.mjs';
 import { AC_ID, opsDecisionProblem } from './story.mjs';
+import { verifyRelease } from './release-integrity.mjs';
 import {
   STATUSES, SEVERITY, EXPENSIVE, isBlocking, insideRepo, parseTraceMatrix,
   ok, fail, blocked, na, awaiting, runHook, runProjectGate, refMatches, selectorPresent,
@@ -581,6 +582,23 @@ export const evaluators = {
       : ok(`${relevant.length} story/stories were verified against this exact candidate tree`);
   },
   /** A candidate is a committed thing: an uncommitted edit is not in any artifact anyone can ship. */
+  /**
+   * The signature over the manifest — the same verdict `eos release verify` prints. Present: it must
+   * verify, on every track. Absent: FAIL on the Regulated track, NOT_APPLICABLE on Standard. (ADR-012)
+   */
+  releaseManifestSignature(ctx) {
+    const m = readManifest(ctx.root, ctx.scopeId);
+    if (!m.manifest) return awaiting(manifestPath(ctx.scopeId));
+    const v = verifyRelease(ctx.root, ctx.snapshot.project, m.manifest);
+    return { status: v.signature.status, detail: v.signature.detail, artifact: m.path };
+  },
+  /** Artifacts, provenance, SBOM and ledger head, bound — worst of the four. (ADR-012) */
+  releaseIntegrity(ctx) {
+    const m = readManifest(ctx.root, ctx.scopeId);
+    if (!m.manifest) return awaiting(manifestPath(ctx.scopeId));
+    const v = verifyRelease(ctx.root, ctx.snapshot.project, m.manifest);
+    return { status: v.integrity.status, detail: v.integrity.detail, artifact: m.path };
+  },
   releaseCandidateCommitted(ctx) {
     if (!ctx.snapshot.commit) return blocked('the current commit is unknown (no git repository), so this candidate cannot be identified');
     const dirty = uncommittedProductChanges(ctx.root);

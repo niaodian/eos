@@ -112,6 +112,8 @@ const CHECK_ACTION = {
   'eval-threshold': 'design-eval-cases',
   'evidence-current': 'refresh-stale-evidence',
   'candidate-identity': 'repair-release',
+  'manifest-signature': 'repair-release',
+  'release-integrity': 'repair-release',
   'candidate-quality': 'repair-verification',
   'stories-verified': 'repair-release',
   'story-evidence-current': 'refresh-stale-evidence',

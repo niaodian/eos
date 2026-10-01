@@ -116,7 +116,8 @@ exitAfterFlush(2);`;
 
 test('every documented command is registered, and every registered command is documented', () => {
   const usage = run(REPO_ROOT, ['help']).out;
-  const documented = [...usage.matchAll(/^ {2}([a-z][a-z-]*)\b/gm)].map((m) => m[1]).filter((n) => n !== 'global');
+  // A command may take several usage lines (one per group of subcommands, like `release`).
+  const documented = [...new Set([...usage.matchAll(/^ {2}([a-z][a-z-]*)\b/gm)].map((m) => m[1]).filter((n) => n !== 'global'))];
   assert.deepEqual([...documented].sort(), Object.keys(commands).sort());
 });
 

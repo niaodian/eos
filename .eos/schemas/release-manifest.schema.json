@@ -76,6 +76,11 @@
       }
     },
     "note": { "type": "string" },
+    "artifacts": {"description":"What ships, by content: each built file and its SHA-256, recorded by `eos release bind`. Provenance must name every one of them.","type":"array","uniqueItems":true,"items":{"type":"object","additionalProperties":false,"required":["path","sha256"],"properties":{"path":{"type":"string","minLength":1},"sha256":{"type":"string","pattern":"^[0-9a-f]{64}$"},"size":{"type":"integer","minimum":0}}}},
+    "sbom": {"description":"The SBOM this release was bound to, by content digest.","type":"object","additionalProperties":false,"required":["path","sha256"],"properties":{"path":{"type":"string","minLength":1},"sha256":{"type":"string","pattern":"^[0-9a-f]{64}$"}}},
+    "ledger": {"description":"The ledger event the release was cut from. The chain must still contain it, unchanged.","type":"object","additionalProperties":false,"required":["seq","hash"],"properties":{"seq":{"type":"integer","minimum":1},"hash":{"type":"string","pattern":"^[0-9a-f]{64}$"}}},
+    "provenance": {"description":"Provenance files for the artifacts (in-toto / DSSE / Sigstore bundle). EOS checks offline that they name every artifact by digest; their own signatures are verified by `gh attestation verify`.","type":"array","uniqueItems":true,"items":{"type":"object","additionalProperties":false,"required":["type"],"properties":{"type":{"enum":["github-attestation","slsa","in-toto"]},"path":{"type":"string","minLength":1},"ref":{"type":"string","minLength":1}}}},
+    "signature": {"description":"Ed25519 signature over the canonical content (everything but this block), by the key in release.signing.publicKey. `eos release sign` writes it.","type":"object","additionalProperties":false,"required":["alg","keyId","value"],"properties":{"alg":{"const":"ed25519"},"keyId":{"type":"string","pattern":"^[0-9a-f]{64}$"},"signedAt":{"type":"string"},"value":{"type":"string","minLength":80}}},
     "supersedes": {
       "description": "For a hotfix or a re-cut candidate: the release id this one replaces.",
       "type": "string"

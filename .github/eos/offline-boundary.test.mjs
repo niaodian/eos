@@ -166,3 +166,20 @@ test('ADR-005 D5: EOS is read-only against every external system', () => {
     'EOS does not configure the systems that hold it accountable. The convenience case is real — '
     + '/eos-init could just set branch protection for you — and the door is closed deliberately.');
 });
+
+test('ADR-012: the one secret EOS reads is a signing key it is handed, in exactly one place', () => {
+  // ADR-005 D3 says EOS never reads a credential. Signing a release needs a private key, so ADR-012
+  // makes one scoped exception: `eos release sign --key <file>` reads it from that file, uses it in
+  // memory and writes nothing but the signature. Any second place that loads a private key widens
+  // the exception and must come with an ADR.
+  const loaders = [];
+  for (const rel of coreFiles()) {
+    const text = readFileSync(join(REPO_ROOT, rel), 'utf8');
+    for (const line of text.split(/\r?\n/)) {
+      if (/^\s*(\/\/|\*|\/\*)/.test(line)) continue;
+      if (/\bloadPrivateKey\(|\bcreatePrivateKey\(/.test(line) && !/export const loadPrivateKey/.test(line)) loaders.push(`${rel}: ${line.trim().slice(0, 90)}`);
+    }
+  }
+  assert.equal(loaders.length, 1, `expected exactly one private-key read, found:\n${loaders.join('\n')}`);
+  assert.match(loaders[0], /^\.github\/eos\/commands\/release\.mjs: .*loadPrivateKey\(readFileSync\(resolve\(flags\.key\)/);
+});

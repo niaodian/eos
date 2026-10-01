@@ -8,7 +8,7 @@
 
 # Gate reference
 
-11 gates, 58 checks. This is a projection of the gate definitions the engine executes — if a rule is here, it runs.
+11 gates, 60 checks. This is a projection of the gate definitions the engine executes — if a rule is here, it runs.
 
 ## Summary
 
@@ -22,7 +22,7 @@
 | `architecture-ready` | G4 | product | 1.1.0 | no | 4 |
 | `story-ready` | G5 | story | 2.0.0 | yes | 6 |
 | `verified` | G7 | story | 2.0.0 | no | 5 |
-| `release-ready` | G8 | release | 3.0.0 | no | 15 |
+| `release-ready` | G8 | release | 4.0.0 | no | 17 |
 | `telemetry-ready` | G9 | release | 1.0.0 | no | 3 |
 | `iteration-ready` | G10 | release | 2.0.0 | no | 3 |
 
@@ -152,6 +152,8 @@ The manifest states exactly which stories this release ships, and the candidate 
 |---|---|---|
 | `release-manifest` | the release states which stories it ships | Run `node .github/eos/eos.mjs release init --release <id>` to propose a manifest, then decide what is in it. Every story must be included or excluded with a reason. |
 | `candidate-identity` | the candidate is a committed, identifiable tree | Commit the outstanding product changes; a release must name a tree that exists in history. |
+| `manifest-signature` | the release manifest is signed by the project's release key (required on the Regulated track) | Run `node .github/eos/eos.mjs release sign --release <id> --key <private-key-file>` with the key whose public half is release.signing.publicKey (`eos release keygen` creates one). A signature that is present must verify on every track. |
+| `release-integrity` | what ships is bound: artifact digests, provenance naming every artifact, the SBOM and the ledger head (required on the Regulated track) | Build, then `node .github/eos/eos.mjs release bind --release <id> [--provenance <file>]` to record the artifacts, SBOM and ledger head; attest the build in CI (.github/workflows/eos-release.yml). `eos release verify --release <id>` shows each part. |
 | `candidate-quality` | the declared quality commands pass ON THIS candidate | Run `node .github/hooks/project-gate.mjs` on the candidate and fix what fails — story state is not a substitute for testing the thing you are shipping. |
 | `stories-verified` | all stories in the release are VERIFIED or MERGED | Finish or drop the unverified stories; `eos release-status` lists them. |
 | `story-evidence-current` | each story's verification describes THIS candidate | Re-run `eos check --gate verified --scope <STORY-ID>` for the stories whose verification predates the candidate tree. |
