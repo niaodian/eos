@@ -14,6 +14,7 @@
 // module per domain, and ./commands/index.mjs is the registry that maps a command name to one.
 import { readSnapshot } from './lib/state.mjs';
 import { compatibilityErrors } from './lib/migrate.mjs';
+import { exitAfterFlush } from './lib/exit.mjs';
 import { EXIT } from './commands/shared.mjs';
 import { commands } from './commands/index.mjs';
 
@@ -107,4 +108,5 @@ async function main() {
   }
 }
 
-process.exit(await main());
+// A plain process.exit() here would cut off output still queued for a pipe (lib/exit.mjs).
+exitAfterFlush(await main());
