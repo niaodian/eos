@@ -16,8 +16,21 @@
 import { gateInputs } from './state.mjs';
 
 export const GENERATED_DIR = 'docs/eos/generated';
+// The Chinese projection of the same sources. Identifiers and the policy's own text (a handoff, a
+// check's fix) stay as the policy states them — translating them would create a second, unchecked
+// copy of the policy. Only the page's structure is localised. (ADR-011)
+export const GENERATED_DIR_ZH = 'docs/zh/generated';
 
-const BANNER = (source) => [
+const BANNER = (source, lang = 'en') => (lang === 'zh' ? [
+  '<!-- 生成文件 —— 请勿手工编辑。',
+  `     真相源：   ${source}`,
+  '     重新生成： node .github/eos/eos.mjs docs --write',
+  '     CI 检查：  node .github/eos/eos.mjs docs --check',
+  '',
+  '     手工编辑此文件没有意义：下一次 --write 会覆盖它，而在此之前 --check 会让构建失败。',
+  '     请修改策略本身，文档会随之更新。 -->',
+  '',
+] : [
   '<!-- GENERATED FILE — DO NOT EDIT.',
   `     Source of truth: ${source}`,
   '     Regenerate:      node .github/eos/eos.mjs docs --write',
@@ -26,7 +39,7 @@ const BANNER = (source) => [
   '     Editing this file by hand is pointless: the next --write overwrites it, and --check fails',
   '     the build in the meantime. Change the policy instead; the prose follows. -->',
   '',
-].join('\n');
+]).join('\n');
 
 const esc = (s) => String(s ?? '').replace(/\|/g, '\\|').replace(/\n+/g, ' ').trim();
 
@@ -41,6 +54,12 @@ export function renderGateReference(gates) {
   for (const g of gates.gates) {
     out.push('', `## ${g.code} · \`${g.id}\``, '', `**${esc(g.title)}**`, '');
     if (g.summary) out.push(esc(g.summary), '');
+    if (g.enforces?.length) {
+      out.push('Also enforces — codes the method names that have no gate of their own:', '',
+        '| Code | What | Through check |', '|---|---|---|');
+      for (const e of g.enforces) out.push(`| ${e.code} | ${esc(e.title)} | ${e.checks.map((c) => `\`${c}\``).join(', ')} |`);
+      out.push('');
+    }
     out.push('| Check | What it verifies | How to satisfy it |', '|---|---|---|');
     for (const c of g.checks) out.push(`| \`${c.id}\` | ${esc(c.title)} | ${esc(c.fix)} |`);
   }
@@ -110,11 +129,43 @@ export function renderEvidenceGraph(snapshot) {
   return out.join('\n');
 }
 
+const ACTION_LABELS = {
+  en: {
+    title: 'Action map',
+    intro: (n) => `${n} actions. \`eos next\` names one of them and hands it to the agent or prompt below. This page is a projection of \`.eos/agent-map.json\` — the file the router reads — so it cannot disagree with what \`eos next\` recommends. The curated, phase-by-phase overview is [agent-map.md](../agent-map.md).`,
+    head: '| Action | Copilot agent | Prompt | Skills | Handoff |',
+    builtin: '(built-in)',
+  },
+  zh: {
+    title: '动作映射',
+    intro: (n) => `共 ${n} 个动作。\`eos next\` 会给出其中一个，并把它交给下表中的 Agent 或 Prompt。本页是 \`.eos/agent-map.json\`（路由器读取的文件）的投影，因此不会与 \`eos next\` 的推荐不一致。按阶段整理的人工概览见 [agent-map.md](../agent-map.md)。交接说明（Handoff）是写给 Agent 的指令，保留策略中的英文原文。`,
+    head: '| 动作 | Copilot Agent | Prompt | 技能 | 交接说明（英文原文） |',
+    builtin: '（内置）',
+  },
+};
+
+/** The action map: which agent, prompt and skills each routed action uses — out of .eos/agent-map.json. */
+export function renderActions(agentMap, lang = 'en') {
+  const L = ACTION_LABELS[lang];
+  const actions = Object.entries(agentMap?.actions || {});
+  const out = [BANNER('.eos/agent-map.json', lang), `# ${L.title}`, '', L.intro(actions.length), '', L.head, '|---|---|---|---|---|'];
+  for (const [id, a] of actions) {
+    const agent = a.agent ? (a.agent === 'agent' ? `\`agent\` ${L.builtin}` : `\`${a.agent}\``) : '—';
+    const prompt = a.prompt ? `\`/${a.prompt}\`` : '—';
+    const skills = (a.skills || []).length ? a.skills.map((s) => `\`${s}\``).join(', ') : '—';
+    out.push(`| \`${id}\` | ${agent} | ${prompt} | ${skills} | ${esc(a.handoff) || '—'} |`);
+  }
+  out.push('');
+  return out.join('\n');
+}
+
 /** Everything EOS generates, as path -> content. */
 export function generateDocs(snapshot) {
   return {
     [`${GENERATED_DIR}/gates.md`]: renderGateReference(snapshot.gates),
     [`${GENERATED_DIR}/workflow.md`]: renderWorkflow(snapshot.workflow),
     [`${GENERATED_DIR}/evidence-graph.md`]: renderEvidenceGraph(snapshot),
+    [`${GENERATED_DIR}/actions.md`]: renderActions(snapshot.agentMap, 'en'),
+    [`${GENERATED_DIR_ZH}/actions.md`]: renderActions(snapshot.agentMap, 'zh'),
   };
 }

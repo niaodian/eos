@@ -908,6 +908,10 @@ node .github/hooks/validate-config.mjs
 | S9 | error | hook JSON is legal and event names are valid |
 | S10 | error/warn | Every `.agent.md` has `name` (error; if missing, Chat will not list it by name) + `description` (warn) |
 | S11 | warn | Every `.prompt.md` has `description` |
+| S12 | error/warn | `.eos/project.json` is valid; a stack manifest with no declaration is an error (a Node-only repo warns) |
+| S13 | error/warn | Workflow, gates and agent map load and cross-reference (gates, states, agents, prompts, the codes a gate `enforces`); a profile that requires the compliance boundary has it; an absent file warns |
+| S14 | error | The commands in the always-on workspace rule match the declared stack |
+| S15 | error | Prompts, agents, instructions, skills and agent-map handoffs cite only gates, gate codes, commands, states, transitions, prompts, agents and scripts that exist ([ADR-011](../adr/011-prompts-cite-only-the-policy.md)) |
 
 > Expected output: `PASS`. Any **error** must be fixed before continuing; **warn** is handled case by case.
 > (The above are the checks actually implemented in current `validate-config.mjs`.)

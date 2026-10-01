@@ -7,7 +7,8 @@
 
 > **你并不需要靠这张表来干活。** `.eos/agent-map.json` 才是 Router 读取的机器可读版本：它把一个动作
 > 映射到一个主 agent（或 prompt）加最小 skill 链，而 `eos next` 已经把这个映射解析好交给你了。
-> 本页是面向人类的投影——想看全景时读它，而不是为了给当前这一步挑 skill。
+> 本页是按阶段人工整理的概览——想看全景时读它，而不是为了给当前这一步挑 skill。逐个动作的投影
+> 由该文件生成并在 CI 中校验：[generated/actions.md](generated/actions.md)。
 
 | 阶段 | 使用（skills / agents） |
 |---|---|

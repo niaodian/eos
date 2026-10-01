@@ -32,7 +32,7 @@ applyTo: "**/*.{sql,prisma}"
 - Every deletion of user data is audited (who/when/what), without logging the data itself.
 
 ## API Contract (contract-first)
-- Define `api/openapi.yaml` BEFORE implementation. Version with `/v1` path prefix.
+- Define `api/openapi.yaml` BEFORE implementation. Version with a `/v1/` path prefix.
 - Breaking changes require a new version; deprecate, don't mutate. Additive changes stay backward-compatible.
 - Deprecation policy: mark deprecated in OpenAPI + send `Deprecation` and `Sunset` response headers; announce
   a migration window (e.g. ≥ 2 releases / 90 days) and a changelog entry before removal. Never remove without notice.

@@ -278,6 +278,10 @@
       "version": "2.0.0",
       "waivable": false,
       "bindsProductTree": true,
+      "enforces": [
+        { "code": "G6", "title": "Development — the declared lint, typecheck and test commands pass (code review stays a human control)", "checks": ["tests-executed"] },
+        { "code": "G-EVAL", "title": "Eval (conditional, LLM/agentic) — every LLM-backed criterion has an eval whose measured score meets its threshold", "checks": ["eval-threshold"] }
+      ],
       "title": "Story is verified by executed tests",
       "summary": "Tests really ran for the declared stack against a recorded product tree, every story acceptance criterion has a trace row backed by a real test file and a real run, evals meet their threshold for agentic products, and the evidence belongs to the current inputs.",
       "checks": [

@@ -28,6 +28,21 @@
             "description": "This gate asserts something about the PRODUCT (not just about a document), so its evidence records the identity of the tree it ran against and expires when that tree changes.",
             "type": "boolean"
           },
+          "enforces": {
+            "description": "Gate codes the method names in prose (prompts, instructions, docs) that have no gate of their own because this gate's checks enforce them — G6 (development) and G-EVAL are checks inside `verified`. Declaring them makes every gate code a prompt may cite machine-checked vocabulary, not prose (validate-config S15, ADR-011). Documentation only: not part of the policy lock.",
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["code", "title", "checks"],
+              "properties": {
+                "code": { "type": "string", "pattern": "^G[0-9A-Z-]+$" },
+                "title": { "type": "string", "minLength": 1 },
+                "checks": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "pattern": "^[a-z0-9-]+$" } }
+              }
+            }
+          },
           "checks": {
             "type": "array",
             "minItems": 1,

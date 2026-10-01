@@ -452,6 +452,37 @@ test('docs --check fails when the POLICY moved and the prose did not', () => {
   assert.equal(r.code, 1, 'prose describing a rule the engine no longer applies must fail the build');
 });
 
+test('the action map is generated in English and Chinese from one source, in lockstep', () => {
+  // [#10] docs/eos/agent-map.md is a hand-curated overview; the action-by-action mapping the router
+  // uses is a projection of .eos/agent-map.json, in both languages, so neither can drift from it.
+  const dir = project({ '.eos/project.json': APP_PROJECT });
+  assert.equal(run(dir, ['docs', '--write']).code, 0);
+  const en = readFileSync(join(dir, 'docs/eos/generated/actions.md'), 'utf8');
+  const zh = readFileSync(join(dir, 'docs/zh/generated/actions.md'), 'utf8');
+  assert.match(en, /^# Action map$/m);
+  assert.match(zh, /^# 动作映射$/m);
+  const rows = (doc) => doc.split('\n').filter((l) => l.startsWith('| `'));
+  const map = JSON.parse(readFileSync(join(dir, '.eos/agent-map.json'), 'utf8'));
+  assert.equal(rows(en).length, Object.keys(map.actions).length);
+  // Identifiers and the policy's own text are identical; only the page around them is localised.
+  assert.deepEqual(rows(zh).map((r) => r.replace('（内置）', '(built-in)')), rows(en));
+
+  map.actions['write-prd'].handoff = 'A different instruction for the agent.';
+  write(dir, '.eos/agent-map.json', map);
+  const r = run(dir, ['docs', '--check']);
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.out, /docs\/eos\/generated\/actions\.md/);
+  assert.match(r.out, /docs\/zh\/generated\/actions\.md/, 'a policy change makes BOTH languages stale');
+});
+
+test('the gate reference names the codes a gate enforces', () => {
+  const dir = project({ '.eos/project.json': APP_PROJECT });
+  run(dir, ['docs', '--write']);
+  const doc = readFileSync(join(dir, 'docs/eos/generated/gates.md'), 'utf8');
+  assert.match(doc, /\| G6 \| Development .* \| `tests-executed` \|/);
+  assert.match(doc, /\| G-EVAL \| Eval .* \| `eval-threshold` \|/);
+});
+
 test('docs without a flag writes nothing', () => {
   const dir = project({ '.eos/project.json': APP_PROJECT });
   const r = run(dir, ['docs']);

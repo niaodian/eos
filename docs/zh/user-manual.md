@@ -955,6 +955,10 @@ node .github/hooks/validate-config.mjs
 | S9 | error | hook JSON 合法且 event 名有效 |
 | S10 | error/warn | 每个 `.agent.md` 有 `name`（error，缺则 Chat 不按名列出）+ `description`（warn） |
 | S11 | warn | 每个 `.prompt.md` 有 `description` |
+| S12 | error/warn | `.eos/project.json` 合法；有技术栈清单却没有声明为 error（仅 Node 仓库为 warn） |
+| S13 | error/warn | workflow、gates 与 agent map 能加载且相互引用一致（门禁、状态、Agent、Prompt、门禁 `enforces` 的编码）；要求合规边界的 Profile 必须声明它；文件缺失为 warn |
+| S14 | error | always-on 工作区规则中的命令与声明的技术栈一致 |
+| S15 | error | Prompt、Agent、Instructions、Skill 与 agent-map 交接说明只能引用真实存在的门禁、门禁编码、命令、状态、迁移、Prompt、Agent 与脚本（[ADR-011](../adr/011-prompts-cite-only-the-policy.md)） |
 
 > 期望输出：`PASS`。任何 **error** 必须先修复再继续；**warn** 视情况处理。
 > （以上为当前 `validate-config.mjs` 实际实现的检查项。）

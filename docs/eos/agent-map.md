@@ -2,8 +2,10 @@
 
 > **You do not need this table to work.** `.eos/agent-map.json` is the machine-readable version the
 > router reads: it maps one action to one primary agent (or prompt) plus the minimal skill chain, and
-> `eos next` hands you that mapping already resolved. This page is the human-readable projection —
-> read it when you want the whole landscape, not to pick a skill for the step you are on.
+> `eos next` hands you that mapping already resolved. This page is a hand-curated overview by phase —
+> read it when you want the whole landscape, not to pick a skill for the step you are on. The
+> action-by-action projection of that file is generated and checked in CI:
+> [generated/actions.md](generated/actions.md).
 
 | Phase | Use (skills / agents) |
 |---|---|

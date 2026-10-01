@@ -362,8 +362,12 @@ a minimal BMAD skill chain. Developers never choose from the 73 installed skills
 
 Rules: one action → one primary agent; the skill list stays minimal; a referenced agent file or
 prompt file that does not exist makes the action `BLOCKED` with an install/alternative path
-(`eos doctor` reports it) instead of silently recommending something unusable. The human-readable
-projection of this map is [agent-map.md](agent-map.md); the JSON is what the router reads.
+(`eos doctor` reports it) instead of silently recommending something unusable. The JSON is what the
+router reads; [generated/actions.md](generated/actions.md) is its projection, generated in English and
+Chinese by `eos docs` and checked in CI, and [agent-map.md](agent-map.md) is the curated overview by
+phase. Every gate, command, state, transition, prompt, agent and script a prompt, agent file,
+instruction or handoff cites must exist in the policy: `validate-config` S15 fails the build otherwise
+([ADR-011](../adr/011-prompts-cite-only-the-policy.md)).
 
 ## 9. Handoff context package
 

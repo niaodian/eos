@@ -34,6 +34,7 @@
       "description": "Pure logic and single-module behaviour. No repository fixtures beyond a temp dir.",
       "budgetMs": 15000,
       "files": [
+        ".github/eos/alignment.test.mjs",
         ".github/eos/atomic.test.mjs",
         ".github/eos/migrate.test.mjs",
         ".github/eos/packs.test.mjs",

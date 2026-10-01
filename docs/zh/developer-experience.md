@@ -331,8 +331,11 @@ BMAD Skill 链。开发者永远不需要从 73 个已安装 Skill 中挑选。
 ```
 
 规则：一个动作 → 一个主 Agent；Skill 列表保持最小；被引用的 Agent 文件或 Prompt 文件不存在时，该动作
-变为 `BLOCKED` 并给出安装/替代路径（由 `eos doctor` 报告），而不是静默推荐一个用不了的东西。这张映射表
-面向人类的投影是 [agent-map.md](agent-map.md)；Router 读取的是 JSON。
+变为 `BLOCKED` 并给出安装/替代路径（由 `eos doctor` 报告），而不是静默推荐一个用不了的东西。Router 读取的
+是 JSON；[generated/actions.md](generated/actions.md) 是它的投影，由 `eos docs` 以中英文生成并在 CI
+中校验；[agent-map.md](agent-map.md) 是按阶段人工整理的概览。Prompt、Agent 文件、Instructions 与交接
+说明中引用的每个门禁、命令、状态、迁移、Prompt、Agent 和脚本都必须在策略中存在，否则
+`validate-config` S15 会让构建失败（[ADR-011](../adr/011-prompts-cite-only-the-policy.md)）。
 
 ## 9. 交接上下文包
 

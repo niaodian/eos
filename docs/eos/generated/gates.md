@@ -127,6 +127,13 @@ The story is context-self-contained: it references real PRD acceptance criteria,
 
 Tests really ran for the declared stack against a recorded product tree, every story acceptance criterion has a trace row backed by a real test file and a real run, evals meet their threshold for agentic products, and the evidence belongs to the current inputs.
 
+Also enforces — codes the method names that have no gate of their own:
+
+| Code | What | Through check |
+|---|---|---|
+| G6 | Development — the declared lint, typecheck and test commands pass (code review stays a human control) | `tests-executed` |
+| G-EVAL | Eval (conditional, LLM/agentic) — every LLM-backed criterion has an eval whose measured score meets its threshold | `eval-threshold` |
+
 | Check | What it verifies | How to satisfy it |
 |---|---|---|
 | `product-tree-bound` | the evidence records the product tree it was produced from | Run this gate inside a git repository — EOS binds a verification to the source, tests, prompts and eval data it actually ran against. |
