@@ -47,7 +47,9 @@ test('journey: an untouched template with product code is routed to activation, 
     'package.json': '{ "name": "demo", "scripts": { "test": "node --version" } }\n',
   });
   const r = runJson(dir, ['next']);
-  assert.equal(r.json.recommendedAction.id, 'complete-local-activation');
+  // 2.0: the activation step that fixes this is declaring the stack — `eos init` names the packs that match.
+  assert.equal(r.json.recommendedAction.id, 'declare-project');
+  assert.match(r.json.recommendedAction.command, /eos\.mjs init$/);
   assert.equal(r.code, 2);
   assert.match(JSON.stringify(r.json.blockers), /config-only/);
 });

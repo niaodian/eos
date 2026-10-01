@@ -3,7 +3,10 @@
 //
 // Exit codes (contract — see docs/eos/developer-experience.md §10.1):
 //   0 PASS / nothing blocking · 1 FAIL or rejected transition · 2 BLOCKED/PENDING/STALE · 3 ERROR
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { activeScope } from '../lib/router.mjs';
+import { loadPrivateKey } from '../lib/signing.mjs';
 import { loadProviders, consult } from '../adapters/contract.mjs';
 
 export const EXIT = { OK: 0, FAIL: 1, BLOCKED: 2, ERROR: 3 };
@@ -60,3 +63,10 @@ export async function consultProviders(snapshot, gateId) {
   }
   return out;
 }
+
+/**
+ * The one place EOS reads a private key: a file the user handed it with --key, for `release sign`
+ * and `policy export --sign`. Read, used in memory, never logged, never written. (ADR-012)
+ * @throws when the file is missing or is not an Ed25519 private key
+ */
+export const privateKeyFromFile = (path) => loadPrivateKey(readFileSync(resolve(path), 'utf8'));

@@ -21,6 +21,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname } from 'node:path';
 import { appendEvent, readEvents, verifyChain, readLedgerSnapshot, LEDGER_PATH, LEDGER_HEAD_PATH, LEDGER_LOCK_PATH } from './lib/ledger.mjs';
 import { writeFileAtomic, withLock, LockTimeoutError, renameWithRetry, lockBusyOnWindows } from './lib/atomic.mjs';
+import { SPAWN_TIMEOUT_MS } from './test-spawn.mjs';
 
 const EOS_DIR = dirname(fileURLToPath(import.meta.url));
 // These are ESM SPECIFIERS embedded in snippets run by a child `node`, not filesystem paths. On
@@ -35,16 +36,25 @@ const dirs = [];
 const sandbox = () => { const d = mkdtempSync(join(tmpdir(), 'eos-atomic-')); dirs.push(d); return d; };
 test.after(() => { for (const d of dirs) rmSync(d, { recursive: true, force: true }); });
 
+// Scaled from the harness's spawn guard, so a slow runner (EOS_TEST_SPAWN_TIMEOUT_MS) moves every limit
+// together and a process's own guard always fires before its test's limit. Defaults: 30s / 60s / 120s.
+const WRITER_LIMIT = SPAWN_TIMEOUT_MS / 2;
+const TEST_LIMIT = SPAWN_TIMEOUT_MS;
+const LONG_TEST_LIMIT = 2 * SPAWN_TIMEOUT_MS;
+
 /** Run a snippet in its own process so the OS, not the event loop, schedules the contention. */
 const node = (code) => new Promise((resolve) => {
-  execFile(process.execPath, ['--input-type=module', '-e', code], { timeout: 30000 }, (err, stdout, stderr) => {
-    resolve({ code: err ? (err.code ?? 1) : 0, out: `${stdout}${stderr}` });
+  execFile(process.execPath, ['--input-type=module', '-e', code], { timeout: WRITER_LIMIT }, (err, stdout, stderr) => {
+    // A killed process has no exit code, and on Windows it reports 1 — say it was killed, or a slow
+    // runner reads as "the writer failed".
+    const killed = err?.killed ? `killed after ${WRITER_LIMIT}ms — the runner is slow (raise EOS_TEST_SPAWN_TIMEOUT_MS) or it hung\n` : '';
+    resolve({ code: err ? (err.code ?? 1) : 0, out: `${killed}${stdout}${stderr}` });
   });
 });
 
 // --------------------------------------------------------------------------------- the real race
 
-test('concurrent appends from separate processes produce one unforked chain', { timeout: 60000 }, async () => {
+test('concurrent appends from separate processes produce one unforked chain', { timeout: TEST_LIMIT }, async () => {
   const dir = sandbox();
   const WRITERS = 8;
   const results = await Promise.all(
@@ -68,7 +78,7 @@ test('concurrent appends from separate processes produce one unforked chain', { 
   assert.ok(v.ok);
 });
 
-test('the head record still points at the last event after concurrent appends', { timeout: 60000 }, async () => {
+test('the head record still points at the last event after concurrent appends', { timeout: TEST_LIMIT }, async () => {
   const dir = sandbox();
   await Promise.all(Array.from({ length: 6 }, (_, i) => node(`
     import { appendEvent } from ${JSON.stringify(LEDGER_MODULE)};
@@ -80,7 +90,7 @@ test('the head record still points at the last event after concurrent appends', 
   assert.equal(head.hash, events.at(-1).hash);
 });
 
-test('the lock is released, not leaked, once the writers finish', { timeout: 60000 }, async () => {
+test('the lock is released, not leaked, once the writers finish', { timeout: TEST_LIMIT }, async () => {
   const dir = sandbox();
   await Promise.all(Array.from({ length: 4 }, () => node(`
     import { appendEvent } from ${JSON.stringify(LEDGER_MODULE)};
@@ -110,7 +120,7 @@ test('a failed atomic write leaves the previous version intact', () => {
   assert.equal(readFileSync(target, 'utf8'), 'original\n');
 });
 
-test('concurrent atomic writers never yield a partially written file', { timeout: 60000 }, async () => {
+test('concurrent atomic writers never yield a partially written file', { timeout: TEST_LIMIT }, async () => {
   const dir = sandbox();
   const target = join(dir, 'contended.json');
   const payloads = Array.from({ length: 6 }, (_, i) => JSON.stringify({ writer: i, filler: 'x'.repeat(20000) }));
@@ -125,7 +135,7 @@ test('concurrent atomic writers never yield a partially written file', { timeout
 
 // --------------------------------------------------------------------------------- the lock itself
 
-test('withLock serialises a read-modify-write across processes', { timeout: 60000 }, async () => {
+test('withLock serialises a read-modify-write across processes', { timeout: TEST_LIMIT }, async () => {
   const dir = sandbox();
   const counter = join(dir, 'counter.txt');
   const lock = join(dir, '.lock');
@@ -201,7 +211,7 @@ test('a genuinely truncated ledger is still reported as truncation', () => {
 // make a busy repository crawl. A reader can therefore read the ledger before an append and the
 // head record after it — and that pair used to read as "line(s) were removed from the end".
 // CI caught it under coverage. readLedgerSnapshot re-reads a disagreement before believing it.
-test('a reader racing a writer never mistakes a write in progress for truncation', { timeout: 120000 }, async () => {
+test('a reader racing a writer never mistakes a write in progress for truncation', { timeout: LONG_TEST_LIMIT }, async () => {
   const dir = sandbox();
   appendEvent(dir, { type: 'note', detail: 'seed', scope: { type: 'product', id: 'product' } });
   const writer = node(`
@@ -310,7 +320,7 @@ test('on Windows a delete-pending lock reads as busy; elsewhere EPERM is still a
   assert.equal(lockBusyOnWindows(Object.assign(new Error('x'), { code: 'ENOENT' }), 'win32'), false);
 });
 
-test('a reader never misreads a SLOW writer (Windows-sized gaps, on any platform)', { timeout: 120000 }, async () => {
+test('a reader never misreads a SLOW writer (Windows-sized gaps, on any platform)', { timeout: LONG_TEST_LIMIT }, async () => {
   // A load test of the protocol appendEvent follows — lock, append, commit the head, release — with
   // a random pause between append and commit. Honest limit: on a fast machine this does NOT reproduce
   // the Windows failure (the previous reader also passes here); scheduler-granularity phase-locking

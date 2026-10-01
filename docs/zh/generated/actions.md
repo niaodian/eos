@@ -8,12 +8,13 @@
 
 # 动作映射
 
-共 27 个动作。`eos next` 会给出其中一个，并把它交给下表中的 Agent 或 Prompt。本页是 `.eos/agent-map.json`（路由器读取的文件）的投影，因此不会与 `eos next` 的推荐不一致。按阶段整理的人工概览见 [agent-map.md](../agent-map.md)。交接说明（Handoff）是写给 Agent 的指令，保留策略中的英文原文。
+共 28 个动作。`eos next` 会给出其中一个，并把它交给下表中的 Agent 或 Prompt。本页是 `.eos/agent-map.json`（路由器读取的文件）的投影，因此不会与 `eos next` 的推荐不一致。按阶段整理的人工概览见 [agent-map.md](../agent-map.md)。交接说明（Handoff）是写给 Agent 的指令，保留策略中的英文原文。
 
 | 动作 | Copilot Agent | Prompt | 技能 | 交接说明（英文原文） |
 |---|---|---|---|---|
 | `fix-eos-configuration` | — | `/validate-config` | — | EOS's own configuration does not load. Fix only the reported file(s); change nothing else. |
 | `complete-local-activation` | — | `/eos-init` | — | Walk the one-time activation: declare .eos/project.json, branch protection, CODEOWNERS, approval baseline. |
+| `declare-project` | — | — | — | Run `eos init` to see the tracks and starter packs, pick the pack closest to this product, then `eos init <pack> --track standard\|regulated --write`. Edit stacks and commands to what CI really runs; change nothing else. |
 | `frame-the-problem` | `eos-discovery` | — | `bmad-brainstorming`, `bmad-agent-analyst` | Converge the idea into one falsifiable problem statement with a measurable success metric, and record it in docs/discovery.md + docs/discovery.json. |
 | `expand-requirements` | — | `/requirements` | `bmad-agent-pm`, `eos-operational-readiness` | Expand the approved problem into functional + NFR + operational-readiness requirements in docs/requirements.md + docs/requirements.json. Every operational concern is ADOPT / SKIP+reason / DEFER+owner+trigger. |
 | `write-prd` | — | `/spec` | `bmad-prd` | Turn docs/requirements.md into docs/prd.md; every requirement gets addressable AC<n>.<n> ids that the PRD DEFINES, not merely mentions. |

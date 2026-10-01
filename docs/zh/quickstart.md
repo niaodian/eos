@@ -12,7 +12,7 @@
 ## 前置条件（local-first——无需任何企业设施）
 | 工具 | 用于 | 缺失时 |
 |---|---|---|
-| **Node.js**（18+） | 验证器、hooks、JS/TS 测试与 eval | 必需——唯一的硬依赖 |
+| **Node.js**（20.10+） | `eos` CLI、验证器、hooks、JS/TS 测试与 eval | 必需——唯一的硬依赖（`npx --offline eos` 快捷方式需要 npm 10.9+，Node 22 自带） |
 | **VS Code + GitHub Copilot** | `eos-*` 智能体、`/eos-*` 指令与常驻规则 | 引导式流程必需；`eos.mjs` CLI 本身不依赖它 |
 | **BMAD 技能**（`bmad-*`） | 各阶段工作流（`bmad-prd`、`bmad-architecture`、`bmad-create-story` 等） | 引导式流程必需——EOS 只做编排，不重复实现它们。用 `node .github/hooks/eos-doctor.mjs --deep` 核验 |
 | **`gh` CLI**（已登录） | 创建远端仓库，以及在 `/eos-init` 中验证分支保护 | **可选**：也可在 GitHub 网页端完成。用 `gh auth login` 配置 |
@@ -52,9 +52,10 @@ EOS **原生在 Windows 上运行**（PowerShell 或 Command Prompt）——核�
 ## Day-1（可直接复制——与用户手册 §3.4 完全一致的序列）
 
 ```sh
-npx degit niaodian/eos#eos-1.22.0 my-new-app && cd my-new-app
+npx degit niaodian/eos#eos-2.0.0 my-new-app && cd my-new-app
 git init && git add -A && git commit -q -m "chore: scaffold from eos"
 node .github/hooks/validate-config.mjs        # 期望 PASS
+node .github/eos/eos.mjs init config-only --write   # 声明项目：还没有代码（或 init <pack>；--track regulated）
 code .                                        # 必须在项目目录*内部*执行——见下方警告
 ```
 
@@ -78,16 +79,18 @@ gh repo create my-new-app --private --source=. --remote=origin --push
    记录在 `docs/eos/activation.md`。
 2. **`/eos-next`**（或 `eos-guide` agent）——照着它说的做。然后重复。
 
-> **`.eos/project.json` 在 Day-1 保持 `config-only` 是正确的。** 这不是你欠下的任务：技术栈属于
-> 不可逆决策，EOS 刻意把它推迟到 **Phase 4（架构阶段）**，由 ADR 正式锁定。只有当真实的技术栈
-> 清单文件（`package.json`、`pyproject.toml`、`go.mod` 等）已经存在、而声明仍说"没有代码"时，
-> 它才会变成错误——因为那时质量门禁会空转通过。
+> **Day-1 就声明项目——`config-only` 是诚实的答案。** 模板自带的 `.eos/project.json` 描述的是
+> EOS（`"templateDefault": true`），所以 `eos next` 会先把你引向 `eos init`。还没有代码时，运行
+> `eos init config-only --write`（适用时加 `--track regulated`）：技术栈属于不可逆决策，EOS 刻意
+> 把它推迟到 **Phase 4（架构阶段）**，由 ADR 正式锁定。只有当真实的技术栈清单（`pyproject.toml`、
+> `go.mod`、带依赖的 `package.json` 等）已经存在、而声明仍说"没有代码"时，它才会变成错误。此时
+> `eos next` 会把你引回 `eos init`，它会点名相匹配的包，而 `eos init <pack> --write` 会保留你的轨道。
 
 > **两个名字很像、但做的事完全不同。**
 > `/eos-init`（Copilot Chat）是上面那个**硬化引导**——这才是你 Day-1 需要的那个。
-> `node .github/eos/eos.mjs init --write`（终端）只写 `.vscode/tasks.json`，让
-> **EOS: Next / Resume / Verify Current Gate / Release Status** 出现在 Run Task 菜单里。
-> 它是便利设施，不是必经步骤。
+> `node .github/eos/eos.mjs init`（终端）负责声明项目——它的治理轨道与起步包——加上 `--write`
+> 时还会写 `.vscode/tasks.json`，让 **EOS: Next / Resume / Verify Current Gate / Release Status**
+> 出现在 Run Task 菜单里。
 
 更喜欢终端？每个 prompt 都有等价的 CLI——`eos next`、`eos resume`、`eos status`——两者是同一个引擎。
 在 VS Code 里 Chat 是更短的路径；CLI 是 CI 实际运行的那条。
@@ -108,10 +111,10 @@ gh repo create my-new-app --private --source=. --remote=origin --push
 - 之后开了新对话？`node .github/eos/eos.mjs resume`（或 `/eos-resume`）会恢复你正在做的事、
   最近一次通过的门禁和当前 Blocker——不需要重读任何文档。
 
-> 首次：在 `.github/instructions/00-workspace.instructions.md` 填项目事实——
-> 从 `docs/eos/stack-presets.md` 复制你的栈预设（Node/Python/Go/Java/Rust/.NET），并把同一套命令
-> 写进 **`.eos/project.json`**，产品质量门禁才会真的跑你的测试。模板初始为
-> `projectType: "config-only"`；有了真实代码还留着它，会**直接失败**，而不是被无声跳过。
+> 首次且已定栈：`eos init <pack> --write` 把它声明进 **`.eos/project.json`**，产品质量门禁才会
+> 真的跑你的测试；再用 `eos stack sync --write` 把同一套命令写进
+> `.github/instructions/00-workspace.instructions.md`（所有技术栈见 `docs/eos/stack-presets.md`）。
+> 有了真实代码还停留在 `config-only`，会**直接失败**，而不是被无声跳过。
 
 ## Happy Path（最短入口）
 ```
@@ -128,6 +131,8 @@ node .github/eos/eos.mjs next
 晋级工作：     node .github/eos/eos.mjs transition --scope story --id <id> --to <STATE>
 一次性硬化：   /eos-init   (branch protection + CODEOWNERS + 审批基线 → docs/eos/activation.md)
 发布前：       node .github/eos/eos.mjs release-status   然后 /release-gate
+声明项目：     node .github/eos/eos.mjs init [<pack>] [--track regulated] --write
+更短的写法：   npx --offline eos <command>   (npm 10.9+) · npm run -s eos -- <command>
 自检：         node .github/hooks/validate-config.mjs · node .github/eos/eos.mjs doctor
 产品门禁：     node .github/hooks/project-gate.mjs   （跑 .eos/project.json 的命令——任意技术栈）
 本地 CI：      act push -j verify   (validate-config + eos-doctor + tests + evals；需 Docker)

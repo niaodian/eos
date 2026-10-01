@@ -7,6 +7,7 @@ import { resolveAction, skillDiagnostics } from './registry.mjs';
 import { evaluateGate, isBlocking } from './gates.mjs';
 import { deriveProductState, classificationBlock } from './transitions.mjs';
 import { scopeState, changeTypeOf, gatePolicy } from './state.mjs';
+import { trackSummary } from './track.mjs';
 
 const CLI = 'node .github/eos/eos.mjs';
 
@@ -14,11 +15,13 @@ const CLI = 'node .github/eos/eos.mjs';
 const BOOTSTRAP_MAP = {
   'fix-eos-configuration': { agent: null, prompt: 'validate-config', skills: [] },
   'complete-local-activation': { agent: null, prompt: 'eos-init', skills: [] },
+  'declare-project': { agent: null, prompt: null, skills: [] },
 };
 
 const TITLES = {
   'fix-eos-configuration': 'Repair the EOS configuration',
   'complete-local-activation': 'Complete local activation',
+  'declare-project': 'Declare your project and choose its governance track',
   'frame-the-problem': 'Frame the problem',
   'expand-requirements': 'Expand the requirements',
   'write-prd': 'Write the PRD',
@@ -73,8 +76,8 @@ const RELEASE_STAGE = {
 
 /** Which repair action a failed check maps to. One check → one action, so routing stays stable. */
 const CHECK_ACTION = {
-  'project-declaration': 'complete-local-activation',
-  'declaration-matches-repo': 'complete-local-activation',
+  'project-declaration': 'declare-project',
+  'declaration-matches-repo': 'declare-project',
   'workflow-profile': 'complete-local-activation',
   'activation-ledger': 'complete-local-activation',
   'discovery-written': 'frame-the-problem',
@@ -109,6 +112,8 @@ const CHECK_ACTION = {
   'eval-threshold': 'design-eval-cases',
   'evidence-current': 'refresh-stale-evidence',
   'candidate-identity': 'repair-release',
+  'manifest-signature': 'repair-release',
+  'release-integrity': 'repair-release',
   'candidate-quality': 'repair-verification',
   'stories-verified': 'repair-release',
   'story-evidence-current': 'refresh-stale-evidence',
@@ -218,6 +223,7 @@ export function route(snapshot, { now = new Date() } = {}) {
     alternatives,
     blockers,
     exitCode,
+    ...(snapshot.workflow ? { track: trackSummary(snapshot) } : {}),
   });
 
   // --- EOS itself must load before anything can be recommended ---------------------------------
@@ -271,8 +277,11 @@ export function route(snapshot, { now = new Date() } = {}) {
       take(action(snapshot, CHECK_ACTION[driver?.id] || 'complete-local-activation', {
         reason: driver?.detail || 'local activation is incomplete',
         targetGate: 'activation',
-        command: `${CLI} check --gate activation`,
-        doneWhen: ['`eos check --gate activation` passes'],
+        // Declaring the project is done with `init`, not by re-running the gate that reports it.
+        command: ['project-declaration', 'declaration-matches-repo'].includes(driver?.id) ? `${CLI} init` : `${CLI} check --gate activation`,
+        doneWhen: ['project-declaration', 'declaration-matches-repo'].includes(driver?.id)
+          ? ['.eos/project.json describes this project (`eos init <pack> --write`)', '`eos status` names the governance track']
+          : ['`eos check --gate activation` passes'],
       }));
       blockers.push(...blockersOf(g));
       exitCode = 2;

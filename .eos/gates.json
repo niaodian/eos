@@ -15,13 +15,13 @@
           "id": "project-declaration",
           "title": ".eos/project.json exists and validates",
           "evaluator": "projectDeclaration",
-          "fix": "Copy your stack's block from docs/eos/stack-presets.md into .eos/project.json (projectType + stacks + commands.test)."
+          "fix": "Run `node .github/eos/eos.mjs init`: choose a governance track and a starter pack (config-only until the stack is decided), then `init <pack> --write`. docs/eos/stack-presets.md has every stack."
         },
         {
           "id": "declaration-matches-repo",
           "title": "the declaration is not the untouched template once code exists",
           "evaluator": "declarationMatchesRepo",
-          "fix": "Change projectType from \"config-only\" to \"application\" (or \"library\") and declare commands.test."
+          "fix": "Still config-only: run `node .github/eos/eos.mjs init` — it names the packs that match the code — then `init <pack> --write` (your track carries over). Otherwise add the stack to \"stacks\" with its commands."
         },
         {
           "id": "workflow-profile",
@@ -321,7 +321,7 @@
       "id": "release-ready",
       "code": "G8",
       "scope": "release",
-      "version": "3.0.0",
+      "version": "4.0.0",
       "waivable": false,
       "bindsProductTree": true,
       "title": "Release candidate is shippable",
@@ -338,6 +338,18 @@
           "title": "the candidate is a committed, identifiable tree",
           "evaluator": "releaseCandidateCommitted",
           "fix": "Commit the outstanding product changes; a release must name a tree that exists in history."
+        },
+        {
+          "id": "manifest-signature",
+          "title": "the release manifest is signed by the project's release key (required on the Regulated track)",
+          "evaluator": "releaseManifestSignature",
+          "fix": "Run `node .github/eos/eos.mjs release sign --release <id> --key <private-key-file>` with the key whose public half is release.signing.publicKey (`eos release keygen` creates one). A signature that is present must verify on every track."
+        },
+        {
+          "id": "release-integrity",
+          "title": "what ships is bound: artifact digests, provenance naming every artifact, the SBOM and the ledger head (required on the Regulated track)",
+          "evaluator": "releaseIntegrity",
+          "fix": "Build, then `node .github/eos/eos.mjs release bind --release <id> [--provenance <file>]` to record the artifacts, SBOM and ledger head; attest the build in CI (.github/workflows/eos-release.yml). `eos release verify --release <id>` shows each part."
         },
         {
           "id": "candidate-quality",

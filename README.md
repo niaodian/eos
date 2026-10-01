@@ -1,109 +1,198 @@
-# EOS Template — Engineering Operating System
+<div align="center">
 
-> 🌏 Chinese: **[README.zh.md](README.zh.md)** (full parity translation) — English is the reference language.
+# EOS — Engineering Operating System
 
-A portable, **local-first** engineering operating system for VS Code + GitHub Copilot,
-orchestrating the installed **BMAD** skills (73 `bmad-*`) across the full SDLC. Version: **eos-1.22.0**.
+**Evidence-gated delivery for AI-assisted teams — offline-first, zero dependencies, from idea to signed release.**
 
-**Supports two paradigms in one framework:**
-- **Traditional SaaS** (deterministic): transactions, resilience (circuit-breaker/backoff), REST/OpenAPI, RBAC/multi-tenancy, OTel observability.
-- **Agentic / LLM products** (probabilistic): prompt-as-artifact, tool allow-lists, eval-driven testing (G-EVAL), cognitive retry (reflection), token/cost tracing.
+[![Release](https://img.shields.io/github/v/release/niaodian/eos?display_name=tag&label=release)](https://github.com/niaodian/eos/releases/latest)
+[![EOS CI](https://github.com/niaodian/eos/actions/workflows/eos-ci.yml/badge.svg?branch=main)](https://github.com/niaodian/eos/actions/workflows/eos-ci.yml)
+[![CI platforms](https://img.shields.io/badge/CI-Linux%20%7C%20macOS%20%7C%20Windows-informational)](.github/workflows/eos-ci.yml)
+[![Provenance](https://img.shields.io/badge/provenance-SLSA%20v1%20attested-2ea44f)](https://github.com/niaodian/eos/attestations)
+[![Node](https://img.shields.io/badge/node-20%20%7C%2022-339933?logo=node.js&logoColor=white)](package.json)
+[![Dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)](package.json)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
-The two are **explicitly isolated** so a project can be either — or both — without paradigm cross-contamination.
+English · [简体中文](README.zh.md)
 
-## The loop (you do not need to read the manual)
+</div>
+
+AI assistants now write code faster than any team can review it. EOS keeps that speed honest. Every
+stage of delivery — problem, requirements, design, architecture, stories, code, release — passes a
+machine-checked gate; every verdict is bound to the exact commit it judged; every release can prove
+what it contains and where it was built. It runs entirely on your machine, inside VS Code with GitHub
+Copilot or from any terminal, with no services, no accounts and no dependencies.
+
+## Why EOS
+
+| The problem | What EOS does about it |
+|---|---|
+| **AI code slop** — plausible code with no spec and no tests, merged because it looked right | Work moves forward only on evidence. Gates run your real test commands on the commit and record the verdict with every input hash. Missing or stale evidence is refused; a missing tool is BLOCKED and a crashed one is ERROR — never PASS. |
+| **Invisible governance decay** — a gate quietly loosened, a prompt that cites a rule that no longer exists | The policy is locked: weakening any gate needs a written reason and a second person, or CI fails. The prompts and agents your AI reads may only cite gates, commands and transitions that really exist. |
+| **Supply-chain tampering** — a release that is not what was reviewed | A release manifest binds the artifacts, the SBOM and the ledger head. It can be signed with Ed25519 and bound to GitHub artifact attestations or SLSA provenance, and both are verified offline. |
+
+One engine, two tracks: a startup gets frictionless defaults, a regulated team turns the same checks
+into hard requirements. No fork, no second tool, no migration when you grow into it.
+
+## What makes it different
+
+- **Offline-first by construction.** EOS Core never touches the network: every check, gate and
+  verification runs locally on Node alone. The only ways out are explicit and opt-in — `eos policy sync`
+  fetches a central baseline, and providers you declare ask GitHub, through your own `gh` login, what a
+  laptop cannot know. Tests enforce that boundary.
+- **A tamper-evident ledger.** Promotions are events in an append-only, hash-chained log that survives
+  branches and merges. `eos ledger --verify` proves nothing was rewritten.
+- **Policy locks.** `.eos/policy.lock.json` pins every gate and workflow rule. A weakening without a
+  reasoned, approved lock fails CI, and an organisation can distribute a signed baseline that every
+  repository enforces locally.
+- **No prompt-to-gate drift.** The instructions your AI follows are checked against the machine policy,
+  so a prompt can never promise a gate, command or transition that does not exist.
+- **Evidence you can audit.** Each verdict records the commit, the gate version and the input hashes.
+  `eos report` turns the ledger into a governance report for one repository or a whole organisation.
+- **Any stack, both paradigms.** Node, Python, Go, Java, Rust and .NET; deterministic SaaS and
+  probabilistic LLM or agentic products with eval-driven gates — kept explicitly isolated.
+
+## Two tracks, one engine
+
+|  | **Standard** (default) | **Regulated** |
+|---|---|---|
+| Built for | open source, startups, internal products | finance, health, public sector, audited software |
+| Choose it | `eos init <pack>` | `eos init <pack> --track regulated` |
+| Cost to adopt | none — no keys, no secrets, no services | one release signing key and CI-produced evidence |
+| Gates and evidence | every SDLC gate; evidence may be recorded locally | the same gates; release evidence must come from CI |
+| Signed release manifest | verified when present, never required | required — unsigned or tampered blocks the release |
+| Build provenance | GitHub artifact attestations, verified when present | required for every artifact; SLSA Build Level 3 generator |
+| Weakening a gate | needs a written reason and a second person | the same, plus an optional central baseline (`eos policy sync`) |
+| Missing signature at release | NOT_APPLICABLE, with the command that adds it | FAIL — the release is blocked |
+
+Switching later is one command. Moving down to Standard is itself a policy weakening, so `eos next`
+shows it with the exact `eos policy lock --write --reason "<why>"` that acknowledges it.
+
+## Quickstart
+
+You need Node.js 20.10+ and Git. VS Code with GitHub Copilot is optional — the CLI works in any terminal.
+
+```bash
+# 1. Start from a pinned release and make it your repository
+npx degit niaodian/eos#eos-2.0.0 my-app && cd my-app && git init
+
+# 2. Declare the project — no code yet, so the stack is decided at architecture time
+npx --offline eos init config-only --write        # add --track regulated for the strict track
+
+# 3. Ask for the one next step: what to do, why, and how to start it
+npx --offline eos next
+
+# 4. The daily loop
+npx --offline eos status                          # where the work stands, and on which track
+npx --offline eos check --gate discovery-ready    # run one gate and record its evidence
+npx --offline eos verify                          # re-run every gate your change can affect
 ```
-node .github/eos/eos.mjs resume   # what was I doing, what is blocking it
-node .github/eos/eos.mjs next     # the ONE recommended next action, why, and how to start it
+
+- **The `npx --offline eos` shortcut needs npm 10.9+** (bundled with Node 22). On older npm, use
+  `npm run -s eos -- <command>` or `node .github/eos/eos.mjs <command>` — they are identical. Keep
+  `--offline`: the public registry has an unrelated package called `eos`, and the flag guarantees that
+  only this checkout ever runs.
+- **Already have code?** `npx --offline eos init` lists the starter packs (`node-service`,
+  `python-service`, `go-service`, `java-service`, `rag-app`, `agentic-app`, `data-pipeline`, `library`,
+  `regulated-app`) and names the ones that match the code it finds.
+- **In Copilot Chat** the same loop is the **eos-guide** agent, or `/eos-next` · `/eos-resume` ·
+  `/eos-status`. Open the project folder itself as the workspace root, or the agents stay inactive.
+
+## How it works
+
+```mermaid
+flowchart LR
+  subgraph Specify["Specify — the docs are the source of truth"]
+    D["Discovery<br/>G1"] --> Q["Requirements<br/>G2"] --> P["PRD<br/>G3"] --> U["UX<br/>G-UX"] --> A["Architecture<br/>G4"]
+  end
+  subgraph Build["Build — one story at a time"]
+    S["Story ready<br/>G5"] --> C["Code and tests"] --> V["Verified<br/>G7"]
+  end
+  subgraph Ship["Ship — prove what you release"]
+    M["Release manifest<br/>artifacts · SBOM · ledger head"] --> SG["Sign and attest"] --> R["Release ready<br/>G8"]
+  end
+  A --> S
+  V --> M
+  R --> O["Observe<br/>G9"] --> I["Iterate<br/>G10"] --> D
+  V -. evidence .-> L[("Hash-chained ledger")]
+  R -. evidence .-> L
+  PL["Policy lock"] -. governs every gate .-> V
 ```
-In Copilot Chat the same loop is the **eos-guide** agent, or `/eos-next` · `/eos-resume` · `/eos-status`.
-EOS derives the phase from artifacts, evidence and an append-only ledger — never from a prose summary —
-recommends exactly one action, and refuses to promote work that has no evidence behind it.
-Contract: [docs/eos/developer-experience.md](docs/eos/developer-experience.md).
+
+- **Gates** — every stage has one (`eos explain <gate>` prints its rules). A gate runs real checks —
+  your test commands, spec alignment, schemas — and writes evidence bound to the commit, the gate
+  version and every input hash.
+- **Transitions** — `eos transition` refuses illegal jumps, missing approvals and stale evidence, and an
+  approval must come from a second person, never the requester.
+- **The ledger** — every promotion is an event in an append-only, hash-chained log that merges cleanly
+  across branches.
+- **Releases** — `eos release bind` pins the artifacts, the SBOM and the ledger head into a manifest;
+  `eos release sign` signs it; CI attests the build; `eos verify-release` checks all of it on the
+  candidate commit.
+
+## Commands at a glance
+
+| Command | What it does |
+|---|---|
+| `eos next` | the one recommended next action — what, why and how to start it |
+| `eos status` | where the product, the active story and the release stand, and the governance track |
+| `eos check --gate <id>` | run one gate for real and record its evidence |
+| `eos verify` | re-run the gates your change can have affected (`--full` for all of them) |
+| `eos transition` · `eos approve` | move work forward — refused without evidence or a second approver |
+| `eos release bind` · `sign` · `verify` | bind artifacts, SBOM and ledger head; sign; verify signature and provenance |
+| `eos verify-release --release <id>` | the release gate, re-run on the candidate commit |
+| `eos policy check` · `lock` · `sync` | detect, approve and distribute governance changes |
+| `eos report --format markdown` | a governance report: gates, waivers, evidence, SBOM and signatures |
+| `eos health` · `eos doctor` | one-screen project health; whether EOS itself is wired correctly |
+
+Add `--json` for machine-readable output; exit codes and diagnostics follow one documented contract:
+[docs/eos/developer-experience.md](docs/eos/developer-experience.md).
+
+## Verify an EOS release
+
+EOS releases are built and attested in GitHub Actions, the way EOS asks your releases to be. Check one
+yourself before you adopt it:
+
+```bash
+gh release download eos-2.0.0 --repo niaodian/eos --pattern 'eos-2.0.0.tar.gz'
+gh attestation verify eos-2.0.0.tar.gz --repo niaodian/eos
+```
+
+Each release also ships its SBOM and a `SHA256SUMS` file.
 
 ## What's inside
+
 ```
-.github/
-  copilot-instructions.md       # R1 always-on global rules (minimal)
-  instructions/                 # scoped rules (applyTo globs): 6 backend stacks + frontend + data-api
-                                #   + ai/llm + testing + security + release-ops
-  prompts/                      # slash-command workflows (/eos-next /eos-resume /eos-status /eos-help
-                                #   /eos-init /requirements /spec /ux-spec /eval-spec /spec-align /adr
-                                #   /nfr /telemetry-plan /release-gate /runbook /validate-config)
-  agents/                       # eos-guide (entry point) + 5 orchestrators (discovery/design/
-                                #   architecture/plan/review)
-  skills/                       # project-level capabilities (operational-readiness)
-  hooks/                        # guardrails + validators (validate-config, eos-doctor, secret-scan,
-                                #   spec-align, project-gate)
-  eos/                          # the guided-workflow CLI (eos.mjs) + deterministic engine + tests
-  workflows/                    # local CI (eos-ci.yml) — runnable via act, no cloud runner
-.eos/
-  project.json                  # project declaration: projectType + stacks + quality commands
-                                #   (what the product-quality gate actually executes — any stack)
-  workflow.json gates.json      # change-type gate policy + machine-verified gate definitions
-  agent-map.json                # action -> one agent/prompt + a minimal BMAD skill chain
-  evidence/ waivers/ ledger/    # gate evidence, controlled exceptions, append-only event log
-docs/
-  checklists/                   # A-gap, B-rework, C-nfr, D-ops, E-security
-  eos/                          # blueprint, user-manual, quickstart, stack-presets, agent-map, examples, VERSION
-  adr/ epics/ stories/          # SDD artifacts
-api/ ops/ src/
+.eos/               the policy (gates, workflow, agent map), your project declaration, schemas,
+                    evidence, waivers, the ledger, the policy lock and release manifests
+.github/eos/        the CLI and its deterministic engine (zero dependencies), with its tests
+.github/hooks/      validators and guardrails: config, doc parity, secrets, the product gate
+.github/agents/     eos-guide and the stage orchestrators for Copilot Chat
+.github/prompts/    slash-command workflows; .github/instructions/ holds the scoped coding rules
+.github/workflows/  eos-ci.yml (Linux, macOS, Windows) and eos-release.yml (attested releases)
+docs/               your specs and ADRs; docs/eos/ is the EOS manual set (中文 in docs/zh/)
 ```
 
-## Four enforcement layers (all local)
-1. **Per-edit hooks** (real-time): guardrail denies destructive / supply-chain-poison / secret-leak ops;
-   quality + config-check run validators after each edit.
-2. **Static validators** (on demand): `validate-config.mjs` (config S1–S13), `check-doc-parity.mjs`
-   (zh⇄en doc parity), `eos-doctor.mjs` (SDLC gates incl. G-EVAL), `secret-scan.mjs` (+gitleaks),
-   `spec-align.mjs` (spec-alignment metric; `--strict` is fail-closed), `project-gate.mjs` (the
-   project's own lint/typecheck/test/eval — for any stack).
-3. **Gate & transition engine** (per scope): `node .github/eos/eos.mjs check --gate <id> --scope <id>`
-   runs a gate for real and records evidence bound to the commit, the gate version and every input
-   hash; `transition` refuses illegal jumps, missing guards and stale evidence. A missing tool or a
-   crashed validator is BLOCKED, never PASS.
-4. **Whole-repo CI** (before merge/release): `act push` runs `.github/workflows/eos-ci.yml`.
-   Product tests run for **whatever stack `.eos/project.json` declares** (Node/Python/Go/Java/Rust/.NET) —
-   a failing test fails CI, and an undeclared or untestable project fails closed rather than being skipped.
+## Documentation
 
-## Verified on this machine
-- A recent VS Code + Copilot Chat build · brace globs (`**/*.{ts,tsx}`) load correctly.
-- PreToolUse guardrail blocks destructive/poison/secret ops (`permissionDecision: "deny"`).
-- `act` runs the CI offline after a one-time image pull; 73 `bmad-*` skills load from user-level dirs.
+- [Quickstart](docs/eos/quickstart.md) — prerequisites and your first day.
+- [User manual](docs/eos/user-manual.md) — idea to launch to iteration, with step-by-step SaaS and Agentic tracks.
+- [Upgrading to eos-2.0.0](docs/eos/user-manual.md#105-upgrading-from-eos-122x-to-eos-200) — what changes and what to do.
+- [Workflow contract](docs/eos/developer-experience.md) — the CLI, exit codes, JSON and diagnostics.
+- [Stack presets and tracks](docs/eos/stack-presets.md) — every supported stack, and how to choose a track.
+- [Design rationale](docs/eos/blueprint.md) and [architecture decisions](docs/adr/).
 
-## Start here
-Open this folder in VS Code, then:
-```
-node .github/eos/eos.mjs init --write     # creates local VS Code tasks (never overwrites)
-node .github/eos/eos.mjs next             # tells you the one next thing to do
-```
-Details in [docs/eos/quickstart.md](docs/eos/quickstart.md) (Prerequisites + Day-1).
+## Requirements and notes
 
-> **One-time hardening (makes the CI gates actually merge-blocking, not just advisory):** after you
-> instantiate a real repo, run `/eos-init` in Copilot Chat. It walks you through branch protection +
-> replacing the CODEOWNERS handle + the approval baseline, and tracks progress in
-> [docs/eos/activation.md](docs/eos/activation.md). `eos-doctor` reminds you of anything still pending
-> on every run, and `/release-gate` re-checks it before you ship — so it can't be systematically forgotten.
-
-> **Open the project folder itself as the workspace root** (`code .` from inside it). VS Code discovers
-> `.github/{agents,instructions,hooks,prompts}` only at the opened root — open a **parent** folder and the
-> custom agents, instructions, and hooks all silently go inactive.
-
-**Full user manual** (idea → launch → iteration; includes step-by-step **SaaS** and **Agentic** tracks
-for beginners): [docs/eos/user-manual.md](docs/eos/user-manual.md).
-
-Design rationale (why it's built this way): [docs/eos/blueprint.md](docs/eos/blueprint.md).
-
-Per-stack setup presets (Node/Python/Go/Java/Rust/.NET + AI/LLM): [docs/eos/stack-presets.md](docs/eos/stack-presets.md).
-
-## Notes
-- No org/network dependencies: fully local & Git-portable.
-- Local CI runs via `act` (GitHub Actions locally, needs Docker) — `.github/workflows/eos-ci.yml`.
-  No Docker? Run the same gate directly: `node .github/hooks/validate-config.mjs && node .github/hooks/eos-doctor.mjs`.
-- Hooks are a VS Code **Preview** feature (official: config format/behavior may change) — `.github/hooks/*.json`
-  load by default via `chat.hookFilesLocations`. See `docs/eos/user-manual.md` §2.4 + Appendix D.
-- There is **no native rule priority** — control is via `applyTo` scope + conventions + hooks.
+- **Node.js 20.10+ and Git** — nothing else. CI runs Node 20 and 22 on Linux, macOS and Windows.
+- **VS Code with GitHub Copilot is optional.** The agents, prompts and hooks load when the project folder
+  itself is the workspace root. Hooks are a VS Code preview feature.
+- **One-time hardening.** Once your real repository exists, run `/eos-init` in Copilot Chat: branch
+  protection, CODEOWNERS and approvals, tracked in [docs/eos/activation.md](docs/eos/activation.md).
+- **Local CI.** `act push` runs [eos-ci.yml](.github/workflows/eos-ci.yml) in Docker; without Docker,
+  `npm run verify` runs the core checks.
+- **BMAD.** When the `bmad-*` skills are installed, EOS orchestrates them for discovery, PRD, architecture
+  and stories; see [docs/eos/agent-map.md](docs/eos/agent-map.md).
 
 ## License
 
 [MIT](LICENSE) © 2026 Xavier Zhang.
-

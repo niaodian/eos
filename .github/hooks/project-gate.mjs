@@ -148,13 +148,16 @@ function main() {
   let plan = null; // { mode, commands }
   let executed = 0; // quality steps actually run — 0 means nothing about the product was proven
 
+  if (present && config.templateDefault === true) {
+    warn('P1', `${PROJECT_CONFIG_PATH} is still the EOS template's own declaration — the commands below are EOS's, not your product's. Run \`node .github/eos/eos.mjs init\` to declare your project.`);
+  }
   if (present) {
     const mode = config.projectType;
     details.stacks = config.stacks;
     if (mode === 'config-only') {
       details.mode = 'config-only';
       if (detected.length) {
-        error('P1', 'FAIL', `${PROJECT_CONFIG_PATH} declares projectType "config-only" but stack manifest(s) were found (${detected.join(', ')}). A real code project must declare "application" or "library" with a test command.`);
+        error('P1', 'FAIL', `${PROJECT_CONFIG_PATH} declares projectType "config-only" but stack manifest(s) were found (${detected.join(', ')}). A real code project must declare "application" or "library" with a test command — \`node .github/eos/eos.mjs init\` names the packs that match.`);
       } else {
         notes.push('config-only: no product code to verify (declared).');
       }

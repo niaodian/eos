@@ -1,6 +1,6 @@
 {
   "name": "eos-template",
-  "version": "1.22.0",
+  "version": "2.0.0",
   "private": true,
   "description": "Engineering Operating System template — a local-first, zero-dependency governance engine for VS Code + GitHub Copilot.",
   "license": "MIT",
@@ -8,10 +8,14 @@
   "engines": {
     "node": ">=20.10.0"
   },
+  "bin": {
+    "eos": ".github/eos/eos.mjs"
+  },
   "comments": {
     "zeroDependency": "EOS has NO dependencies and no devDependencies, and that is a design constraint rather than a current fact. The whole claim is that a developer can run the entire governance loop offline with nothing but Node — `.github/eos/offline-boundary.test.mjs` asserts that EOS Core cannot even reach the network. A dependency would add a lockfile, an install step and a supply-chain surface to a tool whose job is to police exactly those things. Admitting one is an architecture decision: record an ADR in docs/adr/ first. See .github/eos/lib/schema.mjs for the same reasoning applied to a JSON-Schema validator.",
     "engines": "20.10.0 is the floor the engine actually needs (node:test reporters, os.availableParallelism). CI pins 20; development happens on 22. This range is what makes that difference deliberate rather than accidental — the skew used to be untested in both directions.",
-    "scripts": "Every script is a thin delegation to a .mjs entry point that also works when invoked directly. npm is a convenience for contributors, never a requirement: `node .github/eos/eos.mjs next` must keep working in a repository that has no npm at all."
+    "scripts": "Every script is a thin delegation to a .mjs entry point that also works when invoked directly. npm is a convenience for contributors, never a requirement: `node .github/eos/eos.mjs next` must keep working in a repository that has no npm at all.",
+    "bin": "Lets `npx --offline eos <command>` run THIS checkout's EOS. --offline matters: the public npm registry has an unrelated package named \"eos\", and without it npx would offer to download and run that instead when the bin is missing. Needs npm >= 10.9 (bundled with Node 22): older npm drops a bin under a dot-directory as invalid, and --offline then fails closed with ENOTCACHED. `node .github/eos/eos.mjs <command>` is always equivalent."
   },
   "scripts": {
     "test": "node .github/eos/run-tests.mjs",

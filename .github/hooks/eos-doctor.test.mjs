@@ -12,6 +12,8 @@ import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { bmadReadiness } from './lib/bmad-runtime.mjs';
+import * as nodeCrypto from 'node:crypto';
+const require_crypto = () => nodeCrypto;
 import { boundedSpawnSync } from '../eos/test-spawn.mjs';
 
 const HOOK = join(dirname(fileURLToPath(import.meta.url)), 'eos-doctor.mjs');
@@ -430,4 +432,37 @@ test('D6: with no compatibility manifest the BMAD layer is silent rather than gu
   const { code, out } = run(dir, ['--deep']);
   assert.equal(code, 0, out);
   assert.doesNotMatch(out, /D6 BMAD/);
+});
+
+// ---------- D7: release pre-flight (2.0) ----------
+const REGULATED_APP = { projectType: 'application', stacks: ['node'], productParadigms: ['deterministic'], workflowProfile: 'regulated', complianceProfile: 'regulated', evidencePolicy: 'ci', commands: { test: 'npm test' } };
+
+test('D7: a Regulated project hears what its release will lack before release day', () => {
+  const { code, out } = run(project({ '.eos/project.json': { ...REGULATED_APP, evidencePolicy: 'local', evidencePolicyReason: 'Air-gapped fixture; nothing else is reachable here.' } }));
+  assert.equal(code, 0, 'pre-flight warns, it does not fail');
+  assert.match(out, /D7 Release pre-flight: a Regulated release needs a signed manifest/);
+  assert.match(out, /D7 Release pre-flight: no release\.artifacts are declared/);
+  assert.match(out, /D7 Release pre-flight: evidencePolicy is "local"/);
+  assert.match(out, /D7 Release pre-flight: no CI workflow can attest provenance/);
+});
+
+test('D7: a prepared Regulated project is quiet, and the Standard track never hears it', () => {
+  const { generateKeyPairSync } = require_crypto();
+  const pub = generateKeyPairSync('ed25519').publicKey.export({ type: 'spki', format: 'pem' });
+  const ready = run(project({
+    '.eos/project.json': { ...REGULATED_APP, release: { artifacts: ['dist/*.tgz'], signing: { publicKey: '.eos/keys/release.pub' } } },
+    '.eos/keys/release.pub': pub,
+    '.github/workflows/release.yml': 'jobs:\n  attest:\n    permissions:\n      id-token: write\n    steps:\n      - uses: actions/attest-build-provenance@abc\n',
+  }));
+  assert.doesNotMatch(ready.out, /D7/, ready.out);
+  const standard = run(project({ '.eos/project.json': { projectType: 'config-only', stacks: [] } }));
+  assert.doesNotMatch(standard.out, /D7/);
+});
+
+test('D7: a private key inside the repository is an error on every track', () => {
+  const { generateKeyPairSync } = require_crypto();
+  const priv = generateKeyPairSync('ed25519').privateKey.export({ type: 'pkcs8', format: 'pem' });
+  const { code, out } = run(project({ '.eos/project.json': { projectType: 'config-only', stacks: [] }, '.eos/keys/release.pem': priv }));
+  assert.equal(code, 1, out);
+  assert.match(out, /D7 Release pre-flight: \.eos\/keys\/release\.pem is a PRIVATE key inside the repository/);
 });

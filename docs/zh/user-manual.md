@@ -5,7 +5,7 @@
 
 # EOS 用户手册（Engineering Operating System User Manual）
 
-> 版本：与 `docs/eos/VERSION` 同步（当前 `eos-1.22.0`）
+> 版本：与 `docs/eos/VERSION` 同步（当前 `eos-2.0.0`）
 > 适用：较新版本的 VS Code + GitHub Copilot Chat（自定义 agent / hooks 属近版能力，用「关于 VS Code」面板确认版本）+ 已安装 73 个 `bmad-*` skill（用户级）
 > 定位：本手册是**操作指南（怎么用）**；设计原理与取舍见同目录 `blueprint.md`（为什么这么设计）。
 > 约定：正文中文；文件名/路径/命令/配置键保留英文原文。
@@ -24,6 +24,7 @@
 | 想查某个斜杠命令 / agent / 规则 | [第 7 章 完整参考](#第-7-章-完整参考（速查）) |
 | 配置坏了 / Agent 不按预期工作 | [第 9 章 故障定位](#第-9-章-故障定位与排错) |
 | 想把这套搬到别的项目/团队 | [第 10 章 跨项目复用与分发](#第-10-章-跨项目复用与分发) |
+| 升级到 `eos-2.0.0`、选择治理轨道或为发布签名 | [§10.5 升级](#105-从-eos-122x-升级到-eos-200) · [§10.6 轨道与签名发布](#106-治理轨道、签名发布与中心策略) |
 
 ---
 
@@ -82,6 +83,10 @@ node .github/eos/eos.mjs resume
 node .github/eos/eos.mjs next
 node .github/eos/eos.mjs check --gate <id> --scope <id>   # 证明这一步，并写入证据
 ```
+
+**更短的写法，同一条命令：** `npx --offline eos next`（npm 10.9+，Node 22 自带）或
+`npm run -s eos -- next`（任意 npm）。请保留 `--offline`：公共 npm 仓库里有一个同名但无关的
+`eos` 包，这个参数保证只运行当前检出的代码。
 
 Router 会为每一步点名 agent、prompt 和最小
 BMAD skill 链，所以你永远不用自己从 73 个已安装 skill 里挑。完整契约（状态模型、门禁、证据、
@@ -172,7 +177,7 @@ bmad-code-review                   → 审查无阻断项           (Gate G6)
 **方式 A — degit（推荐，最快）**
 ```sh
 # public 模板 —— 直接 degit（无需鉴权）
-npx degit niaodian/eos#eos-1.22.0 my-new-app
+npx degit niaodian/eos#eos-2.0.0 my-new-app
 cd my-new-app
 git init && git add -A && git commit -m "chore: scaffold from eos"
 ```
@@ -201,6 +206,10 @@ node .github/hooks/validate-config.mjs      # 期望：PASS
 
 ## 3.3 填项目专属事实
 
+**先声明项目。** `node .github/eos/eos.mjs init` 会列出两条治理轨道与所有起步包。还没定栈（多数
+0-1 项目如此）？`init config-only --write`。已定栈？`init <pack> --write`，再用 `stack sync --write`
+把它的命令渲染进下面的工作区规则。
+
 打开 `.github/instructions/00-workspace.instructions.md`，把它改成**你这个项目**的真实情况：
 - `Local commands`：**已定栈**就换成你的栈的 install/lint/test/typecheck 命令——**成品行直接抄** `docs/eos/stack-presets.md`（Node/Python/Go/Java/Rust/.NET 全栈配方册，复制对应一块即可）。**还没定栈**（多数 0-1 项目在架构前都没定）就**保留 Node 占位**——这是 ⛳ PROVISIONAL 值，**权威锁定在阶段 4（架构）** 连同 `docs/adr/00X-tech-stack.md`，避免 always-on 规则与将来真实栈打架
 - `Layout`：若目录结构不同，更新
@@ -209,9 +218,11 @@ node .github/hooks/validate-config.mjs      # 期望：PASS
 ## 3.4 Day-1 完整序列（复制即用）
 
 ```sh
-npx degit niaodian/eos#eos-1.22.0 my-new-app && cd my-new-app
+npx degit niaodian/eos#eos-2.0.0 my-new-app && cd my-new-app
 git init && git add -A && git commit -q -m "chore: scaffold from eos"
 node .github/hooks/validate-config.mjs
+node .github/eos/eos.mjs init config-only --write   # 声明项目：还没有代码（或 init <pack> [--track regulated]）
+node .github/eos/eos.mjs next                       # 唯一的下一步
 # 关键：从项目目录内执行 `code .`，让 my-new-app 成为工作区根（含 .github/）。
 # 不要打开它的父目录，否则自定义 agent / instructions / hooks 都不会被发现。
 code .
@@ -328,7 +339,7 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 | 项 | 内容 |
 |---|---|
 | **目标** | 从模板得到一个配置健康的空项目 |
-| **怎么启动** | `npx degit niaodian/eos#eos-1.22.0 my-app && cd my-app` |
+| **怎么启动** | `npx degit niaodian/eos#eos-2.0.0 my-app && cd my-app`，然后声明项目：`node .github/eos/eos.mjs init config-only --write`（未定栈）或 `init <pack> --write` |
 | **产出** | 完整 `.github/` + `docs/` 骨架 |
 | **门** | `node .github/hooks/validate-config.mjs` → **PASS** |
 | **必查** | PASS 0 errors。**栈未定则先别改** `00-workspace`——保留 Node 占位即可；栈是不可逆决策，权威锁定在**阶段 4（ADR）**。已知栈可即抄 `docs/eos/stack-presets.md`（快路径）。 |
@@ -599,11 +610,12 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 
 ### 第 0 步：建项目 + 选栈（5 分钟）
 ```sh
-npx degit niaodian/eos#eos-1.22.0 todo-api && cd todo-api
+npx degit niaodian/eos#eos-2.0.0 todo-api && cd todo-api
 node .github/hooks/validate-config.mjs          # 期望 PASS
+node .github/eos/eos.mjs init node-service --write   # 声明技术栈（或 python-service、go-service…——`eos init` 会列出全部）
 ```
-**已定栈**？打开 `.github/instructions/00-workspace.instructions.md` 把 `Local commands` 抄成你的栈块（`docs/eos/stack-presets.md`，快路径）。
-**还没定**？保留 Node 占位即可——栈的**权威锁定在第 4 步架构**（连同 ADR）。SaaS 项目通常第 0 步就知道栈，可直接抄。
+**已定栈**？`eos init <pack> --write` 声明它；再用 `node .github/eos/eos.mjs stack sync --write` 把它的 `Local commands` 渲染进 `.github/instructions/00-workspace.instructions.md`。
+**还没定**？改为声明 `eos init config-only --write`——栈的**权威锁定在第 4 步架构**（连同 ADR），届时 `eos init <pack> --write` 会保留你的轨道。SaaS 项目通常第 0 步就知道栈。
 
 ### 第 1–3 步：想清楚要做什么（Chat 里逐条输入）
 ```
@@ -662,11 +674,12 @@ SaaS 的 **G7** 要求：每条 AC ≥1 测试、**API 契约测试**（对 open
 
 ### 第 0 步：建项目 + 建 AI 目录
 ```sh
-npx degit niaodian/eos#eos-1.22.0 cs-agent && cd cs-agent
+npx degit niaodian/eos#eos-2.0.0 cs-agent && cd cs-agent
 mkdir -p ai/prompts evals                       # AI 代码放这里，自动叠加 Agentic 规则
 node .github/hooks/validate-config.mjs          # 期望 PASS
+node .github/eos/eos.mjs init rag-app --write    # Python 的 LLM 包：agentic 范式 + eval 命令
 ```
-栈选 Python（LLM 产品最常见）：从 stack-presets 抄 **Python + AI/LLM 附加层**那两块。
+栈选 Python（LLM 产品最常见）：`rag-app` 就是 Python 的 LLM 包——按你的项目调整它的命令，再从 stack-presets 加上 **AI/LLM 附加层**。
 
 ### 第 1–3 步：同路径 A（discovery → requirements → spec）
 ```
@@ -1044,16 +1057,21 @@ Agent 输出不符预期
 ```sh
 # 方式 A：degit（public 仓库，无需鉴权）
 # 固定到 release tag：默认分支会移动，tag 不会。
-npx degit niaodian/eos#eos-1.22.0 my-app
+npx degit niaodian/eos#eos-2.0.0 my-app
+cd my-app && git init
 
 # 方式 B：在 tag 上 clone，并开一段全新历史
-git clone --depth 1 --branch eos-1.22.0 https://github.com/niaodian/eos.git my-app
-cd my-app && git checkout --orphan main && git commit -m "chore: start from eos-1.22.0"
+git clone --depth 1 --branch eos-2.0.0 https://github.com/niaodian/eos.git my-app
+cd my-app && git checkout --orphan main && git commit -m "chore: start from eos-2.0.0"
+
+# 两种方式之后都要声明项目：模板自带的声明描述的是 EOS，而不是你的项目
+node .github/eos/eos.mjs init                       # 两条轨道、所有起步包，以及当前的声明
+node .github/eos/eos.mjs init config-only --write   # 还没有代码——或 <pack>，适用时加 --track regulated
 ```
 
 ## 10.3 分发给团队（纯本地、无企业依赖）
 
-1. 所有人从**同一个 release tag**（`eos-1.22.0`）开始。默认分支会持续变动，
+1. 所有人从**同一个 release tag**（`eos-2.0.0`）开始。默认分支会持续变动，
    不固定版本就意味着每个人拿到的都是略有差异的 EOS。
 2. `【需组织/GitHub 设置】` GitHub **template repository** 属于所有者级设置：EOS 既无法替你设置，
    也无法在本地验证，所以别信本页面的说法——
@@ -1294,6 +1312,149 @@ node .github/eos/eos.mjs providers      # 配置了什么，以及它此刻怎�
 见 [ADR-005](../adr/005-external-authority-boundary.md) 与
 [ADR-006](../adr/006-provider-adapters.md)。
 
+## 10.5 从 `eos-1.22.x` 升级到 `eos-2.0.0`
+
+`eos-2.0.0` 是一个大版本。它新增了两条治理轨道、签名的发布清单、在 CI 中出具证明的发布、中心策略
+分发与治理报告（均见 §10.6），并改变了项目的声明方式。其余一切 —— CLI、退出码、证据、账本与豁免
+的格式 —— 保持不变。
+
+**对已有项目意味着什么**
+
+1. **模板自己的声明会被标记为模板的。** EOS 自带的 `.eos/project.json` 带有 `"templateDefault": true`。
+   合并时请保留你自己的声明 —— 永远不要拿模板的。如果某个项目仍在使用模板的声明，
+   `project-declaration` 激活检查会失败，`eos next` 会把你引向 `eos init`。
+2. **`eos init` 负责声明项目。** 在 1.x 中，`init` 只创建本地 VS Code 任务。现在 `eos init` 会展示
+   当前的声明、两条轨道与所有起步包；`eos init <pack> --write` 写入声明；`eos init --write` 仍然创建
+   本地文件。项目已经做出的声明，没有 `--force` 绝不会被替换 —— 唯一的例外是 `config-only`：代码
+   落地时它可以直接换成一个包，并保留原来的轨道。`eos new <pack>` 依然可用。
+3. **`release-ready` 现在是 4.0.0 版本**，新增两项检查：`manifest-signature` 与 `release-integrity`。
+   在 Standard 轨道上，缺少签名或制品清单是 `NOT_APPLICABLE`；在两条轨道上，凡是存在的都必须
+   验证通过。release-ready 3.x 记录的发布证据已过期，发布前请重新运行这道门。
+4. **Regulated 项目需要一把发布密钥和来源证明。** 在 `complianceProfile: "regulated"` 下，发布门
+   要求签名的清单，以及每个交付制品的来源证明（§10.6.2、§10.6.3）。只需生成一次密钥；如果由 CI
+   为发布签名，请把私钥存为仓库机密 `EOS_RELEASE_SIGNING_KEY`。
+5. **策略锁需要重新记录。** 这次升级加强了 `release-ready`，所以 `eos policy check` 会报告"自锁定
+   以来策略已变化"。没有任何东西被放宽，因此不需要理由，也不需要第二位批准者。
+
+**升级步骤**
+
+```sh
+# 1. 合并新模板的 .github/ 与 .eos/（gates.json、workflow.json、agent-map.json、
+#    schemas/）—— 保留你自己的 .eos/project.json、证据、豁免、账本与发布清单
+# 2. 检查声明与轨道
+node .github/eos/eos.mjs init
+# 3. 查看升级对策略的改动，记录下来，并重新生成派生文档
+node .github/eos/eos.mjs policy lock
+node .github/eos/eos.mjs policy lock --write
+node .github/eos/eos.mjs docs --write
+# 4. 重新验证：在旧门版本下记录的证据已过期
+node .github/eos/eos.mjs verify --full
+```
+
+> 如果模板的 package.json 进入了你的仓库根目录，EOS 会把它当作工具，而不是 Node 项目：一旦它
+> 有了依赖、入口文件，或某个脚本运行了 EOS 以外的东西，它就成了产品代码 —— 此时 `eos next` 会把
+> 你引向 `eos init` 去声明技术栈。
+
+## 10.6 治理轨道、签名发布与中心策略
+
+### 10.6.1 选择治理轨道
+
+每个项目处在两条轨道之一。轨道由声明推导而来 —— Regulated 轨道恰好等于
+`complianceProfile: "regulated"` —— 因此不存在第三个可能与实际执行相矛盾的设置。`eos status` 与
+`eos next` 会显示当前轨道，以及该轨道上的发布必须携带什么。
+
+| | Standard（默认） | Regulated |
+|---|---|---|
+| 如何选择 | `eos init <pack> --write` | `eos init <pack> --track regulated --write` |
+| 发布证据 | 可以在本地记录 | 必须来自 CI（`evidencePolicy` 为 `ci` 或 `attested`） |
+| 签名的发布清单 | 存在时验证，从不强制 | 必需 |
+| 每个制品的来源证明 | 存在时验证，从不强制 | 必需 |
+| 发布时缺少签名 | `NOT_APPLICABLE`，并给出补上它的命令 | `FAIL` —— 发布被阻断 |
+
+**第一天，还没有代码：** `eos init config-only --write`（适用时加上 `--track regulated`）。此后产品
+质量门报告 `NOT_APPLICABLE`，绝不是 `PASS`。代码落地时，`eos next` 会把你引向 `eos init`，它会
+点名与所发现代码相匹配的包；`eos init <pack> --write` 无需 `--force` 即可替换 config-only 声明，
+并保留你的轨道。
+
+**日后更换轨道**是一个刻意的动作：`eos init <pack> --track <track> --force`。从 Regulated 降到
+Standard 会放宽策略，所以 `eos next` 与 `eos status` 会一直显示它，直到
+`eos policy lock --write --reason "<why>"` 记录下这次放宽，并由第二个人在 `.eos/policy.lock.json`
+中以批准者身份签认 —— EOS 记录这份批准，但从不替人授予它。
+
+### 10.6.2 签名的发布清单
+
+```sh
+node .github/eos/eos.mjs release keygen --write                # 每个项目一次
+node .github/eos/eos.mjs release init --release v1.4.0         # 生成清单骨架
+node .github/eos/eos.mjs release bind --release v1.4.0         # 绑定制品、SBOM 与账本头
+node .github/eos/eos.mjs release sign --release v1.4.0 --key ~/.config/eos/keys/my-app-release.pem
+node .github/eos/eos.mjs release verify --release v1.4.0       # 签名、制品摘要、来源证明
+```
+
+- `release keygen` 把公钥写到 `.eos/keys/release.pub`，在 `.eos/project.json` →
+  `release.signing.publicKey` 中声明它，并把私钥写到仓库之外（`~/.config/eos/keys/<repo>-release.pem`，
+  权限 600）。任何位于仓库内的私钥路径都会被拒绝，哪怕是经由符号链接；万一私钥仍被提交，
+  `secret-scan` 也会把它拦下。
+- `release bind` 记录要交付的东西 —— `release.artifacts` 中列出的文件（例如 `"dist/*.tgz"`）及其
+  SHA-256 摘要 —— 外加 SBOM 和已提交的账本头。它不向账本追加任何内容。
+- 签名是对清单规范化 JSON 的 Ed25519 签名，因此 CRLF 检出或重新缩进的文件依然验证通过，而内容的
+  任何改动都不会。签名绝不会改变批准所绑定的那个摘要。
+- 发布门在候选提交上检查这两项：`manifest-signature`（错误的签名永远失败；缺少签名只在 Regulated
+  上失败）与 `release-integrity`（每个列出的制品都与其摘要一致，且在 Regulated 上被来源证明覆盖）。
+
+### 10.6.3 在 CI 中出具证明的发布
+
+`.github/workflows/eos-release.yml` 负责构建你的发布并为其出具证明。推送 `v*` 或 `eos-*` 标签会运行
+它；修改它的 pull request 会运行一次演练：出具证明，但不发布任何东西。
+
+1. **plan** —— 从 `.eos/project.json` 读取轨道（工作流不保存这条规则的副本）。
+2. **build** —— 把这一步换成你真实的构建；`dist/` 中的一切都会被出具证明。默认把仓库本身打成
+   源码归档发布，并附带 SBOM 与 `SHA256SUMS`。
+3. **attest** —— GitHub 制品证明（SLSA v1 来源证明），两条轨道都有。
+4. **slsa** —— 仅限 Regulated：SLSA Build Level 3 生成器，固定在某个发布标签上。
+5. **manifest** —— 绑定发布清单；配置了 `EOS_RELEASE_SIGNING_KEY` 机密时还会为它签名。
+6. **publish** —— 一个带全部资产的 GitHub 发布草稿；在该轨道要求的每个作业都成功之前，什么都不会
+   发布。
+
+只有需要的作业才获得 `id-token: write`；`eos-ci.yml` 一个都没有。用
+`gh attestation verify <file> --repo <owner>/<repo>` 验证发布，用
+`eos release verify --release <id> --provenance <file>` 离线地把来源证明绑定到清单。想在不发布的
+情况下演练 Regulated 路径，请在默认分支上以 `track=regulated` 手动触发该工作流。
+
+### 10.6.4 中心策略分发
+
+组织发布一份策略基线；每个仓库把它纳入仓库（vendor），并离线强制执行。
+
+```sh
+# 在组织的策略仓库中
+node .github/eos/eos.mjs policy export --name acme-baseline --version 2026.10 --sign --key <private-key>
+# 在每个项目中：先在 .eos/project.json 里声明 "policyUpstream"，然后
+node .github/eos/eos.mjs policy sync --check    # 会改变什么 —— 不写任何东西
+node .github/eos/eos.mjs policy sync            # 纳入 .eos/policy.upstream.json 并固定其摘要
+node .github/eos/eos.mjs policy check           # 离线、在 CI 中运行：有没有比基线更弱的地方？
+```
+
+- `policyUpstream.source` 是一个 `https://` URL（只有回环地址允许明文 `http`，重定向一律拒绝），
+  或指向策略仓库检出的 `file:` 路径；`policyUpstream.publicKey` 是签名基线必须通过验证的那把公钥。
+- `policy sync` 是唯一会拉取策略的命令。`policy check` 始终离线：它把你的策略与纳入的基线对比，
+  任何更弱之处都是一条带 `upstream:` 标识的 `WEAKENING`，和其他放宽一样需要理由与第二个人。
+- 这道底线无法被悄悄移除：重新锁定会保留 `policy sync` 固定的摘要；签名基线在每次 `policy check`
+  时都会重新验签；删除 `policyUpstream`（或把它指向别处）本身就是一条 `WEAKENING`。
+
+### 10.6.5 治理报告
+
+```sh
+node .github/eos/eos.mjs report --format markdown --out governance.md
+node .github/eos/eos.mjs report --org team-a.json team-b.json --format markdown
+```
+
+单个仓库的报告涵盖：轨道、每道门的最新结论及其在账本中的通过率、豁免、策略锁、SBOM 及其新鲜度、
+发布签名，以及一份 `attention` 清单。`--org` 汇总多个仓库的 JSON 报告。每份报告在写出之前都会按
+其公开的 Schema（`governance-report`、`governance-org-report`）校验。
+
+见 [ADR-012](../adr/012-supply-chain-trust-model.md) 与
+[ADR-013](../adr/013-central-policy-distribution.md)。
+
 ---
 
 # 第 11 章 新增技术栈
@@ -1368,13 +1529,20 @@ EOS 的栈规则是**可插拔**的。新增一个栈 = 加一个 `*.instruction
 
 ```
 # ── 终端 —— 唯一循环（日常只需要这些）──
-npx degit niaodian/eos#eos-1.22.0 my-app   # 新建项目
+npx degit niaodian/eos#eos-2.0.0 my-app   # 新建项目
+node .github/eos/eos.mjs init                       # 当前声明、两条轨道、所有起步包
+node .github/eos/eos.mjs init <pack> --write        # 声明项目（未定栈时用 config-only；--track regulated）
 node .github/eos/eos.mjs init --write               # 本地 VS Code 任务（绝不覆盖已有文件）
 node .github/eos/eos.mjs next                       # 唯一的下一步、为什么、怎么开始
 node .github/eos/eos.mjs resume                     # 新会话？接着上次继续
 node .github/eos/eos.mjs check --gate <id> --scope <id>   # 证明这一步，并写入证据
 node .github/eos/eos.mjs transition --scope story --id <id> --to <STATE>
 node .github/eos/eos.mjs explain <gate>             # 按需展开某一个门禁的完整规则
+node .github/eos/eos.mjs release keygen --write     # 一次性：发布签名密钥（私钥留在仓库之外）
+node .github/eos/eos.mjs release bind|sign|verify --release <id>   # 绑定制品 + SBOM + 账本头；签名；验证
+node .github/eos/eos.mjs policy sync --check        # 组织基线会带来哪些改变
+node .github/eos/eos.mjs report --format markdown   # 治理报告：门、豁免、SBOM、签名
+npx --offline eos <command>                         # 同一个 CLI，更短的写法（npm 10.9+）
 node .github/hooks/validate-config.mjs              # 配置自检（期望 PASS）
 npm test                                            # 跑测试（质量门同款）
 npm audit                                           # 发布前依赖审计
@@ -1424,7 +1592,7 @@ bmad-tea / bmad-testarch-*   # 阶段7：测试+追溯        → G7
 
 **复现**（终端）：
 ```sh
-npx degit niaodian/eos#eos-1.22.0 my-app && cd my-app
+npx degit niaodian/eos#eos-2.0.0 my-app && cd my-app
 node .github/hooks/validate-config.mjs        # PASS
 npm test                                       # 10/10 green
 echo '{"tool_input":{"command":"rm -rf /tmp/x"}}' | node .github/hooks/deny-dangerous.js  # deny

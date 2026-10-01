@@ -10,14 +10,22 @@ import { readLedgerSnapshot, transitionConflicts } from '../lib/ledger.mjs';
 import { listEvidence, evidenceFreshness, validateEvidenceShape } from '../lib/evidence.mjs';
 import { syncWorkspaceRule } from '../lib/workspace-rule.mjs';
 import { generateDocs } from '../lib/docgen.mjs';
-import { policyChanges, planLock, checkPolicy, readLock, readPolicy, policySnapshot, policyDigest, POLICY_LOCK_PATH } from '../lib/policy.mjs';
+import { policyChanges, planLock, checkPolicy, readLock, readPolicy, policySnapshot, policyDigest, POLICY_LOCK_PATH, UPSTREAM_PATH, buildBaseline, baselineDigest, readVendored } from '../lib/policy.mjs';
 import { planMigration, applyMigration } from '../lib/migrate.mjs';
 import { buildSbom, sbomFreshness, sbomDigest, SBOM_PATH } from '../lib/sbom.mjs';
 import { PACKS, packDeclaration, packIds } from '../lib/packs.mjs';
 import { loadWaivers } from '../lib/waivers.mjs';
 import { writeFileAtomic } from '../lib/atomic.mjs';
 import { resolveAction } from '../lib/registry.mjs';
-import { EXIT, emit } from './shared.mjs';
+import { TRACKS, TRACK_NAMES, trackOf, applyTrack } from '../lib/track.mjs';
+import { detectStacks } from '../../hooks/lib/project-config.mjs';
+import { EXIT, emit, privateKeyFromFile } from './shared.mjs';
+import { fetchBaseline } from '../adapters/policy-upstream.mjs';
+import { signDocument, verifyDocument, loadPublicKey, keyId } from '../lib/signing.mjs';
+import { loadSchema, validate } from '../lib/schema.mjs';
+import { buildReport, renderReportMarkdown, buildOrgReport, renderOrgMarkdown, readReports } from '../lib/report.mjs';
+
+const CLI = 'node .github/eos/eos.mjs';
 
 const VSCODE_TASKS = JSON.stringify({
   version: '2.0.0',
@@ -34,7 +42,290 @@ const VSCODE_TASKS = JSON.stringify({
   ],
 }, null, 2) + '\n';
 
+// --------------------------------------------------------------------------------- declaring a project
+// The first thing a copy of the template does. The template ships EOS's own declaration (its test
+// command is EOS's own suite), marked "templateDefault": true; until it is replaced, `eos next`
+// asks for it. `init` shows the governance tracks and the starter packs and writes the choice.
+// (2.0, ADR-012)
+//
+// Deliberately not an application skeleton: EOS does not scaffold product code, and a half-maintained
+// app template inside a governance repository rots faster than anything else in it. What a newcomer
+// gets wrong is the declaration — an `application` with no `commands.test`, or a `config-only` that
+// should not be one — and both are silent. A declaration the project made is never overwritten
+// without --force; the template's own may be replaced, because it was never this project's.
+const LOCAL_FILES = [
+  { path: '.vscode/tasks.json', body: VSCODE_TASKS },
+  { path: '.eos/local/.gitkeep', body: '' },
+];
+
+function localFiles(root, write) {
+  const rows = [];
+  for (const f of LOCAL_FILES) {
+    const full = join(root, f.path);
+    if (existsSync(full)) { rows.push({ path: f.path, action: 'kept' }); continue; }
+    if (write) { mkdirSync(dirname(full), { recursive: true }); writeFileSync(full, f.body, 'utf8'); }
+    rows.push({ path: f.path, action: write ? 'created' : 'would create' });
+  }
+  return rows;
+}
+
+function currentDeclaration(root) {
+  const full = join(root, PROJECT_PATH);
+  if (!existsSync(full)) return { state: 'missing', declaration: null };
+  let declaration = null;
+  try { declaration = JSON.parse(readFileSync(full, 'utf8')); } catch { return { state: 'declared', declaration: null }; }
+  return { state: declaration?.templateDefault === true ? 'template' : 'declared', declaration };
+}
+
+const PROJECT_PATH = '.eos/project.json';
+const describe = (d) => `${d.projectType} · ${(d.stacks || []).join(', ') || 'no stack'} · ${trackOf(d).title} track (${d.workflowProfile || 'standard-product'})`;
+
+/**
+ *   eos init                                   what is declared, the tracks, the packs, the local files
+ *   eos init <pack> [--track standard|regulated] [--write] [--force]
+ *   eos new <pack> [--track …] [--write]       the same declaration, without the local files
+ */
+function declareProject(snapshot, flags, verb) {
+  const packId = flags._[1];
+  const track = typeof flags.track === 'string' ? flags.track : null;
+  if (flags.track !== undefined && !TRACK_NAMES.includes(track)) {
+    console.log(`unknown track "${flags.track === true ? '' : flags.track}" — choose standard | regulated`);
+    return EXIT.FAIL;
+  }
+  const { state, declaration: existing } = currentDeclaration(snapshot.root);
+
+  if (!packId) {
+    const files = verb === 'init' ? localFiles(snapshot.root, !!flags.write) : [];
+    // Code landing in a config-only project is the moment a stack is chosen: name the packs that fit it.
+    const awaitingStack = state === 'declared' && existing?.projectType === 'config-only';
+    const detected = awaitingStack ? detectStacks(snapshot.root) : [];
+    const matching = packIds().filter((id) => {
+      const stacks = PACKS[id].declaration.stacks;
+      return stacks.length > 0 && stacks.every((st) => detected.includes(st));
+    });
+    const lines = [`EOS ${verb}`, '', 'Your project'];
+    if (state === 'missing') lines.push(`  ${PROJECT_PATH} does not exist yet — choose a track and a pack below.`);
+    else if (state === 'template') lines.push(`  ${PROJECT_PATH} is still the EOS template's own declaration — choose a track and a pack below.`);
+    else lines.push(`  declared — ${existing ? describe(existing) : 'unreadable; run eos doctor'}`);
+    if (detected.length) lines.push(`  product code detected — ${detected.join(', ')} manifest(s); packs that match: ${matching.join(', ') || 'none (see docs/eos/stack-presets.md)'}`);
+    lines.push('', 'Governance tracks');
+    for (const t of Object.values(TRACKS)) lines.push(`  ${t.name.padEnd(10)} ${t.title} — ${t.summary}`);
+    lines.push('', 'Starter packs (each writes a correct .eos/project.json; none scaffolds application code)');
+    for (const id of packIds()) lines.push(`  ${id.padEnd(16)} ${PACKS[id].title}`);
+    if (files.length) { lines.push('', 'Local files'); for (const r of files) lines.push(`  ${r.action.padEnd(12)} ${r.path}${r.action === 'kept' ? ' (already exists — never overwritten)' : ''}`); }
+    lines.push('');
+    if (state !== 'declared') lines.push(`  Declare it:  ${CLI} ${verb} <pack> --track standard|regulated --write`);
+    else if (awaitingStack) lines.push(`  ${detected.length ? 'Declare the stack' : 'When code lands'}:  ${CLI} ${verb} <pack> --write   (no --force needed — the ${trackOf(existing).title} track carries over)`);
+    if (verb === 'init' && !flags.write) lines.push('  Nothing was written. Re-run with --write to create the local files.');
+    lines.push(`  Next:        ${CLI} next`, '');
+    emit(flags, {
+      declaration: state, tracks: Object.values(TRACKS).map(({ name, title, summary }) => ({ name, title, summary })),
+      packs: packIds().map((p) => ({ id: p, title: PACKS[p].title })),
+      ...(awaitingStack ? { detectedStacks: detected, matchingPacks: matching } : {}),
+      ...(verb === 'init' ? { wrote: files.filter((r) => r.action === 'created').length, planned: LOCAL_FILES.map((p) => p.path) } : {}),
+    }, lines.join('\n'));
+    return EXIT.OK;
+  }
+
+  const pack = packDeclaration(packId);
+  if (!pack) { console.log(`unknown pack "${packId}" — known packs: ${packIds().join(', ')}`); return EXIT.FAIL; }
+  // The track a project already chose carries over when it only gains a stack. --track overrides it,
+  // and a pack that IS a track (regulated-app) keeps its own: changing track is never a side effect.
+  const keptTrack = state === 'declared' && existing ? trackOf(existing).name : null;
+  const packTrack = trackOf(pack).name;
+  const declaration = applyTrack(pack, track || (packTrack !== 'standard' ? packTrack : keptTrack));
+  const chosen = trackOf(declaration);
+  const lines = [`EOS ${verb} · ${packId} — ${PACKS[packId].title} · ${chosen.title} track`, ''];
+  // A config-only declaration has no stack to lose: when code lands it takes a pack without --force,
+  // as long as the track stays what the project chose. Anything else the project declared is its own.
+  const fromConfigOnly = state === 'declared' && existing?.projectType === 'config-only' && packId !== 'config-only';
+  const gainsStack = fromConfigOnly && chosen.name === keptTrack;
+  if (state === 'declared' && !flags.force && !gainsStack) {
+    if (fromConfigOnly) {
+      lines.push(`  refused  this would move the project from the ${TRACKS[keptTrack].title} track to the ${chosen.title} track.`,
+        '  A track decides what a release must prove, so changing it is deliberate: re-run with --force if you mean it.', '');
+    } else {
+      lines.push(`  refused  ${PROJECT_PATH} already exists and declares this project (${existing ? describe(existing) : 'unreadable'}).`,
+        '  A project declaration is a decision this project has already made; replacing it would silently',
+        '  change which gates apply. Edit it by hand, or re-run with --force if you really mean to start over.', '');
+    }
+    emit(flags, { pack: packId, track: chosen.name, written: false, reason: fromConfigOnly ? 'track change' : 'declaration already exists', declaration }, lines.join('\n'));
+    return EXIT.FAIL;
+  }
+  const full = join(snapshot.root, PROJECT_PATH);
+  if (flags.write) { mkdirSync(dirname(full), { recursive: true }); writeFileAtomic(full, `${JSON.stringify(declaration, null, 2)}\n`); }
+  const files = verb === 'init' ? localFiles(snapshot.root, !!flags.write) : [];
+  lines.push(`  ${flags.write ? 'written' : 'would write'}  ${PROJECT_PATH}${state === 'template' ? '  (replaces the EOS template\'s own declaration)' : ''}`, '',
+    `  projectType      ${declaration.projectType}`,
+    `  stacks           ${declaration.stacks.join(', ')}`,
+    `  paradigms        ${declaration.productParadigms.join(', ')}`,
+    `  workflowProfile  ${declaration.workflowProfile}${declaration.complianceProfile ? `\n  complianceProfile ${declaration.complianceProfile} · evidencePolicy ${declaration.evidencePolicy}` : ''}`,
+    `  commands         ${declaration.commands ? Object.entries(declaration.commands).map(([k, v]) => `${k}: ${v}`).join('\n                   ') : '(none — no product code yet; the product gate reports NOT_APPLICABLE)'}`, '',
+    ...['Track', `  ${chosen.title} — ${chosen.summary}`, '  A release needs:', ...chosen.releaseRequires.map((r) => `    · ${r}`), '']);
+  for (const r of files) lines.push(`  ${r.action.padEnd(12)} ${r.path}`);
+  if (files.length) lines.push('');
+  if (PACKS[packId].notes.length) { lines.push('Before you rely on this'); for (const n of PACKS[packId].notes) lines.push(`  · ${n}`); lines.push(''); }
+  if (declaration.projectType === 'config-only') {
+    lines.push('Next', `  1. ${CLI} next                 (start the guided loop)`,
+      `  2. When code lands: ${CLI} init <pack> --write — this track carries over`, '');
+    if (!flags.write) lines.push('  Nothing was written. Re-run with --write to apply.', '');
+    emit(flags, { pack: packId, track: chosen.name, written: !!flags.write, replaced: state, declaration, notes: PACKS[packId].notes, localFiles: files }, lines.join('\n'));
+    return EXIT.OK;
+  }
+  lines.push('Next',
+    '  1. Replace the commands above with what CI actually runs — an unrunnable command fails closed.',
+    `  2. ${CLI} stack sync --write   (put the stack in the always-on rule)`);
+  if (chosen.name === 'regulated') {
+    lines.push(`  3. ${CLI} release keygen       (the key your releases will be signed with)`,
+      '     node .github/hooks/eos-doctor.mjs        (release pre-flight: what a regulated release still lacks)',
+      `  4. ${CLI} next`);
+  } else {
+    lines.push(`  3. ${CLI} next                 (start the guided loop)`);
+  }
+  lines.push('');
+  if (!flags.write) lines.push('  Nothing was written. Re-run with --write to apply.', '');
+  emit(flags, { pack: packId, track: chosen.name, written: !!flags.write, replaced: state, declaration, notes: PACKS[packId].notes, localFiles: files }, lines.join('\n'));
+  return EXIT.OK;
+}
+
+// --------------------------------------------------------------------------------- policy baselines
+/** `eos policy export`: this repository's gates and profiles as a baseline others can follow. (ADR-013) */
+function policyExport(snapshot, flags) {
+  const { files, errors } = readPolicy(snapshot.root);
+  if (errors.length || !files.gates || !files.workflow) {
+    console.log(`EOS policy export · the policy cannot be read: ${errors.join('; ') || 'missing gates or workflow'}`);
+    return EXIT.ERROR;
+  }
+  const name = typeof flags.name === 'string' ? flags.name : null;
+  const version = typeof flags.version === 'string' ? flags.version : null;
+  if (!name || !/^[a-z0-9][a-z0-9._-]*$/.test(name) || !version) {
+    console.log('policy export requires --name <org-policy-name> (lowercase) and --version <version>');
+    return EXIT.FAIL;
+  }
+  let bundle = buildBaseline({ gates: files.gates, workflow: files.workflow, name, version });
+  if (flags.sign) {
+    if (typeof flags.key !== 'string') { console.log('policy export --sign requires --key <private-key-file>'); return EXIT.FAIL; }
+    let key;
+    try { key = privateKeyFromFile(flags.key); } catch (e) { console.log(`EOS policy export · cannot use ${flags.key}: ${e.message}`); return EXIT.FAIL; }
+    bundle = signDocument('policy', bundle, key);
+  }
+  const out = typeof flags.out === 'string' ? flags.out : `${name}-${version}.policy-baseline.json`;
+  writeFileSync(out, `${JSON.stringify(bundle, null, 2)}\n`);
+  const lines = [`EOS policy export · ${name}@${version}`, '',
+    `  written   ${out}`,
+    `  digest    ${baselineDigest(bundle)}`,
+    `  signed    ${bundle.signature ? `yes — key ${bundle.signature.keyId.slice(0, 12)}…` : 'no (add --sign --key <file>; followers then declare policyUpstream.publicKey)'}`, '',
+    '  Publish it where projects can fetch it (https, or a repository they check out). Each project declares',
+    '  "policyUpstream": { "source": "<url or file:path>", "publicKey": "<path>" } and runs `eos policy sync`.', ''];
+  emit(flags, { file: out, digest: baselineDigest(bundle), baseline: bundle }, lines.join('\n'));
+  return EXIT.OK;
+}
+
+/**
+ * `eos policy sync [--check]`: the ONE command that may reach the network. It fetches the declared
+ * baseline, verifies its signature, vendors it and pins it. With --check it only reports whether the
+ * vendored copy is still what upstream publishes. (ADR-013)
+ */
+async function policySync(snapshot, flags) {
+  const root = snapshot.root;
+  const declared = snapshot.project?.policyUpstream;
+  if (!declared) { console.log('EOS policy sync · .eos/project.json declares no policyUpstream — nothing to sync'); return EXIT.FAIL; }
+  const lines = [`EOS policy sync${flags.check ? ' --check' : ''} · ${declared.source}`, ''];
+  const done = (code, json) => { emit(flags, json, lines.join('\n')); return code; };
+
+  const fetched = await fetchBaseline(root, declared.source);
+  if (fetched.error) {
+    lines.push(`  ${fetched.blocked ? 'BLOCKED' : 'ERROR'}  ${fetched.error}`, '', '  Nothing was written; `eos policy check` keeps enforcing the copy already vendored.', '');
+    return done(fetched.blocked ? EXIT.BLOCKED : EXIT.FAIL, { synced: false, error: fetched.error, blocked: !!fetched.blocked });
+  }
+  let bundle;
+  try { bundle = JSON.parse(fetched.text); } catch (e) {
+    lines.push(`  ERROR  the baseline is not JSON (${e.message})`, '');
+    return done(EXIT.FAIL, { synced: false, error: 'not JSON' });
+  }
+  const { schema, error } = loadSchema(root, 'policy-baseline.schema.json');
+  const problems = schema ? validate(schema, bundle, { label: declared.source }).errors : [error];
+  if (problems.length) {
+    lines.push(...problems.slice(0, 4).map((p) => `  ERROR  ${p}`), '');
+    return done(EXIT.FAIL, { synced: false, errors: problems });
+  }
+  if (declared.publicKey) {
+    let key;
+    try { key = loadPublicKey(readFileSync(join(root, declared.publicKey), 'utf8')); } catch (e) {
+      lines.push(`  ERROR  the declared key ${declared.publicKey} cannot be used: ${e.message}`, '');
+      return done(EXIT.FAIL, { synced: false, error: 'key' });
+    }
+    const v = verifyDocument('policy', bundle, key);
+    if (!v.valid) {
+      lines.push(`  ERROR  the baseline cannot be trusted: ${v.problem}`, '', '  Nothing was written.', '');
+      return done(EXIT.FAIL, { synced: false, error: v.problem });
+    }
+    lines.push(`  signature verified — key ${keyId(key).slice(0, 12)}…`);
+  } else {
+    lines.push('  UNSIGNED  no policyUpstream.publicKey is declared, so integrity rests on the transport and the pinned digest');
+  }
+
+  const digest = baselineDigest(bundle);
+  const lock = readLock(root).lock;
+  const vendored = readVendored(root).bundle;
+  const pinned = lock?.upstream?.digest || (vendored ? baselineDigest(vendored) : null);
+  const was = vendored || (lock?.upstream ? { name: lock.upstream.name, version: lock.upstream.version } : null);
+  const now = `${bundle.name}@${bundle.version}`;
+  if (flags.check) {
+    if (pinned === digest) { lines.push(`  up to date — ${now}`, ''); return done(EXIT.OK, { current: true, digest }); }
+    lines.push(`  upstream moved: ${was ? `${was.version} → ${bundle.version}` : `(nothing pinned) → ${bundle.version}`} (${bundle.name})`,
+      '  Run `node .github/eos/eos.mjs policy sync`, then `node .github/eos/eos.mjs policy lock --write`, and review what changed.', '');
+    return done(EXIT.FAIL, { current: false, pinned, digest });
+  }
+  writeFileAtomic(join(root, UPSTREAM_PATH), `${JSON.stringify(bundle, null, 2)}\n`);
+  if (lock) {
+    const next = { ...lock, upstream: { source: declared.source, name: bundle.name, version: bundle.version, digest, syncedAt: new Date().toISOString(), ...(bundle.signature ? { keyId: bundle.signature.keyId } : {}) } };
+    writeFileAtomic(join(root, POLICY_LOCK_PATH), `${JSON.stringify(next, null, 2)}\n`);
+  }
+  lines.push(`  vendored  ${UPSTREAM_PATH} — ${now}${pinned && pinned !== digest && was ? ` (was ${was.name}@${was.version})` : ''}`,
+    lock ? `  pinned    ${POLICY_LOCK_PATH} → upstream ${digest.slice(0, 12)}…` : '  Next: `node .github/eos/eos.mjs policy lock --write` pins it.',
+    '  `eos policy check` enforces it from here on, offline.', '');
+  return done(EXIT.OK, { synced: true, digest, baseline: { name: bundle.name, version: bundle.version } });
+}
+
 export const maintenanceCommands = {
+  /**
+   * `eos report [--format json|markdown] [--out <file>]`: this repository's governance report.
+   * `eos report --org <report.json>… [--format …] [--out <file>]`: many repositories, aggregated.
+   * Offline. The output is checked against its own schema before it is written: a malformed report
+   * is an ERROR, not a document someone files. (2.0)
+   */
+  report(snapshot, flags) {
+    const format = flags.json ? 'json' : (typeof flags.format === 'string' ? flags.format : 'markdown');
+    if (!['json', 'markdown'].includes(format)) { console.log('report --format must be json or markdown'); return EXIT.FAIL; }
+    let data;
+    let schemaName;
+    let markdown;
+    if (flags.org !== undefined) {
+      const paths = [...[].concat(flags.org).filter((p) => typeof p === 'string'), ...flags._.slice(1)];
+      if (!paths.length) { console.log('report --org needs one or more report files written by `eos report --format json`'); return EXIT.FAIL; }
+      const { reports, problems } = readReports(paths);
+      if (problems.length) { console.log(['EOS report --org', '', ...problems.map((p) => `  ERROR ${p}`), ''].join('\n')); return EXIT.FAIL; }
+      data = buildOrgReport(reports);
+      schemaName = 'governance-org-report.schema.json';
+      markdown = () => renderOrgMarkdown(data);
+    } else {
+      data = buildReport(snapshot);
+      schemaName = 'governance-report.schema.json';
+      markdown = () => renderReportMarkdown(data);
+    }
+    const { schema, error } = loadSchema(snapshot.root, schemaName);
+    const invalid = schema ? validate(schema, data, { label: 'report' }).errors : [error];
+    if (invalid.length) { console.log(['EOS ERROR — the report does not conform to its schema:', ...invalid.slice(0, 5).map((e) => `  ${e}`)].join('\n')); return EXIT.ERROR; }
+    const text = format === 'json' ? `${JSON.stringify(data, null, 2)}\n` : `${markdown()}\n`;
+    if (typeof flags.out === 'string') {
+      writeFileSync(flags.out, text);
+      console.log(`EOS report · written ${flags.out} (${format}${data.attention ? `, ${data.attention.length} item(s) need attention` : ''})`);
+      return EXIT.OK;
+    }
+    process.stdout.write(text);
+    return EXIT.OK;
+  },
   /**
    * Regenerate every document that restates the machine-readable policy — and, with --check, fail
    * when a committed one no longer matches what the policy would produce.
@@ -160,59 +451,9 @@ export const maintenanceCommands = {
     return EXIT.OK;
   },
 
-  /**
-   * Scaffold the project DECLARATION for a known shape of project.
-   *
-   * Deliberately not an application skeleton: EOS does not scaffold product code, and a
-   * half-maintained app template inside a governance repository rots faster than anything else in
-   * it. What a newcomer actually gets wrong is the declaration — an `application` with no
-   * `commands.test`, or a `config-only` that should not be one — and both of those are silent.
-   *
-   * Never overwrites. A declaration that already exists is the project's own decision.
-   */
+  /** The pack half of `eos init`: the declaration, without the local files. Kept for scripts. */
   new(snapshot, flags) {
-    const id = flags._[1];
-    if (!id) {
-      const lines = ['EOS starter packs', '', '  Each pack writes a correct .eos/project.json for a known shape of project.', '  It does NOT scaffold application code — use your ecosystem\'s own tool for that.', ''];
-      for (const packId of packIds()) lines.push(`  ${packId.padEnd(16)} ${PACKS[packId].title}`);
-      lines.push('', '  node .github/eos/eos.mjs new <pack> --write', '');
-      emit(flags, { packs: packIds().map((p) => ({ id: p, title: PACKS[p].title })) }, lines.join('\n'));
-      return EXIT.OK;
-    }
-    const declaration = packDeclaration(id);
-    if (!declaration) {
-      console.log(`unknown pack "${id}" — known packs: ${packIds().join(', ')}`);
-      return EXIT.FAIL;
-    }
-    const rel = '.eos/project.json';
-    const full = join(snapshot.root, rel);
-    const exists = existsSync(full);
-    const body = `${JSON.stringify(declaration, null, 2)}\n`;
-
-    const lines = [`EOS new · ${id} — ${PACKS[id].title}`, ''];
-    if (exists) {
-      lines.push(`  refused  ${rel} already exists.`,
-        '  A project declaration is a decision this project has already made; overwriting it would',
-        '  silently change which gates apply. Edit it by hand, or delete it first if you meant to',
-        '  start over.', '');
-      emit(flags, { pack: id, written: false, reason: 'declaration already exists', declaration }, lines.join('\n'));
-      return EXIT.FAIL;
-    }
-    if (flags.write) { mkdirSync(dirname(full), { recursive: true }); writeFileAtomic(full, body); }
-    lines.push(`  ${flags.write ? 'written' : 'would write'}  ${rel}`, '',
-      `  projectType      ${declaration.projectType}`,
-      `  stacks           ${declaration.stacks.join(', ')}`,
-      `  paradigms        ${declaration.productParadigms.join(', ')}`,
-      `  workflowProfile  ${declaration.workflowProfile}${declaration.complianceProfile ? `\n  complianceProfile ${declaration.complianceProfile}` : ''}`,
-      `  commands         ${Object.entries(declaration.commands).map(([k, v]) => `${k}: ${v}`).join('\n                   ')}`, '');
-    if (PACKS[id].notes.length) { lines.push('Before you rely on this'); for (const n of PACKS[id].notes) lines.push(`  · ${n}`); lines.push(''); }
-    lines.push('Next',
-      '  1. Replace the commands above with what CI actually runs — an unrunnable command fails closed.',
-      '  2. node .github/eos/eos.mjs stack sync --write   (put the stack in the always-on rule)',
-      '  3. node .github/eos/eos.mjs next                 (start the guided loop)', '');
-    if (!flags.write) lines.push('  Nothing was written. Re-run with --write to apply.', '');
-    emit(flags, { pack: id, written: !!flags.write, declaration, notes: PACKS[id].notes }, lines.join('\n'));
-    return EXIT.OK;
+    return declareProject(snapshot, flags, 'new');
   },
 
   /**
@@ -222,7 +463,7 @@ export const maintenanceCommands = {
    *   policy lock  [--against <ref>] [--write] [--reason "<why>"]
    *   policy check [--against <ref>]                   the CI gate (default subcommand)
    */
-  policy(snapshot, flags) {
+  async policy(snapshot, flags) {
     const sub = flags._[1] || 'check';
     const against = typeof flags.against === 'string' ? flags.against : null;
     const KIND_ORDER = { WEAKENING: 0, REVIEW: 1, STRENGTHENING: 2, INFO: 3 };
@@ -275,30 +516,16 @@ export const maintenanceCommands = {
       return r.ok ? EXIT.OK : EXIT.FAIL;
     }
 
-    console.log(`unknown policy subcommand "${sub}" — use diff, lock or check`);
+    if (sub === 'export') return policyExport(snapshot, flags);
+    if (sub === 'sync') return policySync(snapshot, flags);
+
+    console.log(`unknown policy subcommand "${sub}" — use diff, lock, check, export or sync`);
     return EXIT.FAIL;
   },
 
+  /** Declare the project and choose its governance track; create the local integration files. */
   init(snapshot, flags) {
-    const planned = [
-      { path: '.vscode/tasks.json', body: VSCODE_TASKS },
-      { path: '.eos/local/.gitkeep', body: '' },
-    ];
-    const lines = ['EOS init', ''];
-    let created = 0;
-    for (const f of planned) {
-      const full = join(snapshot.root, f.path);
-      if (existsSync(full)) { lines.push(`  kept    ${f.path} (already exists — never overwritten)`); continue; }
-      if (!flags.write) { lines.push(`  would create ${f.path}`); continue; }
-      mkdirSync(dirname(full), { recursive: true });
-      writeFileSync(full, f.body, 'utf8');
-      created++;
-      lines.push(`  created ${f.path}`);
-    }
-    if (!flags.write) lines.push('', '  Nothing was written. Re-run with --write to create the missing files.');
-    lines.push('', '  Next: node .github/eos/eos.mjs next', '');
-    emit(flags, { wrote: flags.write ? created : 0, planned: planned.map((p) => p.path) }, lines.join('\n'));
-    return EXIT.OK;
+    return declareProject(snapshot, flags, 'init');
   },
 
   /**

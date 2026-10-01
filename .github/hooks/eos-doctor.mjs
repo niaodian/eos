@@ -7,6 +7,7 @@
 import { readdirSync, existsSync, readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { execSync } from 'node:child_process';
+import { createPublicKey } from 'node:crypto';
 import { loadProjectConfig, PROJECT_CONFIG_PATH } from './lib/project-config.mjs';
 import { loadComplianceProfile, evaluateDataBoundary, COMPLIANCE_PROFILE_PATH } from './lib/compliance-profile.mjs';
 import { bmadReadiness, deprecatedMappings, BMAD_LOCK_PATH } from './lib/bmad-runtime.mjs';
@@ -359,6 +360,41 @@ const bmadOut = [];
   }
   if (!deep && report.status !== 'UNCHECKED') {
     bmadOut.push('  BMAD        shallow check only — run `node .github/hooks/eos-doctor.mjs --deep` to verify the project runtime and executables the skills invoke.');
+  }
+}
+
+// --- D7 Release pre-flight (2.0) ---
+// What a Regulated release will need, said now rather than at the tag: a signing key, declared
+// artifacts, CI-produced evidence, and a CI job that can attest provenance. Warnings — the release
+// gate enforces; this only makes sure nobody discovers it on release day. A private key inside the
+// repository is an ERROR on every track: it signs anything, for anyone who can read the repo.
+{
+  const keysDir = join(root, '.eos/keys');
+  if (existsSync(keysDir)) {
+    for (const name of readdirSync(keysDir)) {
+      let text = '';
+      try { text = readFileSync(join(keysDir, name), 'utf8'); } catch { continue; }
+      if (/-----BEGIN [A-Z ]*PRIVATE KEY-----/.test(text)) errors.push(`D7 Release pre-flight: .eos/keys/${name} is a PRIVATE key inside the repository — delete it, keep it outside (eos release keygen writes it to ~/.config/eos/keys/), and rotate it if it was ever committed.`);
+    }
+  }
+  if (proj.config?.complianceProfile === 'regulated') {
+    const rel = proj.config.release || {};
+    const keyPath = rel.signing?.publicKey;
+    if (!keyPath) {
+      warns.push('D7 Release pre-flight: a Regulated release needs a signed manifest, and no release key is declared — run `node .github/eos/eos.mjs release keygen --write`.');
+    } else if (!existsSync(join(root, keyPath))) {
+      warns.push(`D7 Release pre-flight: the declared release key ${keyPath} does not exist.`);
+    } else {
+      try {
+        if (createPublicKey(readFileSync(join(root, keyPath), 'utf8')).asymmetricKeyType !== 'ed25519') throw new Error('not an Ed25519 key');
+      } catch (e) { warns.push(`D7 Release pre-flight: the declared release key ${keyPath} cannot be used — ${e.message}.`); }
+    }
+    if (!(rel.artifacts || []).length) warns.push('D7 Release pre-flight: no release.artifacts are declared — a Regulated release must list what it ships, so its provenance can be bound to it.');
+    if ((proj.config.evidencePolicy || 'local') === 'local') warns.push('D7 Release pre-flight: evidencePolicy is "local" — a Regulated release needs evidence produced in CI ("ci" or "attested").');
+    const wfDir = join(root, '.github/workflows');
+    const workflows = existsSync(wfDir) ? readdirSync(wfDir).filter((f) => /\.ya?ml$/.test(f)).map((f) => readFileSync(join(wfDir, f), 'utf8')) : [];
+    const canAttest = workflows.some((w) => /id-token:\s*write/.test(w) && /(attest-build-provenance|slsa-github-generator)/.test(w));
+    if (!canAttest) warns.push('D7 Release pre-flight: no CI workflow can attest provenance — none grants `id-token: write` to an attestation step (.github/workflows/eos-release.yml does).');
   }
 }
 

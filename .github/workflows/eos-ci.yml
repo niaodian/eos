@@ -229,10 +229,13 @@ jobs:
       fail-fast: false
       matrix:
         os: [windows-latest, macos-latest]
+        # Both supported runtimes on both platforms: the README claims Node 20 and 22, so CI proves
+        # it everywhere rather than on Linux alone.
+        node: ['20', '22']
     runs-on: ${{ matrix.os }}
-    # Measured on Node 20: all five layers take ~8 min on Windows and ~2.5 min on macOS. 30 min is
-    # ~3.5x the slower of the two — room for a slow runner, not for a hang.
-    timeout-minutes: 30
+    # Measured (2.0): all five layers take 8 to 20 min on Windows, depending on the runner, and ~3 min
+    # on macOS. 45 min is room for the slowest Windows runner seen, not for a hang.
+    timeout-minutes: 45
     permissions:
       contents: read
     # Budgets are NOT enforced here, and that is deliberate rather than a concession.
@@ -250,18 +253,45 @@ jobs:
     # The limits need the same care. Node 20 applies --test-timeout to each test FILE (it wraps a
     # file as one top-level test), and on Windows a whole file can legitimately take longer than the
     # 120s default sized for Linux, so Windows gets a longer per-test limit by explicit override.
-    # The layer backstop needs no override: the slowest layer measured on Windows takes ~155s, and
-    # the 15-minute default leaves ~6x headroom. EOS_LAYER_TIMEOUT_MS exists for a slower runner.
-    # macOS keeps every default, so a hang there is still caught early.
+    # Windows also needs longer backstops for the spawn guard and the layer. With 2.0's suites the
+    # integration layer took up to ~9 min on a slow Windows runner, and under Defender a plain
+    # `git add -A` in a fixture stalled past the 60s spawn guard. macOS keeps every default, so a
+    # hang there is still caught early.
     env:
       EOS_TEST_TIMEOUT_MS: ${{ matrix.os == 'windows-latest' && '900000' || '120000' }}
+      EOS_TEST_SPAWN_TIMEOUT_MS: ${{ matrix.os == 'windows-latest' && '180000' || '60000' }}
+      EOS_LAYER_TIMEOUT_MS: ${{ matrix.os == 'windows-latest' && '1800000' || '900000' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: '20'
+          node-version: ${{ matrix.node }}
+      # Windows Defender scans every file the suite writes. Under the integration layer's parallel
+      # fixture churn that stalled git past the spawn guard and doubled the layer time. The runner VM
+      # is ephemeral: excluding its scratch space, the checkout and the two processes that do the I/O
+      # is the usual CI remedy, and it changes nothing EOS verifies.
+      - name: Keep Defender out of the test sandboxes (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Add-MpPreference -ExclusionPath $env:TEMP, "$env:LOCALAPPDATA\Temp", $env:RUNNER_TEMP, $env:GITHUB_WORKSPACE
+          Add-MpPreference -ExclusionProcess 'git.exe', 'node.exe'
+      # The short form the README teaches. --offline means npm can only run THIS checkout's bin; the
+      # registry's unrelated "eos" package can never be fetched in its place. npm < 10.9 cannot run a
+      # bin that lives under a dot-directory at all (@npmcli/package-json < 6 drops it as "invalid"),
+      # so on Node 20's bundled npm 10.8 the documented contract is the other half: it fails closed.
+      - name: npx --offline eos status
+        shell: bash
+        run: |
+          if node -e "const [a, b] = process.argv[1].split('.').map(Number); process.exit(a > 10 || (a === 10 && b >= 9) ? 0 : 1)" "$(npm -v)"; then
+            npx --offline eos status
+          else
+            if npx --offline eos status 2> "$RUNNER_TEMP/npx.err"; then echo "::error::npm $(npm -v) ran something for npx --offline eos"; exit 1; fi
+            grep -q ENOTCACHED "$RUNNER_TEMP/npx.err" || { cat "$RUNNER_TEMP/npx.err"; exit 1; }
+            echo "npm $(npm -v) < 10.9: the shortcut fails closed with ENOTCACHED, as documented."
+          fi
       # One step per layer, and every layer runs even after an earlier one failed: a platform defect
       # in one layer must not hide the ones in the next.
       - name: EOS tests · unit

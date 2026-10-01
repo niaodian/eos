@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/niaodian/eos/.eos/schemas/policy-baseline.schema.json",
+  "title": "EOS policy baseline",
+  "description": "An organization's minimum policy — gates and workflow profiles — written by `eos policy export` and followed by projects through `policyUpstream`. A project may be stricter; anything weaker needs an acknowledgement, with a second person's approval, in its own policy lock. (ADR-013)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "kind",
+    "name",
+    "version",
+    "issuedAt",
+    "snapshot"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": 1
+    },
+    "kind": {
+      "const": "eos-policy-baseline"
+    },
+    "name": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]*$",
+      "description": "Who publishes it, e.g. acme-engineering."
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "issuedAt": {
+      "type": "string",
+      "minLength": 20
+    },
+    "snapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "gates",
+        "workflow",
+        "project"
+      ],
+      "description": "The reference repository's policy snapshot (lib/policy.mjs), with `project` always null: what one project is says nothing about another.",
+      "properties": {
+        "gates": {
+          "type": "object"
+        },
+        "workflow": {
+          "type": "object"
+        },
+        "project": {
+          "type": "null"
+        }
+      }
+    },
+    "signature": {
+      "description": "Ed25519 over the canonical content (everything but this block), domain eos-policy-baseline-v1.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "alg",
+        "keyId",
+        "value"
+      ],
+      "properties": {
+        "alg": {
+          "const": "ed25519"
+        },
+        "keyId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "signedAt": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string",
+          "minLength": 80
+        }
+      }
+    }
+  }
+}

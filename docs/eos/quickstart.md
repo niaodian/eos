@@ -7,7 +7,7 @@
 ## Prerequisites (local-first — nothing enterprise required)
 | Tool | Needed for | If absent |
 |---|---|---|
-| **Node.js** (18+) | validators, hooks, JS/TS tests & evals | required — the only hard dependency |
+| **Node.js** (20.10+) | the `eos` CLI, validators, hooks, JS/TS tests & evals | required — the only hard dependency (npm 10.9+, bundled with Node 22, for the `npx --offline eos` shortcut) |
 | **VS Code + GitHub Copilot** | the `eos-*` agents, `/eos-*` prompts and always-on rules | required for the guided flow; the `eos.mjs` CLI itself works without it |
 | **BMAD skills** (`bmad-*`) | every stage workflow (`bmad-prd`, `bmad-architecture`, `bmad-create-story`, …) | required for the guided flow — EOS orchestrates them, it does not reimplement them. Verify with `node .github/hooks/eos-doctor.mjs --deep` |
 | **`gh` CLI**, authenticated | creating the remote, and verifying branch protection during `/eos-init` | **optional**: do it in the GitHub web UI instead. Set up with `gh auth login` |
@@ -47,9 +47,10 @@ core flow (hooks, validators, tests are all Node, and paths are normalized cross
 ## Day-1 (copy-ready — the same sequence as the manual, §3.4)
 
 ```sh
-npx degit niaodian/eos#eos-1.22.0 my-new-app && cd my-new-app
+npx degit niaodian/eos#eos-2.0.0 my-new-app && cd my-new-app
 git init && git add -A && git commit -q -m "chore: scaffold from eos"
 node .github/hooks/validate-config.mjs        # expect PASS
+node .github/eos/eos.mjs init config-only --write   # declare it: no code yet (or init <pack>; --track regulated)
 code .                                        # from INSIDE the project — see the warning below
 ```
 
@@ -75,17 +76,20 @@ Then, in **Copilot Chat**:
    CODEOWNERS, approval baseline, tracked in `docs/eos/activation.md`.
 2. **`/eos-next`** (or the `eos-guide` agent) — and do what it says. Repeat.
 
-> **`.eos/project.json` stays `config-only` on day one, and that is correct.** It is not a task you
-> are behind on: the tech stack is an irreversible decision that EOS defers to **Phase 4
-> (Architecture)**, where an ADR locks it. It only becomes an error once real stack manifests
-> (`package.json`, `pyproject.toml`, `go.mod`, …) exist while the declaration still claims there is
-> no code — because the quality gate would then be passing vacuously.
+> **Declare the project on day one — `config-only` is the honest answer.** The template's own
+> `.eos/project.json` describes EOS (`"templateDefault": true`), so `eos next` first sends you to
+> `eos init`. With no code yet, `eos init config-only --write` (add `--track regulated` if it
+> applies): the tech stack is an irreversible decision that EOS defers to **Phase 4 (Architecture)**,
+> where an ADR locks it. It only becomes an error once real stack manifests (`pyproject.toml`,
+> `go.mod`, a `package.json` with dependencies, …) exist while the declaration still claims there is
+> no code. `eos next` then routes you back to `eos init`, which names the matching packs, and
+> `eos init <pack> --write` keeps your track.
 
 > **Two similarly-named things, doing different jobs.**
 > `/eos-init` (Copilot Chat) is the **hardening walkthrough** above — the one you want on day one.
-> `node .github/eos/eos.mjs init --write` (terminal) only writes `.vscode/tasks.json` so the
-> **EOS: Next / Resume / Verify Current Gate / Release Status** tasks appear in the Run Task menu.
-> It is a convenience, not a step you have to take.
+> `node .github/eos/eos.mjs init` (terminal) declares the project — its governance track and starter
+> pack — and with `--write` also writes `.vscode/tasks.json` so the **EOS: Next / Resume / Verify
+> Current Gate / Release Status** tasks appear in the Run Task menu.
 
 Prefer the terminal? Every prompt has a CLI equivalent — `eos next`, `eos resume`, `eos status` —
 and the two are the same engine. Chat is the shorter path in VS Code; the CLI is what CI runs.
@@ -107,11 +111,11 @@ That is the whole loop. Everything below is reference material for when you want
 - Starting a new chat later? `node .github/eos/eos.mjs resume` (or `/eos-resume`) restores what you
   were doing, the last verified gate and the current blocker — no re-reading documents.
 
-> First time: set project facts in `.github/instructions/00-workspace.instructions.md` —
-> copy your stack's preset from `docs/eos/stack-presets.md` (Node/Python/Go/Java/Rust/.NET), and
-> declare the same commands in **`.eos/project.json`** so the product-quality gate actually runs
-> your tests. The template ships as `projectType: "config-only"`; leaving it there once real code
-> exists is a **hard failure**, not a silent skip.
+> First time with a known stack: `eos init <pack> --write` declares it in **`.eos/project.json`**
+> so the product-quality gate actually runs your tests, and `eos stack sync --write` puts the same
+> commands into `.github/instructions/00-workspace.instructions.md` (every stack:
+> `docs/eos/stack-presets.md`). Staying `config-only` once real code exists is a **hard failure**,
+> not a silent skip.
 
 ## Happy Path (shortest entry)
 ```
@@ -128,6 +132,8 @@ Why this rule:  node .github/eos/eos.mjs explain <gate> (activation|prd-ready|st
 Promote work:   node .github/eos/eos.mjs transition --scope story --id <id> --to <STATE>
 One-time harden: /eos-init   (branch protection + CODEOWNERS + approval baseline → docs/eos/activation.md)
 Before release: node .github/eos/eos.mjs release-status   then /release-gate
+Declare:        node .github/eos/eos.mjs init [<pack>] [--track regulated] --write
+Shorter:        npx --offline eos <command>   (npm 10.9+) · npm run -s eos -- <command>
 Self-check:     node .github/hooks/validate-config.mjs · node .github/eos/eos.mjs doctor
 Product gate:   node .github/hooks/project-gate.mjs   (runs .eos/project.json commands — any stack)
 Local CI:       act push -j verify   (validate-config + eos-doctor + tests + evals; needs Docker)

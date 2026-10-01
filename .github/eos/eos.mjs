@@ -30,7 +30,9 @@ usage: node .github/eos/eos.mjs <command> [flags]
   transition --scope <type> --id <id> --to <STATE>
   approve --scope <type> --id <id>        record an approval (a second person, never the requester)
   explain <gate>                          the full rule set for one gate
-  release init|bind|list [--release <id>]  scaffold / re-bind / list release manifests
+  release init|bind|list [--release <id>]  scaffold / re-bind (artifacts, SBOM, ledger) / list manifests
+  release keygen [--out <file>] [--write]   the Ed25519 key release manifests are signed with
+  release sign|verify --release <id>      sign a manifest (--key <file>) / verify it (--provenance <file>)
   providers                               what external authorities this project consults
   release-status                          aggregate release readiness
   verify-release --release <id>           candidate-bound release verification
@@ -39,15 +41,20 @@ usage: node .github/eos/eos.mjs <command> [flags]
   handoff --scope <type> --id <id> [--verify]
   ledger [--verify] [--against <ref>] [--resolve [--write]]
   focus --scope <type> --id <id>          set this machine's local focus (no authority)
-  init [--write]                          write .vscode/tasks.json only (NOT the /eos-init hardening walkthrough)
+  init [<pack>] [--track standard|regulated] [--write] [--force]
+                                          declare the project, choose its governance track, create local files
   stack sync [--write]                    render the always-on workspace rule from .eos/project.json
-  new [<pack>] [--write]                  scaffold .eos/project.json from a starter pack
+  new <pack> [--track …] [--write]        the pack half of init (the declaration only)
   sbom [--write] [--check]                software bill of materials, bound to the tree
   policy [diff|lock|check] [--against <ref>] [--write] [--reason <text>]
                                           no gate gets weaker without a reason and a second person
+  policy export --name <org> --version <v> [--sign --key <file>] [--out <file>] | policy sync [--check]
+                                          publish an organisation baseline / vendor it (the only networked command)
   migrate [--apply]                       governance file versions; plan first, then apply
   docs [--write] [--check]                regenerate the docs that restate the policy
   health                                  blockers, stale evidence, waivers, trend — one screen
+  report [--format json|markdown] [--out <file>] [--org <report.json>…]
+                                          governance report for one repository, or many aggregated
   doctor                                  is EOS itself wired correctly?
 
   global: --json  --why  --all  --no-color

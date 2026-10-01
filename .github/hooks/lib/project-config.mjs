@@ -18,10 +18,40 @@ export const PROJECT_TYPES = ['application', 'library', 'config-only'];
 export const PARADIGMS = ['deterministic', 'agentic'];
 export const STACKS = ['node', 'python', 'go', 'java', 'rust', 'dotnet', 'other'];
 export const STEPS = ['install', 'lint', 'typecheck', 'test', 'eval', 'audit'];
-const TOP_LEVEL_KEYS = new Set([
+/** `release`: what ships and the key it is signed with. Paths stay inside the repository. */
+function releaseOf(raw, errors) {
+  if (raw === undefined) return undefined;
+  const inside = (p) => typeof p === 'string' && p.length > 0 && !/^[\\/]/.test(p) && !/^[A-Za-z]:/.test(p) && !p.split(/[\\/]/).includes('..');
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) { errors.push(`${PROJECT_CONFIG_PATH}: "release" must be an object`); return undefined; }
+  for (const k of Object.keys(raw)) if (!['artifacts', 'signing'].includes(k)) errors.push(`${PROJECT_CONFIG_PATH}: unknown key "release.${k}" (allowed: artifacts, signing)`);
+  if (raw.artifacts !== undefined && (!Array.isArray(raw.artifacts) || !raw.artifacts.every(inside))) {
+    errors.push(`${PROJECT_CONFIG_PATH}: "release.artifacts" must be repository-relative paths (no "..", not absolute)`);
+  }
+  if (raw.signing !== undefined && !inside(raw.signing?.publicKey)) {
+    errors.push(`${PROJECT_CONFIG_PATH}: "release.signing.publicKey" must be a repository-relative path to the release public key`);
+  }
+  return raw;
+}
+
+/** `policyUpstream`: where the organization baseline comes from, and the key it is signed with. */
+function upstreamOf(raw, errors) {
+  if (raw === undefined) return undefined;
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw) || typeof raw.source !== 'string' || !raw.source) {
+    errors.push(`${PROJECT_CONFIG_PATH}: "policyUpstream" needs a "source" (https URL or file: path)`);
+    return undefined;
+  }
+  for (const k of Object.keys(raw)) if (!['source', 'publicKey'].includes(k)) errors.push(`${PROJECT_CONFIG_PATH}: unknown key "policyUpstream.${k}" (allowed: source, publicKey)`);
+  if (raw.publicKey !== undefined && (typeof raw.publicKey !== 'string' || /^[\\/]|^[A-Za-z]:/.test(raw.publicKey) || raw.publicKey.split(/[\\/]/).includes('..'))) {
+    errors.push(`${PROJECT_CONFIG_PATH}: "policyUpstream.publicKey" must be a repository-relative path`);
+  }
+  return raw;
+}
+
+// The schema (.eos/schemas/project.schema.json) lists the same keys; a test keeps the two equal.
+export const TOP_LEVEL_KEYS = new Set([
   '$schema', 'projectType', 'language', 'stacks', 'commands', 'productParadigms', 'evalRequired',
   'evalWaiver', 'rationale', 'workflowProfile', 'complianceProfile',
-  'evidencePolicy', 'evidencePolicyReason',
+  'evidencePolicy', 'evidencePolicyReason', 'templateDefault', 'release', 'policyUpstream',
 ]);
 // Prose language only (BCP-47). Deliberately not an enum: EOS must not ship a closed list of
 // languages a team is allowed to think in.
@@ -162,6 +192,29 @@ export function commandList(value) {
   return { commands: out, error: null };
 }
 
+// EOS ships a root package.json of its own: the `bin` behind `npx --offline eos` and npm scripts that
+// run EOS's checks. That is tooling, not product code — counted as a Node project it made every fresh
+// copy of the template refuse the honest day-one declaration, config-only. It is product code the
+// moment it carries anything a product needs: a dependency, an entry point, a workspace, a bin outside
+// .github/, or a script step that runs anything but EOS. Without a trace of EOS in it, it never was ours.
+const PRODUCT_FIELDS = ['dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies', 'bundleDependencies', 'bundledDependencies', 'main', 'module', 'exports', 'browser', 'workspaces'];
+const EOS_SCRIPT_STEP = /^(node \.github\/[\w./-]+(\s+[\w.:=/-]+)*|npm (test|run [\w:-]+))$/;
+const isEmpty = (v) => v !== null && typeof v === 'object' && Object.keys(v).length === 0;
+
+export function isEosToolingManifest(text) {
+  let pkg;
+  try { pkg = JSON.parse(text); } catch { return false; }
+  if (!pkg || typeof pkg !== 'object' || Array.isArray(pkg)) return false;
+  if (PRODUCT_FIELDS.some((k) => pkg[k] !== undefined && !isEmpty(pkg[k]))) return false;
+  const bins = typeof pkg.bin === 'string' ? [pkg.bin] : Object.values(pkg.bin || {});
+  if (!bins.every((b) => typeof b === 'string' && /^(\.\/)?\.github\//.test(b))) return false;
+  const scripts = Object.values(pkg.scripts || {});
+  if (!scripts.every((s) => typeof s === 'string' && s.split('&&').every((step) => EOS_SCRIPT_STEP.test(step.trim())))) return false;
+  return bins.length > 0 || scripts.some((s) => /(^|&&)\s*node \.github\//.test(s));
+}
+
+const isEosTooling = (file) => { try { return isEosToolingManifest(readFileSync(file, 'utf8')); } catch { return false; } };
+
 /** Shallow scan for stack manifests so a declaration can be cross-checked against reality. */
 export function detectStacks(root, maxDepth = 3) {
   const found = new Set();
@@ -174,6 +227,7 @@ export function detectStacks(root, maxDepth = 3) {
         if (!SKIP_DIRS.has(e.name)) rec(join(dir, e.name), depth + 1);
         continue;
       }
+      if (depth === 0 && e.name === 'package.json' && isEosTooling(join(dir, e.name))) continue;
       for (const [stack, names] of Object.entries(STACK_MANIFESTS)) {
         if (names.includes(e.name)) found.add(stack);
       }
@@ -332,7 +386,13 @@ export function loadProjectConfig(root) {
     evalRequired: parsed.evalRequired,
     evalWaiver,
     rationale: typeof parsed.rationale === 'string' ? parsed.rationale : '',
+    templateDefault: parsed.templateDefault === true,
+    release: releaseOf(parsed.release, errors),
+    policyUpstream: upstreamOf(parsed.policyUpstream, errors),
   };
+  if (parsed.templateDefault !== undefined && typeof parsed.templateDefault !== 'boolean') {
+    errors.push(`${PROJECT_CONFIG_PATH}: "templateDefault" must be true or false`);
+  }
   return { present: true, path, config: errors.length ? null : config, errors, warnings };
 }
 

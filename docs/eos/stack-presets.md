@@ -8,6 +8,11 @@
 
 ## How to use (3 steps)
 
+> **Fastest path (eos-2.0.0):** `node .github/eos/eos.mjs init` lists the starter packs and names the
+> ones that match your code; `init <pack> --write` writes a correct `.eos/project.json` for your stack
+> and track, and `stack sync --write` renders its commands into `00-workspace`. The steps below are
+> what those commands do for you, and how to adjust them by hand.
+
 1. Open `.github/instructions/00-workspace.instructions.md` and replace the `## Local commands` line with the finished line for your stack below.
 2. Enable the matching **R3 stack-rule file** (all six backends — Node/Python/Go/Java/Rust/.NET — plus the React frontend ship with the template; just keep them). The unused stack-rule files are **lazy**: they only take effect when the repo actually contains files with the matching extension, so keeping them is harmless (delete them if you prefer).
 3. **Put the same commands into `.eos/project.json`** (see the next section) — that is the copy CI and
@@ -17,6 +22,23 @@
 4. (Optional) If you use a non-Node stack and want the **edit-time** quality gate to fire, replace the `PostToolUse` command in `.github/hooks/quality.json` per the table below (the shipped one is Node-only: it probes for `npm` + `package.json` and no-ops automatically on non-Node repos). Note PostToolUse is **advisory**; the authoritative gate is `project-gate` in CI.
 
 > **Mutual-exclusion reminder**: every R3 file's `applyTo` glob must be non-overlapping (`**/*.ts` / `**/*.py` / `**/*.go` / `**/*.java` / `**/*.rs` / `**/*.cs` / `**/*.{tsx,jsx}`). After editing, run `node .github/hooks/validate-config.mjs` to check S3.
+
+---
+
+## Choose your governance track
+
+A stack says *how* the product is verified; a track says *how much a release must prove*. They are
+independent: every pack works on either track, and the track lives in the same `.eos/project.json`.
+
+| | Standard (default) | Regulated |
+|---|---|---|
+| Declare it | `eos init <pack> --write` | `eos init <pack> --track regulated --write` |
+| What it sets | nothing extra | `workflowProfile` and `complianceProfile` `"regulated"`, `evidencePolicy` `"ci"` |
+| A release needs | the declared quality commands, re-run on the candidate | the same, plus a signed manifest, CI-produced evidence and provenance for every artifact |
+
+No code yet? `eos init config-only --write` (with `--track` if it applies) — the stack is decided at
+architecture, and `eos init <pack> --write` later keeps the track. Details, signing and CI provenance:
+[user manual §10.6](user-manual.md#106-governance-tracks-signed-releases-and-central-policy).
 
 ---
 
@@ -40,6 +62,9 @@ declaration**, executed by the zero-dependency, cross-platform `node .github/hoo
 - Declared but not runnable => **FAIL**; toolchain missing (command not on PATH) => **BLOCKED + exit 1**, never a fake PASS.
 - `application`/`library` without `commands.test` => **FAIL** (a vacuously green gate is refused).
 - `config-only` while a `package.json`/`pyproject.toml`/`go.mod`/`Cargo.toml`/`pom.xml`/`*.csproj` exists => **FAIL**.
+  EOS's own root `package.json` is tooling, not product code, as long as it only carries EOS (a `.github/`
+  bin, scripts that only run `node .github/…` or `npm run …`, no dependency or entry point); the first
+  dependency or product script makes it a Node project.
 - `config-only` that declares `commands` => **FAIL** (they would never run — no pretending a gate exists).
   Code in a stack with no manifest file? Use `"projectType": "application"` + `"stacks": ["other"]`.
 - No `.eos/project.json` at all: a pure Node repo falls back to the legacy npm-script defaults
@@ -88,7 +113,7 @@ declaration**, executed by the zero-dependency, cross-platform `node .github/hoo
 { "projectType": "application", "stacks": ["python"], "productParadigms": ["deterministic", "agentic"],
   "commands": { "lint": "ruff check .", "test": "pytest -q", "eval": "pytest evals/ -q" } }
 
-// The clean EOS template itself (no product code yet)
+// No product code yet — `eos init config-only --write` (the stack is decided at architecture)
 { "projectType": "config-only", "stacks": [], "productParadigms": ["deterministic"] }
 ```
 
