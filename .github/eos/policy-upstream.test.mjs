@@ -10,6 +10,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { baselineDigest } from './lib/policy.mjs';
 import { spawn } from 'node:child_process';
 import { project, write, run, runJson, cleanup, commitAll, APP_PROJECT, REPO_ROOT } from './test-support.mjs';
 import { validate } from './lib/schema.mjs';
@@ -115,6 +116,60 @@ test('the vendored baseline cannot be edited to make a weaker project pass', () 
   assert.match(c.out, /policy\.upstream\.json does not match the baseline pinned/);
 });
 
+test('re-locking cannot launder an edited baseline: only policy sync moves the pin', () => {
+  // Edit the vendored copy, then `policy lock --write` — if the lock re-pinned whatever is vendored,
+  // the mismatch would disappear and the organization's floor would be gone without a trace.
+  const { file } = orgBaseline();
+  const dir = follower(`file:${file}`);
+  assert.equal(run(dir, ['policy', 'sync']).code, 0);
+  assert.equal(run(dir, ['policy', 'lock', '--write']).code, 0);
+  const pinned = readJson(join(dir, '.eos/policy.lock.json')).upstream.digest;
+  const vendored = readJson(join(dir, '.eos/policy.upstream.json'));
+  vendored.snapshot.workflow.profiles['standard-product'].changeTypes.FEATURE.gates.verified = 'not_applicable';
+  write(dir, '.eos/policy.upstream.json', vendored);
+  run(dir, ['policy', 'lock', '--write']);
+  assert.equal(readJson(join(dir, '.eos/policy.lock.json')).upstream.digest, pinned, 'the pin is still what sync fetched');
+  const c = run(dir, ['policy', 'check']);
+  assert.equal(c.code, 1, c.out);
+  assert.match(c.out, /does not match the baseline pinned/);
+});
+
+test('a signed baseline is re-verified offline: an edit fails policy check even with a forged pin', () => {
+  const signed = orgBaseline({ sign: true });
+  const dir = follower(`file:${signed.file}`, { publicKey: signed.publicKey });
+  assert.equal(run(dir, ['policy', 'sync']).code, 0);
+  assert.equal(run(dir, ['policy', 'lock', '--write']).code, 0);
+  commitAll(dir, 'follow the signed baseline');
+  assert.equal(run(dir, ['policy', 'check']).code, 0);
+
+  const vendored = readJson(join(dir, '.eos/policy.upstream.json'));
+  vendored.snapshot.workflow.profiles['standard-product'].changeTypes.FEATURE.gates.verified = 'not_applicable';
+  write(dir, '.eos/policy.upstream.json', vendored);
+  const lock = readJson(join(dir, '.eos/policy.lock.json'));
+  lock.upstream.digest = baselineDigest(vendored);
+  write(dir, '.eos/policy.lock.json', lock);
+  const c = run(dir, ['policy', 'check']);
+  assert.equal(c.code, 1, c.out);
+  assert.match(c.out, /edited after signing/);
+});
+
+test('leaving the organization baseline is a weakening: it needs a reason and a second person', () => {
+  const { file } = orgBaseline();
+  const dir = follower(`file:${file}`);
+  assert.equal(run(dir, ['policy', 'sync']).code, 0);
+  assert.equal(run(dir, ['policy', 'lock', '--write']).code, 0);
+  commitAll(dir, 'follow the org baseline');
+  const declared = readJson(join(dir, '.eos/project.json'));
+  delete declared.policyUpstream;
+  write(dir, '.eos/project.json', declared);
+  const lock = run(dir, ['policy', 'lock', '--write']);
+  assert.notEqual(lock.code, 0, lock.out);
+  assert.match(lock.out, /no longer follows the organization baseline/);
+  const c = run(dir, ['policy', 'check']);
+  assert.equal(c.code, 1, c.out);
+  assert.match(c.out, /project:upstream/);
+});
+
 test('a signed baseline is verified at sync; a different key is refused', () => {
   const signed = orgBaseline({ sign: true });
   assert.equal(readJson(signed.file).signature.alg, 'ed25519');
@@ -154,7 +209,7 @@ async function serve(body) {
     child.stdout.once('data', (d) => resolve(Number(String(d).trim())));
     child.once('error', reject);
   });
-  return { url: `http://127.0.0.1:${port}/baseline.json`, stop: () => child.kill() };
+  return { url: `http://127.0.0.1:${port}/baseline.json`, stop: () => new Promise((done) => { child.once('exit', done); child.kill(); }) };
 }
 
 test('policy sync fetches over the network — plain http only on loopback', async () => {
@@ -172,16 +227,16 @@ test('policy sync fetches over the network — plain http only on loopback', asy
   assert.match(r.out, /https/);
 });
 
-test('an unreachable upstream is BLOCKED and writes nothing; policy check stays offline', () => {
+test('an unreachable upstream is BLOCKED and writes nothing; policy check stays offline', async () => {
   const { file } = orgBaseline();
-  const dir = follower(`file:${file}`);
+  const server = await serve(readFileSync(file, 'utf8'));
+  const dir = follower(server.url);
   assert.equal(run(dir, ['policy', 'sync']).code, 0);
   assert.equal(run(dir, ['policy', 'lock', '--write']).code, 0);
   const before = readFileSync(join(dir, '.eos/policy.upstream.json'), 'utf8');
-  // Point the declaration at a port nothing listens on: sync is blocked, check never notices.
-  const declared = readJson(join(dir, '.eos/project.json'));
-  declared.policyUpstream.source = 'https://127.0.0.1:9/baseline.json';
-  write(dir, '.eos/project.json', declared);
+  // The organization's server goes away. The declaration is untouched — changing which baseline a
+  // project follows is itself a policy change — so sync is blocked and check never notices.
+  await server.stop();
   const s = run(dir, ['policy', 'sync']);
   assert.equal(s.code, 2, s.out);
   assert.equal(readFileSync(join(dir, '.eos/policy.upstream.json'), 'utf8'), before);

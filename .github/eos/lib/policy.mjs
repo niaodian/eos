@@ -25,6 +25,7 @@ import { writeFileAtomic } from './atomic.mjs';
 import { loadSchema, validate } from './schema.mjs';
 import { resolveBaseRef, fileAt, gitOut } from './git-base.mjs';
 import { schemaChanges } from './schema-diff.mjs';
+import { verifyDocument, loadPublicKey } from './signing.mjs';
 
 export const POLICY_LOCK_PATH = '.eos/policy.lock.json';
 export const POLICY_FILES = { gates: '.eos/gates.json', workflow: '.eos/workflow.json', project: '.eos/project.json' };
@@ -87,6 +88,8 @@ export function policySnapshot({ gates, workflow, project }) {
       evalRequired: project.evalRequired === true || (project.evalRequired === undefined && paradigms.includes('agentic')),
       evalWaiver: !!project.evalWaiver,
       commands: Object.fromEntries(Object.entries(project.commands || {}).map(([k, v]) => [k, canonical(v)])),
+      // Which organization baseline the project answers to (ADR-013): leaving it must be visible.
+      upstream: project.policyUpstream?.source || null,
     };
   }
   return { gates: gateMap, workflow: { defaultProfile: workflow?.defaultProfile ?? null, profiles, stateMachines }, project: proj };
@@ -204,6 +207,13 @@ export function diffPolicy(a, b) {
     } else if (pa.projectType !== pb.projectType) {
       add('INFO', `project:projectType:${pa.projectType}->${pb.projectType}`, `project declared as ${pb.projectType}`);
     }
+    // Deleting two lines of project.json must not quietly take a project out from under its
+    // organization's floor: leaving the baseline, or pointing at another one, is a weakening.
+    const ua = pa.upstream ?? null;
+    const ub = pb.upstream ?? null;
+    if (ua && !ub) add('WEAKENING', `project:upstream:${ua}->none`, `the project no longer follows the organization baseline ${ua}`);
+    else if (ua && ub && ua !== ub) add('WEAKENING', `project:upstream:${ua}->${ub}`, `the project now follows ${ub} instead of the organization baseline ${ua} — it may be weaker`);
+    else if (!ua && ub) add('STRENGTHENING', `project:upstream:none->${ub}`, `the project now follows the organization baseline ${ub}`);
     if (pa.workflowProfile !== pb.workflowProfile) {
       const before = a.workflow.profiles[pa.workflowProfile];
       const after = b.workflow.profiles[pb.workflowProfile];
@@ -370,6 +380,10 @@ export function checkPolicy(root, { against = null } = {}) {
       if (lock && lock.upstream?.digest !== up.digest) {
         problems.push(`${UPSTREAM_PATH} does not match the baseline pinned in ${POLICY_LOCK_PATH} — run \`eos policy sync\`, then \`eos policy lock --write\``);
       }
+      // A pinned digest proves the copy did not change since the lock — not that it is what the
+      // organization signed. With a declared key, that is checked here too, offline, every time.
+      const signature = vendoredSignatureProblem(root, up.declared, up.vendored.bundle);
+      if (signature) problems.push(signature);
       for (const c of up.changes.filter((x) => x.requiresAck)) {
         const ack = (lock?.acknowledged || []).find((a) => a.change === c.id);
         const problem = acknowledgementProblem(ack);
@@ -398,9 +412,13 @@ export function planLock(root, { against = null, reason = null, actor = null, wr
     acknowledged.push(entry);
     drafted.push(entry);
   }
-  const pinned = up.vendored?.bundle
-    ? { source: up.declared.source, name: up.vendored.bundle.name, version: up.vendored.bundle.version, digest: up.digest, syncedAt: existing?.upstream?.digest === up.digest ? existing.upstream.syncedAt : now.toISOString(), ...(up.vendored.bundle.signature ? { keyId: up.vendored.bundle.signature.keyId } : {}) }
+  // The pin is what `policy sync` fetched. Re-locking must never move it to whatever the vendored file
+  // says now — that would launder an edited baseline. Only a first lock (sync found no lock to write
+  // into) pins the vendored copy; a project that stops following a baseline drops its pin.
+  const firstPin = up.vendored?.bundle && !existing?.upstream
+    ? { source: up.declared.source, name: up.vendored.bundle.name, version: up.vendored.bundle.version, digest: up.digest, syncedAt: now.toISOString(), ...(up.vendored.bundle.signature ? { keyId: up.vendored.bundle.signature.keyId } : {}) }
     : null;
+  const pinned = up.declared ? (existing?.upstream || firstPin) : null;
   const lock = { $schema: './schemas/policy-lock.schema.json', schemaVersion: 1, policyDigest: policyDigest(current), acknowledged, ...(pinned ? { upstream: pinned } : {}) };
   const refused = drafted.length && (!reason || reason.trim().length < 20)
     ? `${drafted.length} change(s) need acknowledgement: pass --reason "<why, 20+ characters>"`
@@ -432,6 +450,17 @@ export function buildBaseline({ gates, workflow, name, version, now = new Date()
 
 /** A baseline's identity: its canonical content, signature included (a re-signed baseline is a new one). */
 export const baselineDigest = (bundle) => createHash('sha256').update(canonical(bundle)).digest('hex');
+
+/** Why the vendored baseline is not what the declared key signed — or null. Offline. */
+function vendoredSignatureProblem(root, declared, bundle) {
+  if (!declared?.publicKey) return null;
+  let key;
+  try { key = loadPublicKey(readFileSync(join(root, declared.publicKey), 'utf8')); } catch (e) {
+    return `the declared baseline key ${declared.publicKey} cannot be used: ${e.message}`;
+  }
+  const v = verifyDocument('policy', bundle, key);
+  return v.valid ? null : `${UPSTREAM_PATH} is not what the organization signed: ${v.problem} — run \`eos policy sync\``;
+}
 
 /** The vendored baseline, schema-checked. */
 export function readVendored(root) {

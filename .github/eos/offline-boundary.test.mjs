@@ -186,7 +186,9 @@ test('ADR-012: the one secret EOS reads is a signing key it is handed, in exactl
   assert.deepEqual([...new Set(callers)].sort(), ['.github/eos/commands/maintenance.mjs', '.github/eos/commands/release.mjs']);
 });
 
-test('ADR-013: `policy sync` is the one command that reaches the network, through one adapter', () => {
+test('ADR-013: the policy upstream is fetched by `policy sync` alone — one adapter, one call site', () => {
+  // Not the only network path: declared providers (ADR-005/006) consult GitHub through `gh`. This
+  // pins the other one — central policy reaches a repository only when someone runs `policy sync`.
   const importers = coreFiles().filter((rel) => /from ['"]\.\.\/adapters\/policy-upstream\.mjs['"]/.test(readFileSync(join(REPO_ROOT, rel), 'utf8')));
   assert.deepEqual(importers, ['.github/eos/commands/maintenance.mjs']);
   const maintenance = readFileSync(join(REPO_ROOT, '.github/eos/commands/maintenance.mjs'), 'utf8');
