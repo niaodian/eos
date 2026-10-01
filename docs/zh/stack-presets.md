@@ -41,7 +41,7 @@
 
 还没有代码？`eos init config-only --write`（适用时加 `--track`）——技术栈在架构阶段决定，之后
 `eos init <pack> --write` 会保留这条轨道。细节、签名与 CI 来源证明见
-[用户手册 §10.6](user-manual.md#106-治理轨道签名发布与中心策略)。
+[用户手册 §10.6](user-manual.md#106-治理轨道、签名发布与中心策略)。
 
 ---
 
