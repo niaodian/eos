@@ -5,12 +5,35 @@
   "description": "This machine's current focus ONLY (.eos/local/active-work.json, gitignored). It must never carry a gate result, an approval, a release state or a change type — a change type selects the gate policy, so it is authority and lives in the tracked story file.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "scopeType", "scopeId"],
+  "required": [
+    "schemaVersion",
+    "scopeType",
+    "scopeId"
+  ],
   "properties": {
-    "schemaVersion": { "const": 1 },
-    "scopeType": { "enum": ["product", "story", "release"] },
-    "scopeId": { "type": "string", "minLength": 1 },
-    "note": { "type": "string" },
-    "updatedAt": { "type": "string" }
+    "schemaVersion": {
+      "const": 1
+    },
+    "scopeType": {
+      "enum": [
+        "product",
+        "story",
+        "release"
+      ]
+    },
+    "scopeId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "note": {
+      "type": "string"
+    },
+    "updatedAt": {
+      "type": "string"
+    },
+    "branch": {
+      "type": "string",
+      "description": "The branch this focus was recorded on. Focus is kept per branch, so switching branches never hands back another branch’s work."
+    }
   }
 }

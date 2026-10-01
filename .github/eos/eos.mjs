@@ -14,6 +14,7 @@ import { spawnSync } from 'node:child_process';
 import { readSnapshot, gatePolicy, changeTypeOf, scopeState, gateInputs, gateCollections } from './lib/state.mjs';
 import { prepareGateRun, evaluateGate, recordedGateStatus, evidenceIntegrity, isBlocking } from './lib/gates.mjs';
 import { recordGateRun, readIntent } from './lib/record.mjs';
+import { crossBranchActivity, crossBranchLines } from './lib/cross-branch.mjs';
 import { checkTransition, deriveProductState, legalTransitions } from './lib/transitions.mjs';
 import { appendEvent, withLedger, readEvents, verifyChain, parseConflicted, reconcileEvents, writeLedger, divergence, transitionConflicts, stateOf, LEDGER_PATH } from './lib/ledger.mjs';
 import { route, activeScope } from './lib/router.mjs';
@@ -32,7 +33,7 @@ import { buildSbom, sbomFreshness, sbomDigest, SBOM_PATH } from './lib/sbom.mjs'
 import { PACKS, packDeclaration, packIds } from './lib/packs.mjs';
 import { loadWaivers, expiredWaivers, waiverStatus } from './lib/waivers.mjs';
 import { writeFileAtomic } from './lib/atomic.mjs';
-import { resolveAction, ACTIVE_WORK_PATH } from './lib/registry.mjs';
+import { resolveAction, activeWorkPath } from './lib/registry.mjs';
 
 const EXIT = { OK: 0, FAIL: 1, BLOCKED: 2, ERROR: 3 };
 const statusExit = (s) => (['PASS', 'WAIVED', 'NOT_APPLICABLE'].includes(s) ? EXIT.OK : s === 'FAIL' ? EXIT.FAIL : s === 'ERROR' ? EXIT.ERROR : EXIT.BLOCKED);
@@ -212,6 +213,11 @@ const commands = {
       }
       lines.push('');
     }
+    const cross = crossBranchActivity(snapshot.root, {
+      focus: decision.current?.scopeId ? [{ type: decision.current.scopeType, id: decision.current.scopeId }] : [],
+    });
+    json.crossBranch = { checked: cross.checked, base: cross.base?.ref ?? null, overlaps: cross.overlaps };
+    lines.push(...crossBranchLines(cross));
     lines.push(`Recommended next`, `  ${decision.recommendedAction?.title || '—'}`, '', `  ${decision.recommendedAction?.command || ''}`, '');
     emit(flags, json, lines.join('\n'));
     return snapshot.errors.length ? EXIT.ERROR : EXIT.OK;
@@ -219,7 +225,12 @@ const commands = {
 
   next(snapshot, flags) {
     const decision = route(snapshot);
-    emit(flags, decision, renderCard(decision, { why: !!flags.why, all: !!flags.all }));
+    const focus = decision.current?.scopeId ? [{ type: decision.current.scopeType, id: decision.current.scopeId }] : [];
+    const cross = crossBranchActivity(snapshot.root, { focus });
+    // Only present when there is something to say, so the common case's JSON is unchanged.
+    if (cross.overlaps.length) decision.crossBranch = { base: cross.base.ref, overlaps: cross.overlaps };
+    const extra = crossBranchLines(cross);
+    emit(flags, decision, renderCard(decision, { why: !!flags.why, all: !!flags.all }) + (extra.length ? `\n${extra.join('\n')}` : ''));
     return decision.exitCode;
   },
 
@@ -228,12 +239,14 @@ const commands = {
     // Record the focus locally so a new chat session starts where the last one stopped. This file
     // is gitignored and carries no authority — only a scope id and a change type.
     if (decision.current.scopeId) {
-      const full = join(snapshot.root, ACTIVE_WORK_PATH);
+      const { path, branch } = activeWorkPath(snapshot.root);
+      const full = join(snapshot.root, path);
       mkdirSync(dirname(full), { recursive: true });
       writeFileSync(full, JSON.stringify({
         schemaVersion: 1,
         scopeType: decision.current.scopeType,
         scopeId: decision.current.scopeId,
+        ...(branch ? { branch } : {}),
         updatedAt: new Date().toISOString(),
       }, null, 2) + '\n', 'utf8');
     }
@@ -341,11 +354,15 @@ const commands = {
     }
     const skipped = plan.filter((p) => !p.run);
     const worst = results.reduce((acc, r) => (isBlocking(r.status) && !isBlocking(acc) ? r.status : acc), 'PASS');
-    const json = { full, changedFiles: changed, ran: results, skipped: skipped.map((p) => ({ gate: p.def.id, scopeId: p.scopeId, reason: p.reason })), status: worst };
+    const cross = crossBranchActivity(snapshot.root, {
+      focus: snapshot.activeWork?.scopeId ? [{ type: snapshot.activeWork.scopeType, id: snapshot.activeWork.scopeId }] : [],
+    });
+    const json = { full, changedFiles: changed, ran: results, skipped: skipped.map((p) => ({ gate: p.def.id, scopeId: p.scopeId, reason: p.reason })), status: worst, crossBranch: { checked: cross.checked, base: cross.base?.ref ?? null, overlaps: cross.overlaps } };
     const lines = [`EOS verify · ${results.length} gate(s) run, ${skipped.length} skipped`, ''];
     for (const r of results) lines.push(`  ${r.status.padEnd(15)} ${r.gate.padEnd(20)} ${String(r.scopeId).padEnd(14)} ${r.reason}`);
     if (!results.length) lines.push('  nothing to re-verify — every applicable gate has fresh evidence covering the current inputs');
-    lines.push('', `  ${skipped.length} skipped · run with --full to re-verify everything · --plan to see the selection without running it`, '', worst, '');
+    lines.push('', `  ${skipped.length} skipped · run with --full to re-verify everything · --plan to see the selection without running it`, '');
+    lines.push(...crossBranchLines(cross), worst, '');
     emit(flags, json, lines.join('\n'));
     return statusExit(worst);
   },
@@ -1090,15 +1107,16 @@ const commands = {
     const scopeType = flags.scope === true || !flags.scope ? 'story' : flags.scope;
     const scopeId = flags.id;
     if (!scopeId || scopeId === true) { console.log('focus requires --scope <type> --id <id>'); return EXIT.FAIL; }
-    const full = join(snapshot.root, ACTIVE_WORK_PATH);
+    const { path, branch } = activeWorkPath(snapshot.root);
+    const full = join(snapshot.root, path);
     mkdirSync(dirname(full), { recursive: true });
     if (flags['change-type']) {
       console.log('focus does not accept --change-type: a change type selects the gate policy, so it belongs in the tracked story file, not in a gitignored local file.');
       return EXIT.FAIL;
     }
-    const body = { schemaVersion: 1, scopeType, scopeId: String(scopeId), updatedAt: new Date().toISOString() };
+    const body = { schemaVersion: 1, scopeType, scopeId: String(scopeId), ...(branch ? { branch } : {}), updatedAt: new Date().toISOString() };
     writeFileSync(full, JSON.stringify(body, null, 2) + '\n', 'utf8');
-    emit(flags, body, `EOS focus · ${scopeType}/${scopeId} (local only — ${ACTIVE_WORK_PATH} is gitignored and carries no authority)\n`);
+    emit(flags, body, `EOS focus · ${scopeType}/${scopeId}${branch ? ` on ${branch}` : ''} (local only — ${path} is gitignored and carries no authority)\n`);
     return EXIT.OK;
   },
 

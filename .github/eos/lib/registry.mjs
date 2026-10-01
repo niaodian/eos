@@ -5,12 +5,27 @@
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { validate } from './schema.mjs';
+import { currentBranch } from './git-base.mjs';
 
 export const EOS_DIR = '.eos';
 export const WORKFLOW_PATH = '.eos/workflow.json';
 export const GATES_PATH = '.eos/gates.json';
 export const AGENT_MAP_PATH = '.eos/agent-map.json';
 export const ACTIVE_WORK_PATH = '.eos/local/active-work.json';
+
+/**
+ * Where THIS branch's local focus lives.
+ *
+ * The focus used to be one file per machine, so switching branches kept the previous branch's story
+ * and `eos resume` cheerfully handed it back. It is now one file per branch. A detached HEAD, or no
+ * git at all, falls back to the original single file. Only local, non-authoritative state is keyed
+ * this way: committed state (the ledger, evidence) is already per-branch because git is — see ADR-009.
+ */
+export function activeWorkPath(root) {
+  const branch = currentBranch(root);
+  if (!branch || branch === 'HEAD') return { path: ACTIVE_WORK_PATH, branch: null };
+  return { path: `.eos/local/active-work.${branch.replace(/[^A-Za-z0-9._-]/g, '_')}.json`, branch };
+}
 /** Bumping this invalidates every previously written evidence file. */
 export const EVALUATOR_VERSION = '2.0.0';
 
@@ -117,7 +132,14 @@ export function skillDiagnostics(skills, root = null) {
 
 /** Local focus only. Any authority-looking key is dropped on read (defence in depth). */
 export function loadActiveWork(root) {
-  const { present, data, error } = readJson(root, ACTIVE_WORK_PATH);
+  const { path, branch } = activeWorkPath(root);
+  let { present, data, error } = readJson(root, path);
+  if (!present && path !== ACTIVE_WORK_PATH) {
+    // A focus written before 1.20.0 has no branch. Honour it once; a focus recorded on ANOTHER
+    // branch is never borrowed, because that is the exact bug this file layout exists to stop.
+    const legacy = readJson(root, ACTIVE_WORK_PATH);
+    if (legacy.present && !legacy.error && legacy.data && (!legacy.data.branch || legacy.data.branch === branch)) ({ present, data, error } = legacy);
+  }
   if (!present || error || !data || typeof data !== 'object') return { present: false, activeWork: null, errors: error ? [error] : [] };
   const { schema } = loadSchema(root, 'active-work.schema.json');
   // `changeType` selects the gate policy, so it IS an authority-carrying key: it is dropped here
@@ -129,10 +151,11 @@ export function loadActiveWork(root) {
     scopeId: data.scopeId,
     ...(data.note ? { note: data.note } : {}),
     ...(data.updatedAt ? { updatedAt: data.updatedAt } : {}),
+    ...(data.branch ? { branch: data.branch } : {}),
   };
   const errors = [];
   if (schema) {
-    const v = validate(schema, cleaned, { label: ACTIVE_WORK_PATH });
+    const v = validate(schema, cleaned, { label: path });
     if (!v.valid) errors.push(...v.errors);
   }
   return { present: true, activeWork: errors.length ? null : cleaned, errors };
