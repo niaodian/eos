@@ -14,6 +14,19 @@
 // Packs are data. The commands mirror STACK_PRESETS in lib/workspace-rule.mjs so a pack and the
 // generated workspace rule cannot disagree about how a stack is built.
 export const PACKS = {
+  // Day one of most projects: the stack is an irreversible decision EOS defers to architecture
+  // (Phase 4). Declaring config-only says so honestly — the product gate reports NOT_APPLICABLE, never
+  // PASS — and `eos init <pack> --write` replaces it when code lands, keeping the chosen track.
+  'config-only': {
+    title: 'No product code yet (the stack is decided at architecture)',
+    declaration: {
+      projectType: 'config-only',
+      stacks: [],
+      productParadigms: ['deterministic'],
+      workflowProfile: 'standard-product',
+    },
+    notes: ['When product code lands — Phase 4 locks the stack in an ADR — run `eos init <pack> --write`; the governance track you chose carries over.'],
+  },
   'node-service': {
     title: 'Node / TypeScript service',
     declaration: {
@@ -126,13 +139,18 @@ export const PACKS = {
   },
 };
 
-const RATIONALE = (id, pack) => [
+const RATIONALE = (id, pack) => (id === 'config-only' ? [
+  'No product code yet: the stack is an irreversible decision EOS defers to architecture (Phase 4).',
+  'The product-quality gate reports NOT_APPLICABLE until then, never PASS. When code lands, run',
+  '`node .github/eos/eos.mjs init <pack> --write` — the governance track carries over.',
+].join(' ') : [
+
   `Scaffolded from the "${id}" starter pack (${pack.title}).`,
   'REPLACE THE COMMANDS with what CI actually runs for this project — commands.test is executed by',
   'the product-quality gate, so a command that does not exist fails closed rather than passing',
   'vacuously. Set "language" to the BCP-47 tag you want agents to answer in, or omit it to mirror',
   'whatever language you write in. See docs/eos/stack-presets.md for every supported stack.',
-].join(' ');
+].join(' '));
 
 /** The declaration a pack produces, ready to be written to .eos/project.json. */
 export function packDeclaration(id) {

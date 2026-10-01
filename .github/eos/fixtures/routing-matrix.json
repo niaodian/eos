@@ -24,7 +24,7 @@
         },
         "package.json": "{ \"name\": \"app\", \"scripts\": { \"test\": \"node --version\" } }\n"
       },
-      "expectedAction": "complete-local-activation",
+      "expectedAction": "declare-project",
       "expectedExitCode": 2,
       "expectBlocker": "declaration-matches-repo"
     },

@@ -49,7 +49,7 @@ export const evaluators = {
     if (!p) return blocked('the declaration could not be read');
     const detected = detectStacks(ctx.root);
     if (p.projectType === 'config-only' && detected.length) {
-      return fail(`.eos/project.json still declares "config-only" but ${detected.join(', ')} manifest(s) exist — declare "application" (or "library") with commands.test so the quality gate actually runs`);
+      return fail(`.eos/project.json still declares "config-only" but ${detected.join(', ')} manifest(s) exist — declare the stack with \`node .github/eos/eos.mjs init <pack> --write\` (your track carries over) so the quality gate actually runs`);
     }
     const undeclared = detected.filter((s) => !p.stacks.includes(s));
     if (p.projectType !== 'config-only' && undeclared.length) {

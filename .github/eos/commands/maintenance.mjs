@@ -18,6 +18,7 @@ import { loadWaivers } from '../lib/waivers.mjs';
 import { writeFileAtomic } from '../lib/atomic.mjs';
 import { resolveAction } from '../lib/registry.mjs';
 import { TRACKS, TRACK_NAMES, trackOf, applyTrack } from '../lib/track.mjs';
+import { detectStacks } from '../../hooks/lib/project-config.mjs';
 import { EXIT, emit, privateKeyFromFile } from './shared.mjs';
 import { fetchBaseline } from '../adapters/policy-upstream.mjs';
 import { signDocument, verifyDocument, loadPublicKey, keyId } from '../lib/signing.mjs';
@@ -95,10 +96,18 @@ function declareProject(snapshot, flags, verb) {
 
   if (!packId) {
     const files = verb === 'init' ? localFiles(snapshot.root, !!flags.write) : [];
+    // Code landing in a config-only project is the moment a stack is chosen: name the packs that fit it.
+    const awaitingStack = state === 'declared' && existing?.projectType === 'config-only';
+    const detected = awaitingStack ? detectStacks(snapshot.root) : [];
+    const matching = packIds().filter((id) => {
+      const stacks = PACKS[id].declaration.stacks;
+      return stacks.length > 0 && stacks.every((st) => detected.includes(st));
+    });
     const lines = [`EOS ${verb}`, '', 'Your project'];
     if (state === 'missing') lines.push(`  ${PROJECT_PATH} does not exist yet — choose a track and a pack below.`);
     else if (state === 'template') lines.push(`  ${PROJECT_PATH} is still the EOS template's own declaration — choose a track and a pack below.`);
     else lines.push(`  declared — ${existing ? describe(existing) : 'unreadable; run eos doctor'}`);
+    if (detected.length) lines.push(`  product code detected — ${detected.join(', ')} manifest(s); packs that match: ${matching.join(', ') || 'none (see docs/eos/stack-presets.md)'}`);
     lines.push('', 'Governance tracks');
     for (const t of Object.values(TRACKS)) lines.push(`  ${t.name.padEnd(10)} ${t.title} — ${t.summary}`);
     lines.push('', 'Starter packs (each writes a correct .eos/project.json; none scaffolds application code)');
@@ -106,11 +115,13 @@ function declareProject(snapshot, flags, verb) {
     if (files.length) { lines.push('', 'Local files'); for (const r of files) lines.push(`  ${r.action.padEnd(12)} ${r.path}${r.action === 'kept' ? ' (already exists — never overwritten)' : ''}`); }
     lines.push('');
     if (state !== 'declared') lines.push(`  Declare it:  ${CLI} ${verb} <pack> --track standard|regulated --write`);
+    else if (awaitingStack) lines.push(`  ${detected.length ? 'Declare the stack' : 'When code lands'}:  ${CLI} ${verb} <pack> --write   (no --force needed — the ${trackOf(existing).title} track carries over)`);
     if (verb === 'init' && !flags.write) lines.push('  Nothing was written. Re-run with --write to create the local files.');
     lines.push(`  Next:        ${CLI} next`, '');
     emit(flags, {
       declaration: state, tracks: Object.values(TRACKS).map(({ name, title, summary }) => ({ name, title, summary })),
       packs: packIds().map((p) => ({ id: p, title: PACKS[p].title })),
+      ...(awaitingStack ? { detectedStacks: detected, matchingPacks: matching } : {}),
       ...(verb === 'init' ? { wrote: files.filter((r) => r.action === 'created').length, planned: LOCAL_FILES.map((p) => p.path) } : {}),
     }, lines.join('\n'));
     return EXIT.OK;
@@ -118,14 +129,27 @@ function declareProject(snapshot, flags, verb) {
 
   const pack = packDeclaration(packId);
   if (!pack) { console.log(`unknown pack "${packId}" — known packs: ${packIds().join(', ')}`); return EXIT.FAIL; }
-  const declaration = applyTrack(pack, track);
+  // The track a project already chose carries over when it only gains a stack. --track overrides it,
+  // and a pack that IS a track (regulated-app) keeps its own: changing track is never a side effect.
+  const keptTrack = state === 'declared' && existing ? trackOf(existing).name : null;
+  const packTrack = trackOf(pack).name;
+  const declaration = applyTrack(pack, track || (packTrack !== 'standard' ? packTrack : keptTrack));
   const chosen = trackOf(declaration);
   const lines = [`EOS ${verb} · ${packId} — ${PACKS[packId].title} · ${chosen.title} track`, ''];
-  if (state === 'declared' && !flags.force) {
-    lines.push(`  refused  ${PROJECT_PATH} already exists and declares this project (${existing ? describe(existing) : 'unreadable'}).`,
-      '  A project declaration is a decision this project has already made; replacing it would silently',
-      '  change which gates apply. Edit it by hand, or re-run with --force if you really mean to start over.', '');
-    emit(flags, { pack: packId, track: chosen.name, written: false, reason: 'declaration already exists', declaration }, lines.join('\n'));
+  // A config-only declaration has no stack to lose: when code lands it takes a pack without --force,
+  // as long as the track stays what the project chose. Anything else the project declared is its own.
+  const fromConfigOnly = state === 'declared' && existing?.projectType === 'config-only' && packId !== 'config-only';
+  const gainsStack = fromConfigOnly && chosen.name === keptTrack;
+  if (state === 'declared' && !flags.force && !gainsStack) {
+    if (fromConfigOnly) {
+      lines.push(`  refused  this would move the project from the ${TRACKS[keptTrack].title} track to the ${chosen.title} track.`,
+        '  A track decides what a release must prove, so changing it is deliberate: re-run with --force if you mean it.', '');
+    } else {
+      lines.push(`  refused  ${PROJECT_PATH} already exists and declares this project (${existing ? describe(existing) : 'unreadable'}).`,
+        '  A project declaration is a decision this project has already made; replacing it would silently',
+        '  change which gates apply. Edit it by hand, or re-run with --force if you really mean to start over.', '');
+    }
+    emit(flags, { pack: packId, track: chosen.name, written: false, reason: fromConfigOnly ? 'track change' : 'declaration already exists', declaration }, lines.join('\n'));
     return EXIT.FAIL;
   }
   const full = join(snapshot.root, PROJECT_PATH);
@@ -136,11 +160,18 @@ function declareProject(snapshot, flags, verb) {
     `  stacks           ${declaration.stacks.join(', ')}`,
     `  paradigms        ${declaration.productParadigms.join(', ')}`,
     `  workflowProfile  ${declaration.workflowProfile}${declaration.complianceProfile ? `\n  complianceProfile ${declaration.complianceProfile} · evidencePolicy ${declaration.evidencePolicy}` : ''}`,
-    `  commands         ${Object.entries(declaration.commands).map(([k, v]) => `${k}: ${v}`).join('\n                   ')}`, '',
+    `  commands         ${declaration.commands ? Object.entries(declaration.commands).map(([k, v]) => `${k}: ${v}`).join('\n                   ') : '(none — no product code yet; the product gate reports NOT_APPLICABLE)'}`, '',
     ...['Track', `  ${chosen.title} — ${chosen.summary}`, '  A release needs:', ...chosen.releaseRequires.map((r) => `    · ${r}`), '']);
   for (const r of files) lines.push(`  ${r.action.padEnd(12)} ${r.path}`);
   if (files.length) lines.push('');
   if (PACKS[packId].notes.length) { lines.push('Before you rely on this'); for (const n of PACKS[packId].notes) lines.push(`  · ${n}`); lines.push(''); }
+  if (declaration.projectType === 'config-only') {
+    lines.push('Next', `  1. ${CLI} next                 (start the guided loop)`,
+      `  2. When code lands: ${CLI} init <pack> --write — this track carries over`, '');
+    if (!flags.write) lines.push('  Nothing was written. Re-run with --write to apply.', '');
+    emit(flags, { pack: packId, track: chosen.name, written: !!flags.write, replaced: state, declaration, notes: PACKS[packId].notes, localFiles: files }, lines.join('\n'));
+    return EXIT.OK;
+  }
   lines.push('Next',
     '  1. Replace the commands above with what CI actually runs — an unrunnable command fails closed.',
     `  2. ${CLI} stack sync --write   (put the stack in the always-on rule)`);

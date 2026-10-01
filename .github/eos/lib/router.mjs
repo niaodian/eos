@@ -77,7 +77,7 @@ const RELEASE_STAGE = {
 /** Which repair action a failed check maps to. One check → one action, so routing stays stable. */
 const CHECK_ACTION = {
   'project-declaration': 'declare-project',
-  'declaration-matches-repo': 'complete-local-activation',
+  'declaration-matches-repo': 'declare-project',
   'workflow-profile': 'complete-local-activation',
   'activation-ledger': 'complete-local-activation',
   'discovery-written': 'frame-the-problem',
@@ -278,8 +278,8 @@ export function route(snapshot, { now = new Date() } = {}) {
         reason: driver?.detail || 'local activation is incomplete',
         targetGate: 'activation',
         // Declaring the project is done with `init`, not by re-running the gate that reports it.
-        command: driver?.id === 'project-declaration' ? `${CLI} init` : `${CLI} check --gate activation`,
-        doneWhen: driver?.id === 'project-declaration'
+        command: ['project-declaration', 'declaration-matches-repo'].includes(driver?.id) ? `${CLI} init` : `${CLI} check --gate activation`,
+        doneWhen: ['project-declaration', 'declaration-matches-repo'].includes(driver?.id)
           ? ['.eos/project.json describes this project (`eos init <pack> --write`)', '`eos status` names the governance track']
           : ['`eos check --gate activation` passes'],
       }));

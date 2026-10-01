@@ -9,11 +9,12 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { project, write, run, runJson, cleanup, commitAll, REPO_ROOT, APP_PROJECT } from './test-support.mjs';
 import { validate } from './lib/schema.mjs';
-import { TOP_LEVEL_KEYS } from '../hooks/lib/project-config.mjs';
+import { TOP_LEVEL_KEYS, detectStacks } from '../hooks/lib/project-config.mjs';
 
 after(cleanup);
 
 const SHIPPED = JSON.parse(readFileSync(join(REPO_ROOT, '.eos/project.json'), 'utf8'));
+const SHIPPED_PACKAGE = readFileSync(join(REPO_ROOT, 'package.json'), 'utf8');
 const NEXT_SCHEMA = JSON.parse(readFileSync(join(REPO_ROOT, '.eos/schemas/next-action.schema.json'), 'utf8'));
 const declaration = (dir) => JSON.parse(readFileSync(join(dir, '.eos/project.json'), 'utf8'));
 
@@ -92,6 +93,96 @@ test('an unknown track is refused, not guessed', () => {
   const r = run(dir, ['init', 'node-service', '--track', 'enterprise', '--write']);
   assert.equal(r.code, 1, r.out);
   assert.match(r.out, /standard \| regulated/);
+});
+
+test('no code yet: eos init config-only declares the track now and the stack later', () => {
+  const dir = project({ '.eos/project.json': SHIPPED });
+  assert.equal(run(dir, ['init', 'config-only', '--track', 'regulated', '--write']).code, 0);
+  let d = declaration(dir);
+  assert.equal(d.projectType, 'config-only');
+  assert.equal(d.complianceProfile, 'regulated');
+  assert.equal(d.commands, undefined);
+  commitAll(dir, 'declare: no code yet');
+  assert.notEqual(runJson(dir, ['next']).json.recommendedAction.id, 'declare-project');
+
+  // Code lands. The config-only declaration takes a pack without --force, and keeps its track.
+  const r = run(dir, ['init', 'node-service', '--write']);
+  assert.equal(r.code, 0, r.out);
+  d = declaration(dir);
+  assert.deepEqual(d.stacks, ['node']);
+  assert.equal(d.complianceProfile, 'regulated', 'the chosen track carries over');
+  assert.match(r.out, /Regulated track/);
+});
+
+test('changing the track of a declaration is deliberate: it needs --force', () => {
+  const dir = project({ '.eos/project.json': SHIPPED });
+  assert.equal(run(dir, ['init', 'config-only', '--track', 'regulated', '--write']).code, 0);
+  const r = run(dir, ['init', 'node-service', '--track', 'standard', '--write']);
+  assert.equal(r.code, 1, r.out);
+  assert.equal(declaration(dir).complianceProfile, 'regulated');
+});
+
+test('a stack manifest that appears while still config-only is routed to eos init', () => {
+  const dir = project({ '.eos/project.json': { projectType: 'config-only', stacks: [] }, 'package.json': '{ "name": "app", "scripts": { "test": "node --test" } }\n' });
+  const r = runJson(dir, ['next']);
+  assert.equal(r.json.recommendedAction.id, 'declare-project', r.out);
+  assert.match(r.json.recommendedAction.command, /eos\.mjs init$/);
+});
+
+test('a fresh copy can honestly stay config-only: the template\'s own package.json is EOS tooling, not product code', () => {
+  // The template ships a package.json for `npx --offline eos` and its npm scripts. Counted as a
+  // Node project, it refused the honest day-one declaration and routed straight back to eos init.
+  const dir = project({ '.eos/project.json': SHIPPED, 'package.json': SHIPPED_PACKAGE });
+  assert.equal(run(dir, ['init', 'config-only', '--write']).code, 0);
+  commitAll(dir, 'declare: no code yet');
+  assert.deepEqual(detectStacks(dir), []);
+  const r = runJson(dir, ['next']);
+  assert.ok(!r.json.blockers.some((b) => b.check === 'declaration-matches-repo'), JSON.stringify(r.json.blockers));
+  assert.notEqual(r.json.recommendedAction.id, 'declare-project');
+});
+
+test('the template\'s package.json is product code the moment it carries anything a product needs', () => {
+  const pkg = JSON.parse(SHIPPED_PACKAGE);
+  for (const [why, change] of [
+    ['a dependency', (p) => { p.dependencies = { express: '^5.0.0' }; }],
+    ['a script that runs the product', (p) => { p.scripts.start = 'node src/server.js'; }],
+    ['a script step that is not EOS', (p) => { p.scripts.verify = `tsc && ${p.scripts.verify}`; }],
+    ['an entry point', (p) => { p.main = 'src/index.js'; }],
+    ['a bin outside .github/', (p) => { p.bin.app = 'bin/app.mjs'; }],
+  ]) {
+    const next = structuredClone(pkg); change(next);
+    const dir = project({ 'package.json': JSON.stringify(next, null, 2) });
+    assert.deepEqual(detectStacks(dir), ['node'], why);
+  }
+  // A manifest with no EOS tooling in it was never EOS's: it stays a Node project, as before.
+  assert.deepEqual(detectStacks(project({ 'package.json': '{ "name": "app" }\n' })), ['node']);
+  // And only the root manifest can be EOS's: a nested copy is a package of the product.
+  assert.deepEqual(detectStacks(project({ 'web/package.json': SHIPPED_PACKAGE })), ['node']);
+});
+
+test('when code lands in a config-only project, eos init names the packs that match it', () => {
+  const pkg = JSON.parse(SHIPPED_PACKAGE); pkg.dependencies = { express: '^5.0.0' };
+  const dir = project({ '.eos/project.json': SHIPPED, 'package.json': JSON.stringify(pkg, null, 2) });
+  assert.equal(run(dir, ['init', 'config-only', '--track', 'regulated', '--write']).code, 0);
+  const r = run(dir, ['init']);
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /node-service/);
+  assert.match(r.out, /init <pack> --write/);
+  assert.match(r.out, /Regulated track carries over/);
+  const j = runJson(dir, ['init']).json;
+  assert.deepEqual(j.detectedStacks, ['node']);
+  assert.ok(j.matchingPacks.includes('node-service') && !j.matchingPacks.includes('python-service'), JSON.stringify(j.matchingPacks));
+});
+
+test('a pack that is a track keeps it: regulated-app on a Standard config-only project is a deliberate track change', () => {
+  const dir = project({ '.eos/project.json': SHIPPED });
+  assert.equal(run(dir, ['init', 'config-only', '--write']).code, 0);
+  const r = run(dir, ['init', 'regulated-app', '--write']);
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.out, /Standard track to the Regulated track/);
+  assert.equal(declaration(dir).projectType, 'config-only', 'nothing was written');
+  assert.equal(run(dir, ['init', 'regulated-app', '--write', '--force']).code, 0);
+  assert.equal(declaration(dir).complianceProfile, 'regulated', 'the pack keeps the track it is');
 });
 
 test('eos new <pack> still works, as the pack half of eos init', () => {

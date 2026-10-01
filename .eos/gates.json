@@ -15,13 +15,13 @@
           "id": "project-declaration",
           "title": ".eos/project.json exists and validates",
           "evaluator": "projectDeclaration",
-          "fix": "Copy your stack's block from docs/eos/stack-presets.md into .eos/project.json (projectType + stacks + commands.test)."
+          "fix": "Run `node .github/eos/eos.mjs init`: choose a governance track and a starter pack (config-only until the stack is decided), then `init <pack> --write`. docs/eos/stack-presets.md has every stack."
         },
         {
           "id": "declaration-matches-repo",
           "title": "the declaration is not the untouched template once code exists",
           "evaluator": "declarationMatchesRepo",
-          "fix": "Change projectType from \"config-only\" to \"application\" (or \"library\") and declare commands.test."
+          "fix": "Still config-only: run `node .github/eos/eos.mjs init` — it names the packs that match the code — then `init <pack> --write` (your track carries over). Otherwise add the stack to \"stacks\" with its commands."
         },
         {
           "id": "workflow-profile",

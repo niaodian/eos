@@ -192,6 +192,29 @@ export function commandList(value) {
   return { commands: out, error: null };
 }
 
+// EOS ships a root package.json of its own: the `bin` behind `npx --offline eos` and npm scripts that
+// run EOS's checks. That is tooling, not product code — counted as a Node project it made every fresh
+// copy of the template refuse the honest day-one declaration, config-only. It is product code the
+// moment it carries anything a product needs: a dependency, an entry point, a workspace, a bin outside
+// .github/, or a script step that runs anything but EOS. Without a trace of EOS in it, it never was ours.
+const PRODUCT_FIELDS = ['dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies', 'bundleDependencies', 'bundledDependencies', 'main', 'module', 'exports', 'browser', 'workspaces'];
+const EOS_SCRIPT_STEP = /^(node \.github\/[\w./-]+(\s+[\w.:=/-]+)*|npm (test|run [\w:-]+))$/;
+const isEmpty = (v) => v !== null && typeof v === 'object' && Object.keys(v).length === 0;
+
+export function isEosToolingManifest(text) {
+  let pkg;
+  try { pkg = JSON.parse(text); } catch { return false; }
+  if (!pkg || typeof pkg !== 'object' || Array.isArray(pkg)) return false;
+  if (PRODUCT_FIELDS.some((k) => pkg[k] !== undefined && !isEmpty(pkg[k]))) return false;
+  const bins = typeof pkg.bin === 'string' ? [pkg.bin] : Object.values(pkg.bin || {});
+  if (!bins.every((b) => typeof b === 'string' && /^(\.\/)?\.github\//.test(b))) return false;
+  const scripts = Object.values(pkg.scripts || {});
+  if (!scripts.every((s) => typeof s === 'string' && s.split('&&').every((step) => EOS_SCRIPT_STEP.test(step.trim())))) return false;
+  return bins.length > 0 || scripts.some((s) => /(^|&&)\s*node \.github\//.test(s));
+}
+
+const isEosTooling = (file) => { try { return isEosToolingManifest(readFileSync(file, 'utf8')); } catch { return false; } };
+
 /** Shallow scan for stack manifests so a declaration can be cross-checked against reality. */
 export function detectStacks(root, maxDepth = 3) {
   const found = new Set();
@@ -204,6 +227,7 @@ export function detectStacks(root, maxDepth = 3) {
         if (!SKIP_DIRS.has(e.name)) rec(join(dir, e.name), depth + 1);
         continue;
       }
+      if (depth === 0 && e.name === 'package.json' && isEosTooling(join(dir, e.name))) continue;
       for (const [stack, names] of Object.entries(STACK_MANIFESTS)) {
         if (names.includes(e.name)) found.add(stack);
       }

@@ -157,7 +157,7 @@ function main() {
     if (mode === 'config-only') {
       details.mode = 'config-only';
       if (detected.length) {
-        error('P1', 'FAIL', `${PROJECT_CONFIG_PATH} declares projectType "config-only" but stack manifest(s) were found (${detected.join(', ')}). A real code project must declare "application" or "library" with a test command.`);
+        error('P1', 'FAIL', `${PROJECT_CONFIG_PATH} declares projectType "config-only" but stack manifest(s) were found (${detected.join(', ')}). A real code project must declare "application" or "library" with a test command — \`node .github/eos/eos.mjs init\` names the packs that match.`);
       } else {
         notes.push('config-only: no product code to verify (declared).');
       }

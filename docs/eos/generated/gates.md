@@ -34,8 +34,8 @@ The project declares what it is and how it is verified, and the workflow profile
 
 | Check | What it verifies | How to satisfy it |
 |---|---|---|
-| `project-declaration` | .eos/project.json exists and validates | Copy your stack's block from docs/eos/stack-presets.md into .eos/project.json (projectType + stacks + commands.test). |
-| `declaration-matches-repo` | the declaration is not the untouched template once code exists | Change projectType from "config-only" to "application" (or "library") and declare commands.test. |
+| `project-declaration` | .eos/project.json exists and validates | Run `node .github/eos/eos.mjs init`: choose a governance track and a starter pack (config-only until the stack is decided), then `init <pack> --write`. docs/eos/stack-presets.md has every stack. |
+| `declaration-matches-repo` | the declaration is not the untouched template once code exists | Still config-only: run `node .github/eos/eos.mjs init` — it names the packs that match the code — then `init <pack> --write` (your track carries over). Otherwise add the stack to "stacks" with its commands. |
 | `workflow-profile` | workflowProfile resolves in .eos/workflow.json | Set "workflowProfile" to a profile that exists in .eos/workflow.json (default: standard-product). |
 | `activation-ledger` | docs/eos/activation.md tracks the one-time hardening items | Run /eos-init in Copilot Chat; it creates and maintains docs/eos/activation.md. |
 
