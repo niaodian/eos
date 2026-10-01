@@ -34,7 +34,8 @@ export function planRelease({ root, event, refType, refName, requested = 'auto',
     manifest: isTag && readManifest(root, release).manifest ? 'true' : 'false',
     attest: fork ? 'false' : 'true',
     publish: isTag ? 'true' : 'false',
-    name: `${project}-${release}`,
+    // A tag that already names the project (eos-2.0.0 in niaodian/eos) is not prefixed twice.
+    name: release.startsWith(`${project}-`) ? release : `${project}-${release}`,
   };
 }
 

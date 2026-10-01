@@ -85,6 +85,9 @@ test('the plan reads the track from the project, and a dispatch or a pull reques
   const standard = project({ '.eos/project.json': APP_PROJECT });
   const tag = planRelease({ root: standard, event: 'push', refType: 'tag', refName: 'v1.0.0', repo: 'acme/app' });
   assert.deepEqual(tag, { track: 'standard', release: 'v1.0.0', manifest: 'false', attest: 'true', publish: 'true', name: 'app-v1.0.0' });
+  // A tag that already names the project is not prefixed twice: EOS's own eos-2.0.0 ships eos-2.0.0.tar.gz.
+  assert.equal(planRelease({ root: standard, event: 'push', refType: 'tag', refName: 'eos-2.0.0', repo: 'niaodian/eos' }).name, 'eos-2.0.0');
+  assert.equal(planRelease({ root: standard, event: 'push', refType: 'tag', refName: 'eosx-1', repo: 'niaodian/eos' }).name, 'eos-eosx-1');
 
   const regulated = project({ '.eos/project.json': { ...APP_PROJECT, workflowProfile: 'regulated', complianceProfile: 'regulated', evidencePolicy: 'ci' } });
   assert.equal(planRelease({ root: regulated, event: 'push', refType: 'tag', refName: 'v2', repo: 'acme/app' }).track, 'regulated');
