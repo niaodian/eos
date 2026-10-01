@@ -7,12 +7,12 @@
 //  "no redaction is implemented" READ AS a recorded data-boundary decision.]
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { bmadReadiness } from './lib/bmad-runtime.mjs';
+import { boundedSpawnSync } from '../eos/test-spawn.mjs';
 
 const HOOK = join(dirname(fileURLToPath(import.meta.url)), 'eos-doctor.mjs');
 const sandboxes = [];
@@ -28,7 +28,7 @@ function project(files) {
   return dir;
 }
 const run = (dir, args = []) => {
-  const r = spawnSync(process.execPath, [HOOK, ...args], { cwd: dir, encoding: 'utf8' });
+  const r = boundedSpawnSync(process.execPath, [HOOK, ...args], { cwd: dir, encoding: 'utf8' });
   return { code: r.status, out: (r.stdout || '') + (r.stderr || '') };
 };
 
@@ -395,7 +395,7 @@ test('D6: a mapped skill that is DEPRECATED upstream is an error', () => {
 
 test('D6: the shipped agent map maps no deprecated skill', () => {
   const repoRoot = join(dirname(HOOK), '..', '..');
-  const r = spawnSync(process.execPath, [HOOK], { cwd: repoRoot, encoding: 'utf8' });
+  const r = boundedSpawnSync(process.execPath, [HOOK], { cwd: repoRoot, encoding: 'utf8' });
   assert.doesNotMatch((r.stdout || '') + (r.stderr || ''), /D6 BMAD.*DEPRECATED/);
 });
 

@@ -29,6 +29,7 @@ export const CURRENT_VERSIONS = {
   '.eos/gates.json': 1,
   '.eos/agent-map.json': 1,
   '.eos/test-budget.json': 1,
+  '.eos/policy.lock.json': 1,
 };
 
 /**

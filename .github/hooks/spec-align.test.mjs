@@ -6,11 +6,11 @@
 //  project with NO spec evidence at all passed the G8 hard gate.]
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { boundedSpawnSync } from '../eos/test-spawn.mjs';
 
 const HOOK = join(dirname(fileURLToPath(import.meta.url)), 'spec-align.mjs');
 const sandboxes = [];
@@ -28,7 +28,7 @@ function project(files) {
 }
 
 function run(dir, args = []) {
-  const r = spawnSync(process.execPath, [HOOK, ...args], { cwd: dir, encoding: 'utf8' });
+  const r = boundedSpawnSync(process.execPath, [HOOK, ...args], { cwd: dir, encoding: 'utf8' });
   return { code: r.status, out: (r.stdout || '') + (r.stderr || '') };
 }
 

@@ -27,6 +27,7 @@ import { readStageRecord, emptyDocReason, decisionProblem, openBlockers, substan
 import { readManifest, manifestProblems, manifestPath } from './release.mjs';
 import { resolve as applyProviderVerdict } from '../adapters/contract.mjs';
 import { lastGateEvent } from './ledger.mjs';
+import { readIntent } from './record.mjs';
 import { findWaiver, expiredWaivers } from './waivers.mjs';
 import { AC_ID, opsDecisionProblem } from './story.mjs';
 
@@ -260,6 +261,16 @@ export function evidenceIntegrity(snapshot, evidence) {
     const digest = sha256File(snapshot.root, evidenceFile(evidence.gate, evidence.scope.type, evidence.scope.id));
     if (digest !== event.evidenceSha256) {
       problems.push(`the evidence file has changed since the ledger recorded it (the chain pins its digest) — re-run the gate instead of editing the file`);
+    }
+  }
+  // An interrupted run looks exactly like an edited file: the ledger pins a digest the file does not
+  // have. The intent record written before every run is what tells the two apart, and the cause
+  // decides the message — "re-run it" is a fix; "this was edited by hand" is an accusation.
+  if (problems.length && event) {
+    const pending = readIntent(snapshot.root);
+    if (pending.present && pending.interrupted && pending.intent?.gate === evidence.gate
+        && pending.intent?.scope?.id === evidence.scope.id && pending.intent.evidenceSha256 === event.evidenceSha256) {
+      return [pending.detail];
     }
   }
   return problems;

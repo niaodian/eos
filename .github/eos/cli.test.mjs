@@ -7,6 +7,7 @@ import { readFileSync, existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { project, write, run, runJson, cleanup, commitAll, REPO_ROOT, APP_PROJECT, PRD_2AC, story } from './test-support.mjs';
 import { validate } from './lib/schema.mjs';
+import { activeWorkPath } from './lib/registry.mjs';
 
 after(cleanup);
 
@@ -45,9 +46,13 @@ test('resume --json satisfies the same contract and names the last verified gate
 test('resume restores the focus in a brand-new session without re-reading the docs', () => {
   const dir = READY_REPO();
   run(dir, ['resume']); // first session records the focus
-  assert.ok(existsSync(join(dir, '.eos/local/active-work.json')));
-  const saved = JSON.parse(readFileSync(join(dir, '.eos/local/active-work.json'), 'utf8'));
+  // Kept per branch since 1.20.0 — switching branches must never hand back another branch's work.
+  const { path, branch } = activeWorkPath(dir);
+  assert.equal(branch, 'main');
+  assert.ok(existsSync(join(dir, path)), path);
+  const saved = JSON.parse(readFileSync(join(dir, path), 'utf8'));
   assert.equal(saved.scopeId, 'STORY-012');
+  assert.equal(saved.branch, 'main');
   assert.ok(!('status' in saved) && !('gateStatus' in saved), 'local focus must not carry authority');
   const second = runJson(dir, ['resume']);
   assert.equal(second.json.current.scopeId, 'STORY-012');

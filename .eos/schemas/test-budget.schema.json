@@ -4,29 +4,93 @@
   "title": "EOS test layers and wall-clock budgets",
   "description": "Declares which test files make up each layer and how long that layer may take. Consumed by .github/eos/run-tests.mjs. A declared file that does not exist is an ERROR, so a renamed or deleted suite cannot silently stop running.",
   "type": "object",
-  "required": ["schemaVersion", "layers"],
+  "required": [
+    "schemaVersion",
+    "layers"
+  ],
   "additionalProperties": false,
   "properties": {
-    "$schema": { "type": "string" },
-    "schemaVersion": { "type": "integer", "minimum": 1 },
-    "description": { "type": "string" },
+    "$schema": {
+      "type": "string"
+    },
+    "schemaVersion": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "description": {
+      "type": "string"
+    },
     "defaultScale": {
       "type": "number",
       "minimum": 0.1,
       "description": "Multiplier applied to every budget. Overridden by EOS_TEST_BUDGET_SCALE. Scale for a slow runner instead of raising individual budgets, so a breach keeps meaning the same thing everywhere."
+    },
+    "testTimeoutMs": {
+      "type": "integer",
+      "minimum": 1000,
+      "description": "Per-TEST limit passed to node --test-timeout (Node 20.11+). One stuck test cannot hold its whole layer hostage."
+    },
+    "layerTimeoutMs": {
+      "type": "integer",
+      "minimum": 1000,
+      "description": "Backstop for each layer PROCESS. Outliving it means the process hung (an unclosed handle, a child that never exited), not that a test was slow."
+    },
+    "coverageTimeoutMs": {
+      "type": "integer",
+      "minimum": 1000,
+      "description": "Backstop for the single --coverage invocation, which runs every layer at once."
+    },
+    "baselineTolerance": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 5,
+      "description": "How far above its recorded baseline a layer may run before it fails as DRIFT. 0.5 = 50%: wide enough for shared-runner noise, narrow enough to catch the slow creep an absolute budget cannot see."
+    },
+    "baselines": {
+      "type": "object",
+      "description": "Recorded per-layer timings keyed by environment (EOS_TEST_BASELINE_ENV). A baseline only means something for the environment it was measured in, so there is no global one.",
+      "patternProperties": {
+        "^[a-z0-9-]+$": {
+          "type": "object",
+          "patternProperties": {
+            "^[a-z0-9-]+$": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
     },
     "coverage": {
       "type": "object",
       "additionalProperties": false,
       "description": "Thresholds for `run-tests.mjs --coverage`. Enforced natively by Node 22+; on older versions the report still prints and run-tests says the threshold was not applied rather than implying a pass.",
       "properties": {
-        "description": { "type": "string" },
-        "lines": { "type": "number", "minimum": 0, "maximum": 100 },
-        "branches": { "type": "number", "minimum": 0, "maximum": 100 },
-        "functions": { "type": "number", "minimum": 0, "maximum": 100 },
+        "description": {
+          "type": "string"
+        },
+        "lines": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "branches": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "functions": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
         "exclude": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "description": "Globs excluded from the measurement — the tests themselves and their harnesses, which would otherwise inflate the number with code that exists to exercise other code."
         }
       }
@@ -38,10 +102,15 @@
       "patternProperties": {
         "^[a-z0-9-]+$": {
           "type": "object",
-          "required": ["budgetMs", "files"],
+          "required": [
+            "budgetMs",
+            "files"
+          ],
           "additionalProperties": false,
           "properties": {
-            "description": { "type": "string" },
+            "description": {
+              "type": "string"
+            },
             "budgetMs": {
               "type": "integer",
               "minimum": 1,
@@ -51,7 +120,10 @@
               "type": "array",
               "minItems": 1,
               "uniqueItems": true,
-              "items": { "type": "string", "pattern": "\\.test\\.mjs$" }
+              "items": {
+                "type": "string",
+                "pattern": "\\.test\\.mjs$"
+              }
             }
           }
         }

@@ -48,6 +48,11 @@ jobs:
     timeout-minutes: 20
     permissions:
       contents: read
+    env:
+      # Which recorded baseline in .eos/test-budget.json this runner is compared against. A layer
+      # more than baselineTolerance slower than it fails as DRIFT — the slow creep an absolute budget
+      # cannot see. Baselines are per environment because a laptop's timings say nothing about CI's.
+      EOS_TEST_BASELINE_ENV: ci-linux
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -150,6 +155,28 @@ jobs:
         env:
           GITHUB_EVENT_BEFORE: ${{ github.event.before }}
 
+      - name: EOS policy integrity (no gate gets weaker without a second person)
+        # One edit to .eos/workflow.json can switch a gate off for a whole kind of work, and
+        # re-running under the weaker rule then passes. This compares the policy with what the change
+        # merges into: every weakening must be recorded in .eos/policy.lock.json with a reason and an
+        # approver who is not the requester. Stricter schemas without a migration are held the same way.
+        run: |
+          REF=""
+          if [ -n "${GITHUB_BASE_REF:-}" ]; then
+            git fetch --no-tags --depth=1 origin "$GITHUB_BASE_REF" || true
+            REF="origin/$GITHUB_BASE_REF"
+          elif [ -n "${GITHUB_EVENT_BEFORE:-}" ] && [ "${GITHUB_EVENT_BEFORE}" != "0000000000000000000000000000000000000000" ]; then
+            git fetch --no-tags --depth=2 origin "$GITHUB_EVENT_BEFORE" || true
+            REF="$GITHUB_EVENT_BEFORE"
+          fi
+          if [ -n "$REF" ]; then
+            node .github/eos/eos.mjs policy check --against "$REF"
+          else
+            node .github/eos/eos.mjs policy check
+          fi
+        env:
+          GITHUB_EVENT_BEFORE: ${{ github.event.before }}
+
       - name: EOS guided-workflow self-check (is EOS itself wired correctly?)
         run: node .github/eos/eos.mjs doctor
 
@@ -224,6 +251,13 @@ jobs:
         # another platform, and the Linux `verify` job asserts they pass FAST, at scale 1, where a
         # regression is visible. Timings are still printed here — they are useful data, they just
         # do not gate.
+        #
+        # The per-test limit needs the same care. Node 20 applies --test-timeout to each test FILE
+        # (it wraps a file as one top-level test), and on Windows a whole file can legitimately take
+        # longer than the 120s default (cli.test.mjs: ~9s on Linux). Windows gets a longer limit by
+        # explicit override; macOS keeps the default, so a hang there is still caught early.
+        env:
+          EOS_TEST_TIMEOUT_MS: ${{ matrix.os == 'windows-latest' && '900000' || '120000' }}
         run: node .github/eos/run-tests.mjs unit contract --no-budget
 
   # ---------------------------------------------------------------------------------------------

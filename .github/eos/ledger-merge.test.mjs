@@ -20,8 +20,8 @@ import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { project, run, runJson, git, commitAll, cleanup, APP_PROJECT, REPO_ROOT } from './test-support.mjs';
-import { readEvents, verifyChain, parseConflicted, reconcileEvents, divergence, LEDGER_PATH } from './lib/ledger.mjs';
+import { project, run, runJson, git, commitAll, cleanup, storyFiles, APP_PROJECT, REPO_ROOT } from './test-support.mjs';
+import { readEvents, verifyChain, parseConflicted, reconcileEvents, divergence, transitionConflicts, stateOf, appendEvent, LEDGER_PATH } from './lib/ledger.mjs';
 
 after(cleanup);
 
@@ -185,4 +185,91 @@ test('the resolved ledger is accepted by the normal verify path', () => {
   assert.equal(v.code, 0, v.out);
   assert.match(v.out, /PASS/);
   assert.ok(existsSync(join(dir, '.eos/ledger/head.json')));
+});
+
+// ================================================================ status history after a merge (#4)
+// Replaying two histories makes the CHAIN valid. It does not make the history mean something: a
+// story both branches moved ends up with a status change that starts from a state the merged
+// history already left, and the derived state rests on a sequence that never happened.
+const WORKFLOW = JSON.parse(readFileSync(join(REPO_ROOT, '.eos/workflow.json'), 'utf8'));
+const tr = (seq, id, from, to, ts) => ({ seq, ts: ts || `2026-01-01T00:00:${String(seq).padStart(2, '0')}.000Z`, type: 'transition', scope: { type: 'story', id }, from, to });
+
+test('a single consistent history has no conflicts', () => {
+  const events = [tr(1, 'S1', 'DRAFT', 'IN_REVIEW'), tr(2, 'S1', 'IN_REVIEW', 'READY_FOR_DEV')];
+  assert.deepEqual(transitionConflicts(events, WORKFLOW), []);
+});
+
+test('a change that starts from a state the history already left is a conflict', () => {
+  const events = [tr(1, 'S1', 'DRAFT', 'IN_REVIEW'), tr(2, 'S1', 'IN_REVIEW', 'READY_FOR_DEV'), tr(3, 'S1', 'READY_FOR_DEV', 'IN_DEVELOPMENT'), tr(4, 'S1', 'IN_REVIEW', 'READY_FOR_DEV')];
+  const [c] = transitionConflicts(events, WORKFLOW);
+  assert.equal(c.seq, 4);
+  assert.equal(c.derived, 'IN_DEVELOPMENT');
+  assert.equal(c.agreed, 'IN_REVIEW', 'the conflicting change started from the last state both histories shared');
+});
+
+test('both branches making the same move is a harmless duplicate, not a conflict', () => {
+  const events = [tr(1, 'S1', 'DRAFT', 'IN_REVIEW'), tr(2, 'S1', 'IN_REVIEW', 'READY_FOR_DEV'), tr(3, 'S1', 'IN_REVIEW', 'READY_FOR_DEV')];
+  assert.deepEqual(transitionConflicts(events, WORKFLOW), []);
+});
+
+test('a reconcile entry settles the conflict and sets the state', () => {
+  const events = [tr(1, 'S1', 'DRAFT', 'IN_REVIEW'), tr(2, 'S1', 'IN_REVIEW', 'READY_FOR_DEV'), tr(3, 'S1', 'READY_FOR_DEV', 'IN_DEVELOPMENT'), tr(4, 'S1', 'IN_REVIEW', 'READY_FOR_DEV'),
+    { seq: 5, ts: '2026-01-01T00:01:00.000Z', type: 'reconcile', scope: { type: 'story', id: 'S1' }, from: 'READY_FOR_DEV', to: 'IN_REVIEW' }];
+  assert.deepEqual(transitionConflicts(events, WORKFLOW), []);
+  assert.equal(stateOf(events, WORKFLOW, 'story', 'S1'), 'IN_REVIEW');
+});
+
+test('a later policy change never makes yesterday\'s history a conflict', () => {
+  // Consistency, not legality: an edge the workflow has since removed is still a valid record of
+  // what happened when it was allowed.
+  const events = [tr(1, 'S1', 'DRAFT', 'SOME_RETIRED_STATE'), tr(2, 'S1', 'SOME_RETIRED_STATE', 'IN_REVIEW')];
+  assert.deepEqual(transitionConflicts(events, WORKFLOW), []);
+});
+
+test('an inconsistent history on an intact chain fails verify, and resolve settles it without rewriting anything', () => {
+  const dir = project({ '.eos/project.json': APP_PROJECT }, { withHooks: true });
+  // An intact, hash-chained ledger whose status history does not follow from itself — what a
+  // ledger resolved before 1.20.0 can look like.
+  for (const [from, to] of [['DRAFT', 'IN_REVIEW'], ['IN_REVIEW', 'READY_FOR_DEV'], ['READY_FOR_DEV', 'IN_DEVELOPMENT'], ['IN_REVIEW', 'READY_FOR_DEV']]) {
+    appendEvent(dir, { type: 'transition', scope: { type: 'story', id: 'STORY-001' }, from, to });
+  }
+  const before = ledgerText(dir);
+  const v = run(dir, ['ledger', '--verify']);
+  assert.equal(v.code, 1, v.out);
+  assert.match(v.out, /changed it concurrently/);
+
+  const r = runJson(dir, ['ledger', '--resolve', '--write']);
+  assert.equal(r.code, 0, r.out);
+  assert.equal(r.json.reconciled.length, 1);
+  assert.ok(ledgerText(dir).startsWith(before), 'every earlier event is byte-for-byte unchanged — the settling entry is appended');
+  const { events } = readEvents(dir);
+  assert.equal(events.at(-1).type, 'reconcile');
+  assert.equal(stateOf(events, WORKFLOW, 'story', 'STORY-001'), 'IN_REVIEW');
+  assert.equal(run(dir, ['ledger', '--verify']).code, 0);
+});
+
+test('a real merge where both branches moved the same story is reconciled to the state they shared', () => {
+  const dir = project({ ...storyFiles() }, { withHooks: true });
+  run(dir, ['check', '--gate', 'story-ready', '--scope', 'STORY-001']);
+  assert.equal(run(dir, ['transition', '--scope', 'story', '--id', 'STORY-001', '--to', 'IN_REVIEW']).code, 0);
+  commitAll(dir, 'story in review on main');
+
+  git(dir, ['checkout', '-q', '-b', 'branch-a']);
+  for (const to of ['READY_FOR_DEV', 'IN_DEVELOPMENT']) assert.equal(run(dir, ['transition', '--scope', 'story', '--id', 'STORY-001', '--to', to]).code, 0);
+  commitAll(dir, 'a moves the story on');
+
+  git(dir, ['checkout', '-q', 'main']);
+  git(dir, ['checkout', '-q', '-b', 'branch-b']);
+  assert.equal(run(dir, ['transition', '--scope', 'story', '--id', 'STORY-001', '--to', 'READY_FOR_DEV']).code, 0);
+  commitAll(dir, 'b moves it differently');
+
+  const merge = git(dir, ['merge', '--no-edit', 'branch-a']);
+  assert.notEqual(merge.code, 0, 'the ledger must conflict');
+  const r = runJson(dir, ['ledger', '--resolve', '--write']);
+  assert.equal(r.code, 0, r.out);
+  assert.deepEqual(r.json.reconciled.map((x) => `${x.scope.id}:${x.to}`), ['STORY-001:IN_REVIEW']);
+  const { events } = readEvents(dir);
+  assert.equal(stateOf(events, WORKFLOW, 'story', 'STORY-001'), 'IN_REVIEW', 'neither branch\'s state wins; the shared one does');
+  assert.deepEqual(transitionConflicts(events, WORKFLOW), []);
+  assert.equal(run(dir, ['ledger', '--verify']).code, 0);
 });

@@ -22,7 +22,7 @@ import { randomBytes } from 'node:crypto';
 import { dirname } from 'node:path';
 
 /** Synchronous sleep with no dependency and no busy-wait. */
-function sleep(ms) {
+export function sleep(ms) {
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 }
 
@@ -45,7 +45,7 @@ export function writeFileAtomic(full, data) {
     fsyncSync(fd);
     closeSync(fd);
     fd = null;
-    renameSync(tmp, full);
+    renameWithRetry(tmp, full);
   } catch (e) {
     if (fd !== null) { try { closeSync(fd); } catch { /* already closed */ } }
     try { unlinkSync(tmp); } catch { /* never created, or already gone */ }
@@ -53,8 +53,40 @@ export function writeFileAtomic(full, data) {
   }
 }
 
+/**
+ * rename(2), patient with Windows.
+ *
+ * On Windows, replacing a file that another process has open — a reader in the middle of reading
+ * head.json — fails with EPERM/EACCES/EBUSY instead of succeeding as it does on POSIX. A reader holds
+ * the file for microseconds, so the right response is a short retry, not a failure. Without it, a
+ * concurrent READER could make a WRITER throw after appending its ledger line but before committing
+ * the head record — leaving a genuinely interrupted write behind. CI's Windows runner caught exactly
+ * that. Any other error, or one that outlasts the retries, is still thrown.
+ */
+export function renameWithRetry(from, to, { attempts = 60, pauseMs = 15, rename = renameSync } = {}) {
+  for (let i = 1; ; i += 1) {
+    try { rename(from, to); return; } catch (e) {
+      if (!['EPERM', 'EACCES', 'EBUSY'].includes(e.code) || i >= attempts) throw e;
+      sleep(pauseMs);
+    }
+  }
+}
+
 export class LockTimeoutError extends Error {
   constructor(message) { super(message); this.name = 'LockTimeoutError'; }
+}
+
+/**
+ * Windows' version of "someone else has the lock".
+ *
+ * A file deleted while ANY other process still has a handle on it — even the instant a reader spends
+ * checking whether it exists — lingers in a "delete pending" state, and creating it again fails with
+ * EPERM or EACCES rather than EEXIST. The previous holder has released it; it just has not finished
+ * disappearing. CI's Windows runner hit exactly this under concurrent readers. On every other
+ * platform those codes mean a real permission problem and are still thrown at once.
+ */
+export function lockBusyOnWindows(e, platform = process.platform) {
+  return platform === 'win32' && (e?.code === 'EPERM' || e?.code === 'EACCES');
 }
 
 /**
@@ -83,7 +115,7 @@ export function withLock(lockPath, fn, { timeoutMs = 10000, staleMs = 60000, now
       fd = openSync(lockPath, 'wx');
       break;
     } catch (e) {
-      if (e.code !== 'EEXIST') throw e;
+      if (e.code !== 'EEXIST' && !lockBusyOnWindows(e)) throw e;
       let age = null;
       try { age = now() - statSync(lockPath).mtimeMs; } catch { /* released between open and stat */ }
       if (age !== null && age > staleMs) {

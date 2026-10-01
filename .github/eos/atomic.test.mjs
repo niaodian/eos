@@ -14,13 +14,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync, openSync, closeSync, utimesSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync, openSync, closeSync, utimesSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname } from 'node:path';
-import { appendEvent, readEvents, verifyChain, LEDGER_PATH, LEDGER_HEAD_PATH, LEDGER_LOCK_PATH } from './lib/ledger.mjs';
-import { writeFileAtomic, withLock, LockTimeoutError } from './lib/atomic.mjs';
+import { appendEvent, readEvents, verifyChain, readLedgerSnapshot, LEDGER_PATH, LEDGER_HEAD_PATH, LEDGER_LOCK_PATH } from './lib/ledger.mjs';
+import { writeFileAtomic, withLock, LockTimeoutError, renameWithRetry, lockBusyOnWindows } from './lib/atomic.mjs';
 
 const EOS_DIR = dirname(fileURLToPath(import.meta.url));
 // These are ESM SPECIFIERS embedded in snippets run by a child `node`, not filesystem paths. On
@@ -194,4 +194,181 @@ test('a genuinely truncated ledger is still reported as truncation', () => {
   const v = verifyChain(readEvents(dir).events, { root: dir });
   assert.equal(v.ok, false);
   assert.match(v.problems.join(' '), /removed from the end/);
+});
+
+// --------------------------------------------------------------------------------- readers
+// Readers take no lock: every command reads the ledger, and serialising reads behind writers would
+// make a busy repository crawl. A reader can therefore read the ledger before an append and the
+// head record after it — and that pair used to read as "line(s) were removed from the end".
+// CI caught it under coverage. readLedgerSnapshot re-reads a disagreement before believing it.
+test('a reader racing a writer never mistakes a write in progress for truncation', { timeout: 120000 }, async () => {
+  const dir = sandbox();
+  appendEvent(dir, { type: 'note', detail: 'seed', scope: { type: 'product', id: 'product' } });
+  const writer = node(`
+    import { appendEvent } from ${JSON.stringify(LEDGER_MODULE)};
+    for (let i = 0; i < 300; i += 1) appendEvent(${JSON.stringify(dir)}, { type: 'note', detail: 'w' + i, scope: { type: 'product', id: 'product' } });
+  `);
+  let done = false;
+  let writerResult = null;
+  writer.then((r) => { writerResult = r; done = true; });
+  let reads = 0;
+  const false_alarms = [];
+  while (!done) {
+    const { chain, errors } = readLedgerSnapshot(dir);
+    reads += 1;
+    if (chain.problems.length || errors.length) false_alarms.push([...errors, ...chain.problems].join(' | '));
+    await new Promise((r) => setImmediate(r));
+  }
+  // The writer has to SUCCEED. On Windows a reader holding head.json open once made the writer's
+  // rename fail mid-write — a crash after the append and before the commit — and a dead writer
+  // would otherwise look like a quiet, successful run.
+  assert.equal(writerResult.code, 0, `the writer failed while being read:\n${writerResult.out}`);
+  assert.ok(reads > 10, `the reader must actually overlap the writer (read ${reads} times)`);
+  assert.deepEqual(false_alarms, [], 'an honest concurrent write must never read as tampering');
+  assert.equal(readLedgerSnapshot(dir).events.length, 301);
+});
+
+test('real truncation is still reported, after the re-reads', () => {
+  const dir = sandbox();
+  for (const d of ['a', 'b', 'c']) appendEvent(dir, { type: 'note', detail: d, scope: { type: 'product', id: 'product' } });
+  const lines = readFileSync(join(dir, LEDGER_PATH), 'utf8').trim().split('\n');
+  writeFileSync(join(dir, LEDGER_PATH), `${lines.slice(0, 2).join('\n')}\n`, 'utf8');
+  const { chain } = readLedgerSnapshot(dir, { attempts: 3, pauseMs: 1 });
+  assert.match(chain.problems.join(' '), /removed from the end/, 'patience must never become blindness');
+});
+
+// The states a reader can meet mid-write, built directly so they do not depend on a platform's
+// timing. On Windows the gap between append and head update is most of every write (fsync is
+// slow), so a reader lands in it constantly — waiting it out is not an answer; the commit point is.
+/** A ledger with three committed events, then a fourth appended but not yet committed by head.json. */
+function midWrite(dir, { torn = false } = {}) {
+  for (const d of ['a', 'b', 'c']) appendEvent(dir, { type: 'note', detail: d, scope: { type: 'product', id: 'product' } });
+  const head = readFileSync(join(dir, LEDGER_HEAD_PATH), 'utf8');
+  appendEvent(dir, { type: 'note', detail: 'd', scope: { type: 'product', id: 'product' } });
+  writeFileSync(join(dir, LEDGER_HEAD_PATH), head, 'utf8'); // head back at 3: the 4th is in flight
+  if (torn) {
+    const text = readFileSync(join(dir, LEDGER_PATH), 'utf8');
+    writeFileSync(join(dir, LEDGER_PATH), text.slice(0, text.length - 20), 'utf8'); // half-written line
+  }
+}
+
+test('while a writer holds the lock, a reader sees the last committed state at once', () => {
+  const dir = sandbox();
+  midWrite(dir);
+  closeSync(openSync(join(dir, LEDGER_LOCK_PATH), 'wx')); // a writer is mid-way
+  const started = Date.now();
+  const s = readLedgerSnapshot(dir);
+  assert.deepEqual([...s.errors, ...s.chain.problems], [], 'an in-flight append is not damage');
+  assert.equal(s.events.length, 3, 'the snapshot is the committed history');
+  assert.ok(Date.now() - started < 500, 'and it needs no waiting');
+});
+
+test('a half-written final line during a write is not corruption', () => {
+  const dir = sandbox();
+  midWrite(dir, { torn: true });
+  closeSync(openSync(join(dir, LEDGER_LOCK_PATH), 'wx'));
+  const s = readLedgerSnapshot(dir);
+  assert.deepEqual([...s.errors, ...s.chain.problems], []);
+  assert.equal(s.events.length, 3);
+});
+
+test('the same state with NO writer is reported — an interrupted write is still visible', () => {
+  const dir = sandbox();
+  midWrite(dir);
+  const s = readLedgerSnapshot(dir, { attempts: 3, pauseMs: 1 });
+  assert.match(s.chain.problems.join(' '), /interrupted write/);
+});
+
+test('a rename refused transiently is retried, and succeeds', () => {
+  // The Windows case: the target is open in another process for a moment. Simulated, because no
+  // portable call produces a transient EPERM.
+  let calls = 0;
+  const rename = () => { calls += 1; if (calls < 3) throw Object.assign(new Error('busy'), { code: 'EPERM' }); };
+  renameWithRetry('a', 'b', { rename, pauseMs: 1 });
+  assert.equal(calls, 3, 'two refusals, then the rename goes through');
+});
+
+test('a rename that stays refused is thrown, not retried forever', () => {
+  const rename = () => { throw Object.assign(new Error('busy'), { code: 'EACCES' }); };
+  assert.throws(() => renameWithRetry('a', 'b', { rename, attempts: 5, pauseMs: 1 }), /busy/);
+});
+
+test('an error that is not transient is thrown at once', () => {
+  let calls = 0;
+  const rename = () => { calls += 1; throw Object.assign(new Error('gone'), { code: 'ENOENT' }); };
+  assert.throws(() => renameWithRetry('a', 'b', { rename, pauseMs: 1 }), /gone/);
+  assert.equal(calls, 1, 'only EPERM/EACCES/EBUSY are worth waiting for');
+});
+
+test('on Windows a delete-pending lock reads as busy; elsewhere EPERM is still an error', () => {
+  const eperm = Object.assign(new Error('operation not permitted'), { code: 'EPERM' });
+  const eacces = Object.assign(new Error('access denied'), { code: 'EACCES' });
+  assert.equal(lockBusyOnWindows(eperm, 'win32'), true, 'a lock still disappearing is someone else\'s lock');
+  assert.equal(lockBusyOnWindows(eacces, 'win32'), true);
+  assert.equal(lockBusyOnWindows(eperm, 'linux'), false, 'on POSIX it is a real permission problem — never waited on');
+  assert.equal(lockBusyOnWindows(eperm, 'darwin'), false);
+  assert.equal(lockBusyOnWindows(Object.assign(new Error('x'), { code: 'ENOENT' }), 'win32'), false);
+});
+
+test('a reader never misreads a SLOW writer (Windows-sized gaps, on any platform)', { timeout: 120000 }, async () => {
+  // A load test of the protocol appendEvent follows — lock, append, commit the head, release — with
+  // a random pause between append and commit. Honest limit: on a fast machine this does NOT reproduce
+  // the Windows failure (the previous reader also passes here); scheduler-granularity phase-locking
+  // is what caused that, and the deterministic straddle test below is its regression test. This one
+  // stays because it keeps the whole protocol under concurrent load on every platform CI runs.
+  const dir = sandbox();
+  appendEvent(dir, { type: 'note', detail: 'seed', scope: { type: 'product', id: 'product' } });
+  const writer = node(`
+    import { withLock, writeFileAtomic, sleep } from ${JSON.stringify(ATOMIC_MODULE)};
+    import { hashEvent, readEvents, LEDGER_PATH, LEDGER_HEAD_PATH, LEDGER_LOCK_PATH } from ${JSON.stringify(LEDGER_MODULE)};
+    import { appendFileSync } from 'node:fs';
+    import { join } from 'node:path';
+    const dir = ${JSON.stringify(dir)};
+    for (let i = 0; i < 150; i += 1) {
+      withLock(join(dir, LEDGER_LOCK_PATH), () => {
+        const { events } = readEvents(dir);
+        const prev = events.at(-1) || null;
+        const body = { seq: events.length + 1, ts: new Date().toISOString(), actor: 'w', type: 'note', detail: 'w' + i, scope: { type: 'product', id: 'product' }, prevHash: prev ? prev.hash : null };
+        body.hash = hashEvent(body);
+        appendFileSync(join(dir, LEDGER_PATH), JSON.stringify(body) + '\\n');
+        sleep(Math.floor(Math.random() * 4));
+        writeFileAtomic(join(dir, LEDGER_HEAD_PATH), JSON.stringify({ schemaVersion: 1, count: events.length + 1, hash: body.hash }, null, 2) + '\\n');
+      });
+      sleep(Math.floor(Math.random() * 2));
+    }
+  `);
+  let done = false;
+  let writerResult = null;
+  writer.then((r) => { writerResult = r; done = true; });
+  let reads = 0;
+  const alarms = [];
+  while (!done) {
+    const { chain, errors } = readLedgerSnapshot(dir);
+    reads += 1;
+    if (chain.problems.length || errors.length) alarms.push([...errors, ...chain.problems].join(' | '));
+    await new Promise((r) => setImmediate(r));
+  }
+  assert.equal(writerResult.code, 0, writerResult.out);
+  assert.ok(reads > 10, `the reader must overlap the writer (read ${reads} times)`);
+  assert.deepEqual(alarms, [], 'a slow, honest writer must never read as damage');
+  assert.equal(readLedgerSnapshot(dir).events.length, 151);
+});
+
+test('a commit landing inside a read, attempt after attempt, is never reported as damage', () => {
+  // The Windows failure, made deterministic. A writer whose cycle lines up with the reader's re-read
+  // pause lands a whole write — append, commit, release — between the reader's reads on every
+  // attempt. Waiting cannot fix phase-locking; noticing that the head moved during the read does.
+  const dir = sandbox();
+  appendEvent(dir, { type: 'note', detail: 'seed', scope: { type: 'product', id: 'product' } });
+  let writes = 0;
+  const onRead = (stage) => {
+    if (stage === 'after-head' && writes < 5) {
+      appendEvent(dir, { type: 'note', detail: `straddle ${writes}`, scope: { type: 'product', id: 'product' } });
+      writes += 1;
+    }
+  };
+  const s = readLedgerSnapshot(dir, { pauseMs: 1, onRead });
+  assert.equal(writes, 5, 'the first five attempts were each straddled by a complete write');
+  assert.deepEqual([...s.errors, ...s.chain.problems], [], 'and none of them read as an interrupted write');
+  assert.equal(s.events.length, 6);
 });

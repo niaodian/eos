@@ -12,9 +12,11 @@ import { existsSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { readSnapshot, gatePolicy, changeTypeOf, scopeState, gateInputs, gateCollections } from './lib/state.mjs';
-import { runGate, evaluateGate, recordedGateStatus, evidenceIntegrity, isBlocking } from './lib/gates.mjs';
+import { prepareGateRun, evaluateGate, recordedGateStatus, evidenceIntegrity, isBlocking } from './lib/gates.mjs';
+import { recordGateRun, readIntent } from './lib/record.mjs';
+import { crossBranchActivity, crossBranchLines } from './lib/cross-branch.mjs';
 import { checkTransition, deriveProductState, legalTransitions } from './lib/transitions.mjs';
-import { appendEvent, readEvents, verifyChain, parseConflicted, reconcileEvents, writeLedger, divergence, LEDGER_PATH } from './lib/ledger.mjs';
+import { appendEvent, withLedger, readEvents, readLedgerSnapshot, verifyChain, parseConflicted, reconcileEvents, writeLedger, divergence, transitionConflicts, stateOf, LEDGER_PATH } from './lib/ledger.mjs';
 import { route, activeScope } from './lib/router.mjs';
 import { renderCard, renderGate, renderExplain } from './lib/render.mjs';
 import { buildHandoff, writeHandoff, readHandoff, verifyHandoff, handoffPath } from './lib/handoff.mjs';
@@ -24,12 +26,14 @@ import { readManifest, manifestPath, manifestDigest as computeManifestDigest, li
 import { loadProviders, consult } from './adapters/contract.mjs';
 import { syncWorkspaceRule } from './lib/workspace-rule.mjs';
 import { generateDocs } from './lib/docgen.mjs';
+import { testDurationTrend } from './lib/test-history.mjs';
+import { policyChanges, planLock, checkPolicy, readLock, readPolicy, policySnapshot, policyDigest, POLICY_LOCK_PATH } from './lib/policy.mjs';
 import { planMigration, applyMigration, compatibilityErrors } from './lib/migrate.mjs';
 import { buildSbom, sbomFreshness, sbomDigest, SBOM_PATH } from './lib/sbom.mjs';
 import { PACKS, packDeclaration, packIds } from './lib/packs.mjs';
 import { loadWaivers, expiredWaivers, waiverStatus } from './lib/waivers.mjs';
 import { writeFileAtomic } from './lib/atomic.mjs';
-import { resolveAction, ACTIVE_WORK_PATH } from './lib/registry.mjs';
+import { resolveAction, activeWorkPath } from './lib/registry.mjs';
 
 const EXIT = { OK: 0, FAIL: 1, BLOCKED: 2, ERROR: 3 };
 const statusExit = (s) => (['PASS', 'WAIVED', 'NOT_APPLICABLE'].includes(s) ? EXIT.OK : s === 'FAIL' ? EXIT.FAIL : s === 'ERROR' ? EXIT.ERROR : EXIT.BLOCKED);
@@ -59,6 +63,8 @@ usage: node .github/eos/eos.mjs <command> [flags]
   stack sync [--write]                    render the always-on workspace rule from .eos/project.json
   new [<pack>] [--write]                  scaffold .eos/project.json from a starter pack
   sbom [--write] [--check]                software bill of materials, bound to the tree
+  policy [diff|lock|check] [--against <ref>] [--write] [--reason <text>]
+                                          no gate gets weaker without a reason and a second person
   migrate [--apply]                       governance file versions; plan first, then apply
   docs [--write] [--check]                regenerate the docs that restate the policy
   health                                  blockers, stale evidence, waivers, trend — one screen
@@ -207,6 +213,11 @@ const commands = {
       }
       lines.push('');
     }
+    const cross = crossBranchActivity(snapshot.root, {
+      focus: decision.current?.scopeId ? [{ type: decision.current.scopeType, id: decision.current.scopeId }] : [],
+    });
+    json.crossBranch = { checked: cross.checked, base: cross.base?.ref ?? null, overlaps: cross.overlaps };
+    lines.push(...crossBranchLines(cross));
     lines.push(`Recommended next`, `  ${decision.recommendedAction?.title || '—'}`, '', `  ${decision.recommendedAction?.command || ''}`, '');
     emit(flags, json, lines.join('\n'));
     return snapshot.errors.length ? EXIT.ERROR : EXIT.OK;
@@ -214,7 +225,12 @@ const commands = {
 
   next(snapshot, flags) {
     const decision = route(snapshot);
-    emit(flags, decision, renderCard(decision, { why: !!flags.why, all: !!flags.all }));
+    const focus = decision.current?.scopeId ? [{ type: decision.current.scopeType, id: decision.current.scopeId }] : [];
+    const cross = crossBranchActivity(snapshot.root, { focus });
+    // Only present when there is something to say, so the common case's JSON is unchanged.
+    if (cross.overlaps.length) decision.crossBranch = { base: cross.base.ref, overlaps: cross.overlaps };
+    const extra = crossBranchLines(cross);
+    emit(flags, decision, renderCard(decision, { why: !!flags.why, all: !!flags.all }) + (extra.length ? `\n${extra.join('\n')}` : ''));
     return decision.exitCode;
   },
 
@@ -223,12 +239,14 @@ const commands = {
     // Record the focus locally so a new chat session starts where the last one stopped. This file
     // is gitignored and carries no authority — only a scope id and a change type.
     if (decision.current.scopeId) {
-      const full = join(snapshot.root, ACTIVE_WORK_PATH);
+      const { path, branch } = activeWorkPath(snapshot.root);
+      const full = join(snapshot.root, path);
       mkdirSync(dirname(full), { recursive: true });
       writeFileSync(full, JSON.stringify({
         schemaVersion: 1,
         scopeType: decision.current.scopeType,
         scopeId: decision.current.scopeId,
+        ...(branch ? { branch } : {}),
         updatedAt: new Date().toISOString(),
       }, null, 2) + '\n', 'utf8');
     }
@@ -248,18 +266,13 @@ const commands = {
       ? { type: 'product', id: 'product' }
       : { type: def.scope, id: resolveScope(snapshot, flags, def.scope).id };
     const providerVerdicts = await consultProviders(snapshot, def.id);
-    const { result, evidenceFile } = runGate(snapshot, def.id, scope.type, scope.id, { providerVerdicts });
-    appendEvent(snapshot.root, {
-      type: 'gate',
-      scope: { type: scope.type, id: String(scope.id) },
-      changeType: result.changeType,
-      gate: result.gate,
-      status: result.status,
-      // The digest goes INTO the hashed body, so regenerating or editing the evidence file after
-      // the fact no longer matches what the chain says was verified.
-      evidenceSha256: evidenceFile ? sha256File(snapshot.root, evidenceFile) : null,
-      commit: snapshot.commit,
-      detail: evidenceFile || '',
+    const { result, evidence, evidenceFile } = prepareGateRun(snapshot, def.id, scope.type, scope.id, { providerVerdicts });
+    // Evidence and its ledger entry are written as ONE unit (record.mjs). The digest goes INTO the
+    // hashed entry, so regenerating or editing the evidence afterwards no longer matches the chain.
+    recordGateRun(snapshot.root, {
+      evidence,
+      evidenceFile,
+      event: { type: 'gate', scope: { type: scope.type, id: String(scope.id) }, changeType: result.changeType, gate: result.gate, status: result.status, commit: snapshot.commit },
     });
     emit(flags, { ...result, evidence: { file: evidenceFile, inputs: (listEvidence(snapshot.root).find((e) => e.file === evidenceFile)?.evidence?.inputs) || [] } }, renderGate(result, { evidenceFile }));
     return statusExit(result.status);
@@ -331,26 +344,25 @@ const commands = {
     const results = [];
     for (const p of selected) {
       const providerVerdicts = await consultProviders(snapshot, p.def.id);
-      const { result, evidenceFile } = runGate(snapshot, p.def.id, p.scopeType, p.scopeId, { providerVerdicts });
-      appendEvent(snapshot.root, {
-        type: 'gate',
-        scope: { type: p.scopeType, id: String(p.scopeId) },
-        changeType: result.changeType,
-        gate: result.gate,
-        status: result.status,
-        evidenceSha256: evidenceFile ? sha256File(snapshot.root, evidenceFile) : null,
-        commit: snapshot.commit,
-        detail: evidenceFile || '',
+      const { result, evidence, evidenceFile } = prepareGateRun(snapshot, p.def.id, p.scopeType, p.scopeId, { providerVerdicts });
+      recordGateRun(snapshot.root, {
+        evidence,
+        evidenceFile,
+        event: { type: 'gate', scope: { type: p.scopeType, id: String(p.scopeId) }, changeType: result.changeType, gate: result.gate, status: result.status, commit: snapshot.commit },
       });
       results.push({ gate: p.def.id, scopeType: p.scopeType, scopeId: p.scopeId, status: result.status, reason: p.reason, rerunCommand: result.rerunCommand });
     }
     const skipped = plan.filter((p) => !p.run);
     const worst = results.reduce((acc, r) => (isBlocking(r.status) && !isBlocking(acc) ? r.status : acc), 'PASS');
-    const json = { full, changedFiles: changed, ran: results, skipped: skipped.map((p) => ({ gate: p.def.id, scopeId: p.scopeId, reason: p.reason })), status: worst };
+    const cross = crossBranchActivity(snapshot.root, {
+      focus: snapshot.activeWork?.scopeId ? [{ type: snapshot.activeWork.scopeType, id: snapshot.activeWork.scopeId }] : [],
+    });
+    const json = { full, changedFiles: changed, ran: results, skipped: skipped.map((p) => ({ gate: p.def.id, scopeId: p.scopeId, reason: p.reason })), status: worst, crossBranch: { checked: cross.checked, base: cross.base?.ref ?? null, overlaps: cross.overlaps } };
     const lines = [`EOS verify · ${results.length} gate(s) run, ${skipped.length} skipped`, ''];
     for (const r of results) lines.push(`  ${r.status.padEnd(15)} ${r.gate.padEnd(20)} ${String(r.scopeId).padEnd(14)} ${r.reason}`);
     if (!results.length) lines.push('  nothing to re-verify — every applicable gate has fresh evidence covering the current inputs');
-    lines.push('', `  ${skipped.length} skipped · run with --full to re-verify everything · --plan to see the selection without running it`, '', worst, '');
+    lines.push('', `  ${skipped.length} skipped · run with --full to re-verify everything · --plan to see the selection without running it`, '');
+    lines.push(...crossBranchLines(cross), worst, '');
     emit(flags, json, lines.join('\n'));
     return statusExit(worst);
   },
@@ -419,6 +431,9 @@ const commands = {
     const recent = gateEvents.slice(-20);
     const rate = (list) => (list.length ? Math.round((list.filter((e) => e.status === 'PASS').length / list.length) * 100) : null);
     const trend = { total: gateEvents.length, allTimePassRate: rate(gateEvents), recentPassRate: rate(recent), recentWindow: recent.length };
+    // Local only: this machine's suite timings, from run-tests.mjs. The enforced number is the CI
+    // baseline; this answers "is it getting slower here, and since when?".
+    const testDurations = testDurationTrend(snapshot.root);
 
     // --- remote governance: what EOS could not verify by itself
     const { providers, errors: providerErrors } = loadProviders(snapshot.root);
@@ -444,6 +459,7 @@ const commands = {
       remoteGovernance: remote,
       releases,
       trend,
+      testDurations,
       stories: snapshot.stories.map((s) => ({ id: s.id, state: scopeState(snapshot, 'story', s.id) })),
     };
 
@@ -481,6 +497,15 @@ const commands = {
     lines.push('');
     lines.push('Gate trend',
       trend.total ? `  ${trend.total} gate run(s) recorded · first-pass rate ${trend.allTimePassRate}% all time · ${trend.recentPassRate}% over the last ${trend.recentWindow}` : '  no gate has been run yet');
+    lines.push('');
+    lines.push('Test duration trend (this machine)');
+    if (!testDurations.runs) lines.push('  no local history yet — run `node .github/eos/run-tests.mjs` to start one');
+    for (const [name, d] of Object.entries(testDurations.layers)) {
+      const change = d.changePct === null
+        ? `${d.samples} run(s) so far — a trend needs 6`
+        : `${d.changePct >= 0 ? '+' : ''}${d.changePct}% vs the previous 5 runs`;
+      lines.push(`  ${name.padEnd(18)} latest ${String(d.latestMs).padStart(6)}ms · median ${String(d.recentMedianMs).padStart(6)}ms · ${change}`);
+    }
     lines.push('');
     emit(flags, json, lines.join('\n'));
     // Health REPORTS; it does not gate. Exit stays 0 unless the state source itself is broken, so
@@ -666,6 +691,70 @@ const commands = {
     if (!flags.write) lines.push('  Nothing was written. Re-run with --write to apply.', '');
     emit(flags, { pack: id, written: !!flags.write, declaration, notes: PACKS[id].notes }, lines.join('\n'));
     return EXIT.OK;
+  },
+
+  /**
+   * Policy integrity: no gate gets weaker without a reason and a second person's sign-off.
+   *
+   *   policy diff  [--against <ref>]                   every change since the base, classified
+   *   policy lock  [--against <ref>] [--write] [--reason "<why>"]
+   *   policy check [--against <ref>]                   the CI gate (default subcommand)
+   */
+  policy(snapshot, flags) {
+    const sub = flags._[1] || 'check';
+    const against = typeof flags.against === 'string' ? flags.against : null;
+    const KIND_ORDER = { WEAKENING: 0, REVIEW: 1, STRENGTHENING: 2, INFO: 3 };
+    const listChanges = (changes) => [...changes]
+      .sort((x, y) => KIND_ORDER[x.kind] - KIND_ORDER[y.kind])
+      .map((c) => `  ${c.kind.padEnd(13)} ${c.id}\n                ${c.detail}`);
+
+    if (sub === 'diff') {
+      const { base, changes, errors } = policyChanges(snapshot.root, against);
+      const lines = [`EOS policy diff · against ${base ? base.label : '(nothing to compare with)'}`, ''];
+      if (!changes.length) lines.push('  no policy change');
+      lines.push(...listChanges(changes), '', ...errors.map((e) => `  ERROR ${e}`));
+      const needing = changes.filter((c) => c.requiresAck).length;
+      if (needing) lines.push(`  ${needing} change(s) need acknowledgement: \`eos policy lock --write --reason "<why>"\`, then a second person fills in "approver".`, '');
+      emit(flags, { base, changes, errors }, lines.join('\n'));
+      return errors.length ? EXIT.ERROR : EXIT.OK;
+    }
+
+    if (sub === 'lock') {
+      const actor = process.env.EOS_ACTOR || process.env.USER || process.env.USERNAME || 'unknown';
+      const reason = typeof flags.reason === 'string' ? flags.reason : null;
+      const plan = planLock(snapshot.root, { against, reason, actor, write: !!flags.write });
+      const lines = [`EOS policy lock · against ${plan.base ? plan.base.label : '(nothing to compare with)'}`, ''];
+      lines.push(...listChanges(plan.changes.filter((c) => c.requiresAck)));
+      if (!plan.changes.some((c) => c.requiresAck)) lines.push('  no change needs acknowledgement');
+      lines.push('', `  digest  ${plan.lock.policyDigest.slice(0, 16)}…`, ...plan.errors.map((e) => `  ERROR ${e}`));
+      if (plan.refused) {
+        lines.push('', `  REFUSED — ${plan.refused}`, '');
+        emit(flags, { ...plan, written: false }, lines.join('\n'));
+        return EXIT.FAIL;
+      }
+      if (plan.drafted.length) {
+        lines.push('', `  ${plan.drafted.length} acknowledgement(s) drafted with an EMPTY approver. A second person must fill in`,
+          `  "approver" in ${POLICY_LOCK_PATH} and commit it; until then \`eos policy check\` fails.`);
+      }
+      lines.push('', plan.written ? `  written ${POLICY_LOCK_PATH}` : '  Nothing was written. Re-run with --write to apply.', '');
+      emit(flags, plan, lines.join('\n'));
+      return plan.errors.length ? EXIT.ERROR : EXIT.OK;
+    }
+
+    if (sub === 'check') {
+      const r = checkPolicy(snapshot.root, { against });
+      const lines = [`EOS policy check · against ${r.base ? r.base.label : '(nothing to compare with)'}`, ''];
+      const shown = r.changes.filter((c) => c.requiresAck);
+      lines.push(shown.length ? `  ${shown.length} change(s) needing acknowledgement, ${r.changes.length - shown.length} other change(s)` : `  ${r.changes.length} policy change(s), none weakening`);
+      for (const n of r.notes) lines.push(`  NOTE  ${n}`);
+      for (const p of r.problems) lines.push(`  ERROR ${p}`);
+      lines.push('', r.ok ? 'PASS' : 'FAIL', '');
+      emit(flags, r, lines.join('\n'));
+      return r.ok ? EXIT.OK : EXIT.FAIL;
+    }
+
+    console.log(`unknown policy subcommand "${sub}" — use diff, lock or check`);
+    return EXIT.FAIL;
   },
 
   transition(snapshot, flags) {    const scopeType = flags.scope === true || !flags.scope ? 'story' : flags.scope;
@@ -890,23 +979,19 @@ const commands = {
     const id = flags.release === true || !flags.release ? null : flags.release;
     if (!id) { console.log('verify-release requires --release <id>'); return EXIT.FAIL; }
     const providerVerdicts = await consultProviders(snapshot, 'release-ready');
-    const { result, evidenceFile } = runGate(snapshot, 'release-ready', 'release', id, { providerVerdicts });
-    const recorded = recordedGateStatus(snapshot, 'release-ready', 'release', id);
-    const boundToCandidate = !!snapshot.commit && recorded.evidence?.commit === snapshot.commit;
+    const { result, evidence, evidenceFile } = prepareGateRun(snapshot, 'release-ready', 'release', id, { providerVerdicts });
+    // Bound to the candidate when the evidence names the commit being released. Read from the
+    // prepared evidence rather than re-read from disk: it is the same object that gets written.
+    const boundToCandidate = !!snapshot.commit && evidence?.commit === snapshot.commit;
     const expired = expiredWaivers(snapshot.root);
     const status = result.status === 'PASS' && !boundToCandidate ? 'BLOCKED' : result.status;
     // The SAME event shape `check` writes. Recording a different type here left the release
     // evidence with no matching gate entry, so the very next transition rejected it as
     // "evidence without a ledger entry" — verify-release could never promote anything.
-    appendEvent(snapshot.root, {
-      type: 'gate',
-      scope: { type: 'release', id: String(id) },
-      changeType: result.changeType,
-      gate: 'release-ready',
-      status,
-      evidenceSha256: evidenceFile ? sha256File(snapshot.root, evidenceFile) : null,
-      commit: snapshot.commit,
-      detail: evidenceFile || '',
+    recordGateRun(snapshot.root, {
+      evidence,
+      evidenceFile,
+      event: { type: 'gate', scope: { type: 'release', id: String(id) }, changeType: result.changeType, gate: 'release-ready', status, commit: snapshot.commit },
     });
     appendEvent(snapshot.root, { type: 'release', scope: { type: 'release', id }, gate: 'release-ready', status, commit: snapshot.commit, detail: evidenceFile || '' });
     const lines = [renderGate(result, { evidenceFile }),
@@ -948,8 +1033,11 @@ const commands = {
     if (!waiver.riskOwner) { console.log('waive requires --risk-owner'); return EXIT.FAIL; }
     const rel = `.eos/waivers/${def.id}__${scopeType}__${String(scopeId).replace(/[^A-Za-z0-9._-]/g, '_')}.json`;
     mkdirSync(join(snapshot.root, '.eos/waivers'), { recursive: true });
-    writeFileAtomic(join(snapshot.root, rel), JSON.stringify(waiver, null, 2) + '\n');
-    appendEvent(snapshot.root, { type: 'waiver', scope: { type: scopeType, id: String(scopeId) }, gate: def.id, status: 'DRAFT', detail: rel });
+    // The draft file and its ledger entry are one unit, entry first — the same rule as a gate run.
+    withLedger(snapshot.root, ({ append }) => {
+      append({ type: 'waiver', scope: { type: scopeType, id: String(scopeId) }, gate: def.id, status: 'DRAFT', detail: rel });
+      writeFileAtomic(join(snapshot.root, rel), JSON.stringify(waiver, null, 2) + '\n');
+    });
     emit(flags, { drafted: rel, waiver, honored: false }, [
       `EOS waive · DRAFTED ${rel}`, '',
       '  This waiver is NOT in effect: "approver" is empty. EOS drafts waivers and never approves them.',
@@ -982,9 +1070,16 @@ const commands = {
 
   ledger(snapshot, flags) {
     if (flags.resolve) return resolveLedger(snapshot, flags);
-    const { events, errors } = readEvents(snapshot.root);
-    const chain = verifyChain(events, { root: snapshot.root });
+    const { events, errors, chain } = readLedgerSnapshot(snapshot.root);
     const problems = [...errors, ...chain.problems];
+    // A valid chain can still carry a history that does not follow from itself: two branches
+    // moved the same story and the merge replayed both. Not tampering — but the derived state
+    // rests on a sequence that never happened, so it is reported until it is reconciled.
+    if (!chain.problems.length) {
+      for (const c of transitionConflicts(events, snapshot.workflow)) {
+        problems.push(`${c.scope.id}: the status change at seq ${c.seq} starts from ${c.recordedFrom}, but the history was already in ${c.derived} — two branches changed it concurrently. Run \`eos ledger --resolve --write\`: it resets ${c.scope.id} to ${c.agreed} and keeps every event.`);
+      }
+    }
     const warnings = [...chain.warnings];
     if (flags.against && flags.against !== true) {
       const r = spawnSync('git', ['show', `${flags.against}:${LEDGER_PATH}`], { cwd: snapshot.root, encoding: 'utf8' });
@@ -1011,15 +1106,16 @@ const commands = {
     const scopeType = flags.scope === true || !flags.scope ? 'story' : flags.scope;
     const scopeId = flags.id;
     if (!scopeId || scopeId === true) { console.log('focus requires --scope <type> --id <id>'); return EXIT.FAIL; }
-    const full = join(snapshot.root, ACTIVE_WORK_PATH);
+    const { path, branch } = activeWorkPath(snapshot.root);
+    const full = join(snapshot.root, path);
     mkdirSync(dirname(full), { recursive: true });
     if (flags['change-type']) {
       console.log('focus does not accept --change-type: a change type selects the gate policy, so it belongs in the tracked story file, not in a gitignored local file.');
       return EXIT.FAIL;
     }
-    const body = { schemaVersion: 1, scopeType, scopeId: String(scopeId), updatedAt: new Date().toISOString() };
+    const body = { schemaVersion: 1, scopeType, scopeId: String(scopeId), ...(branch ? { branch } : {}), updatedAt: new Date().toISOString() };
     writeFileSync(full, JSON.stringify(body, null, 2) + '\n', 'utf8');
-    emit(flags, body, `EOS focus · ${scopeType}/${scopeId} (local only — ${ACTIVE_WORK_PATH} is gitignored and carries no authority)\n`);
+    emit(flags, body, `EOS focus · ${scopeType}/${scopeId}${branch ? ` on ${branch}` : ''} (local only — ${path} is gitignored and carries no authority)\n`);
     return EXIT.OK;
   },
 
@@ -1099,6 +1195,18 @@ const commands = {
     }
     const { errors: waiverErrors } = loadWaivers(snapshot.root);
     for (const e of waiverErrors) problems.push({ level: 'ERROR', detail: e });
+    // A policy edited after it was locked is exactly the drift the lock exists to catch. Doctor does
+    // not compare with a base branch (that is `eos policy check`); it only says the pin is stale.
+    const policyLock = readLock(snapshot.root);
+    for (const e of policyLock.errors) problems.push({ level: 'ERROR', detail: e });
+    if (policyLock.lock && policyLock.lock.policyDigest !== policyDigest(policySnapshot(readPolicy(snapshot.root).files))) {
+      problems.push({ level: 'ERROR', detail: `the policy changed since ${POLICY_LOCK_PATH} was written — run \`eos policy lock\` to see what changed` });
+    }
+    // A gate run that stopped between its ledger entry and its evidence. BLOCKED, not ERROR: nothing
+    // is corrupt and nobody tampered with anything — one re-run completes it.
+    const intent = readIntent(snapshot.root);
+    if (intent.present && intent.interrupted) problems.push({ level: 'BLOCKED', detail: intent.detail });
+    if (intent.present && !intent.interrupted) notes.push(intent.detail);
     // Doctor's verdict covers EOS's own wiring. Saying so matters most when it is green: a PASS
     // here has never meant "the product is tested", and on a config-only repository nothing about
     // a product is executed at all. [audit: config-only false PASS]
@@ -1122,11 +1230,16 @@ const commands = {
       });
       if (f.status === 'STALE') notes.push(`${file} is STALE: ${f.reasons[0]}`);
     }
-    const chain = verifyChain(readEvents(snapshot.root).events, { root: snapshot.root });
+    const { chain } = readLedgerSnapshot(snapshot.root);
     for (const p of chain.problems) problems.push({ level: 'ERROR', detail: `ledger: ${p}` });
     // An unverifiable ledger is BLOCKED, not a note: "PASS (1 note)" would be the same
     // absence-of-proof-as-proof that this layer exists to refuse.
     for (const w of chain.warnings) problems.push({ level: 'BLOCKED', detail: `ledger: ${w}` });
+    if (!chain.problems.length) {
+      for (const c of transitionConflicts(snapshot.events, snapshot.workflow)) {
+        problems.push({ level: 'BLOCKED', detail: `ledger: ${c.scope.id} was moved on two branches at once (seq ${c.seq} starts from ${c.recordedFrom}, the history was in ${c.derived}) — run \`eos ledger --resolve --write\`` });
+      }
+    }
 
     const lines = ['EOS doctor', ''];
     for (const n of notes) lines.push(`  NOTE    ${n}`);
@@ -1136,6 +1249,27 @@ const commands = {
     return problems.length ? (problems.some((p) => p.level === 'ERROR' && !p.detail.startsWith('ledger')) ? EXIT.BLOCKED : EXIT.BLOCKED) : EXIT.OK;
   },
 };
+
+/**
+ * One `reconcile` entry per story/release whose status history stopped following from itself.
+ *
+ * Its timestamp is placed after everything already in the ledger (not merely "now"), so a replay in
+ * timestamp order can never slide it in front of the events it settles — even with a skewed clock.
+ */
+function buildReconciles(events, workflow) {
+  const conflicts = transitionConflicts(events, workflow);
+  if (!conflicts.length) return [];
+  const latest = Math.max(Date.now(), ...events.map((e) => Date.parse(e.ts) || 0));
+  return conflicts.map((c, i) => ({
+    ts: new Date(latest + 1 + i).toISOString(),
+    type: 'reconcile',
+    scope: c.scope,
+    from: stateOf(events, workflow, c.scope.type, c.scope.id),
+    to: c.agreed,
+    actor: 'eos ledger --resolve',
+    detail: `two histories changed ${c.scope.id} concurrently: seq ${c.seq} moved it ${c.recordedFrom} → ${c.to} while the merged history was already in ${c.derived}. Reset to ${c.agreed}, the last state both agreed on; re-run its gates to move it forward.`,
+  }));
+}
 
 /**
  * Reconcile a ledger that two branches both appended to.
@@ -1164,6 +1298,22 @@ function resolveLedger(snapshot, flags) {
     const { events } = readEvents(snapshot.root);
     if (!divergence(events).diverged) {
       const chain = verifyChain(events, { root: snapshot.root });
+      const pending = buildReconciles(events, snapshot.workflow);
+      if (!chain.problems.length && pending.length) {
+        // The chain is intact, but two histories already replayed together left status changes
+        // that do not follow from each other (a ledger resolved before 1.20.0 did not check this).
+        // Nothing needs replaying; the settling entries are appended like any other event.
+        const lines = ['EOS ledger · resolve', '', `  ${pending.length} story/release status history does not follow from itself after a merge:`, ''];
+        for (const r of pending) lines.push(`  ${r.scope.id.padEnd(14)} ${r.from} → ${r.to}  (${r.detail})`);
+        if (flags.write) {
+          withLedger(snapshot.root, ({ append }) => { for (const r of pending) append(r); });
+          lines.push('', `  appended ${pending.length} reconcile entr${pending.length === 1 ? 'y' : 'ies'} — every earlier event is unchanged`, '', 'PASS', '');
+        } else {
+          lines.push('', '  Nothing was written. Re-run with --write to record the reconciliation.', '', 'PASS', '');
+        }
+        emit(flags, { resolved: !!flags.write, diverged: false, reconciled: pending.map((r) => ({ scope: r.scope, from: r.from, to: r.to })) }, lines.join('\n'));
+        return EXIT.OK;
+      }
       const lines = ['EOS ledger · resolve', '',
         chain.problems.length
           ? '  This ledger is broken, but NOT by a merge: no conflict markers and no duplicated sequence numbers.'
@@ -1176,11 +1326,18 @@ function resolveLedger(snapshot, flags) {
     sources = [events];
   }
 
-  const replayed = reconcileEvents(sources);
+  const merged = reconcileEvents(sources);
+  // Replaying makes the CHAIN valid; it does not make the history mean something. A story both
+  // branches moved now has a status change that starts from a state the merged history already
+  // left. Each such story is reset to the last state both histories agreed on, by an entry that
+  // says so — never by editing or dropping the events that disagree.
+  const reconciles = buildReconciles(merged, snapshot.workflow);
+  const replayed = reconciles.length ? reconcileEvents([merged, reconciles]) : merged;
   const before = conflicted ? common.length + ours.length + theirs.length : sources[0].length;
   const json = {
     resolved: !!flags.write, conflicted, events: replayed.length, inputEvents: before,
     ours: ours.length, theirs: theirs.length, common: common.length,
+    reconciled: reconciles.map((r) => ({ scope: r.scope, from: r.from, to: r.to })),
   };
   const lines = ['EOS ledger · resolve', '',
     conflicted
@@ -1190,6 +1347,11 @@ function resolveLedger(snapshot, flags) {
     '  Every event is kept. Timestamps, actors, gates, statuses and evidence digests are unchanged;',
     '  only seq/prevHash/hash move, because that is what giving two histories one order means.',
     ''];
+  if (reconciles.length) {
+    lines.push(`  ${reconciles.length} story/release was changed on both sides; each is reset to the last state both agreed on:`);
+    for (const r of reconciles) lines.push(`    ${r.scope.id.padEnd(14)} ${r.from} → ${r.to}`);
+    lines.push('  Re-run their gates to move them forward again — the merged code is not what either side verified.', '');
+  }
   if (flags.write) {
     writeLedger(snapshot.root, replayed);
     const check = verifyChain(readEvents(snapshot.root).events, { root: snapshot.root });

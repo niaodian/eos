@@ -7,7 +7,7 @@ import { mkdtempSync, rmSync, cpSync, writeFileSync, mkdirSync, readFileSync, rm
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { boundedSpawnSync } from '../eos/test-spawn.mjs';
 
 const HOOKS = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HOOKS, '..', '..');
@@ -35,7 +35,7 @@ function repo(mutate = () => {}) {
 }
 
 const run = (dir) => {
-  const r = spawnSync(process.execPath, [VALIDATOR], { cwd: dir, encoding: 'utf8' });
+  const r = boundedSpawnSync(process.execPath, [VALIDATOR], { cwd: dir, encoding: 'utf8' });
   return { code: r.status, out: (r.stdout || '') + (r.stderr || '') };
 };
 

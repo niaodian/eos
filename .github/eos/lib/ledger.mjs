@@ -6,7 +6,7 @@ import { createHash } from 'node:crypto';
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
-import { withLock, writeFileAtomic } from './atomic.mjs';
+import { withLock, writeFileAtomic, sleep } from './atomic.mjs';
 
 export const LEDGER_PATH = '.eos/ledger/events.jsonl';
 // A forward-only chain cannot notice that the TAIL was cut off: deleting the last lines leaves
@@ -176,7 +176,7 @@ function writeHead(root, events) {
  * ledger written before the head record existed cannot be *verified* for truncation, but it is not
  * itself evidence of tampering, so it must not brick an existing repository.
  */
-export function verifyChain(events, { root = null } = {}) {
+export function verifyChain(events, { root = null, headRecord = null } = {}) {
   const problems = [];
   const warnings = [];
   // A merged ledger is not a tampered one. Diagnose it first, so the report names the real cause
@@ -202,7 +202,9 @@ export function verifyChain(events, { root = null } = {}) {
     prevHash = e.hash;
   });
   if (root) {
-    const { present, head, error } = readHead(root);
+    // A caller that already read the head (readLedgerSnapshot reads it FIRST, as the commit point)
+    // passes it in, so the check is against the same instant as the events it was given.
+    const { present, head, error } = headRecord || readHead(root);
     if (error) problems.push(error);
     else if (!present) {
       // "Never had one" (a ledger predating this record) is a migration fact. "Had one and it is
@@ -231,29 +233,110 @@ export function verifyChain(events, { root = null } = {}) {
   return { ok: problems.length === 0, problems, warnings };
 }
 
+/** Append one event. The caller MUST hold the ledger lock (see appendEvent / withLedger). */
+function appendUnlocked(root, event) {
+  const { events, errors } = readEvents(root);
+  if (errors.length) throw new Error(errors.join('; '));
+  const prev = events.at(-1) || null;
+  const body = {
+    seq: events.length + 1,
+    ts: new Date().toISOString(),
+    actor: process.env.EOS_ACTOR || process.env.USER || process.env.USERNAME || 'unknown',
+    ...event,
+    prevHash: prev ? prev.hash : null,
+  };
+  body.hash = hashEvent(body);
+  const full = join(root, LEDGER_PATH);
+  mkdirSync(dirname(full), { recursive: true });
+  appendFileSync(full, JSON.stringify(body) + '\n', 'utf8');
+  writeHead(root, [...events, body]);
+  return body;
+}
+
 export function appendEvent(root, event) {
   // The ENTIRE read-modify-write is the critical section. `seq` and `prevHash` are derived from the
   // events already on disk, so two concurrent appenders that both read N events would both write
   // seq N+1 with the same prevHash — a forked chain that `verifyChain` reports as tampering. The
   // lock is what makes "append-only" true under concurrency rather than only in the happy path.
-  return withLock(join(root, LEDGER_LOCK_PATH), () => {
-    const { events, errors } = readEvents(root);
-    if (errors.length) throw new Error(errors.join('; '));
-    const prev = events.at(-1) || null;
-    const body = {
-      seq: events.length + 1,
-      ts: new Date().toISOString(),
-      actor: process.env.EOS_ACTOR || process.env.USER || process.env.USERNAME || 'unknown',
-      ...event,
-      prevHash: prev ? prev.hash : null,
-    };
-    body.hash = hashEvent(body);
-    const full = join(root, LEDGER_PATH);
-    mkdirSync(dirname(full), { recursive: true });
-    appendFileSync(full, JSON.stringify(body) + '\n', 'utf8');
-    writeHead(root, [...events, body]);
-    return body;
-  });
+  return withLock(join(root, LEDGER_LOCK_PATH), () => appendUnlocked(root, event));
+}
+
+/**
+ * Hold the ledger lock across several writes that only make sense together.
+ *
+ * Appending under the lock made the CHAIN safe; it did not make a gate run safe, because a gate run
+ * is two writes — the evidence file and the entry pinning its digest — and two runs could still
+ * interleave between them. Everything that pairs a file with a ledger entry goes through here, so
+ * the pair is written as one unit. The lock is not re-entrant: inside `fn`, append with the
+ * `append` it is given, never with appendEvent.
+ */
+export function withLedger(root, fn) {
+  return withLock(join(root, LEDGER_LOCK_PATH), () => fn({ append: (event) => appendUnlocked(root, event) }));
+}
+
+/**
+ * Read the events AND judge them against the head record as one consistent snapshot.
+ *
+ * A writer appends the line and then rewrites head.json, under the lock. Readers take no lock —
+ * every EOS command reads the ledger, and serialising reads behind writers would make a busy
+ * repository crawl. Reading the ledger before an append and the head after it used to read as
+ * "line(s) were removed from the end": truncation, for a ledger nobody touched (about 10% of reads
+ * under a concurrent writer, measured).
+ *
+ * The head record is therefore the COMMIT POINT. It is read first; a line beyond its count was
+ * appended by a write that has not finished. While a writer holds the lock, the ledger is judged as
+ * of that commit point — consistent by construction, no waiting, which matters on Windows where the
+ * gap between append and head update is most of every write. With no writer holding the lock, a
+ * disagreement is re-read briefly and then believed, so real truncation or a genuinely interrupted
+ * write is reported exactly as before.
+ *
+ * @returns {{events:object[], errors:string[], conflicted:boolean, chain:{ok:boolean, problems:string[], warnings:string[]}}}
+ */
+export function readLedgerSnapshot(root, { attempts = 40, pauseMs = 25, onRead = null } = {}) {
+  const headKey = (h) => (h.error ? 'error' : h.present && h.head ? `${h.head.count}:${h.head.hash}` : 'absent');
+  const lockPath = join(root, LEDGER_LOCK_PATH);
+  let last = null;
+  let quietConfirmations = 0;
+  for (let i = 0; i < attempts; i += 1) {
+    const headRecord = readHead(root);
+    // `onRead` is a TEST SEAM: it runs between the reads of one attempt, so interleavings that need a
+    // slow scheduler to happen naturally (Windows) can be reproduced deterministically anywhere.
+    onRead?.('after-head', i);
+    const read = readEvents(root);
+    const writing = existsSync(lockPath);
+    // The head is read again AFTER the lock check. If it moved, a write committed while this read was
+    // under way — the pair is unreliable, so read again. Without this, a writer could append, commit
+    // and release the lock entirely between the reads, and the reader would see "an extra line and
+    // nobody writing": an interrupted write that never happened. CI's Windows runner caught that once
+    // in hundreds of reads.
+    if (headKey(readHead(root)) !== headKey(headRecord)) { sleep(1); continue; }
+    let { events, errors } = read;
+    const committed = headRecord.present && headRecord.head ? headRecord.head.count : null;
+    if (writing && committed !== null && !read.conflicted) {
+      // A torn final line belongs to the write in progress, not to the history.
+      const lineOf = (e) => Number((/:(\d+): not valid JSON/.exec(e) || [])[1] || 0);
+      const lastLine = readFileSync(join(root, LEDGER_PATH), 'utf8').split('\n').reduce((n, l, k) => (l.trim() ? k + 1 : n), 0);
+      errors = errors.filter((e) => lineOf(e) !== lastLine);
+      if (events.length > committed) events = events.slice(0, committed);
+    }
+    const chain = read.conflicted ? { ok: false, problems: [], warnings: [] } : verifyChain(events, { root, headRecord });
+    last = { events, errors, conflicted: read.conflicted, chain };
+    const settling = chain.problems.some((p) => p.includes(LEDGER_HEAD_PATH))
+      || (!read.conflicted && errors.some((e) => /not valid JSON/.test(e)));
+    if (!settling) return last;
+    // Patience is only owed to a write that is actually happening: a head that did not move, with
+    // nobody holding the lock, confirmed three times, is real damage and is reported as such.
+    if (!writing) quietConfirmations += 1;
+    if (quietConfirmations >= 3) return last;
+    sleep(pauseMs);
+  }
+  // Every attempt saw the head move: a writer committing faster than a read completes. Report what a
+  // plain read sees rather than nothing at all — this is the one outcome patience could not settle.
+  if (!last) {
+    const read = readEvents(root);
+    return { ...read, chain: read.conflicted ? { ok: false, problems: [], warnings: [] } : verifyChain(read.events, { root }) };
+  }
+  return last;
 }
 
 /** Current state of a scope from the ledger, falling back to the machine's initial state. */
@@ -261,9 +344,48 @@ export function stateOf(events, workflow, scopeType, scopeId) {
   const machine = workflow?.stateMachines?.[scopeType];
   let state = machine ? machine.initial : null;
   for (const e of events) {
-    if (e.type === 'transition' && e.scope?.type === scopeType && e.scope?.id === scopeId && e.to) state = e.to;
+    // A `reconcile` entry is written by `ledger --resolve` when two branches moved the same scope:
+    // it sets the state both histories last agreed on, so the merged history has one meaning.
+    if ((e.type === 'transition' || e.type === 'reconcile') && e.scope?.type === scopeType && e.scope?.id === scopeId && e.to) state = e.to;
   }
   return state;
+}
+
+/**
+ * Status changes that do not follow from the history before them, and that no later `reconcile`
+ * entry has settled.
+ *
+ * Every status change records the state it started FROM. In a single history that always equals the
+ * state the ledger derives at that point; when two branches each moved the same story and the
+ * histories were replayed together, the second branch's change starts from a state the merged
+ * history has already left. The derived state then rests on a sequence that never happened.
+ *
+ * The check is deliberately about consistency, not legality: whether an edge is still allowed
+ * depends on today's workflow, and a later policy change must not make yesterday's history invalid.
+ * A repeated change that lands where the history already is (both branches moved B → C) is a
+ * harmless duplicate, not a conflict. Only story and release scopes are checked — the product state
+ * is derived live from its gates, so its recorded `from` legitimately differs.
+ *
+ * @returns {{scope:{type:string,id:string}, seq:number, recordedFrom:string, derived:string, to:string, agreed:string}[]}
+ */
+export function transitionConflicts(events, workflow, { scopeTypes = ['story', 'release'] } = {}) {
+  const states = new Map();
+  const open = new Map();
+  for (const e of events) {
+    const type = e.scope?.type;
+    if (!scopeTypes.includes(type) || (e.type !== 'transition' && e.type !== 'reconcile')) continue;
+    const key = `${type}/${e.scope.id}`;
+    const current = states.has(key) ? states.get(key) : workflow?.stateMachines?.[type]?.initial ?? null;
+    if (e.type === 'reconcile') {
+      open.delete(key);
+    } else if (e.from !== undefined && e.from !== current && e.to !== current && !open.has(key)) {
+      // The FROM of the first change that does not follow is the state the other history started
+      // from — the last state every history agreed on.
+      open.set(key, { scope: { type, id: e.scope.id }, seq: e.seq, recordedFrom: e.from, derived: current, to: e.to, agreed: e.from });
+    }
+    if (e.to) states.set(key, e.to);
+  }
+  return [...open.values()];
 }
 
 export const eventsFor = (events, scopeType, scopeId) =>

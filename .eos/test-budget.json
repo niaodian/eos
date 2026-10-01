@@ -1,8 +1,21 @@
 {
   "$schema": "./schemas/test-budget.schema.json",
   "schemaVersion": 1,
-  "description": "Test layers and their wall-clock budgets. Run with `node .github/eos/run-tests.mjs`. A layer is a set of files that run in ONE `node --test` invocation, so Node parallelises them across cores. Budgets are ~3x the observed local time: they exist to catch a genuine 2x regression, not to police variance. On a slow runner set EOS_TEST_BUDGET_SCALE instead of raising a budget, so the ratio a breach represents stays the same everywhere.",
+  "description": "Test layers and their wall-clock budgets. Run with `node .github/eos/run-tests.mjs`. A layer is a set of files that run in ONE `node --test` invocation, so Node parallelises them across cores. budgetMs is the ABSOLUTE ceiling everywhere, calibrated against the CI runner that enforces it (about 1.8x its observed time): the first budgets were set from a 16-core laptop, so on the 2-core runner audit-regression already sat at 95%. Slow creep below the ceiling is the job of the per-environment baseline (EOS_TEST_BASELINE_ENV, baselineTolerance). On a slow runner set EOS_TEST_BUDGET_SCALE instead of raising a budget, so the ratio a breach represents stays the same everywhere.",
   "defaultScale": 1,
+  "testTimeoutMs": 120000,
+  "layerTimeoutMs": 900000,
+  "coverageTimeoutMs": 1800000,
+  "baselineTolerance": 0.5,
+  "baselines": {
+    "ci-linux": {
+      "audit-regression": 29800,
+      "contract": 10200,
+      "integration": 20400,
+      "journey": 4200,
+      "unit": 7200
+    }
+  },
   "coverage": {
     "description": "Thresholds for `run-tests.mjs --coverage`. Set just below the measured figure (lines 96.9 / branches 75.8 / functions 96.3 at the time of writing) so they catch a real regression rather than chasing a round number. Enforced natively by Node 22+; on Node 20 the report still prints but the threshold is not applied, and run-tests says so rather than implying it passed.",
     "lines": 95,
@@ -19,12 +32,13 @@
   "layers": {
     "unit": {
       "description": "Pure logic and single-module behaviour. No repository fixtures beyond a temp dir.",
-      "budgetMs": 12000,
+      "budgetMs": 15000,
       "files": [
         ".github/eos/atomic.test.mjs",
         ".github/eos/migrate.test.mjs",
         ".github/eos/packs.test.mjs",
         ".github/eos/state-model.test.mjs",
+        ".github/eos/test-hygiene.test.mjs",
         ".github/eos/workspace-rule.test.mjs",
         ".github/hooks/check-doc-parity.test.mjs",
         ".github/hooks/deny-dangerous.test.mjs",
@@ -33,7 +47,7 @@
     },
     "contract": {
       "description": "Published interfaces: the CLI's JSON contract and exit codes, the provider-adapter contract, and the offline boundary that both rest on.",
-      "budgetMs": 15000,
+      "budgetMs": 20000,
       "files": [
         ".github/eos/cli.test.mjs",
         ".github/eos/adapters.test.mjs",
@@ -43,26 +57,29 @@
     },
     "integration": {
       "description": "Several modules together through real fixtures: routing decisions, gate bypasses, cross-stack quality.",
-      "budgetMs": 19000,
+      "budgetMs": 40000,
       "files": [
         ".github/eos/bypass.test.mjs",
+        ".github/eos/cross-branch.test.mjs",
         ".github/eos/incremental.test.mjs",
         ".github/eos/ledger-merge.test.mjs",
+        ".github/eos/policy.test.mjs",
         ".github/eos/router.test.mjs",
+        ".github/eos/transaction.test.mjs",
         ".github/hooks/eos-doctor.test.mjs",
         ".github/hooks/project-gate.test.mjs"
       ]
     },
     "journey": {
       "description": "The whole developer loop end to end, executed through the real CLI, offline.",
-      "budgetMs": 8000,
+      "budgetMs": 10000,
       "files": [
         ".github/eos/journey.test.mjs"
       ]
     },
     "audit-regression": {
       "description": "One executable case per audit finding. Each test performs the reported bypass, then asserts it no longer works. A failure here means an audit finding has re-opened.",
-      "budgetMs": 29000,
+      "budgetMs": 55000,
       "files": [
         ".github/eos/audit-evidence.test.mjs",
         ".github/eos/audit-gates.test.mjs",
