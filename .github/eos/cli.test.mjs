@@ -8,6 +8,7 @@ import { join } from 'node:path';
 import { project, write, run, runJson, cleanup, commitAll, REPO_ROOT, APP_PROJECT, PRD_2AC, story } from './test-support.mjs';
 import { validate } from './lib/schema.mjs';
 import { activeWorkPath } from './lib/registry.mjs';
+import { commands } from './commands/index.mjs';
 
 after(cleanup);
 
@@ -95,6 +96,23 @@ test('exit codes: an unknown command exits 3 with usage, never 0', () => {
   const { code, out } = run(project({ '.eos/project.json': APP_PROJECT }), ['frobnicate']);
   assert.equal(code, 3);
   assert.match(out, /usage/i);
+});
+
+// ---------------------------------------------------------------- command registry
+test('every documented command is registered, and every registered command is documented', () => {
+  const usage = run(REPO_ROOT, ['help']).out;
+  const documented = [...usage.matchAll(/^ {2}([a-z][a-z-]*)\b/gm)].map((m) => m[1]).filter((n) => n !== 'global');
+  assert.deepEqual([...documented].sort(), Object.keys(commands).sort());
+});
+
+test('an inherited property name is an unknown command, not something to dispatch to', () => {
+  // A plain-object registry resolved `constructor` to Object and crashed in process.exit — exit 1,
+  // which reads as a FAIL verdict rather than a usage error.
+  for (const name of ['constructor', 'toString', '__proto__', 'hasOwnProperty']) {
+    const { code, out } = run(REPO_ROOT, [name]);
+    assert.equal(code, 3, `${name}\n${out}`);
+    assert.ok(out.includes(`unknown command "${name}"`), out);
+  }
 });
 
 // ---------------------------------------------------------------- explain

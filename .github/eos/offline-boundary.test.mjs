@@ -1,7 +1,8 @@
 // The offline boundary — enforced, not promised.
 //
 // EOS's distinguishing claim is that a developer can run the entire governance loop with no network
-// and no account. That claim is true today: nothing under `.github/eos/lib/` or `eos.mjs` can reach
+// and no account. That claim is true today: nothing under `.github/eos/lib/`, `.github/eos/commands/`
+// or `eos.mjs` can reach
 // the network. But "true today" is not a property — it is a coincidence that survives only until
 // someone adds a convenient `fetch` in a hurry.
 //
@@ -20,12 +21,17 @@
 //   node --test .github/eos/offline-boundary.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { REPO_ROOT } from './test-support.mjs';
 
-/** EOS Core: the engine the whole guarantee rests on. */
-const CORE = ['.github/eos/lib', '.github/eos/eos.mjs'];
+/** EOS Core: the engine the whole guarantee rests on — the libraries, the command handlers, the entry. */
+const CORE = ['.github/eos/lib', '.github/eos/commands', '.github/eos/eos.mjs'];
+
+test('every EOS Core location exists — moving code cannot silently take it out of the boundary', () => {
+  // coreFiles() skips a missing entry, so a renamed directory would otherwise just stop being scanned.
+  for (const entry of CORE) assert.ok(existsSync(join(REPO_ROOT, entry)), `${entry} is listed as EOS Core but does not exist`);
+});
 
 /**
  * Where an adapter is allowed to live once one exists. Nothing here yet — the directory is named so
