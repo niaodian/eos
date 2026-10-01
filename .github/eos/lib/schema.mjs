@@ -60,18 +60,19 @@ function check(schema, data, path, rootSchema, errors) {
 
   if (typeof data === 'string') {
     if (schema.maxLength !== undefined && data.length > schema.maxLength) {
-      errors.push(`${path}: string longer than ${schema.maxLength}`);
+      errors.push(`${path}: is ${data.length} character(s), longer than the maximum ${schema.maxLength}`);
     }
     if (schema.minLength !== undefined && data.length < schema.minLength) {
-      errors.push(`${path}: string shorter than ${schema.minLength}`);
+      errors.push(`${path}: is ${data.length} character(s), shorter than the minimum ${schema.minLength}`);
     }
     if (schema.pattern && !new RegExp(schema.pattern).test(data)) {
       errors.push(`${path}: ${JSON.stringify(data)} does not match /${schema.pattern}/`);
     }
   }
   if (typeof data === 'number') {
-    if (schema.minimum !== undefined && data < schema.minimum) errors.push(`${path}: < minimum ${schema.minimum}`);
-    if (schema.maximum !== undefined && data > schema.maximum) errors.push(`${path}: > maximum ${schema.maximum}`);
+    // The value AND the bound: "< minimum 1" alone leaves the reader to go and find what was there.
+    if (schema.minimum !== undefined && data < schema.minimum) errors.push(`${path}: ${data} is below the minimum ${schema.minimum}`);
+    if (schema.maximum !== undefined && data > schema.maximum) errors.push(`${path}: ${data} is above the maximum ${schema.maximum}`);
   }
   if (Array.isArray(data)) {
     if (schema.uniqueItems === true) {
