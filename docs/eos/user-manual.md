@@ -19,7 +19,7 @@
 | Want to look up a slash command / agent / rule | [Chapter 7 Complete reference](#chapter-7-complete-reference-quick-reference) |
 | Configuration is broken / Agent is not working as expected | [Chapter 9 Failure localization](#chapter-9-failure-localization-and-troubleshooting) |
 | Want to move this system to another project/team | [Chapter 10 Cross-project reuse and distribution](#chapter-10-cross-project-reuse-and-distribution) |
-| Upgrading to `eos-2.0.0`, choosing a governance track, or signing releases | [§10.5 Upgrading](#105-upgrading-from-eos-122x-to-eos-200) · [§10.6 Tracks and signed releases](#106-governance-tracks-signed-releases-and-central-policy) |
+| Upgrading to `eos-2.0.0`, choosing a governance track, or signing releases | [§10.5 Upgrading](#105-upgrading-from-eos-122x-to-eos-200) · [§10.6 Tracks and signed releases](#106-governance-tracks-signed-releases-and-central-policy) · [§10.7 The 2.0.1 security patch](#107-upgrading-from-eos-200-to-eos-201) |
 
 ---
 
@@ -1440,6 +1440,30 @@ the JSON reports of many repositories. Every report is validated against its pub
 
 See [ADR-012](../adr/012-supply-chain-trust-model.md) and
 [ADR-013](../adr/013-central-policy-distribution.md).
+
+## 10.7 Upgrading from `eos-2.0.0` to `eos-2.0.1`
+
+A security patch for the two secret guards: the PreToolUse hook (`deny-dangerous.js`) and the scanner
+(`secret-scan.mjs`, run by CI and by the release-ready `secret-scan` check). The policy, the gates, the CLI,
+evidence, the ledger and waivers do not change, so there is nothing to re-lock or re-verify. The scanner
+now reads lines it used to skip, though, so a project that passed on 2.0.0 can fail on 2.0.1 — and when it
+does, a hardcoded value was hiding there.
+
+| What changed | What you will see | What to do |
+|---|---|---|
+| **One rule set for both guards** — `.github/hooks/lib/secret-rules.mjs` | The hook and the scanner agree on what is a secret and what is a placeholder; before, they had drifted apart | Nothing — it arrives with `.github/hooks/` |
+| **Lines that read an environment variable are scanned** | A literal fallback is reported: `process.env.X \|\| "<LITERAL>"`, `os.environ.get("X", "<LITERAL>")`, `env("X", "<LITERAL>")`, `${X:-<LITERAL>}`, and a key on a line whose comment names an env var | Remove the literal; keep the value in the environment or a secret store. A development default must be an obvious placeholder (`change-me`, `<TOKEN>`) |
+| **More credential forms and key formats** | JSON keys (`"password": "<VALUE>"`), Django's `SECRET_KEY`, unquoted `key=value` in `.properties` / `.ini` / `.cfg` / `.conf`, project-scoped OpenAI keys, Anthropic keys, fine-grained GitHub tokens, Stripe live keys and encrypted or PGP private keys | The same: move the value out, or replace it with a placeholder |
+| **The hook reads each field of a tool call as itself** | A double-quoted credential is denied (it used to slip through as an escaped `\"`); two lines of a file are no longer read as one command; documentation may name a command; the old text an edit replaces is not judged; a payload it cannot parse is scanned instead of allowed | Nothing. An agent that was blocked from writing documentation that merely mentions a command is no longer blocked |
+| **An obvious placeholder is not a secret for the hook either** | `.env.example` values such as `change-me` or `<TOKEN>` are no longer denied | Nothing |
+
+**Upgrade steps**
+
+```sh
+# 1. Take the new template's .github/hooks/ (deny-dangerous.js, secret-scan.mjs and lib/secret-rules.mjs)
+# 2. Scan, and move every reported value out of the code
+node .github/hooks/secret-scan.mjs
+```
 
 ---
 

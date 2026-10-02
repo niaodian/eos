@@ -24,7 +24,7 @@
 | 想查某个斜杠命令 / agent / 规则 | [第 7 章 完整参考](#第-7-章-完整参考（速查）) |
 | 配置坏了 / Agent 不按预期工作 | [第 9 章 故障定位](#第-9-章-故障定位与排错) |
 | 想把这套搬到别的项目/团队 | [第 10 章 跨项目复用与分发](#第-10-章-跨项目复用与分发) |
-| 升级到 `eos-2.0.0`、选择治理轨道或为发布签名 | [§10.5 升级](#105-从-eos-122x-升级到-eos-200) · [§10.6 轨道与签名发布](#106-治理轨道、签名发布与中心策略) |
+| 升级到 `eos-2.0.0`、选择治理轨道或为发布签名 | [§10.5 升级](#105-从-eos-122x-升级到-eos-200) · [§10.6 轨道与签名发布](#106-治理轨道、签名发布与中心策略) · [§10.7 2.0.1 安全补丁](#107-从-eos-200-升级到-eos-201) |
 
 ---
 
@@ -1454,6 +1454,29 @@ node .github/eos/eos.mjs report --org team-a.json team-b.json --format markdown
 
 见 [ADR-012](../adr/012-supply-chain-trust-model.md) 与
 [ADR-013](../adr/013-central-policy-distribution.md)。
+
+## 10.7 从 `eos-2.0.0` 升级到 `eos-2.0.1`
+
+这是针对两道密钥防线的安全补丁：PreToolUse 钩子（`deny-dangerous.js`）与扫描器（`secret-scan.mjs`，
+由 CI 和发布门禁 release-ready 的 `secret-scan` 检查调用）。策略、门禁、CLI、证据、账本与豁免都没有变化，
+因此无需重新锁定，也无需重新验证。但扫描器现在会读取它过去跳过的行，所以在 2.0.0 上通过的项目可能在
+2.0.1 上失败——一旦失败，就说明那里藏着一个硬编码的值。
+
+| 变化 | 你会看到什么 | 你需要做什么 |
+|---|---|---|
+| **两道防线共用一套规则** —— `.github/hooks/lib/secret-rules.mjs` | 钩子与扫描器对"什么是密钥、什么是占位符"的判断一致；此前两者已各自漂移 | 无需操作——它随 `.github/hooks/` 一起到来 |
+| **读取环境变量的行也会被扫描** | 字面量回退会被报告：`process.env.X \|\| "<LITERAL>"`、`os.environ.get("X", "<LITERAL>")`、`env("X", "<LITERAL>")`、`${X:-<LITERAL>}`，以及注释里提到环境变量的那一行上的密钥 | 删除字面量，把值放在环境变量或密钥管理服务里。开发用的默认值必须是明显的占位符（`change-me`、`<TOKEN>`） |
+| **更多凭据写法与密钥格式** | JSON 键（`"password": "<VALUE>"`）、Django 的 `SECRET_KEY`、`.properties` / `.ini` / `.cfg` / `.conf` 中不带引号的 `key=value`、项目级 OpenAI 密钥、Anthropic 密钥、细粒度 GitHub 令牌、Stripe live 密钥，以及加密或 PGP 私钥 | 同上：把值移出代码，或换成占位符 |
+| **钩子逐个字段读取工具调用** | 双引号写的凭据会被拦截（过去它被转义成 `\"` 而漏过）；文件里的两行不再被当成一条命令；文档可以提到命令；编辑时被替换掉的旧内容不再参与判断；无法解析的负载会被扫描，而不是直接放行 | 无需操作。过去 agent 写入仅仅提到某条命令的文档会被拦截，现在不会了 |
+| **明显的占位符对钩子也不再算密钥** | `.env.example` 中的 `change-me`、`<TOKEN>` 之类的值不再被拦截 | 无需操作 |
+
+**升级步骤**
+
+```sh
+# 1. 采用新模板的 .github/hooks/（deny-dangerous.js、secret-scan.mjs 与 lib/secret-rules.mjs）
+# 2. 扫描，并把每个被报告的值移出代码
+node .github/hooks/secret-scan.mjs
+```
 
 ---
 
