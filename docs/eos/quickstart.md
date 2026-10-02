@@ -47,7 +47,7 @@ core flow (hooks, validators, tests are all Node, and paths are normalized cross
 ## Day-1 (copy-ready — the same sequence as the manual, §3.4)
 
 ```sh
-npx degit niaodian/eos#eos-2.0.0 my-new-app && cd my-new-app
+npx degit niaodian/eos#eos-2.0.1 my-new-app && cd my-new-app
 git init && git add -A && git commit -q -m "chore: scaffold from eos"
 node .github/hooks/validate-config.mjs        # expect PASS
 node .github/eos/eos.mjs init config-only --write   # declare it: no code yet (or init <pack>; --track regulated)

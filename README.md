@@ -73,7 +73,7 @@ You need Node.js 20.10+ and Git. VS Code with GitHub Copilot is optional — the
 
 ```bash
 # 1. Start from a pinned release and make it your repository
-npx degit niaodian/eos#eos-2.0.0 my-app && cd my-app && git init
+npx degit niaodian/eos#eos-2.0.1 my-app && cd my-app && git init
 
 # 2. Declare the project — no code yet, so the stack is decided at architecture time
 npx --offline eos init config-only --write        # add --track regulated for the strict track
@@ -153,8 +153,8 @@ EOS releases are built and attested in GitHub Actions, the way EOS asks your rel
 yourself before you adopt it:
 
 ```bash
-gh release download eos-2.0.0 --repo niaodian/eos --pattern 'eos-2.0.0.tar.gz'
-gh attestation verify eos-2.0.0.tar.gz --repo niaodian/eos
+gh release download eos-2.0.1 --repo niaodian/eos --pattern 'eos-2.0.1.tar.gz'
+gh attestation verify eos-2.0.1.tar.gz --repo niaodian/eos
 ```
 
 Each release also ships its SBOM and a `SHA256SUMS` file.
