@@ -119,9 +119,10 @@
 These are **not** recoverable by any action you take; they are the template's inherent ceiling under a
 profile-neutral / local-first premise, and the audit disclosed them faithfully:
 
-- **Hooks are Preview · per-machine · fail-open on parse error · not invoked by CI** — local guardrails are a
+- **Hooks are Preview · per-machine · fail-open on an internal error · not invoked by CI** — local guardrails are a
   "speed bump", not authority; authority is correctly relocated to the CI hard gates + human review
-  (see Appendix D.4).
+  (see Appendix D.4). Since eos-2.0.1 a payload the hook cannot parse is checked as plain text with every
+  rule instead of being let through; only a failure of the hook itself still opens the barrier.
 - **The denylist is a finite enumerated blacklist** — the real floor is `autoApprove:false` (deny-by-default);
   the denylist is only defense-in-depth.
 - **`bmad-*` user-level, not pinned** — a cross-machine reproducibility gap, the inherent cost of reuse-first
@@ -134,7 +135,7 @@ still-in-preview official features" premise, and each one has a harder safety ne
 
 | What you see | Plain-words translation | Why it isn't scary |
 |---|---|---|
-| Hooks are Preview · fail-open on parse error | That "automatic speed bump" at the door is beta; on input it can't parse it **lifts the barrier and lets you through** rather than locking you out | It's only a speed bump, not a turnstile — what actually stops danger is items 1/3/4 of the "safety net" below |
+| Hooks are Preview · fail-open on an internal error | That "automatic speed bump" at the door is beta; if the speed bump itself breaks, it **lifts the barrier and lets you through** rather than locking you out (input it merely can't parse is still checked as plain text) | It's only a speed bump, not a turnstile — what actually stops danger is items 1/3/4 of the "safety net" below |
 | Denylist is finite / incomplete | The guard's "dangerous-command list" is inherently incomplete (`shred`, `git clean -fdx`, etc. aren't all listed) | The real floor is that **by default every command needs one click of your approval** (`autoApprove:false`); the list is just an extra automatic helper |
 | quality runs in full every time | Every file edit auto-runs a check, a bit slow (already slimmed from "full test suite" to **just the fast checks `lint`+`typecheck`**) | It **only advises, never interrupts you** (always exit 0); the full test suite is run by the cloud CI authority, so correctness is unaffected |
 | `bmad-*` not pinned | The bmad skills installed on your machine aren't version-locked; another computer may have different versions | Affects "cross-machine identical", not single-machine correct operation; a team can standardize the version in `docs/` |

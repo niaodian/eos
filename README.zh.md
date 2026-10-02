@@ -70,7 +70,7 @@ GitHub Copilot 里用，或在任意终端里用，不需要服务、不需要�
 
 ```bash
 # 1. 从一个固定的发布版本开始，并把它变成你的仓库
-npx degit niaodian/eos#eos-2.0.0 my-app && cd my-app && git init
+npx degit niaodian/eos#eos-2.0.1 my-app && cd my-app && git init
 
 # 2. 声明项目 —— 还没有代码，技术栈留到架构阶段再定
 npx --offline eos init config-only --write        # 想走严格轨道就加上 --track regulated
@@ -146,8 +146,8 @@ EOS 的发布在 GitHub Actions 中构建并出具证明 —— 正是 EOS 要�
 你可以亲自核验：
 
 ```bash
-gh release download eos-2.0.0 --repo niaodian/eos --pattern 'eos-2.0.0.tar.gz'
-gh attestation verify eos-2.0.0.tar.gz --repo niaodian/eos
+gh release download eos-2.0.1 --repo niaodian/eos --pattern 'eos-2.0.1.tar.gz'
+gh attestation verify eos-2.0.1.tar.gz --repo niaodian/eos
 ```
 
 每个发布还附带它的 SBOM 和一个 `SHA256SUMS` 文件。
@@ -170,6 +170,7 @@ docs/               你的规格与 ADR；docs/eos/ 是 EOS 手册（中文版�
 - [快速开始](docs/zh/quickstart.md) —— 前置条件与你的第一天。
 - [用户手册](docs/zh/user-manual.md) —— 从想法到上线再到迭代，含分步的 SaaS 与 Agentic 路线。
 - [升级到 eos-2.0.0](docs/zh/user-manual.md#105-从-eos-122x-升级到-eos-200) —— 改变了什么、你需要做什么。
+- [升级到 eos-2.0.1](docs/zh/user-manual.md#107-从-eos-200-升级到-eos-201) —— 密钥检测安全补丁。
 - [工作流契约](docs/zh/developer-experience.md) —— CLI、退出码、JSON 与诊断。
 - [技术栈预设与轨道](docs/zh/stack-presets.md) —— 所有受支持的技术栈，以及如何选择轨道。
 - [设计原理](docs/zh/blueprint.md) 与 [架构决策记录](docs/adr/)。

@@ -5,31 +5,20 @@
 //   node .github/hooks/secret-scan.mjs
 // If `gitleaks` is on PATH it ALSO runs a deeper scan (optional enhancement — never required;
 // absence degrades gracefully to the built-in patterns). Exit 1 on any finding. Matches redacted.
+// The rules are ./lib/secret-rules.mjs, shared with the PreToolUse hook. The import is static on
+// purpose: this scanner is an authority (CI, and the release-ready `secret-scan` check), so a
+// missing rule module must fail the run, never quietly scan nothing.
 import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 import { join, extname, relative } from 'node:path';
+import { findSecret, isConfigFile, redact } from './lib/secret-rules.mjs';
 
 const root = process.cwd();
 const findings = [];
 
-// High-signal secret patterns (kept tight to avoid false positives).
-const PATTERNS = [
-  ['OpenAI-style key', /sk-[A-Za-z0-9]{16,}/],
-  ['AWS access key id', /AKIA[0-9A-Z]{16}/],
-  ['GitHub token', /gh[pousr]_[A-Za-z0-9]{20,}/],
-  ['Google API key', /AIza[0-9A-Za-z_\-]{35}/],
-  ['Slack token', /xox[baprs]-[A-Za-z0-9-]{10,}/],
-  ['private key block', /-----BEGIN\s+(RSA|EC|OPENSSH|DSA|PRIVATE)\s+(PRIVATE\s+)?KEY-----/],
-  ['hardcoded credential', /(?:password|passwd|secret|api[_-]?key|access[_-]?token|client[_-]?secret)\s*[:=]\s*["']([^"'${}\n]{6,})["']/i],
-];
-// Lines that merely READ an env var are code, not a literal secret — skip the whole line.
-const ENV_REF = /(process\.env|os\.environ|import\.meta\.env|System\.getenv|getenv\(|ENV\[)/i;
-// A matched VALUE that is itself an obvious placeholder — skip only that match (not the whole line,
-// so a real secret sharing a line with a `# example` comment is still caught). [audit D4]
-// Strong markers (${...}, <UPPER>, example, placeholder…) match as substrings; generic words that
-// could appear INSIDE a real secret (xxx/dummy/sample/redacted/replace/todo) are word-bounded to
-// shrink the false-negative surface. Residual heuristic gap is backstopped by opt-in gitleaks. [round-2 N3]
-const PLACEHOLDER = /\$\{|<[A-Z_]+>|example|placeholder|change[_-]?me|your[_-]|\*{3,}|\b(?:x{3,}|dummy|sample|redacted|replace|todo)\b/i;
+// The guards' own sources hold the patterns themselves, so they are exempt — by exact path, so a
+// project file that merely shares one of these names is still scanned.
+const SELF = new Set(['.github/hooks/secret-scan.mjs', '.github/hooks/deny-dangerous.js', '.github/hooks/lib/secret-rules.mjs']);
 
 const TEXT_EXT = new Set(['.js', '.mjs', '.cjs', '.ts', '.tsx', '.jsx', '.py', '.go', '.java', '.rs', '.cs', '.rb', '.php', '.sh', '.bash', '.zsh', '.ps1', '.psm1', '.env', '.json', '.yaml', '.yml', '.toml', '.ini', '.conf', '.cfg', '.tf', '.tfvars', '.hcl', '.xml', '.gradle', '.md', '.txt', '.sql', '.properties']);
 // Secret-bearing files with no (or an unusual) extension — matched by exact basename. [audit D3]
@@ -64,21 +53,16 @@ for (const rel of listFiles()) {
   const ext = extname(rel).toLowerCase();
   const base = rel.split('/').pop();
   if (!TEXT_EXT.has(ext) && !TEXT_NAMES.has(base)) continue;
-  if (rel.includes('/eval-starter/') || base === 'secret-scan.mjs' || base === 'deny-dangerous.js') continue; // self / examples with placeholder patterns
+  if (rel.includes('/eval-starter/') || SELF.has(rel)) continue; // self / examples with placeholder patterns
   const full = join(root, rel);
   let txt;
   try { if (statSync(full).size > 512 * 1024) continue; txt = readFileSync(full, 'utf8'); } catch { continue; }
+  const configFile = isConfigFile(rel);
+  // Every line is read. Before 2.0.1 a line that mentioned an environment variable was skipped
+  // whole, which hid exactly the literal fallback (`process.env.X || "<LITERAL>"`) that leaks.
   txt.split('\n').forEach((line, i) => {
-    if (ENV_REF.test(line)) return; // a line that reads an env var isn't a literal secret
-    for (const [kind, re] of PATTERNS) {
-      const m = line.match(re);
-      if (!m) continue;
-      const hit = m[1] || m[0];           // capture group = the value (credential pattern); else whole match
-      if (PLACEHOLDER.test(hit)) continue; // the matched value itself is an obvious placeholder
-      const red = hit.length > 8 ? hit.slice(0, 4) + '***' + hit.slice(-2) : '***';
-      findings.push({ file: rel, line: i + 1, kind, sample: red });
-      break;
-    }
+    const hit = findSecret(line, { configFile });
+    if (hit) findings.push({ file: rel, line: i + 1, kind: hit.kind, sample: redact(hit.value) });
   });
 }
 
