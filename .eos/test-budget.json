@@ -44,6 +44,7 @@
         ".github/eos/workspace-rule.test.mjs",
         ".github/hooks/check-doc-parity.test.mjs",
         ".github/hooks/deny-dangerous.test.mjs",
+        ".github/hooks/secret-rules.test.mjs",
         ".github/hooks/spec-align.test.mjs"
       ]
     },
@@ -93,7 +94,8 @@
         ".github/eos/audit-gates.test.mjs",
         ".github/eos/audit-release.test.mjs",
         ".github/eos/audit-review.test.mjs",
-        ".github/eos/audit-robustness.test.mjs"
+        ".github/eos/audit-robustness.test.mjs",
+        ".github/eos/audit-secrets.test.mjs"
       ]
     }
   }
