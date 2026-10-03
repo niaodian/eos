@@ -37,6 +37,7 @@
         ".github/eos/alignment.test.mjs",
         ".github/eos/release-workflow.test.mjs",
         ".github/eos/atomic.test.mjs",
+        ".github/eos/ci-workflow.test.mjs",
         ".github/eos/gate-registry.test.mjs",
         ".github/eos/junit.test.mjs",
         ".github/eos/migrate.test.mjs",
@@ -67,6 +68,7 @@
       "description": "Several modules together through real fixtures: routing decisions, gate bypasses, cross-stack quality.",
       "budgetMs": 95000,
       "files": [
+        ".github/eos/adopter-ci.test.mjs",
         ".github/eos/agent-platforms.test.mjs",
         ".github/eos/brownfield.test.mjs",
         ".github/eos/bypass.test.mjs",

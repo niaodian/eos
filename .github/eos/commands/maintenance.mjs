@@ -12,7 +12,7 @@ import { readLedgerSnapshot, transitionConflicts } from '../lib/ledger.mjs';
 import { listEvidence, evidenceFreshness, validateEvidenceShape } from '../lib/evidence.mjs';
 import { syncWorkspaceRule } from '../lib/workspace-rule.mjs';
 import { generateDocs } from '../lib/docgen.mjs';
-import { policyChanges, planLock, checkPolicy, readLock, readPolicy, policySnapshot, policyDigest, POLICY_LOCK_PATH, UPSTREAM_PATH, buildBaseline, baselineDigest, readVendored } from '../lib/policy.mjs';
+import { policyChanges, planLock, checkPolicy, readLock, readPolicy, policySnapshot, policyDigest, POLICY_LOCK_PATH, UPSTREAM_PATH, buildBaseline, baselineDigest, readVendored, baselineLock } from '../lib/policy.mjs';
 import { planMigration, applyMigration } from '../lib/migrate.mjs';
 import { buildSbom, sbomFreshness, sbomDigest, SBOM_PATH } from '../lib/sbom.mjs';
 import { PACKS, packDeclaration, packIds } from '../lib/packs.mjs';
@@ -90,6 +90,41 @@ function currentDeclaration(root) {
 
 const PROJECT_PATH = '.eos/project.json';
 const describe = (d) => `${d.projectType} · ${(d.stacks || []).join(', ') || 'no stack'} · ${trackOf(d).title} track (${d.workflowProfile || 'standard-product'})`;
+
+/**
+ * What a declaration write does to the two files derived from the declaration (ADR-022).
+ *
+ * The policy lock: a template copy's lock describes EOS's own policy, so the first declaration starts
+ * this project's — a digest, nothing acknowledged. A project that has declared itself keeps its lock:
+ * re-declaring is a policy change like any other, recorded with `eos policy lock` and, when it weakens
+ * anything, a second person.
+ *
+ * The SBOM: it lists what the declared stacks resolve to, so a declaration that changes the stacks
+ * leaves it describing something else. It is regenerated when, and only when, it no longer describes
+ * the tree — a bill of materials needs no approval, and `sbom --check` would fail CI otherwise.
+ */
+function derivedFiles(snapshot, { declaration, firstDeclaration, write }) {
+  const rows = [];
+  const notes = [];
+  if (firstDeclaration) {
+    const r = baselineLock(snapshot.root, { project: declaration, write });
+    if (r.errors.length) notes.push(...r.errors.map((e) => `${POLICY_LOCK_PATH} not written: ${e}`));
+    else rows.push({ path: POLICY_LOCK_PATH, action: write ? 'written' : 'would write', why: 'this project\'s policy baseline — the template\'s lock described EOS\'s' });
+  }
+  const next = { ...snapshot, project: declaration };
+  if (sbomFreshness(next).status !== 'FRESH') {
+    if (write) writeFileAtomic(join(snapshot.root, SBOM_PATH), `${JSON.stringify(buildSbom(next).sbom, null, 2)}\n`);
+    rows.push({ path: SBOM_PATH, action: write ? 'written' : 'would write', why: 'the bill of materials of the declared stacks' });
+  }
+  if (write && firstDeclaration && !notes.length) {
+    // The baseline approves nothing. A change the base still holds against this one — a gate or a
+    // profile weakened against the template — needs a second person: say so now, not in the first CI run.
+    const { base, changes } = policyChanges(snapshot.root);
+    const pending = changes.filter((c) => c.requiresAck);
+    if (pending.length) notes.push(`${pending.length} policy change(s) against ${base?.label || 'the base'} still need a reason and a second person — \`${CLI} policy diff\` lists them`);
+  }
+  return { rows, notes };
+}
 
 /**
  *   eos init                                   what is declared, the tracks, the packs, the local files
@@ -183,8 +218,11 @@ function declareProject(snapshot, flags, verb) {
   }
   const full = join(snapshot.root, PROJECT_PATH);
   if (flags.write) { mkdirSync(dirname(full), { recursive: true }); writeFileAtomic(full, `${JSON.stringify(declaration, null, 2)}\n`); }
+  const derived = derivedFiles(snapshot, { declaration, firstDeclaration: state === 'template', write: !!flags.write });
   const files = verb === 'init' ? localFiles(snapshot.root, !!flags.write) : [];
-  lines.push(`  ${flags.write ? 'written' : 'would write'}  ${PROJECT_PATH}${state === 'template' ? '  (replaces the EOS template\'s own declaration)' : ''}`, '',
+  lines.push(`  ${flags.write ? 'written' : 'would write'}  ${PROJECT_PATH}${state === 'template' ? '  (replaces the EOS template\'s own declaration)' : ''}`,
+    ...derived.rows.map((r) => `  ${r.action}  ${r.path}  (${r.why})`),
+    ...derived.notes.map((n) => `  NOTE  ${n}`), '',
     `  projectType      ${declaration.projectType}`,
     `  stacks           ${declaration.stacks.join(', ')}`,
     `  paradigms        ${declaration.productParadigms.join(', ')}`,
@@ -194,15 +232,23 @@ function declareProject(snapshot, flags, verb) {
   for (const r of files) lines.push(`  ${r.action.padEnd(12)} ${r.path}`);
   if (files.length) lines.push('');
   if (PACKS[packId].notes.length) { lines.push('Before you rely on this'); for (const n of PACKS[packId].notes) lines.push(`  · ${n}`); lines.push(''); }
+  if (state === 'declared') {
+    lines.push('Policy', `  The declaration is part of the policy: ${CLI} policy lock shows what this changes, --write records it.`,
+      '  A weakening also needs --reason and a second person — re-declaring never resets the lock (ADR-022).', '');
+  }
+  const json = { pack: packId, track: chosen.name, brownfield, written: !!flags.write, replaced: state, declaration, notes: PACKS[packId].notes, localFiles: files,
+    derivedFiles: derived.rows.map(({ path, action }) => ({ path, action })), policyNotes: derived.notes };
   if (declaration.projectType === 'config-only') {
     lines.push('Next', `  1. ${CLI} next                 (start the guided loop)`,
       `  2. When code lands: ${CLI} init <pack> --write — this track carries over`, '');
     if (!flags.write) lines.push('  Nothing was written. Re-run with --write to apply.', '');
-    emit(flags, { pack: packId, track: chosen.name, brownfield, written: !!flags.write, replaced: state, declaration, notes: PACKS[packId].notes, localFiles: files }, lines.join('\n'));
+    emit(flags, json, lines.join('\n'));
     return EXIT.OK;
   }
   lines.push('Next',
     '  1. Replace the commands above with what CI actually runs — an unrunnable command fails closed.',
+    ...(state === 'template' ? [`     Edit them before you commit this declaration, then ${CLI} policy lock --write — until`,
+      '     it is committed it is the first declaration, and nothing in it needs approving.'] : []),
     `  2. ${CLI} stack sync --write   (put the stack in the always-on rule)`);
   if (brownfield) {
     lines.push(`  3. ${CLI} next                 (brownfield: it asks for the as-is documentation — bmad-document-project → docs/index.md — then the first story)`);
@@ -215,7 +261,7 @@ function declareProject(snapshot, flags, verb) {
   }
   lines.push('');
   if (!flags.write) lines.push('  Nothing was written. Re-run with --write to apply.', '');
-  emit(flags, { pack: packId, track: chosen.name, brownfield, written: !!flags.write, replaced: state, declaration, notes: PACKS[packId].notes, localFiles: files }, lines.join('\n'));
+  emit(flags, json, lines.join('\n'));
   return EXIT.OK;
 }
 
@@ -546,6 +592,7 @@ export const maintenanceCommands = {
       const lines = [`EOS sbom · ${fresh.status}`, ''];
       for (const r of fresh.reasons) lines.push(`  ${r}`);
       if (fresh.status === 'FRESH') lines.push(`  ${SBOM_PATH} describes the current tree (${sbom.components.length} component(s))`);
+      else if (fresh.status === 'STALE') lines.push(`  Regenerate it: ${CLI} sbom --write`);
       lines.push('', fresh.status === 'FRESH' ? 'PASS' : 'FAIL', '');
       emit(flags, json, lines.join('\n'));
       return fresh.status === 'FRESH' ? EXIT.OK : EXIT.FAIL;

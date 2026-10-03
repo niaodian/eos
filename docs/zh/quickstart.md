@@ -75,10 +75,11 @@ EOS 本身从不调用任何模型，也不需要任何 API key。每一行都�
 ## Day-1（可直接复制——与用户手册 §3.4 完全一致的序列）
 
 ```sh
-npx degit niaodian/eos#eos-2.4.0 my-new-app && cd my-new-app
+npx degit niaodian/eos#eos-2.5.0 my-new-app && cd my-new-app
 git init && git add -A && git commit -q -m "chore: scaffold from eos"
 node .github/hooks/validate-config.mjs        # 期望 PASS
 node .github/eos/eos.mjs init config-only --write   # 声明项目：还没有代码（或 init <pack>；--track regulated）
+git add -A && git commit -q -m "chore: declare the project"   # 连同本项目的策略锁与 SBOM
 code .                                        # 必须在项目目录*内部*执行——见下方警告
 ```
 
@@ -99,6 +100,10 @@ code .                                        # 必须在项目目录*内部*执
 gh repo create my-new-app --private --source=. --remote=origin --push
 ```
 
+**你的 CI 运行什么。** `eos-ci.yml` 随模板一起复制过来。项目声明之后，它运行治理门禁（配置、密钥、SBOM、
+账本、策略锁、doctor）以及你在声明中写明的命令。EOS 自己的测试套件、覆盖率作业与跨平台矩阵测试的是 EOS，
+因此会被跳过（见[手册 §8.4](user-manual.md#84-你的仓库里-ci-运行什么)）。分支保护中只把 `verify` 设为必需检查。
+
 然后，在 **Copilot Chat** 里：
 
 1. **`/eos-init`**——一次性硬化引导：回答语言、分支保护、CODEOWNERS、审批基线，
@@ -111,6 +116,10 @@ gh repo create my-new-app --private --source=. --remote=origin --push
 > 把它推迟到 **Phase 4（架构阶段）**，由 ADR 正式锁定。只有当真实的技术栈清单（`pyproject.toml`、
 > `go.mod`、带依赖的 `package.json` 等）已经存在、而声明仍说"没有代码"时，它才会变成错误。此时
 > `eos next` 会把你引回 `eos init`，它会点名相匹配的包，而 `eos init <pack> --write` 会保留你的轨道。
+>
+> 第一次 `init --write` 还会为本项目建立自己的策略锁（`.eos/policy.lock.json`）与 SBOM
+> （`.eos/sbom.json`），模板自带的那两份描述的是 EOS。请把它们和声明一起提交。无论脚手架是否已先提交，
+> 首次推送与首个 PR 都能通过 CI（[ADR-022](../adr/022-first-declaration-starts-the-policy.md)）。
 
 > **两个名字很像、但做的事完全不同。**
 > `/eos-init`（Copilot Chat）是上面那个**硬化引导**——这才是你 Day-1 需要的那个。

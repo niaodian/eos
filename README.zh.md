@@ -75,10 +75,11 @@ AI agent 是可选的 —— CLI 在任何终端里都能用。
 
 ```bash
 # 1. 从一个固定的发布版本开始，并把它变成你的仓库
-npx degit niaodian/eos#eos-2.4.0 my-app && cd my-app && git init
+npx degit niaodian/eos#eos-2.5.0 my-app && cd my-app && git init
 
 # 2. 声明项目 —— 还没有代码，技术栈留到架构阶段再定
 npx --offline eos init config-only --write        # 想走严格轨道就加上 --track regulated
+git add -A && git commit -m "chore: start from eos"   # 声明，连同它自己的策略锁与 SBOM
 
 # 3. 询问唯一的下一步：做什么、为什么、怎么开始
 npx --offline eos next
@@ -95,6 +96,9 @@ npx --offline eos verify                          # 重跑你的改动可能影�
 - **已经有代码了？** `npx --offline eos init` 会列出所有起步包（`node-service`、`python-service`、
   `go-service`、`java-service`、`rag-app`、`agentic-app`、`data-pipeline`、`library`、
   `regulated-app`），并指出与它所发现的代码相匹配的那些。
+- **首次推送即为绿。** `eos init --write` 用你的声明替换模板自身的声明，并建立你自己的策略锁与 SBOM，
+  模板自带的那两份描述的是 EOS（[ADR-022](docs/adr/022-first-declaration-starts-the-policy.md)）。
+  之后 CI 在你的项目上运行治理门禁，而不是 EOS 自己的测试套件（[ADR-021](docs/adr/021-eos-tests-run-only-in-eos.md)）。
 - **在你的 agent 里**，同样的循环只需一条斜杠命令。各 agent 的一次性配置见
   [用户手册第 6.6 章](docs/zh/user-manual.md#第-66-章-在-claude-code、codex-和-antigravity-中使用-eos)：
   - **GitHub Copilot（VS Code）：** 使用 **eos-guide** Agent，或 `/eos-next` · `/eos-resume` · `/eos-status`。
@@ -162,8 +166,8 @@ EOS 的发布在 GitHub Actions 中构建并出具证明 —— 正是 EOS 要�
 你可以亲自核验：
 
 ```bash
-gh release download eos-2.4.0 --repo niaodian/eos --pattern 'eos-2.4.0.tar.gz'
-gh attestation verify eos-2.4.0.tar.gz --repo niaodian/eos
+gh release download eos-2.5.0 --repo niaodian/eos --pattern 'eos-2.5.0.tar.gz'
+gh attestation verify eos-2.5.0.tar.gz --repo niaodian/eos
 ```
 
 每个发布还附带它的 SBOM 和一个 `SHA256SUMS` 文件。
@@ -181,7 +185,8 @@ gh attestation verify eos-2.4.0.tar.gz --repo niaodian/eos
                     .claude/skills/ 是为 Claude Code 生成的副本
 .mcp.json、.claude/settings.json、.agents/hooks.json、.agents/mcp_config.json、.agents/agents/
                     由 `eos agents sync` 为每个已声明的 agent 平台生成——不要手工编辑
-.github/workflows/  eos-ci.yml（Linux、macOS、Windows）与 eos-release.yml（带证明的发布）
+.github/workflows/  eos-ci.yml（治理门禁；EOS 自己的测试矩阵只在 EOS 自身运行）与
+                    eos-release.yml（带证明的发布）
 docs/               你的规格与 ADR；docs/eos/ 是 EOS 手册（中文版在 docs/zh/）
 ```
 
@@ -192,7 +197,7 @@ docs/               你的规格与 ADR；docs/eos/ 是 EOS 手册（中文版�
 - [在 Claude Code、Codex 和 Antigravity 中使用 EOS](docs/zh/user-manual.md#第-66-章-在-claude-code、codex-和-antigravity-中使用-eos) —— 各 agent 的一次性配置与日常开发流程。
 - [升级到 eos-2.0.0](docs/zh/user-manual.md#105-从-eos-122x-升级到-eos-200) —— 改变了什么、你需要做什么。
 - [升级到 eos-2.0.1](docs/zh/user-manual.md#107-从-eos-200-升级到-eos-201) —— 密钥检测安全补丁。
-- [升级到 eos-2.4.0](docs/zh/user-manual.md#1011-从-eos-23x-升级到-eos-240) —— 各平台都测试 Node 24、为 Antigravity 安装的 BMAD 能被识别、`eos next --exit-zero`、runbook 写在发布门禁读取的位置。
+- [升级到 eos-2.5.0](docs/zh/user-manual.md#1012-从-eos-24x-升级到-eos-250) —— 你的 CI 运行你的项目而不是 EOS 的测试套件，首次声明会建立你自己的策略锁与 SBOM，每次变更只运行一次 CI。
 - [工作流契约](docs/zh/developer-experience.md) —— CLI、退出码、JSON 与诊断。
 - [技术栈预设与轨道](docs/zh/stack-presets.md) —— 所有受支持的技术栈，以及如何选择轨道。
 - [设计原理](docs/zh/blueprint.md) 与 [架构决策记录](docs/adr/)。
@@ -200,7 +205,12 @@ docs/               你的规格与 ADR；docs/eos/ 是 EOS 手册（中文版�
 ## 环境要求与说明
 
 - **Node.js 20.10+ 和 Git** —— 别无其他。请使用 Node 22 或 24：Node 20 已于 2026-04-30 停止维护，
-  只作为声明的最低版本继续受支持。CI 在 Linux、macOS 和 Windows 上运行 Node 20、22 与 24。
+  只作为声明的最低版本继续受支持。EOS 自己的 CI 在每次合并、每个 tag 和每周一次的运行中，于 Linux、macOS 和
+  Windows 上测试 Node 20、22 与 24；PR 只在每个平台上用 Node 24 各跑一次。
+- **你的 CI。** [eos-ci.yml](.github/workflows/eos-ci.yml) 随模板一起提供。在你的仓库里，它运行治理门禁和你在声明中
+  写明的命令。EOS 自己的测试套件、覆盖率与跨平台矩阵测试的是 EOS，所以只在 `.eos/project.json` 仍是模板自身的
+  声明时运行，执行 `eos init` 之后即被跳过（见[手册 §8.4](docs/zh/user-manual.md#84-你的仓库里-ci-运行什么)、
+  [ADR-021](docs/adr/021-eos-tests-run-only-in-eos.md)）。
 - **永远不需要 API key。** EOS 从不调用模型。每一项附加（Copilot、BMAD、BMAD 运行时）带来什么，以及已知局限，
   见 [快速开始](docs/zh/quickstart.md#能力与依赖)。
 - **AI agent 是可选的。** GitHub Copilot（VS Code）、Claude Code、OpenAI Codex 和 Google Antigravity 都有分步指导；

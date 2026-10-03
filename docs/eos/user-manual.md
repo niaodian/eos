@@ -1,6 +1,6 @@
 # EOS User Manual (Engineering Operating System)
 
-> Version: synced with `docs/eos/VERSION` (current `eos-2.4.0`)
+> Version: synced with `docs/eos/VERSION` (current `eos-2.5.0`)
 > Applies to: recent VS Code + GitHub Copilot Chat (custom agent / hooks are recent-version capabilities; confirm the version in the "About VS Code" panel), or Claude Code, OpenAI Codex or Google Antigravity ([Chapter 6.6](#chapter-66-using-eos-with-claude-code-codex-and-antigravity)) + 73 installed `bmad-*` skills (user-level)
 > Positioning: this manual is an **operating guide (how to use it)**; for design rationale and trade-offs, see `blueprint.md` in the same directory (why it is designed this way).
 > Conventions: prose in English; file names / paths / commands / config keys kept verbatim.
@@ -20,7 +20,7 @@
 | Want to look up a slash command / agent / rule | [Chapter 7 Complete reference](#chapter-7-complete-reference-quick-reference) |
 | Configuration is broken / Agent is not working as expected | [Chapter 9 Failure localization](#chapter-9-failure-localization-and-troubleshooting) |
 | Want to move this system to another project/team | [Chapter 10 Cross-project reuse and distribution](#chapter-10-cross-project-reuse-and-distribution) |
-| Upgrading to `eos-2.0.0`, choosing a governance track, or signing releases | [§10.5 Upgrading](#105-upgrading-from-eos-122x-to-eos-200) · [§10.6 Tracks and signed releases](#106-governance-tracks-signed-releases-and-central-policy) · [§10.7 The 2.0.1 security patch](#107-upgrading-from-eos-200-to-eos-201) · [§10.8 `eos upgrade` and 2.1.0](#108-upgrading-from-eos-20x-to-eos-210) · [§10.9 2.2.0](#109-upgrading-from-eos-21x-to-eos-220) · [§10.10 2.3.0](#1010-upgrading-from-eos-22x-to-eos-230) · [§10.11 2.4.0](#1011-upgrading-from-eos-23x-to-eos-240) |
+| Upgrading to `eos-2.0.0`, choosing a governance track, or signing releases | [§10.5 Upgrading](#105-upgrading-from-eos-122x-to-eos-200) · [§10.6 Tracks and signed releases](#106-governance-tracks-signed-releases-and-central-policy) · [§10.7 The 2.0.1 security patch](#107-upgrading-from-eos-200-to-eos-201) · [§10.8 `eos upgrade` and 2.1.0](#108-upgrading-from-eos-20x-to-eos-210) · [§10.9 2.2.0](#109-upgrading-from-eos-21x-to-eos-220) · [§10.10 2.3.0](#1010-upgrading-from-eos-22x-to-eos-230) · [§10.11 2.4.0](#1011-upgrading-from-eos-23x-to-eos-240) · [§10.12 2.5.0](#1012-upgrading-from-eos-24x-to-eos-250) |
 
 ---
 
@@ -180,7 +180,7 @@ If you want to promote some `eos-*.agent.md` files to "available in all projects
 **Method A — degit (recommended, fastest)**
 ```sh
 # Public template — plain degit works (no auth needed)
-npx degit niaodian/eos#eos-2.4.0 my-new-app
+npx degit niaodian/eos#eos-2.5.0 my-new-app
 cd my-new-app
 git init && git add -A && git commit -m "chore: scaffold from eos"
 ```
@@ -214,6 +214,13 @@ Seeing `PASS` means the rule layers, prompts, agents, and hooks are healthy, and
 starter packs. Stack not decided yet (most 0-1 projects)? `init config-only --write`. Stack known?
 `init <pack> --write`, then `stack sync --write` renders its commands into the workspace rule below.
 
+`init --write` also starts this project's own policy lock (`.eos/policy.lock.json`) and SBOM
+(`.eos/sbom.json`) — the template's described EOS. Commit them with the declaration: whether the scaffold
+was committed first or not, the first push and the first pull request pass CI
+([ADR-022](../adr/022-first-declaration-starts-the-policy.md)). Chose a pack? Edit its commands before you
+commit the declaration, then `eos policy lock --write`: until it is committed it is the first declaration,
+and nothing in it needs approving.
+
 Open `.github/instructions/00-workspace.instructions.md` and change it to the real facts of **your project**:
 - `Local commands`: if the stack is **already decided**, replace this with the install/lint/test/typecheck commands for your stack--**copy the finished line directly** from `docs/eos/stack-presets.md` (a recipe book for Node/Python/Go/Java/Rust/.NET full stacks; copy the matching block). If the stack is **not decided yet** (most 0-1 projects are not before architecture), **keep the Node placeholder**--this is a ⛳ PROVISIONAL value, and the authoritative lock happens in **Phase 4 (Architecture)** together with `docs/adr/00X-tech-stack.md`, avoiding conflict between always-on rules and the future real stack.
 - `Layout`: update it if the directory structure differs.
@@ -222,10 +229,11 @@ Open `.github/instructions/00-workspace.instructions.md` and change it to the re
 ## 3.4 Full Day-1 sequence (copy-ready)
 
 ```sh
-npx degit niaodian/eos#eos-2.4.0 my-new-app && cd my-new-app
+npx degit niaodian/eos#eos-2.5.0 my-new-app && cd my-new-app
 git init && git add -A && git commit -q -m "chore: scaffold from eos"
 node .github/hooks/validate-config.mjs
 node .github/eos/eos.mjs init config-only --write   # declare it: no code yet (or init <pack> [--track regulated])
+git add -A && git commit -q -m "chore: declare the project"   # with this project's policy lock and SBOM
 node .github/eos/eos.mjs next                       # the one next action
 # Key: run `code .` from inside the project directory so my-new-app becomes the workspace root (including .github/).
 # Do not open its parent directory, or custom agents / instructions / hooks will not be discovered.
@@ -244,7 +252,7 @@ setup for each.
 A system that already runs does not have to be re-specified before EOS can help. Adopt it at the **delivery gates** with the `delivery-only` workflow profile (since eos-2.3.0): the running system is the baseline, and every change from now on is a story that must be ready (G5), verified (G7) and released (G8).
 
 ```sh
-npx degit niaodian/eos#eos-2.4.0 /tmp/eos                      # the template, outside your repository
+npx degit niaodian/eos#eos-2.5.0 /tmp/eos                      # the template, outside your repository
 # copy into your repository: .eos/ .agents/ .github/{eos,hooks,agents,instructions}/ docs/eos/
 # and merge by hand what you already have: AGENTS.md, .github/copilot-instructions.md, .github/workflows/eos-ci.yml
 node .github/hooks/validate-config.mjs                          # S7 names anything still missing
@@ -366,7 +374,7 @@ So EOS **never depends on "Rule A overriding Rule B"**. The only reliable contro
 | Item | Content |
 |---|---|
 | **Goal** | Get an empty project with healthy configuration from the template |
-| **How to start** | `npx degit niaodian/eos#eos-2.4.0 my-app && cd my-app`, then declare it: `node .github/eos/eos.mjs init config-only --write` (stack undecided) or `init <pack> --write` |
+| **How to start** | `npx degit niaodian/eos#eos-2.5.0 my-app && cd my-app`, then declare it: `node .github/eos/eos.mjs init config-only --write` (stack undecided) or `init <pack> --write` |
 | **Output** | Complete `.github/` + `docs/` skeleton |
 | **Gate** | `node .github/hooks/validate-config.mjs` → **PASS** |
 | **Must check** | PASS 0 errors. **If the stack is undecided, do not change** `00-workspace` yet--keep the Node placeholder; the stack is an irreversible decision, and the authority is locked in **Phase 4 (ADR)**. If the stack is known, copy `docs/eos/stack-presets.md` directly (fast path). |
@@ -629,9 +637,11 @@ So EOS **never depends on "Rule A overriding Rule B"**. The only reliable contro
 
 ### Step 0: Create project + choose stack (5 minutes)
 ```sh
-npx degit niaodian/eos#eos-2.4.0 todo-api && cd todo-api
+npx degit niaodian/eos#eos-2.5.0 todo-api && cd todo-api
+git init && git add -A && git commit -q -m "chore: scaffold from eos"
 node .github/hooks/validate-config.mjs          # expect PASS
 node .github/eos/eos.mjs init node-service --write   # declare the stack (or python-service, go-service… — `eos init` lists them)
+git add -A && git commit -q -m "chore: declare the project"   # with its policy lock and SBOM — edit the commands first (§3.3)
 ```
 **Stack already decided?** `eos init <pack> --write` declares it; `node .github/eos/eos.mjs stack sync --write` then renders its `Local commands` into `.github/instructions/00-workspace.instructions.md`.
 **Not decided yet?** Declare `eos init config-only --write` instead--the **authoritative stack lock happens in Step 4 Architecture** (together with ADR), and `eos init <pack> --write` then keeps your track. SaaS projects usually know the stack at Step 0.
@@ -690,10 +700,12 @@ The gate reads the *machine* result, not a hand-written PASS — and since eos-2
 
 ### Step 0: Create project + create AI directories
 ```sh
-npx degit niaodian/eos#eos-2.4.0 cs-agent && cd cs-agent
+npx degit niaodian/eos#eos-2.5.0 cs-agent && cd cs-agent
+git init && git add -A && git commit -q -m "chore: scaffold from eos"
 mkdir -p ai/prompts evals                       # AI code goes here; Agentic rules overlay automatically
 node .github/hooks/validate-config.mjs          # expect PASS
 node .github/eos/eos.mjs init rag-app --write    # the Python LLM pack: agentic paradigm + an eval command
+git add -A && git commit -q -m "chore: declare the project"   # with its policy lock and SBOM — edit the commands first (§3.3)
 ```
 Choose Python as the stack (most common for LLM products): `rag-app` is the Python LLM pack--adjust its commands to your project, and add the **AI/LLM additional layer** from stack-presets.
 
@@ -1222,6 +1234,29 @@ Run one minimal dry-run feature (such as "user login") end to end through 10 pha
 
 > See **Appendix C** for the complete real example (`my-app` 12/12 passed, report in `my-app/docs/eos/walkthrough.md`).
 
+## 8.4 What CI runs in your repository
+
+`.github/workflows/eos-ci.yml` came with the template, and it is two things at once: the governance gate
+every project runs, and EOS's own test suite ([ADR-021](../adr/021-eos-tests-run-only-in-eos.md)).
+`.github/eos/ci-plan.mjs` tells them apart from `.eos/project.json`: the template ships its own
+declaration marked `"templateDefault": true`, and `eos init` replaces it with yours.
+
+| Job / step | In your project | In EOS itself |
+|---|---|---|
+| `verify` — validate-config, doc parity, SBOM, governance versions, generated docs, agent platforms, doctor `--deep`, gitleaks and the secret scan, spec-align, ledger, policy lock, `eos doctor` | runs | runs |
+| `verify` — the product-quality gate (`project-gate.mjs`) | runs **your** declared install / lint / typecheck / test / eval | runs EOS's declared suite |
+| `verify` — the five `EOS tests ·` layers | skipped | runs |
+| `coverage` and `cross-platform` | skipped — no runner starts | runs |
+| `release-candidate` (tags only) | runs | runs |
+
+Until you declare your project, a push still runs EOS's suites — and they pass, because the tree is still
+the template's. Mark only `verify` as a required check ([Appendix D.1](#appendix-d-post-instantiation-hardening-make-gates-authoritative)).
+
+**When it runs.** On a push to `main` or `master` and on a tag; on every pull request, where a new commit
+cancels the pull request's earlier run; and once a week on the default branch, where a project runs only
+the short `plan` job. A branch without a pull request is not built when you push it: open a pull request,
+or add the branch to `on.push.branches` (a release branch, say).
+
 ---
 
 # Chapter 9 Failure localization and troubleshooting
@@ -1283,12 +1318,12 @@ Agent output does not match expectation
 ```sh
 # Method A: degit (public repository — no auth needed)
 # Pin the release tag: the default branch moves, a tag does not.
-npx degit niaodian/eos#eos-2.4.0 my-app
+npx degit niaodian/eos#eos-2.5.0 my-app
 cd my-app && git init
 
 # Method B: git clone at the tag, into a fresh history
-git clone --depth 1 --branch eos-2.4.0 https://github.com/niaodian/eos.git my-app
-cd my-app && git checkout --orphan main && git commit -m "chore: start from eos-2.4.0"
+git clone --depth 1 --branch eos-2.5.0 https://github.com/niaodian/eos.git my-app
+cd my-app && git checkout --orphan main && git commit -m "chore: start from eos-2.5.0"
 
 # Either way, declare the project: the template's own declaration describes EOS, not you
 node .github/eos/eos.mjs init                       # the tracks, the packs, and what is declared
@@ -1297,7 +1332,7 @@ node .github/eos/eos.mjs init config-only --write   # no code yet — or <pack>,
 
 ## 10.3 Distribution to a team (purely local, no enterprise dependency)
 
-1. Everyone starts from the **same release tag** (`eos-2.4.0`). The default branch keeps moving, so
+1. Everyone starts from the **same release tag** (`eos-2.5.0`). The default branch keeps moving, so
    an unpinned copy is a slightly different EOS for every person who takes one.
 2. `【Needs org/GitHub settings】` The GitHub **template repository** setting is owner-level: EOS can
    neither apply nor verify it locally, so do not take this page's word for it —
@@ -1841,6 +1876,28 @@ node /tmp/eos-next/.github/eos/eos.mjs upgrade --from /tmp/eos-next --base /tmp/
 node .github/eos/eos.mjs policy check && node .github/eos/eos.mjs verify --full
 ```
 
+## 10.12 Upgrading from `eos-2.4.x` to `eos-2.5.0`
+
+Nothing gets stricter for a project that changes nothing. `.eos/gates.json`, `.eos/workflow.json` and the evaluator version are unchanged, and a declared project's policy digest is the same as before — the new template marker is recorded only where it is set. As after every upgrade, the gates bound to the product tree (`verified`, `release-ready`) re-run.
+
+| What changed | What you will see | What to do |
+|---|---|---|
+| **Your CI no longer runs EOS's own tests** ([ADR-021](../adr/021-eos-tests-run-only-in-eos.md)) | In `verify`, the five `EOS tests ·` steps are skipped; `coverage` and `cross-platform` show as skipped jobs, and a short `plan` job appears (§8.4) | Require only `verify` in branch protection (Appendix D.1). If you edited `eos-ci.yml` — a toolchain setup step, say — the upgrade parks the new version under `.eos/local/upgrade/`: merge it by hand |
+| **When CI runs** | A push builds `main`, `master` and tags only; a pull request is built once per commit, and a new commit cancels its older run; a weekly run starts only the `plan` job | Open a pull request for a branch you want built, or add the branch to `on.push.branches`; delete the `schedule:` block if you do not want the weekly run |
+| **The first declaration starts your own policy** ([ADR-022](../adr/022-first-declaration-starts-the-policy.md)) | Only in a copy that has not declared itself: `eos init <pack> --write` also writes `.eos/policy.lock.json` and `.eos/sbom.json` (§3.3), and the first push and the first pull request pass `policy check` | Not declared yet? `policy check` fails on the lock's digest until you run `eos init`, which `eos next` asks for first |
+| **Marking a declaration as the template's own is a weakening** | Adding `"templateDefault": true` to a declared project is `WEAKENING project:templateDefault:declared->template` | Nothing, unless you do that — then it needs a reason and a second person |
+| **`eos init` keeps the SBOM current** | A declaration that changes the stacks — code landing in a `config-only` project, say — regenerates `.eos/sbom.json`; `sbom --check` names `eos sbom --write` when it fails | Commit `.eos/sbom.json` with the declaration |
+
+**Upgrade steps**
+
+```sh
+npx degit niaodian/eos#eos-2.4.0 /tmp/eos-base    # the version you are on — see docs/eos/VERSION
+npx degit niaodian/eos#eos-2.5.0 /tmp/eos-next
+node /tmp/eos-next/.github/eos/eos.mjs upgrade --from /tmp/eos-next --base /tmp/eos-base          # review the plan
+node /tmp/eos-next/.github/eos/eos.mjs upgrade --from /tmp/eos-next --base /tmp/eos-base --write  # apply it, and regenerate the agent-platform files
+node .github/eos/eos.mjs policy check && node .github/eos/eos.mjs verify --full
+```
+
 ---
 
 # Chapter 11 Adding a technology stack
@@ -1915,7 +1972,7 @@ EOS stack rules are **pluggable**. Adding a stack = add one `*.instructions.md` 
 
 ```
 # ── Terminal — the loop (this is all you need day to day) ──
-npx degit niaodian/eos#eos-2.4.0 my-app   # create new project
+npx degit niaodian/eos#eos-2.5.0 my-app   # create new project
 node .github/eos/eos.mjs init                       # what is declared, the two tracks, the starter packs
 node .github/eos/eos.mjs init <pack> --write        # declare it (config-only until the stack is decided; --track regulated)
 node .github/eos/eos.mjs init --write               # local VS Code tasks (never overwrites)
@@ -1984,7 +2041,7 @@ A real dry-run that passed end to end (feature: user login), **12/12 gates passe
 
 **Reproduce** (terminal):
 ```sh
-npx degit niaodian/eos#eos-2.4.0 my-app && cd my-app
+npx degit niaodian/eos#eos-2.5.0 my-app && cd my-app
 node .github/hooks/validate-config.mjs        # PASS
 npm test                                      # 10/10 green
 echo '{"tool_input":{"command":"rm -rf /tmp/x"}}' | node .github/hooks/deny-dangerous.js  # deny
@@ -2010,6 +2067,7 @@ GitHub repository → **Settings → Rules → Rulesets → New branch ruleset**
 2. Check **Require a pull request before merging** (forbid direct push to the default branch).
 3. Check **Require status checks to pass before merging** → search and select **`verify`** (the job in `eos-ci.yml`).
    -- This step turns validate-config / eos-doctor / secret-scan from "green-light advice" into "red-light block".
+   Select `verify` only: `coverage` and `cross-platform` test EOS itself and are skipped in your repository ([§8.4](#84-what-ci-runs-in-your-repository)).
 4. Check **Require review from Code Owners** (paired with CODEOWNERS in D.2).
 5. (Recommended) Check **Do not allow bypassing the above settings**, to avoid casual administrator bypass.
 
