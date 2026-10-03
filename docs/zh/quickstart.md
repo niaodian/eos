@@ -73,7 +73,7 @@ EOS 本身从不调用任何模型，也不需要任何 API key。每一行都�
 ## Day-1（可直接复制——与用户手册 §3.4 完全一致的序列）
 
 ```sh
-npx degit niaodian/eos#eos-2.0.1 my-new-app && cd my-new-app
+npx degit niaodian/eos#eos-2.1.0 my-new-app && cd my-new-app
 git init && git add -A && git commit -q -m "chore: scaffold from eos"
 node .github/hooks/validate-config.mjs        # 期望 PASS
 node .github/eos/eos.mjs init config-only --write   # 声明项目：还没有代码（或 init <pack>；--track regulated）

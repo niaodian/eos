@@ -70,7 +70,7 @@ GitHub Copilot 里用，或在任意终端里用，不需要服务、不需要�
 
 ```bash
 # 1. 从一个固定的发布版本开始，并把它变成你的仓库
-npx degit niaodian/eos#eos-2.0.1 my-app && cd my-app && git init
+npx degit niaodian/eos#eos-2.1.0 my-app && cd my-app && git init
 
 # 2. 声明项目 —— 还没有代码，技术栈留到架构阶段再定
 npx --offline eos init config-only --write        # 想走严格轨道就加上 --track regulated
@@ -147,8 +147,8 @@ EOS 的发布在 GitHub Actions 中构建并出具证明 —— 正是 EOS 要�
 你可以亲自核验：
 
 ```bash
-gh release download eos-2.0.1 --repo niaodian/eos --pattern 'eos-2.0.1.tar.gz'
-gh attestation verify eos-2.0.1.tar.gz --repo niaodian/eos
+gh release download eos-2.1.0 --repo niaodian/eos --pattern 'eos-2.1.0.tar.gz'
+gh attestation verify eos-2.1.0.tar.gz --repo niaodian/eos
 ```
 
 每个发布还附带它的 SBOM 和一个 `SHA256SUMS` 文件。
