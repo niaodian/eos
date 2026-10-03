@@ -81,3 +81,32 @@ test('without the two templates, upgrade names the exact commands to fetch them 
   const notATemplate = tree({ 'x.txt': 'x\n' });
   assert.equal(cli(local, ['upgrade', '--from', notATemplate, '--base', notATemplate]).code, 3);
 });
+
+// eos-2.3.0: the new template's changelog says what changes for the project, before --write.
+const CHANGELOG = [
+  '# EOS changelog', '', '> intro', '',
+  '## eos-1.2.0 — 2026-10-03', '', '- **Breaking:** commands renamed.', '- a new gate check.', '',
+  '## eos-1.1.0 — 2026-10-02', '', '- `eos upgrade` exists.', '',
+  '## eos-1.0.0 — 2026-10-01', '', '- the first release.', '',
+].join('\n');
+
+test('the plan says what changes, from the new template\'s changelog — only the versions after the base', () => {
+  const base = template('eos-1.0.0', BASE);
+  const next = template('eos-1.2.0', { ...NEXT, 'docs/eos/CHANGELOG.md': CHANGELOG });
+  const local = template('eos-1.0.0', { ...BASE });
+  const r = cli(local, ['upgrade', '--from', next, '--base', base, '--json']);
+  assert.equal(r.code, 0, r.out);
+  const { changelog } = JSON.parse(r.out);
+  assert.deepEqual(changelog.map((e) => e.version), ['eos-1.2.0', 'eos-1.1.0']);
+  assert.deepEqual(changelog[0].lines, ['**Breaking:** commands renamed.', 'a new gate check.']);
+  const text = cli(local, ['upgrade', '--from', next, '--base', base]).out;
+  assert.match(text, /What changes for you \(docs\/eos\/CHANGELOG\.md of eos-1\.2\.0\)\n {2}eos-1\.2\.0 — 2026-10-03\n {4}· Breaking: commands renamed\./);
+  assert.doesNotMatch(text, /the first release/);
+});
+
+test('a template without a changelog plans exactly as before', () => {
+  const { base, next, local } = scenario();
+  const r = cli(local, ['upgrade', '--from', next, '--base', base, '--json']);
+  assert.deepEqual(JSON.parse(r.out).changelog, []);
+  assert.doesNotMatch(cli(local, ['upgrade', '--from', next, '--base', base]).out, /What changes for you/);
+});

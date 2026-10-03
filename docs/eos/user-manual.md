@@ -1049,6 +1049,7 @@ node .github/eos/eos.mjs init config-only --write   # no code yet — or <pack>,
 
 - Every EOS configuration change: update `docs/eos/VERSION` (e.g., `eos-1.4.1`→`eos-1.6.0`), run `validate-config.mjs`, commit with Conventional Commits.
 - Upgrading existing projects (2.1.0+): `eos upgrade --from <new template> --base <the template you started from>` — a dry run by default, `--write` to apply. Per file it compares the two templates with your copy: what only EOS changed is updated, what only you changed is kept, and a file both changed is never overwritten — the new version is parked under `.eos/local/upgrade/` for a hand merge. Your declaration, evidence, ledger, waivers, stories and README are never touched. Fetch both templates yourself (degit or the attested release tarball) and run the NEW version's CLI; number your own ADRs from 100 ([ADR-015](../adr/015-three-way-upgrades.md)). User-level `bmad-*` upgrades independently.
+- What changed: `eos upgrade` prints the entries of [CHANGELOG.md](CHANGELOG.md) between your version and the new one (since eos-2.3.0). EOS releases on trains — at most one minor version a week, patches only for security fixes and regressions, breaking changes only in a minor — and the stable choice is the newest minor that has been out a week without a patch ([CONTRIBUTING.md](../../CONTRIBUTING.md#release-cadence)).
 
 ### 10.4.1 Upgrading from `eos-1.12.0` to `eos-1.13.0`
 

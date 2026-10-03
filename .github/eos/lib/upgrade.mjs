@@ -61,6 +61,38 @@ export function templateVersion(dir) {
 /** Is `dir` a copy of the EOS template? */
 export const isTemplate = (dir) => existsSync(join(dir, '.github/eos/eos.mjs')) && templateVersion(dir) !== null;
 
+const semver = (v) => (String(v || '').match(/(\d+)\.(\d+)\.(\d+)/) || []).slice(1).map(Number);
+const compare = (a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2];
+
+/**
+ * What changed between the version a project is on and the one it moves to — read from the NEW
+ * template's changelog, so the developer sees it before applying anything. A project that writes in
+ * Chinese gets docs/zh/CHANGELOG.md. A template that has no changelog (before 2.3) yields nothing.
+ * @returns {{path: string|null, entries: Array<{version: string, title: string, lines: string[]}>}}
+ */
+export function changelogBetween(nextDir, fromVersion, toVersion, { language = null } = {}) {
+  const candidates = [/^zh/i.test(language || '') ? 'docs/zh/CHANGELOG.md' : null, 'docs/eos/CHANGELOG.md'].filter(Boolean);
+  const path = candidates.find((c) => existsSync(join(nextDir, c))) || null;
+  if (!path) return { path: null, entries: [] };
+  const entries = [];
+  let current = null;
+  for (const line of readFileSync(join(nextDir, path), 'utf8').split(/\r?\n/)) {
+    const heading = line.match(/^## (eos-\d+\.\d+\.\d+)\b\s*(?:[—–-]\s*)?(.*)$/);
+    if (heading) { current = { version: heading[1], title: heading[2].trim(), lines: [] }; entries.push(current); continue; }
+    if (/^#{1,2} /.test(line)) { current = null; continue; }
+    if (current && /^[-*] /.test(line)) current.lines.push(line.slice(2).trim());
+  }
+  const from = semver(fromVersion);
+  const to = semver(toVersion);
+  return {
+    path,
+    entries: entries.filter((e) => {
+      const v = semver(e.version);
+      return v.length === 3 && (from.length !== 3 || compare(v, from) > 0) && (to.length !== 3 || compare(v, to) <= 0);
+    }),
+  };
+}
+
 /**
  * What an upgrade would do, file by file. Pure: reads the three trees, writes nothing.
  * @returns {{path: string, action: 'current'|'update'|'add'|'remove'|'kept'|'conflict'}[]}

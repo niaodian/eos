@@ -3,7 +3,7 @@
 // Registered in ./index.mjs. A handler receives (snapshot, flags) and returns an exit code (./shared.mjs).
 import { existsSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { join, dirname, resolve } from 'node:path';
-import { planUpgrade, applyUpgrade, templateVersion, isTemplate, PROJECT_OWNED } from '../lib/upgrade.mjs';
+import { planUpgrade, applyUpgrade, templateVersion, isTemplate, changelogBetween, PROJECT_OWNED } from '../lib/upgrade.mjs';
 import { gateInputs, gateCollections } from '../lib/state.mjs';
 import { evidenceIntegrity } from '../lib/gates.mjs';
 import { readIntent } from '../lib/record.mjs';
@@ -329,10 +329,17 @@ export const maintenanceCommands = {
     if (flags.write) applyUpgrade({ root: snapshot.root, next, rows });
     const counts = Object.fromEntries(['update', 'add', 'remove', 'kept', 'conflict', 'current'].map((a) => [a, rows.filter((r) => r.action === a).length]));
     const conflicts = rows.filter((r) => r.action === 'conflict');
-    const json = { from: baseVersion, to: nextVersion, write: !!flags.write, counts, files: rows.filter((r) => r.action !== 'current') };
+    // What changed, from the new template's own changelog — read before anything is applied.
+    const changelog = changelogBetween(next, baseVersion, nextVersion, { language: snapshot.project?.language });
+    const json = { from: baseVersion, to: nextVersion, write: !!flags.write, counts, files: rows.filter((r) => r.action !== 'current'), changelog: changelog.entries };
+    const news = changelog.entries.length
+      ? [`What changes for you (${changelog.path} of ${nextVersion})`,
+        ...changelog.entries.flatMap((e) => [`  ${e.version}${e.title ? ` — ${e.title}` : ''}`, ...e.lines.map((l) => `    · ${l.replace(/\*\*/g, '')}`)]), '']
+      : [];
     const verb = { update: flags.write ? 'updated' : 'would update', add: flags.write ? 'added' : 'would add', remove: flags.write ? 'removed' : 'would remove', kept: 'kept (only you changed it)', conflict: flags.write ? 'conflict — the new version is parked' : 'conflict — both changed it' };
     const text = [
       `EOS upgrade ${baseVersion} → ${nextVersion}${flags.write ? '' : ' (dry run)'}`, '',
+      ...news,
       ...json.files.map((r) => `  ${r.action.padEnd(8)} ${r.path}${r.parked ? `  → ${r.parked}` : ''}   ${verb[r.action]}`),
       '',
       `  ${counts.update} update · ${counts.add} add · ${counts.remove} remove · ${counts.kept} kept · ${counts.conflict} conflict · ${counts.current} current`,

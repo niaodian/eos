@@ -1095,6 +1095,7 @@ node .github/eos/eos.mjs init config-only --write   # 还没有代码——或 <
 
 - 每次改 EOS 配置：改 `docs/eos/VERSION`（如 `eos-1.4.1`→`eos-1.6.0`），跑 `validate-config.mjs`，Conventional Commits 提交。
 - 升级既有项目（2.1.0 起）：`eos upgrade --from <新版模板> --base <你当初起步的模板>`——默认只预览，加 `--write` 才执行。它逐个文件比较两份模板与你的副本：只有 EOS 改过的会更新，只有你改过的会保留，双方都改过的绝不覆盖——新版本放进 `.eos/local/upgrade/` 供手工合并。你的声明、证据、账本、豁免、story 与 README 永远不会被触碰。两份模板由你自己获取（degit 或带证明的发布 tarball），并用**新版本**的 CLI 运行；你自己的 ADR 从 100 起编号（[ADR-015](../adr/015-three-way-upgrades.md)）。用户级 `bmad-*` 独立升级。
+- 变了什么：`eos upgrade` 会打印 [CHANGELOG.md](CHANGELOG.md) 中你的版本与新版本之间的条目（自 eos-2.3.0 起）。EOS 按发布火车发版——每周至多一个次版本，补丁版只包含安全修复与回归修复，破坏性变更只出现在次版本中——稳定之选是已发布满一周且没有补丁的最新次版本（[CONTRIBUTING.md](../../CONTRIBUTING.md#release-cadence)）。
 
 ### 10.4.1 从 `eos-1.12.0` 升级到 `eos-1.13.0`
 
