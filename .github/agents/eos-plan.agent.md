@@ -48,8 +48,9 @@ drafts sitting in `docs/stories/` block nothing. Therefore:
    real reason to promote serially — not an excuse to also *write* serially.
 
 If drafting a story would require new acceptance criteria that the PRD does not have, that is a PRD
-gap: say so and fix it in `/eos-spec` **once, for the whole backlog**, rather than amending `docs/prd.md`
-19 more times and invalidating `prd-ready` evidence on every single story.
+gap: say so and fix it with the `eos-spec` skill (`/eos-spec`) **once, for the whole backlog**,
+rather than amending `docs/prd.md` 19 more times and invalidating `prd-ready` evidence on every
+single story.
 
 ## Stage close-out (do not skip)
 

@@ -3,11 +3,12 @@
 //   node --test .github/eos/alignment.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { REPO_ROOT } from './test-support.mjs';
 import { alignmentVocabulary, checkAlignment, scanText } from './lib/alignment.mjs';
 import { commands } from './commands/index.mjs';
+import { RUNBOOKS } from './lib/gate-primitives.mjs';
 
 const read = (rel) => JSON.parse(readFileSync(join(REPO_ROOT, rel), 'utf8'));
 const policy = { gates: read('.eos/gates.json'), workflow: read('.eos/workflow.json'), commands: Object.keys(commands) };
@@ -72,4 +73,32 @@ test('frontmatter handoffs: an agent file or a built-in mode', () => {
 
 test('one citation is reported once per line, not once per pattern that sees it', () => {
   assert.equal(scan('`eos check --gate design-ready` and again `eos check --gate design-ready`').length, 1);
+});
+
+test('every runbook the docs tell a project to write is one the release gate reads', () => {
+  // The runbook skill, the release rule, the deployment checklist and the manual all named
+  // ops/runbook-<service>.md, while G8 reads only RUNBOOKS: following them looped at the release
+  // gate ("no runbook found — run /eos-runbook").
+  const markdown = (rel) => {
+    const full = join(REPO_ROOT, rel);
+    if (rel.endsWith('.md')) return [rel];
+    return readdirSync(full, { withFileTypes: true }).flatMap((e) => (e.isDirectory() || e.name.endsWith('.md') ? markdown(`${rel}/${e.name}`) : []));
+  };
+  // History may name the old path: the changelog and the manual's upgrade notes ("Upgrading from …")
+  // say what changed. Everything else tells a project what to do.
+  const instructions = (rel) => {
+    if (/(^|\/)CHANGELOG\.md$/.test(rel)) return '';
+    let fence = false;
+    let history = false;
+    return readFileSync(join(REPO_ROOT, rel), 'utf8').split('\n').filter((line) => {
+      if (/^\s*(```|~~~)/.test(line)) fence = !fence;
+      else if (!fence && /^#{1,4} /.test(line)) history = /Upgrading from|升级到/.test(line);
+      return !history;
+    }).join('\n');
+  };
+  const files = ['.agents/skills', '.github/agents', '.github/instructions', 'docs/checklists', 'docs/eos', 'docs/zh', 'README.md', 'README.zh.md', 'AGENTS.md'].flatMap(markdown);
+  const cited = files.flatMap((rel) => [...instructions(rel).matchAll(/(?:^|[\s`(→])(?:[\w-]+\/)?((?:ops|docs)\/[\w.<>*-]*runbook[\w.<>*-]*\.md)/gim)]
+    .map((m) => ({ rel, path: m[1] })));
+  assert.ok(cited.some((c) => c.rel === '.agents/skills/eos-runbook/SKILL.md'), 'the runbook skill names the file it writes');
+  assert.deepEqual(cited.filter((c) => !RUNBOOKS.includes(c.path)).map((c) => `${c.rel}: ${c.path}`), [], `G8 reads ${RUNBOOKS.join(', ')}`);
 });

@@ -7,7 +7,7 @@
 ## Prerequisites (local-first — nothing enterprise required)
 | Tool | Needed for | If absent |
 |---|---|---|
-| **Node.js** (20.10+) | the `eos` CLI, validators, hooks, JS/TS tests & evals | required — the only hard dependency (npm 10.9+, bundled with Node 22, for the `npx --offline eos` shortcut) |
+| **Node.js** (20.10+; 22 or 24 recommended — Node 20 reached end of life on 2026-04-30) | the `eos` CLI, validators, hooks, JS/TS tests & evals | required — the only hard dependency (npm 10.9+, bundled with Node 22, for the `npx --offline eos` shortcut) |
 | **An AI agent** — VS Code + GitHub Copilot, Claude Code, OpenAI Codex or Google Antigravity | the `eos-*` agents, the `/eos-*` slash commands (skills, `$eos-*` in Codex) and the guardrail; Copilot also applies the scoped coding rules automatically | one of them for the guided flow — the setup for each is in the [user manual, Chapter 6.6](user-manual.md#chapter-66-using-eos-with-claude-code-codex-and-antigravity); the `eos.mjs` CLI itself works without any |
 | **BMAD skills** (`bmad-*`) | every stage workflow (`bmad-prd`, `bmad-architecture`, `bmad-create-story`, …) | required for the guided flow — EOS orchestrates them, it does not reimplement them. Verify with `node .github/hooks/eos-doctor.mjs --deep` |
 | **`gh` CLI**, authenticated | creating the remote, and verifying branch protection during `/eos-init` | **optional**: do it in the GitHub web UI instead. Set up with `gh auth login` |
@@ -64,13 +64,13 @@ EOS itself never calls a model and needs no API key. Each row adds to the one ab
 - **Until branch protection and CODEOWNERS exist, governance is contractual.** EOS cannot verify server-side protection from a laptop, so "a weakening needs a second person" holds only after the `/eos-init` hardening; `eos-doctor` reports `CONTRACTUAL` until then ([ADR-014](../adr/014-trust-chain.md)).
 - **Local evidence is honest but unattested.** Evidence recorded on a laptop is `UNATTESTED_LOCAL`; a Regulated release needs evidence produced in CI (`evidencePolicy`).
 - **"Any stack" is verified to different depths.** EOS's own CI exercises the Node path and the Python eval starter; the Python, Go, Java, Rust and .NET packs declare the commands EOS runs, and their toolchains are yours to install.
-- **A JUnit result may be matched by name only.** Some runners — node:test among them — record no file in their JUnit XML. EOS then matches a trace-matrix row by test name and marks it `"match": "name"`, and settles the file from the source: the file the row names must declare the test (not in a comment), and no other test file may declare the same name — give tests unique names, or name the suite in the row (`tests/login.test.mjs::login > valid password`) ([ADR-016](../adr/016-junit-test-evidence.md)).
+- **A JUnit result may be matched by name only.** Some runners — node:test on Node 20 and 22 among them — record no file in their JUnit XML (node:test records it from Node 24.11 on). EOS then matches a trace-matrix row by test name and marks it `"match": "name"`, and settles the file from the source: the file the row names must declare the test (not in a comment), and no other test file may declare the same name — give tests unique names, or name the suite in the row (`tests/login.test.mjs::login > valid password`) ([ADR-016](../adr/016-junit-test-evidence.md)).
 - **Symlinks on Windows.** A checkout without symlink support turns a link into a plain file, so the product-tree digest differs from Linux and evidence recorded on one reads `STALE` on the other.
 
 ## Day-1 (copy-ready — the same sequence as the manual, §3.4)
 
 ```sh
-npx degit niaodian/eos#eos-2.3.0 my-new-app && cd my-new-app
+npx degit niaodian/eos#eos-2.4.0 my-new-app && cd my-new-app
 git init && git add -A && git commit -q -m "chore: scaffold from eos"
 node .github/hooks/validate-config.mjs        # expect PASS
 node .github/eos/eos.mjs init config-only --write   # declare it: no code yet (or init <pack>; --track regulated)

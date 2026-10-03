@@ -58,10 +58,16 @@ mention them only if the developer asks, or if they say the recommendation is wr
 
 ## 3. Hand off honestly
 
-There is no supported API that lets a terminal command switch the active Copilot agent, so:
+You cannot switch the developer's agent, and no command can. So tell them how to take the step in
+the tool they are working in:
 
-1. offer the **handoff button** above that matches `recommendedAction.copilotAgent`;
-2. if the action maps to a prompt instead, tell them to run `/<copilotPrompt>`;
+1. when `recommendedAction.copilotAgent` names one of the `eos-*` stage agents (the field is named
+   for Copilot; the agent is the same everywhere), name it and how to reach it: Copilot offers a
+   handoff button for it and lists it in the agent picker; Antigravity lists it as an agent to pick
+   or to run as a subagent; Codex spawns it when asked ("spawn the eos-architecture agent"); in any
+   other agent, give it the handoff package below and point it at `.github/agents/<name>.agent.md`;
+2. if the action maps to a slash command instead, tell them to run `/<copilotPrompt>`
+   (`$<copilotPrompt>` in Codex);
 3. if neither applies, print the `command` from the JSON verbatim so they can paste it.
 
 Never claim you switched agents. Never claim a skill ran if it did not.

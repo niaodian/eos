@@ -186,7 +186,7 @@ function action(snapshot, id, { reason, targetGate = null, command = null, doneW
     },
     problems: [
       ...(mapped.blocked ? [{ gate: 'agent-map', check: 'action-mapping', status: 'BLOCKED', detail: mapped.blocked }] : []),
-      ...(diag.checked && diag.missing.length ? [{ gate: 'agent-map', check: 'skill-availability', status: 'BLOCKED', detail: `BMAD skill(s) not installed: ${diag.missing.join(', ')} — install them at ~/.agents/skills/, or do the step manually` }] : []),
+      ...(diag.checked && diag.missing.length ? [{ gate: 'agent-map', check: 'skill-availability', status: 'BLOCKED', detail: `BMAD skill(s) not installed: ${diag.missing.join(', ')} — install them in the user-level skills folder your agent reads (~/.agents/skills/ for Copilot and Codex; the user manual's §2.2 lists the others), or do the step manually` }] : []),
     ],
   };
 }

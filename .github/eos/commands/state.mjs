@@ -23,6 +23,14 @@ import { EXIT, emit } from './shared.mjs';
 
 const CLI = 'node .github/eos/eos.mjs';
 
+/**
+ * `next --exit-zero` / `resume --exit-zero`: for a caller that wants the card, not a verdict — a
+ * prompt, a session hook, an `&&` chain — a blocked step (2) or a failed check (1) exits 0. An EOS
+ * that cannot evaluate (3) still exits 3, so a broken configuration is never hidden. The JSON keeps
+ * the real exitCode. Opt-in only: it never switches on by itself, on a terminal or in CI.
+ */
+const cardExit = (flags, code) => (flags['exit-zero'] && code !== EXIT.ERROR ? EXIT.OK : code);
+
 /** The governance track and what a release on it will require — said up front, not at tag time. */
 function trackLines(track) {
   return ['Track', `  ${track.title} track · ${track.profile || '—'} — ${track.summary}`, '  A release needs:',
@@ -153,7 +161,7 @@ export const stateCommands = {
     if (ahead) decision.releasePreview = ahead;
     const extra = [...previewLines(ahead, { compact: true }), ...crossBranchLines(cross), ...policyDriftLines(drift)];
     emit(flags, decision, renderCard(decision, { why: !!flags.why, all: !!flags.all }) + (extra.length ? `\n${extra.join('\n')}` : ''));
-    return decision.exitCode;
+    return cardExit(flags, decision.exitCode);
   },
 
   resume(snapshot, flags) {
@@ -176,7 +184,7 @@ export const stateCommands = {
     const card = renderCard(decision, { why: !!flags.why, all: !!flags.all });
     const extra = lastGate ? `\nLast verified gate\n  ${lastGate.gate} — PASS at ${lastGate.ts}\n` : '';
     emit(flags, decision, card + extra);
-    return decision.exitCode;
+    return cardExit(flags, decision.exitCode);
   },
 
   /**

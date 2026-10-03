@@ -25,12 +25,29 @@ import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { REPO_ROOT } from './test-support.mjs';
 
-/** EOS Core: the engine the whole guarantee rests on — the libraries, the command handlers, the entry. */
-const CORE = ['.github/eos/lib', '.github/eos/commands', '.github/eos/eos.mjs'];
+/**
+ * EOS Core: the engine the whole guarantee rests on — the libraries, the gate evaluators, the command
+ * handlers, the entry. A directory is scanned one level deep, so each subdirectory is listed itself.
+ */
+const CORE = ['.github/eos/lib', '.github/eos/lib/evaluators', '.github/eos/commands', '.github/eos/eos.mjs'];
 
 test('every EOS Core location exists — moving code cannot silently take it out of the boundary', () => {
   // coreFiles() skips a missing entry, so a renamed directory would otherwise just stop being scanned.
   for (const entry of CORE) assert.ok(existsSync(join(REPO_ROOT, entry)), `${entry} is listed as EOS Core but does not exist`);
+});
+
+test('every directory inside EOS Core is listed — code in a new subdirectory cannot sit outside the boundary', () => {
+  // coreFiles() reads one level of each listed directory: an unlisted subdirectory would never be scanned.
+  const unlisted = new Set();
+  const walk = (rel) => {
+    for (const e of readdirSync(join(REPO_ROOT, rel), { withFileTypes: true })) {
+      if (!e.isDirectory()) continue;
+      if (!CORE.includes(`${rel}/${e.name}`)) unlisted.add(`${rel}/${e.name}`);
+      walk(`${rel}/${e.name}`);
+    }
+  };
+  for (const entry of CORE) if (statSync(join(REPO_ROOT, entry)).isDirectory()) walk(entry);
+  assert.deepEqual([...unlisted], [], 'list each of these in CORE, so the offline and zero-dependency checks read the code in it');
 });
 
 /**

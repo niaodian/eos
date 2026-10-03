@@ -63,6 +63,8 @@ jobs:
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
+          # The declared minimum (`engines`), end of life since 2026-04-30: the gate proves the floor
+          # still works, and the ci-linux timing baseline is recorded on it. 22 and 24 run below.
           node-version: '20'
 
       - name: EOS config validation (S1–S13)
@@ -259,9 +261,14 @@ jobs:
       fail-fast: false
       matrix:
         os: [windows-latest, macos-latest]
-        # Both supported runtimes on both platforms: the README claims Node 20 and 22, so CI proves
-        # it everywhere rather than on Linux alone.
-        node: ['20', '22']
+        # Every runtime the README claims, on every platform. Node 20 reached end of life on
+        # 2026-04-30 but stays: it is still the declared minimum (`engines`), and raising that is a
+        # breaking change of its own. 22 and 24 are the LTS lines the README recommends. Linux
+        # already runs 20 (verify) and 22 (coverage), so it joins the matrix for 24 only.
+        node: ['20', '22', '24']
+        include:
+          - os: ubuntu-latest
+            node: '24'
     runs-on: ${{ matrix.os }}
     # Measured (2.0): all five layers take 8 to 20 min on Windows, depending on the runner, and ~3 min
     # on macOS. 45 min is room for the slowest Windows runner seen, not for a hang.

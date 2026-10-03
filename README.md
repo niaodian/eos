@@ -8,7 +8,7 @@
 [![EOS CI](https://github.com/niaodian/eos/actions/workflows/eos-ci.yml/badge.svg?branch=main)](https://github.com/niaodian/eos/actions/workflows/eos-ci.yml)
 [![CI platforms](https://img.shields.io/badge/CI-Linux%20%7C%20macOS%20%7C%20Windows-informational)](.github/workflows/eos-ci.yml)
 [![Provenance](https://img.shields.io/badge/provenance-SLSA%20v1%20attested-2ea44f)](https://github.com/niaodian/eos/attestations)
-[![Node](https://img.shields.io/badge/node-20%20%7C%2022-339933?logo=node.js&logoColor=white)](package.json)
+[![Node](https://img.shields.io/badge/node-20%20%7C%2022%20%7C%2024-339933?logo=node.js&logoColor=white)](package.json)
 [![Dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)](package.json)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
@@ -74,11 +74,12 @@ shows it with the exact `eos policy lock --write --reason "<why>"` that acknowle
 
 ## Quickstart
 
-You need Node.js 20.10+ and Git. An AI agent is optional — the CLI works in any terminal.
+You need Node.js 20.10+ (22 or 24 recommended — Node 20 reached end of life on 2026-04-30) and Git. An
+AI agent is optional — the CLI works in any terminal.
 
 ```bash
 # 1. Start from a pinned release and make it your repository
-npx degit niaodian/eos#eos-2.3.0 my-app && cd my-app && git init
+npx degit niaodian/eos#eos-2.4.0 my-app && cd my-app && git init
 
 # 2. Declare the project — no code yet, so the stack is decided at architecture time
 npx --offline eos init config-only --write        # add --track regulated for the strict track
@@ -169,8 +170,8 @@ EOS releases are built and attested in GitHub Actions, the way EOS asks your rel
 yourself before you adopt it:
 
 ```bash
-gh release download eos-2.3.0 --repo niaodian/eos --pattern 'eos-2.3.0.tar.gz'
-gh attestation verify eos-2.3.0.tar.gz --repo niaodian/eos
+gh release download eos-2.4.0 --repo niaodian/eos --pattern 'eos-2.4.0.tar.gz'
+gh attestation verify eos-2.4.0.tar.gz --repo niaodian/eos
 ```
 
 Each release also ships its SBOM and a `SHA256SUMS` file.
@@ -199,14 +200,15 @@ docs/               your specs and ADRs; docs/eos/ is the EOS manual set (中文
 - [Using EOS with Claude Code, Codex and Antigravity](docs/eos/user-manual.md#chapter-66-using-eos-with-claude-code-codex-and-antigravity) — the one-time setup and the daily workflow in each agent.
 - [Upgrading to eos-2.0.0](docs/eos/user-manual.md#105-upgrading-from-eos-122x-to-eos-200) — what changes and what to do.
 - [Upgrading to eos-2.0.1](docs/eos/user-manual.md#107-upgrading-from-eos-200-to-eos-201) — the secret-detection security patch.
-- [Upgrading to eos-2.3.0](docs/eos/user-manual.md#1010-upgrading-from-eos-22x-to-eos-230) — every agent platform generated from one source, `eos mcp`, brownfield adoption, `eos stage init`.
+- [Upgrading to eos-2.4.0](docs/eos/user-manual.md#1011-upgrading-from-eos-23x-to-eos-240) — Node 24 tested everywhere, BMAD found for Antigravity, `eos next --exit-zero`, the runbook where the release gate reads it.
 - [Workflow contract](docs/eos/developer-experience.md) — the CLI, exit codes, JSON and diagnostics.
 - [Stack presets and tracks](docs/eos/stack-presets.md) — every supported stack, and how to choose a track.
 - [Design rationale](docs/eos/blueprint.md) and [architecture decisions](docs/adr/).
 
 ## Requirements and notes
 
-- **Node.js 20.10+ and Git** — nothing else. CI runs Node 20 and 22 on Linux, macOS and Windows.
+- **Node.js 20.10+ and Git** — nothing else. Use Node 22 or 24: Node 20 reached end of life on 2026-04-30
+  and stays supported only as the declared minimum. CI runs Node 20, 22 and 24 on Linux, macOS and Windows.
 - **No API key, ever.** EOS never calls a model. What each addition (Copilot, BMAD, the BMAD runtime) brings,
   and the known limitations, are in the [quickstart](docs/eos/quickstart.md#what-you-need-for-what).
 - **An AI agent is optional.** GitHub Copilot (VS Code), Claude Code, OpenAI Codex and Google Antigravity are

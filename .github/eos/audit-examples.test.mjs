@@ -14,7 +14,7 @@ import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
 import { join } from 'node:path';
 import { boundedSpawnSync, cleanEnv, SPAWN_TIMEOUT_MS } from './test-spawn.mjs';
-import { project, run, runJson, cleanup, storyFiles, story, commitAll, writeManifest, APP_PROJECT, REPO_ROOT, treeDigest, producerTrust } from './audit-support.mjs';
+import { project, run, runJson, cleanup, storyFiles, story, commitAll, writeManifest, APP_PROJECT, REPO_ROOT, treeDigest, producerTrust, junitMatchOf } from './audit-support.mjs';
 import { readSummary, summaryTreeMismatch } from './lib/machine-summary.mjs';
 
 after(cleanup);
@@ -113,7 +113,8 @@ test('the trace-evidence example passes G7 as a dual-stack project — node:test
   assert.equal(r.code, 0, r.out);
   const summary = readSummary(dir, 'testRun').data;
   assert.deepEqual(summary.source.reports, ['reports/junit/node.xml', 'reports/junit/python.xml']);
-  assert.deepEqual(summary.results.map((x) => `${x.ac} ${x.status} ${x.match}`), ['AC1.1 PASS name', 'AC1.2 PASS file']);
+  // pytest places its case by module; node:test records the file from Node 24.11 on, the name before.
+  assert.deepEqual(summary.results.map((x) => `${x.ac} ${x.status} ${x.match}`), [`AC1.1 PASS ${junitMatchOf(join(dir, 'reports/junit/node.xml'))}`, 'AC1.2 PASS file']);
 });
 
 // ---------------------------------------------------------------- NFR evidence (P1-2)

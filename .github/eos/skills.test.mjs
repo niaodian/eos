@@ -11,6 +11,7 @@ import { existsSync, readFileSync, readdirSync, cpSync, rmSync, symlinkSync, lst
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { project, write, run, runJson, cleanup, REPO_ROOT, APP_PROJECT } from './test-support.mjs';
+import { boundedSpawnSync } from './test-spawn.mjs';
 import { listSkills, skillProblems, skillFrontmatter, planSkillSync, SKILLS_DIR } from './lib/skills.mjs';
 
 after(cleanup);
@@ -153,4 +154,39 @@ test('a link where a copy belongs is replaced — the link goes, never what it p
   }
   assert.equal(run(dir, ['agents', 'sync', '--check']).code, 0);
   rmSync(outside, { recursive: true, force: true });
+});
+
+test('BMAD installed only where Antigravity reads skills is found — by eos next and by the doctor', () => {
+  const lock = JSON.parse(readFileSync(join(REPO_ROOT, '.eos/bmad.lock.json'), 'utf8'));
+  const dir = project({
+    '.eos/project.json': APP_PROJECT,
+    '.eos/bmad.lock.json': lock,
+    '.eos/schemas/bmad-lock.schema.json': JSON.parse(readFileSync(join(REPO_ROOT, '.eos/schemas/bmad-lock.schema.json'), 'utf8')),
+  });
+  const bmad = new Set([...lock.requiredSkills.map((s) => s.name), ...Object.values(agentMap.actions).flatMap((a) => a.skills || [])].filter((n) => !n.startsWith('eos-')));
+  const homes = [];
+  const home = (rel = null) => {
+    const h = mkdtempSync(join(tmpdir(), 'eos-home-'));
+    homes.push(h);
+    if (rel) for (const name of bmad) write(h, `${rel}/${name}/SKILL.md`, `---\nname: ${name}\ndescription: Stand-in for ${name}. Use never.\n---\n`);
+    return h;
+  };
+  // eos next reads the skills of the step it recommends; the doctor checks every skill bmad.lock.json requires.
+  const unseenByNext = (h) => runJson(dir, ['next'], { HOME: h, USERPROFILE: h }).json.blockers.filter((b) => b.check === 'skill-availability');
+  const unseenByDoctor = (h) => JSON.parse(boundedSpawnSync(process.execPath, [join(REPO_ROOT, '.github/hooks/eos-doctor.mjs'), '--deep', '--json'], {
+    cwd: dir, encoding: 'utf8', env: { ...process.env, HOME: h, USERPROFILE: h },
+  }).stdout).notes.filter((n) => /is not installed/.test(n));
+  try {
+    const none = home();
+    assert.match(unseenByNext(none)[0]?.detail || '', /BMAD skill\(s\) not installed: .*bmad-/, 'with no BMAD anywhere, the step says what is missing');
+    assert.ok(unseenByDoctor(none).length, 'with no BMAD anywhere, the doctor says what is missing');
+    // Antigravity 2.0 and the IDE, its CLI, and the IDE's legacy folder — none of them reads ~/.agents/skills.
+    for (const rel of ['.gemini/config/skills', '.gemini/antigravity-cli/skills', '.gemini/antigravity/skills']) {
+      const h = home(rel);
+      assert.deepEqual(unseenByNext(h), [], `~/${rel}`);
+      assert.deepEqual(unseenByDoctor(h), [], `~/${rel}`);
+    }
+  } finally {
+    for (const h of homes) rmSync(h, { recursive: true, force: true });
+  }
 });

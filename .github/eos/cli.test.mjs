@@ -100,6 +100,25 @@ test('exit codes: an unknown command exits 3 with usage, never 0', () => {
   assert.match(out, /usage/i);
 });
 
+test('exit codes: next and resume --exit-zero exit 0 while blocked, keep the verdict in the JSON, and still exit 3 when EOS cannot evaluate', () => {
+  const blocked = project({ '.eos/project.json': APP_PROJECT });
+  for (const cmd of ['next', 'resume']) {
+    const plain = runJson(blocked, [cmd]);
+    assert.equal(plain.code, 2, plain.out);
+    const zero = runJson(blocked, [cmd, '--exit-zero']);
+    assert.equal(zero.code, 0, zero.out);
+    // Only the process status changes: the document is the same, verdict included.
+    assert.equal(zero.json.exitCode, 2);
+    assert.deepEqual({ ...zero.json, generatedAt: null }, { ...plain.json, generatedAt: null });
+    assert.equal(run(blocked, [cmd, '--exit-zero']).code, 0, `${cmd} --exit-zero without --json`);
+  }
+  // A configuration EOS cannot evaluate is never hidden behind the flag.
+  const broken = project({ '.eos/project.json': APP_PROJECT, '.eos/workflow.json': '{ not json' });
+  for (const cmd of ['next', 'resume']) assert.equal(run(broken, [cmd, '--exit-zero']).code, 3, cmd);
+  // The flag belongs to the two commands that print the card: a gate's verdict is untouched.
+  assert.equal(run(blocked, ['check', '--gate', 'story-ready', '--scope', 'NOPE', '--exit-zero']).code, 2);
+});
+
 // ---------------------------------------------------------------- command registry
 test('a large --json document reaches a pipe whole, not cut off at the pipe buffer', () => {
   // Pipes are asynchronous on macOS and Windows. Exiting straight after the write cut a

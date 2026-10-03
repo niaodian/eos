@@ -6,7 +6,7 @@ import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { validate } from './schema.mjs';
 import { currentBranch } from './git-base.mjs';
-import { skillExists, SKILLS_DIR, PROJECT_SKILL_DIRS } from './skills.mjs';
+import { skillExists, SKILLS_DIR, PROJECT_SKILL_DIRS, USER_SKILL_DIRS } from './skills.mjs';
 
 export const EOS_DIR = '.eos';
 export const WORKFLOW_PATH = '.eos/workflow.json';
@@ -116,7 +116,7 @@ export function skillDiagnostics(skills, root = null) {
   const roots = [process.env.HOME, process.env.USERPROFILE].filter(Boolean);
   const dirs = [];
   for (const home of roots) {
-    for (const rel of ['.agents/skills', '.claude/skills', '.copilot/skills']) {
+    for (const rel of USER_SKILL_DIRS) {
       const d = join(home, rel);
       if (existsSync(d)) dirs.push(d);
     }

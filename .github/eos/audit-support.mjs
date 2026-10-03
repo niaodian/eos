@@ -11,7 +11,7 @@ export {
   project, write, run, runJson, cleanup, git, commitAll, story, releaseFiles,
   APP_PROJECT, PRD_2AC, baselineFiles, storyFiles, testRun, treeDigest, DISCOVERY_RECORD,
   writeManifest, bindDigests, ARCHITECTURE_RECORD, REQUIREMENTS_RECORD,
-  TELEMETRY_MD, TELEMETRY_RECORD, ITERATION_RECORD, REPO_ROOT,
+  TELEMETRY_MD, TELEMETRY_RECORD, ITERATION_RECORD, REPO_ROOT, junitMatchOf,
 } from './test-support.mjs';
 export { computeProductTree, compareProductTree, clearProductTreeCache, isSelfReference } from './lib/product-tree.mjs';
 export { emptyDocReason } from './lib/stage-record.mjs';

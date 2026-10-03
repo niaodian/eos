@@ -18,7 +18,7 @@
 //
 // When the tests run in another CI step, `eos evidence junit <files…> --write` is the same conversion
 // with a different freshness rule: a report older than any product file is refused.
-import { existsSync, mkdirSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, statSync } from 'node:fs';
 import { join, isAbsolute, relative } from 'node:path';
 import { parseJUnit, answerReference, JUNIT_MAX_BYTES } from './junit.mjs';
 import { parseTraceMatrix, insideRepo, repoFileExists } from './gate-primitives.mjs';
@@ -123,12 +123,33 @@ const stampOf = (root, rel) => {
 };
 
 /**
+ * A testcase's `file` as a repository path when it lies inside the repository. node:test records the
+ * absolute path from Node 24.11 on: kept as it is, the checkout location — a home directory, a CI
+ * runner's workspace — would reach the committed evidence through a message, and differ per machine.
+ * A path outside the repository (a report written in another checkout) is kept: matching compares
+ * the end of a path, so it still places the case.
+ */
+function repositoryPath(bases, file) {
+  if (!file || !isAbsolute(file)) return file;
+  for (const base of bases) {
+    const rel = relative(base, file);
+    if (rel && rel !== '..' && !/^\.\.[\\/]/.test(rel) && !isAbsolute(rel)) return posix(rel);
+  }
+  return file;
+}
+
+/**
  * Read and parse reports. One unreadable or malformed report fails the whole set: dropping it would
  * silently drop whatever failures it recorded.
  * @returns {{cases: object[], error: string|null}}
  */
 export function readReports(root, files) {
   const cases = [];
+  // The reporter writes the path its process saw: on macOS a temporary checkout under /var is
+  // /private/var to it, so the real path of the root counts too.
+  let real = root;
+  try { real = realpathSync.native(root); } catch { /* the root as given */ }
+  const bases = [...new Set([root, real])];
   let total = 0;
   for (const rel of files) {
     const full = join(root, rel);
@@ -139,7 +160,7 @@ export function readReports(root, files) {
     if (total > MAX_TOTAL_BYTES) return { cases: [], error: `the ${files.length} matching reports add up to more than ${MAX_TOTAL_BYTES / (1024 * 1024)} MB — refused rather than read; narrow evidence.junit` };
     const parsed = parseJUnit(readFileSync(full, 'utf8'));
     if (!parsed.ok) return { cases: [], error: `${rel}: not a JUnit report EOS can read — ${parsed.error}` };
-    for (const c of parsed.cases) cases.push({ ...c, report: rel });
+    for (const c of parsed.cases) cases.push({ ...c, file: repositoryPath(bases, c.file), report: rel });
   }
   return { cases, error: null };
 }

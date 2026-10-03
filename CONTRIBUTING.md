@@ -35,7 +35,9 @@ These are the beliefs the template is built on. Changes are easiest to accept wh
 
 ## Prerequisites
 
-- **Node.js 18+** — the only hard dependency (runs the validators, hooks, tests, and evals).
+- **Node.js 20.10+** — the only hard dependency (runs the validators, hooks, tests, and evals). Develop on
+  Node 22 or 24: Node 20 reached end of life on 2026-04-30 and remains only the declared minimum, which CI
+  keeps testing.
 - *Optional:* Docker + [`act`](https://github.com/nektos/act) to run the CI workflow locally;
   [`gitleaks`](https://github.com/gitleaks/gitleaks) for deeper secret scanning. Both degrade gracefully
   if absent.

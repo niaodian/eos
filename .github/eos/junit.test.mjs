@@ -1,17 +1,17 @@
 // JUnit XML parsing and trace-matrix matching (ADR-016) — pure functions, no sandbox.
 //
-// The node:test and pytest fixtures are real reporter output (Node 22, pytest 9), trimmed of host
-// names and stack traces; the others are the shapes vitest, Playwright, Maven Surefire, gotestsum
+// The node:test and pytest fixtures are real reporter output (Node 22 and 24, pytest 9), trimmed of
+// host names and stack traces; the others are the shapes vitest, Playwright, Maven Surefire, gotestsum
 // and JunitXml.TestLogger write. A parser that only ever saw hand-written XML would be tested
 // against the reports nobody produces.
 //   node --test .github/eos/junit.test.mjs
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, realpathSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { parseJUnit, answerReference, nameMatches, locationVerdict, JUNIT_MAX_BYTES } from './lib/junit.mjs';
-import { globToRegExp, deriveResults, producerFromEnv, findReports } from './lib/test-evidence.mjs';
+import { globToRegExp, deriveResults, producerFromEnv, findReports, readReports } from './lib/test-evidence.mjs';
 import { sourceTokens, declaresSelector, TEST_PATH } from './lib/test-source.mjs';
 import { parseTraceMatrix } from './lib/gate-primitives.mjs';
 
@@ -44,6 +44,20 @@ const NODE = `<?xml version="1.0" encoding="utf-8"?>
 `;
 
 const PYTEST = '<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="1" skipped="1" tests="5" time="0.016"><testcase classname="pytests.test_login" name="test_valid_password" time="0.000" /><testcase classname="pytests.test_login.TestSession" name="test_expires" time="0.000" /><testcase classname="pytests.test_login" name="test_param[1]" time="0.000" /><testcase classname="pytests.test_login" name="test_param[2]" time="0.000"><failure message="assert 2 == 1">n = 2\n\n&gt;       assert n == 1\nE       assert 2 == 1</failure></testcase><testcase classname="pytests.test_login" name="test_skipped" time="0.000"><skipped type="pytest.skip" message="later">pytests/test_login.py:14: later</skipped></testcase></testsuite></testsuites>';
+
+// node:test from Node 24.11 on (nodejs/node#59432): each testcase carries the absolute path of its file.
+const NODE24 = `<?xml version="1.0" encoding="utf-8"?>
+<testsuites>
+	<testcase name="valid password logs the user in" time="0.000296" classname="test" file="/work/app/tests/login.test.mjs"/>
+	<testsuite name="session" time="0.000221" disabled="0" errors="0" tests="2" failures="0" skipped="1">
+		<testcase name="expires after 30 minutes" time="0.000070" classname="test" file="/work/app/tests/login.test.mjs"/>
+		<testcase name="is skipped" time="0.000040" classname="test" file="/work/app/tests/login.test.mjs">
+			<skipped type="skipped" message="not yet"/>
+		</testcase>
+	</testsuite>
+	<!-- tests 3 -->
+</testsuites>
+`;
 
 const PYTEST_XUNIT1 = '<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" tests="1"><testcase classname="pytests.test_login" name="test_valid_password" file="pytests/test_login.py" line="2" time="0.000" /></testsuite></testsuites>';
 
@@ -105,6 +119,36 @@ test('a report that records no file is matched by name, and says so', () => {
   assert.match(a.detail, /matched by name/);
   // A selector may carry the describe path, in the separator the matrix already uses.
   assert.equal(answerReference(cases(NODE), 'tests/login.test.mjs', 'session > nested > deep case').status, 'PASS');
+});
+
+test('node:test from Node 24.11 records each case\'s file: matched by file, and a case in another file does not answer the row', () => {
+  const a = answerReference(cases(NODE24), 'tests/login.test.mjs', 'session > expires after 30 minutes');
+  assert.deepEqual([a.status, a.match], ['PASS', 'file']);
+  assert.equal(answerReference(cases(NODE24), 'tests/login.test.mjs', 'is skipped').status, 'SKIP');
+  const elsewhere = answerReference(cases(NODE24), 'tests/logout.test.mjs', 'valid password logs the user in');
+  assert.equal(elsewhere.status, 'ERROR');
+  assert.match(elsewhere.detail, /places it in \/work\/app\/tests\/login\.test\.mjs, not tests\/logout\.test\.mjs/);
+});
+
+test('read from a repository, a report\'s absolute file paths become repository paths — the checkout is never recorded', () => {
+  const root = mkdtempSync(join(tmpdir(), 'eos-junit-'));
+  temps.push(root);
+  mkdirSync(join(root, 'reports'));
+  const real = realpathSync.native(root);
+  const attr = (p) => p.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+  writeFileSync(join(root, 'reports/r.xml'), [
+    '<testsuites>',
+    `<testcase name="a" classname="test" file="${attr(join(root, 'tests', 'a.test.mjs'))}"/>`,
+    `<testcase name="b" classname="test" file="${attr(join(real, 'tests', 'b.test.mjs'))}"/>`,
+    `<testcase name="c" classname="test" file="${attr(join(dirname(root), 'elsewhere', 'c.test.mjs'))}"/>`,
+    '<testcase name="d" classname="test" file="tests/d.test.mjs"/>',
+    '</testsuites>',
+  ].join('\n'));
+  const { cases: read, error } = readReports(root, ['reports/r.xml']);
+  assert.equal(error, null);
+  assert.deepEqual(read.map((c) => c.file), ['tests/a.test.mjs', 'tests/b.test.mjs', join(dirname(root), 'elsewhere', 'c.test.mjs'), 'tests/d.test.mjs']);
+  // A path outside the repository is still placed by its end, as before.
+  assert.equal(locationVerdict(read[2], 'elsewhere/c.test.mjs'), 'agrees');
 });
 
 test('a skipped or todo test is never a PASS, and a failing one fails the row', () => {

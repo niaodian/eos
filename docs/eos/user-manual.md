@@ -1,6 +1,6 @@
 # EOS User Manual (Engineering Operating System)
 
-> Version: synced with `docs/eos/VERSION` (current `eos-2.3.0`)
+> Version: synced with `docs/eos/VERSION` (current `eos-2.4.0`)
 > Applies to: recent VS Code + GitHub Copilot Chat (custom agent / hooks are recent-version capabilities; confirm the version in the "About VS Code" panel), or Claude Code, OpenAI Codex or Google Antigravity ([Chapter 6.6](#chapter-66-using-eos-with-claude-code-codex-and-antigravity)) + 73 installed `bmad-*` skills (user-level)
 > Positioning: this manual is an **operating guide (how to use it)**; for design rationale and trade-offs, see `blueprint.md` in the same directory (why it is designed this way).
 > Conventions: prose in English; file names / paths / commands / config keys kept verbatim.
@@ -20,7 +20,7 @@
 | Want to look up a slash command / agent / rule | [Chapter 7 Complete reference](#chapter-7-complete-reference-quick-reference) |
 | Configuration is broken / Agent is not working as expected | [Chapter 9 Failure localization](#chapter-9-failure-localization-and-troubleshooting) |
 | Want to move this system to another project/team | [Chapter 10 Cross-project reuse and distribution](#chapter-10-cross-project-reuse-and-distribution) |
-| Upgrading to `eos-2.0.0`, choosing a governance track, or signing releases | [§10.5 Upgrading](#105-upgrading-from-eos-122x-to-eos-200) · [§10.6 Tracks and signed releases](#106-governance-tracks-signed-releases-and-central-policy) · [§10.7 The 2.0.1 security patch](#107-upgrading-from-eos-200-to-eos-201) · [§10.8 `eos upgrade` and 2.1.0](#108-upgrading-from-eos-20x-to-eos-210) · [§10.9 2.2.0](#109-upgrading-from-eos-21x-to-eos-220) · [§10.10 2.3.0](#1010-upgrading-from-eos-22x-to-eos-230) |
+| Upgrading to `eos-2.0.0`, choosing a governance track, or signing releases | [§10.5 Upgrading](#105-upgrading-from-eos-122x-to-eos-200) · [§10.6 Tracks and signed releases](#106-governance-tracks-signed-releases-and-central-policy) · [§10.7 The 2.0.1 security patch](#107-upgrading-from-eos-200-to-eos-201) · [§10.8 `eos upgrade` and 2.1.0](#108-upgrading-from-eos-20x-to-eos-210) · [§10.9 2.2.0](#109-upgrading-from-eos-21x-to-eos-220) · [§10.10 2.3.0](#1010-upgrading-from-eos-22x-to-eos-230) · [§10.11 2.4.0](#1011-upgrading-from-eos-23x-to-eos-240) |
 
 ---
 
@@ -128,7 +128,7 @@ bmad-code-review                   → review has no blockers  (Gate G6)
 | VS Code | Recent version (custom agent / hooks require a recent version) | Check the real version in the About panel (`code --version` may be a shim and is not reliable) |
 | GitHub Copilot | Logged in (enterprise license is only a license, not a configuration dependency) | Chat panel is usable |
 | Or another agent | Claude Code, OpenAI Codex or Google Antigravity instead of VS Code + Copilot — setup in [Chapter 6.6](#chapter-66-using-eos-with-claude-code-codex-and-antigravity) | it starts in the project folder, and `/eos-next` (Codex: `$eos-next`) answers |
-| Node.js | 18+ (used by validators and hooks) | `node -v` |
+| Node.js | 20.10+ (the CLI, validators and hooks); use 22 or 24 — Node 20 reached end of life on 2026-04-30 and remains only the declared minimum | `node -v` |
 | BMAD skills | 73 `bmad-*` (user-level) | macOS/Linux `ls ~/.agents/skills &#124; grep -c '^bmad-'` · Windows `(Get-ChildItem ~/.agents/skills -Filter 'bmad-*').Count` |
 
 > **On Windows or Linux?** The core flow is identical — all hooks/validators are Node and paths are
@@ -147,6 +147,12 @@ These are **user-level** and shared across all projects. EOS invokes them by the
 Other agents read user-level skills from their own folders: Claude Code from `~/.claude/skills/` (the
 mirror above), Codex from `~/.agents/skills/`, and Antigravity from `~/.gemini/config/skills/` (IDE) or
 `~/.gemini/antigravity-cli/skills/` (CLI) — link BMAD there as shown in §6.6.3.
+
+`eos next` and `eos-doctor --deep` look for BMAD in every one of these folders — `~/.agents/skills/`,
+`~/.claude/skills/`, `~/.copilot/skills/`, `~/.gemini/config/skills/`, `~/.gemini/antigravity-cli/skills/`
+and the Antigravity IDE's legacy `~/.gemini/antigravity/skills/` — and in the project's `.agents/skills/`
+(since eos-2.4.0). A skill found in any of them counts as installed; whether the agent you use reads
+that folder is the setup above.
 
 ## 2.3 User-level agents directory (optional)
 
@@ -174,7 +180,7 @@ If you want to promote some `eos-*.agent.md` files to "available in all projects
 **Method A — degit (recommended, fastest)**
 ```sh
 # Public template — plain degit works (no auth needed)
-npx degit niaodian/eos#eos-2.3.0 my-new-app
+npx degit niaodian/eos#eos-2.4.0 my-new-app
 cd my-new-app
 git init && git add -A && git commit -m "chore: scaffold from eos"
 ```
@@ -216,7 +222,7 @@ Open `.github/instructions/00-workspace.instructions.md` and change it to the re
 ## 3.4 Full Day-1 sequence (copy-ready)
 
 ```sh
-npx degit niaodian/eos#eos-2.3.0 my-new-app && cd my-new-app
+npx degit niaodian/eos#eos-2.4.0 my-new-app && cd my-new-app
 git init && git add -A && git commit -q -m "chore: scaffold from eos"
 node .github/hooks/validate-config.mjs
 node .github/eos/eos.mjs init config-only --write   # declare it: no code yet (or init <pack> [--track regulated])
@@ -238,7 +244,7 @@ setup for each.
 A system that already runs does not have to be re-specified before EOS can help. Adopt it at the **delivery gates** with the `delivery-only` workflow profile (since eos-2.3.0): the running system is the baseline, and every change from now on is a story that must be ready (G5), verified (G7) and released (G8).
 
 ```sh
-npx degit niaodian/eos#eos-2.3.0 /tmp/eos                      # the template, outside your repository
+npx degit niaodian/eos#eos-2.4.0 /tmp/eos                      # the template, outside your repository
 # copy into your repository: .eos/ .agents/ .github/{eos,hooks,agents,instructions}/ docs/eos/
 # and merge by hand what you already have: AGENTS.md, .github/copilot-instructions.md, .github/workflows/eos-ci.yml
 node .github/hooks/validate-config.mjs                          # S7 names anything still missing
@@ -360,7 +366,7 @@ So EOS **never depends on "Rule A overriding Rule B"**. The only reliable contro
 | Item | Content |
 |---|---|
 | **Goal** | Get an empty project with healthy configuration from the template |
-| **How to start** | `npx degit niaodian/eos#eos-2.3.0 my-app && cd my-app`, then declare it: `node .github/eos/eos.mjs init config-only --write` (stack undecided) or `init <pack> --write` |
+| **How to start** | `npx degit niaodian/eos#eos-2.4.0 my-app && cd my-app`, then declare it: `node .github/eos/eos.mjs init config-only --write` (stack undecided) or `init <pack> --write` |
 | **Output** | Complete `.github/` + `docs/` skeleton |
 | **Gate** | `node .github/hooks/validate-config.mjs` → **PASS** |
 | **Must check** | PASS 0 errors. **If the stack is undecided, do not change** `00-workspace` yet--keep the Node placeholder; the stack is an irreversible decision, and the authority is locked in **Phase 4 (ADR)**. If the stack is known, copy `docs/eos/stack-presets.md` directly (fast path). |
@@ -537,12 +543,12 @@ So EOS **never depends on "Rule A overriding Rule B"**. The only reliable contro
 | **Goal** | Release only after passing quality/security/rollback/canary/NFR gates |
 | **When to enter** | G7 passed |
 | **How to start** | Enter **`/eos-release-gate`** in Chat; if runbook is missing, run **`/eos-runbook <service>`** first |
-| **Input** | Test results, NFR verification results (`docs/evidence/nfr-summary.json` — measure each target and write it with [examples/nfr-summary](examples/nfr-summary/README.md)), `ops/runbook-*.md`. `eos status` has listed what G8 needs since the project was declared |
-| **Output** | Release-gate report (PASS/FAIL item by item), `ops/runbook-<service>.md` |
+| **Input** | Test results, NFR verification results (`docs/evidence/nfr-summary.json` — measure each target and write it with [examples/nfr-summary](examples/nfr-summary/README.md)), `ops/runbook.md`. `eos status` has listed what G8 needs since the project was declared |
+| **Output** | Release-gate report (PASS/FAIL item by item), `ops/runbook.md` (one section per service) |
 | **Decision gate G8 (hard gate)** | `node .github/eos/eos.mjs verify-release --release <id>` runs all 13 checks the prompt lists: ① the candidate is committed ② **the quality commands re-run ON THIS candidate** ③ stories VERIFIED ④ **each story's verification describes THIS tree** ⑤ spec alignment ⑥ secret scan ⑦ dependency audit ⑧ NFR evidence ⑨ compliance boundary ⑩ waivers ⑪ runbook: rollback **+ canary + health/readiness** ⑫ deployment-topology ADR ⑬ enforcement authority. **Any FAIL blocks release**; `DEFERRED` (an offline audit, an NFR with owner+trigger) is visible and never green |
 | **Must-check items** | Are rollback steps "exact executable steps" or empty words? Do deferred canary items have triggers? Does audit show 0 vulnerabilities? **Were NFR targets verified**? Note that `VERIFIED → APPROVED` needs an approval recorded by **someone other than whoever prepared the candidate** — no model, and no automation, can supply it |
 | **Anti-rework** | No rollback/no canary/unverified NFR means no launch--blocks "launching while sick". |
-| **Example** | `my-app/docs/release-gate.md` (all applicable items pass, `npm audit` 0 vulns), `my-app/docs/trace-matrix.md` (performance NFR item explicitly deferred+trigger), `my-app/ops/runbook-auth.md` (`FEATURE_LOGIN=off` rollback) |
+| **Example** | `my-app/docs/release-gate.md` (all applicable items pass, `npm audit` 0 vulns), `my-app/docs/trace-matrix.md` (performance NFR item explicitly deferred+trigger), `my-app/ops/runbook.md` (`FEATURE_LOGIN=off` rollback) |
 
 ---
 
@@ -623,7 +629,7 @@ So EOS **never depends on "Rule A overriding Rule B"**. The only reliable contro
 
 ### Step 0: Create project + choose stack (5 minutes)
 ```sh
-npx degit niaodian/eos#eos-2.3.0 todo-api && cd todo-api
+npx degit niaodian/eos#eos-2.4.0 todo-api && cd todo-api
 node .github/hooks/validate-config.mjs          # expect PASS
 node .github/eos/eos.mjs init node-service --write   # declare the stack (or python-service, go-service… — `eos init` lists them)
 ```
@@ -670,7 +676,7 @@ The gate reads the *machine* result, not a hand-written PASS — and since eos-2
 
 ### Step 8–10: Release + observability + iteration
 ```
-/eos-runbook todo-api                  → ops/runbook-todo-api.md (including rollback steps)
+/eos-runbook todo-api                  → ops/runbook.md (rollback, gradual rollout, health checks)
 /eos-release-gate                      → G8 five gates (quality+audit+NFR+rollback+canary)
 /eos-telemetry-plan                    → telemetry (SaaS side: QPS/latency/5xx golden signals)
 (switch to agent) eos-review       → iteration writes back to PRD
@@ -684,7 +690,7 @@ The gate reads the *machine* result, not a hand-written PASS — and since eos-2
 
 ### Step 0: Create project + create AI directories
 ```sh
-npx degit niaodian/eos#eos-2.3.0 cs-agent && cd cs-agent
+npx degit niaodian/eos#eos-2.4.0 cs-agent && cd cs-agent
 mkdir -p ai/prompts evals                       # AI code goes here; Agentic rules overlay automatically
 node .github/hooks/validate-config.mjs          # expect PASS
 node .github/eos/eos.mjs init rag-app --write    # the Python LLM pack: agentic paradigm + an eval command
@@ -937,8 +943,9 @@ them (§7.9).
   points to them: ask the agent to read the rule for the files it is about to change.
 - **Claude Code runs the workflows as skills, not as EOS subagents** (6.6.1).
 - **BMAD lives in a different folder per agent** (6.6.0). `eos-doctor --deep` and `eos next` check
-  `~/.agents/skills/`, `~/.claude/skills/` and `~/.copilot/skills/`, so they do not see a BMAD
-  install that exists only in Antigravity's folder.
+  every one of them, Antigravity's included (since eos-2.4.0, §2.2), so a BMAD install in any of them
+  counts. They cannot tell which folder your agent reads: an install only in `~/.agents/skills/`
+  satisfies the check but stays invisible to Antigravity until you link it (6.6.3).
 - **Hooks are local speed bumps.** Each agent asks you to trust them once. If the hook itself fails,
   some agents let the call through (Claude Code) and some refuse it (VS Code); CI stays the authority
   (Appendix D).
@@ -967,7 +974,7 @@ them (§7.9).
 | `/eos-compliance` | Regulated-industry compliance pre-flight (regime selection + boundary controls, conditional; uses F-compliance) | `<regime name or domain description>` | `docs/compliance-profile.md` |
 | `/eos-telemetry-plan` | Design telemetry and align it with success metrics | — | `docs/telemetry-plan.md` |
 | `/eos-release-gate` | Run release gate (G8) | — | Gate report |
-| `/eos-runbook` | Generate operations runbook (including rollback steps) | `<service name>` | `ops/runbook-<service>.md` |
+| `/eos-runbook` | Generate operations runbook (rollback, gradual rollout, health/readiness) | `<service name>` | `ops/runbook.md` (one section per service) — the file G8 reads |
 | `/eos-validate-config` | EOS configuration static+semantic health check | — | Issue table (does not change code) |
 
 Since eos-2.2.0 every slash command is an **Agent Skill** in `.agents/skills/eos-*/SKILL.md` — the open format Copilot (VS Code, CLI, cloud agent), Codex, Cursor and Antigravity read natively; VS Code's Agent Host no longer loads prompt files. Claude Code reads only `.claude/skills/`, so EOS keeps a byte-identical copy there: edit the skill in `.agents/skills/`, then run `node .github/eos/eos.mjs agents sync --write` (CI runs `agents sync --check`). In Codex the commands are `$eos-spec`, `$eos-next` …; `/eos-next`, `/eos-resume`, `/eos-status`, `/eos-help` and `/eos-init` are described in Chapter 1 and §3.
@@ -975,12 +982,16 @@ Since eos-2.2.0 every slash command is an **Agent Skill** in `.agents/skills/eos
 ## 7.2 EOS CLI (`node .github/eos/eos.mjs <command>`)
 
 Everything below is offline, zero-dependency and cross-platform. Exit codes: `0` pass · `1` fail or
-rejected transition · `2` blocked/pending/stale · `3` EOS itself cannot be evaluated.
+rejected transition · `2` blocked/pending/stale · `3` EOS itself cannot be evaluated. To look rather
+than gate — a shell prompt, a session-start hook, an `&&` chain — use `status` or `health`, which exit
+`0` whenever EOS can evaluate, or `next --exit-zero` / `resume --exit-zero` (since eos-2.4.0), which
+exit `0` instead of `1` or `2` and still `3` when EOS cannot evaluate. The flag never switches on by
+itself, and the `--json` document keeps the real `exitCode`.
 
 | Command | Purpose |
 |---|---|
-| `next` | The ONE recommended next action, why, and how to start it (`--why`, `--all`) |
-| `resume` | Restore this machine's focus in a new session |
+| `next` | The ONE recommended next action, why, and how to start it (`--why`, `--all`, `--exit-zero`) |
+| `resume` | Restore this machine's focus in a new session (`--exit-zero`) |
 | `status` | Where the product and the active scope are (`--changed`), and — since eos-2.2.0 — what the release gate (G8) will need that does not exist yet: a dependency audit, NFR measurements, a runbook, a deployment-topology ADR (`next` names the missing ones once there is product code) |
 | `check --gate <id> [--scope <id>]` | Run one gate for real and record the evidence |
 | `explain <gate>` | The full rule set for one gate, on demand |
@@ -1272,12 +1283,12 @@ Agent output does not match expectation
 ```sh
 # Method A: degit (public repository — no auth needed)
 # Pin the release tag: the default branch moves, a tag does not.
-npx degit niaodian/eos#eos-2.3.0 my-app
+npx degit niaodian/eos#eos-2.4.0 my-app
 cd my-app && git init
 
 # Method B: git clone at the tag, into a fresh history
-git clone --depth 1 --branch eos-2.3.0 https://github.com/niaodian/eos.git my-app
-cd my-app && git checkout --orphan main && git commit -m "chore: start from eos-2.3.0"
+git clone --depth 1 --branch eos-2.4.0 https://github.com/niaodian/eos.git my-app
+cd my-app && git checkout --orphan main && git commit -m "chore: start from eos-2.4.0"
 
 # Either way, declare the project: the template's own declaration describes EOS, not you
 node .github/eos/eos.mjs init                       # the tracks, the packs, and what is declared
@@ -1286,7 +1297,7 @@ node .github/eos/eos.mjs init config-only --write   # no code yet — or <pack>,
 
 ## 10.3 Distribution to a team (purely local, no enterprise dependency)
 
-1. Everyone starts from the **same release tag** (`eos-2.3.0`). The default branch keeps moving, so
+1. Everyone starts from the **same release tag** (`eos-2.4.0`). The default branch keeps moving, so
    an unpinned copy is a slightly different EOS for every person who takes one.
 2. `【Needs org/GitHub settings】` The GitHub **template repository** setting is owner-level: EOS can
    neither apply nor verify it locally, so do not take this page's word for it —
@@ -1806,6 +1817,30 @@ node /tmp/eos-next/.github/eos/eos.mjs upgrade --from /tmp/eos-next --base /tmp/
 node .github/eos/eos.mjs policy lock --write && node .github/eos/eos.mjs verify --full
 ```
 
+## 10.11 Upgrading from `eos-2.3.x` to `eos-2.4.0`
+
+Nothing gets stricter for a project that changes nothing. `.eos/gates.json`, `.eos/workflow.json` and the evaluator version are unchanged, so recorded gate results stay FRESH — except the gates bound to the product tree (`verified`, `release-ready`): EOS's own files are part of that tree, so those re-run after every upgrade.
+
+| What changed | What you will see | What to do |
+|---|---|---|
+| **Node 24 in CI; Node 20 is end-of-life** | `eos-ci.yml` runs Node 20, 22 and 24 on Linux, macOS and Windows — one more job. `engines` still says `>=20.10.0` | Move developers and your own CI to Node 22 or 24; keep 20 only while something forces you to |
+| **Node 24's JUnit report records each test's file** | On Node 24.11 and later, `docs/evidence/test-run.json` says `"match": "file"` where Node 20 and 22 said `"name"`, and its paths are repository-relative | Verify on one Node major, on every machine and in CI: a run on another major rewrites `test-run.json`, which every story's `verified` evidence binds |
+| **BMAD found where Antigravity reads it** | `eos next` and `eos-doctor --deep` no longer report BMAD missing when it is installed only for Antigravity (§2.2) | Nothing |
+| **The runbook is `ops/runbook.md`** | The `eos-runbook` skill and the docs name the file G8 reads; they used to name `ops/runbook-<service>.md`, which G8 never read | If you have `ops/runbook-<service>.md`, merge it into `ops/runbook.md`, one section per service |
+| **`eos next --exit-zero`, `eos resume --exit-zero`** | New, opt-in flags (§7.2) | Use them where the card must not fail a chain — a prompt, a hook, `&&`; `3` still means EOS cannot evaluate |
+| **The orchestrators read the same in every tool** | `.agents/agents/` (and `.codex/agents/`) say how to reach the next agent in each tool | Nothing: the upgrade regenerates them |
+| **EOS's own coverage thresholds rise** | `.eos/test-budget.json` sets 97 / 79 / 96 for EOS's own suite | Nothing, unless you edited that file — the upgrade then parks a conflict for you to merge |
+
+**Upgrade steps**
+
+```sh
+npx degit niaodian/eos#eos-2.3.0 /tmp/eos-base    # the version you are on — see docs/eos/VERSION
+npx degit niaodian/eos#eos-2.4.0 /tmp/eos-next
+node /tmp/eos-next/.github/eos/eos.mjs upgrade --from /tmp/eos-next --base /tmp/eos-base          # review the plan
+node /tmp/eos-next/.github/eos/eos.mjs upgrade --from /tmp/eos-next --base /tmp/eos-base --write  # apply it, and regenerate the agent-platform files
+node .github/eos/eos.mjs policy check && node .github/eos/eos.mjs verify --full
+```
+
 ---
 
 # Chapter 11 Adding a technology stack
@@ -1880,7 +1915,7 @@ EOS stack rules are **pluggable**. Adding a stack = add one `*.instructions.md` 
 
 ```
 # ── Terminal — the loop (this is all you need day to day) ──
-npx degit niaodian/eos#eos-2.3.0 my-app   # create new project
+npx degit niaodian/eos#eos-2.4.0 my-app   # create new project
 node .github/eos/eos.mjs init                       # what is declared, the two tracks, the starter packs
 node .github/eos/eos.mjs init <pack> --write        # declare it (config-only until the stack is decided; --track regulated)
 node .github/eos/eos.mjs init --write               # local VS Code tasks (never overwrites)
@@ -1942,14 +1977,14 @@ A real dry-run that passed end to end (feature: user login), **12/12 gates passe
 | 5 Planning | `my-app/docs/stories/story-001-auth.md` |
 | 6 Development | `my-app/src/auth.js` (zero-dependency node:crypto) |
 | 7 Testing | `my-app/test/auth.test.js` (10 AC-traced, all green), `my-app/docs/trace-matrix.md` |
-| 8 Release | `my-app/docs/release-gate.md`, `my-app/ops/runbook-auth.md` |
+| 8 Release | `my-app/docs/release-gate.md`, `my-app/ops/runbook.md` |
 | 9 Observability | 5 `auth.*` events in `src/auth.js` |
 | 10 Iteration | `my-app/docs/prd.md §6` (CR-001 write-back) |
 | Acceptance report | `my-app/docs/eos/walkthrough.md` (full scorecard + reproduction commands) |
 
 **Reproduce** (terminal):
 ```sh
-npx degit niaodian/eos#eos-2.3.0 my-app && cd my-app
+npx degit niaodian/eos#eos-2.4.0 my-app && cd my-app
 node .github/hooks/validate-config.mjs        # PASS
 npm test                                      # 10/10 green
 echo '{"tool_input":{"command":"rm -rf /tmp/x"}}' | node .github/hooks/deny-dangerous.js  # deny

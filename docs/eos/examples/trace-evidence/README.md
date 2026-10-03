@@ -58,11 +58,13 @@ its own report, nothing else declared:
   answered by `invalid password`.
 - When the report says **where** a testcase lives — a `file` attribute, a path or dotted module in
   `classname`, a file-named suite — only cases in the row's file count, and the result says
-  `"match": "file"`. When it does not (node:test writes `classname="test"` and no file), the name alone
-  matches and the result says `"match": "name"`. The file is then settled from the source: the file
-  the matrix names must declare the test (a string literal or function name, not a comment), and no
-  other test file may declare the same name — if two do, the row is an ERROR until the name is unique
-  or the selector names its suite (`tests/login.test.mjs::login > valid password`).
+  `"match": "file"` (node:test records the file from Node 24.11 on, as an absolute path EOS makes
+  repository-relative). When it does not (node:test on Node 20 and 22 writes `classname="test"` and
+  no file), the name alone matches and the result says `"match": "name"`. The file is then settled
+  from the source: the file the matrix names must declare the test (a string literal or function
+  name, not a comment), and no other test file may declare the same name — if two do, the row is an
+  ERROR until the name is unique or the selector names its suite
+  (`tests/login.test.mjs::login > valid password`).
 - Several testcases may answer one row (a parametrised test, or two runners with a same-named test):
   **one failing instance makes the row FAIL**, and a **skipped** or todo test is never a PASS.
 - A row with no match is reported with the name it looked for. A row that names only a file

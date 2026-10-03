@@ -17,10 +17,10 @@
     }
   },
   "coverage": {
-    "description": "Thresholds for `run-tests.mjs --coverage`. Set just below the measured figure (lines 96.9 / branches 75.8 / functions 96.3 at the time of writing) so they catch a real regression rather than chasing a round number. Enforced natively by Node 22+; on Node 20 the report still prints but the threshold is not applied, and run-tests says so rather than implying it passed.",
-    "lines": 95,
-    "branches": 73,
-    "functions": 94,
+    "description": "Thresholds for `run-tests.mjs --coverage`. Set just below the measured figure so they catch a real regression rather than chasing a round number: the CI coverage job (Node 22, no pytest) measured lines 97.80 / branches 80.45 / functions 96.60 at eos-2.4.0. Raise them when the figure rises; never lower them to let a change in. Enforced natively by Node 22+; on Node 20 the report still prints but the threshold is not applied, and run-tests says so rather than implying it passed.",
+    "lines": 97,
+    "branches": 79,
+    "functions": 96,
     "exclude": [
       "**/*.test.mjs",
       "**/test-support.mjs",
@@ -37,6 +37,7 @@
         ".github/eos/alignment.test.mjs",
         ".github/eos/release-workflow.test.mjs",
         ".github/eos/atomic.test.mjs",
+        ".github/eos/gate-registry.test.mjs",
         ".github/eos/junit.test.mjs",
         ".github/eos/migrate.test.mjs",
         ".github/eos/packs.test.mjs",

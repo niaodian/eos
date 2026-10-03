@@ -12,7 +12,7 @@
 ## 前置条件（local-first——无需任何企业设施）
 | 工具 | 用于 | 缺失时 |
 |---|---|---|
-| **Node.js**（20.10+） | `eos` CLI、验证器、hooks、JS/TS 测试与 eval | 必需——唯一的硬依赖（`npx --offline eos` 快捷方式需要 npm 10.9+，Node 22 自带） |
+| **Node.js**（20.10+；推荐 22 或 24——Node 20 已于 2026-04-30 停止维护） | `eos` CLI、验证器、hooks、JS/TS 测试与 eval | 必需——唯一的硬依赖（`npx --offline eos` 快捷方式需要 npm 10.9+，Node 22 自带） |
 | **一个 AI agent**——VS Code + GitHub Copilot、Claude Code、OpenAI Codex 或 Google Antigravity | `eos-*` 智能体、`/eos-*` 斜杠命令（技能；Codex 中为 `$eos-*`）与护栏；Copilot 还会自动应用按范围生效的编码规则 | 引导式流程需要其中之一——各 agent 的配置见[用户手册第 6.6 章](user-manual.md#第-66-章-在-claude-code、codex-和-antigravity-中使用-eos)；`eos.mjs` CLI 本身不依赖任何 agent |
 | **BMAD 技能**（`bmad-*`） | 各阶段工作流（`bmad-prd`、`bmad-architecture`、`bmad-create-story` 等） | 引导式流程必需——EOS 只做编排，不重复实现它们。用 `node .github/hooks/eos-doctor.mjs --deep` 核验 |
 | **`gh` CLI**（已登录） | 创建远端仓库，以及在 `/eos-init` 中验证分支保护 | **可选**：也可在 GitHub 网页端完成。用 `gh auth login` 配置 |
@@ -69,13 +69,13 @@ EOS 本身从不调用任何模型，也不需要任何 API key。每一行都�
 - **在分支保护与 CODEOWNERS 就位之前，治理是契约式的。** EOS 无法在本机验证服务端保护，因此"放宽需要第二个人"只有在完成 `/eos-init` 加固后才成立；在此之前 `eos-doctor` 会报告 `CONTRACTUAL`（[ADR-014](../adr/014-trust-chain.md)）。
 - **本地证据诚实，但未经证明。** 在笔记本上记录的证据是 `UNATTESTED_LOCAL`；Regulated 发布需要 CI 产出的证据（`evidencePolicy`）。
 - **"任意技术栈"的验证深度不同。** EOS 自身的 CI 覆盖 Node 路径与 Python 评估起步包；Python、Go、Java、Rust 与 .NET 起步包声明的是 EOS 会运行的命令，对应的工具链需要你自行安装。
-- **JUnit 结果可能只按名称匹配。** 有些运行器（包括 node:test）在 JUnit XML 中不记录文件。此时 EOS 按测试名称匹配 trace matrix 的行，标记为 `"match": "name"`，并从源码确定文件：该行所指文件必须声明这个测试（不能在注释里），且不能有其他测试文件声明同名测试——请让测试名称唯一，或在行中写明所属 suite（`tests/login.test.mjs::login > valid password`）（[ADR-016](../adr/016-junit-test-evidence.md)）。
+- **JUnit 结果可能只按名称匹配。** 有些运行器（包括 Node 20 与 22 上的 node:test）在 JUnit XML 中不记录文件（node:test 自 Node 24.11 起记录文件）。此时 EOS 按测试名称匹配 trace matrix 的行，标记为 `"match": "name"`，并从源码确定文件：该行所指文件必须声明这个测试（不能在注释里），且不能有其他测试文件声明同名测试——请让测试名称唯一，或在行中写明所属 suite（`tests/login.test.mjs::login > valid password`）（[ADR-016](../adr/016-junit-test-evidence.md)）。
 - **Windows 上的符号链接。** 不支持符号链接的检出会把链接变成普通文件，于是产品树指纹与 Linux 不同，在一边记录的证据在另一边读作 `STALE`。
 
 ## Day-1（可直接复制——与用户手册 §3.4 完全一致的序列）
 
 ```sh
-npx degit niaodian/eos#eos-2.3.0 my-new-app && cd my-new-app
+npx degit niaodian/eos#eos-2.4.0 my-new-app && cd my-new-app
 git init && git add -A && git commit -q -m "chore: scaffold from eos"
 node .github/hooks/validate-config.mjs        # 期望 PASS
 node .github/eos/eos.mjs init config-only --write   # 声明项目：还没有代码（或 init <pack>；--track regulated）

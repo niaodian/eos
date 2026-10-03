@@ -66,6 +66,6 @@ body:
     id: node-version
     attributes:
       label: Node.js version
-      description: "Output of `node --version` (Node 18+ is the only hard dependency)."
+      description: "Output of `node --version` (Node.js 20.10+ is the only hard dependency)."
     validations:
       required: true

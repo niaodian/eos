@@ -8,6 +8,7 @@
 //
 // Exit codes (contract — see docs/eos/developer-experience.md §10.1):
 //   0 PASS / nothing blocking · 1 FAIL or rejected transition · 2 BLOCKED/PENDING/STALE · 3 ERROR
+//   `next --exit-zero` and `resume --exit-zero` exit 0 instead of 1 or 2; 3 stays 3.
 //
 // Layout: this file parses arguments and applies the preconditions every command shares (files from
 // a newer EOS, a configuration that cannot be evaluated). The handlers live in ./commands/, one
@@ -23,8 +24,8 @@ const USAGE = `EOS guided workflow
 usage: node .github/eos/eos.mjs <command> [flags]
 
   status [--changed]                      where the project and the active scope are
-  next [--why] [--all]                    the single recommended next action
-  resume                                  restore the local focus in a new session
+  next [--why] [--all] [--exit-zero]      the single recommended next action
+  resume [--exit-zero]                    restore the local focus in a new session
   check --gate <id> [--scope <id>]        run one gate and record evidence
   verify [--full] [--plan]                run the gates this change can have affected
   transition --scope <type> --id <id> --to <STATE>
@@ -68,6 +69,7 @@ usage: node .github/eos/eos.mjs <command> [flags]
   doctor                                  is EOS itself wired correctly?
 
   global: --json  --why  --all  --no-color
+  --exit-zero  next and resume exit 0 while blocked (1, 2) — 3, EOS cannot evaluate, stays 3
 `;
 
 function parseArgs(argv) {

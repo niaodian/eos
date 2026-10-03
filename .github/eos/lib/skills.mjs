@@ -27,6 +27,17 @@ export const SKILLS_DIR = '.agents/skills';
 export const SKILL_MIRRORS = { claude: '.claude/skills', qwen: '.qwen/skills' };
 /** Every project-level directory an agent may load skills from, the source first. */
 export const PROJECT_SKILL_DIRS = [SKILLS_DIR, '.github/skills', '.claude/skills'];
+/**
+ * Every user-level directory, under the home directory, an agent reads skills from — BMAD is
+ * installed in one of them (user manual §2.2). Copilot and Codex: .agents/skills; Claude Code:
+ * .claude/skills; Copilot also .copilot/skills. Antigravity: .gemini/config/skills (Antigravity 2.0
+ * and the IDE), .gemini/antigravity-cli/skills (the CLI), and .gemini/antigravity/skills, the IDE's
+ * legacy folder.
+ */
+export const USER_SKILL_DIRS = [
+  '.agents/skills', '.claude/skills', '.copilot/skills',
+  '.gemini/config/skills', '.gemini/antigravity-cli/skills', '.gemini/antigravity/skills',
+];
 
 const NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const STANDARD_KEYS = new Set(['name', 'description', 'license', 'compatibility', 'metadata', 'allowed-tools']);

@@ -42,19 +42,20 @@ Options considered:
    vitest, Playwright, pytest, Maven/Gradle, gotestsum, .NET (JunitXml.TestLogger), cargo-nextest and
    jest-junit all write it.
 2. **The trace matrix stays the mapping.** Each row (AC → `path::selector`) is answered by the
-   testcases whose name matches the selector — exactly, without a parameter suffix, or as the leaf of
-   a name that embeds its ancestry; never as a substring. When the report records where a case lives
-   (`file`, a path or dotted module in `classname`, a file-named suite), only cases in the row's file
-   count (`"match": "file"`). When it does not — node:test writes `classname="test"` and no file — the
-   name alone matches and the result is marked `"match": "name"`. Which file it ran from is then
-   settled from the source (`test-source.mjs`), and is an ERROR when it cannot be: the named file must
-   declare the test — as a string literal or a function name, outside comments, so "valid password"
-   inside "invalid password" or a commented-out test does not count — and no other test file may
-   declare the same name, because the passing case could be that file's. A qualified selector
-   (`suite > name`) narrows both. Several matching cases all count, and the worst outcome wins: one
-   failure fails the row, and skipped is never PASS. A row with no match is reported with the name that
-   was looked for. When the matrix has a header, references are read from its "Test" column; a
-   file-only reference that names no file ("e.g.", "Node.js") is prose and is skipped.
+   testcases whose name matches the selector — exactly, without a parameter suffix, or as the leaf
+   of a name that embeds its ancestry; never as a substring. When the report records where a case
+   lives (`file`, a path or dotted module in `classname`, a file-named suite), only cases in the
+   row's file count (`"match": "file"`). When it does not — node:test before Node 24.11 writes
+   `classname="test"` and no file — the name alone matches and the result is marked
+   `"match": "name"`. Which file it ran from is then settled from the source (`test-source.mjs`),
+   and is an ERROR when it cannot be: the named file must declare the test — as a string literal or
+   a function name, outside comments, so "valid password" inside "invalid password" or a
+   commented-out test does not count — and no other test file may declare the same name, because the
+   passing case could be that file's. A qualified selector (`suite > name`) narrows both. Several
+   matching cases all count, and the worst outcome wins: one failure fails the row, and skipped is
+   never PASS. A row with no match is reported with the name that was looked for. When the matrix
+   has a header, references are read from its "Test" column; a file-only reference that names no
+   file ("e.g.", "Node.js") is prose and is skipped.
 3. **Freshness by mechanism.** A project declares `"evidence": { "junit": ["reports/junit/*.xml"] }`.
    The `verified` gate inventories the matching files, runs the declared quality commands as before,
    and reads only the reports that run created or changed. It then writes `docs/evidence/test-run.json`
