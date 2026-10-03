@@ -178,6 +178,8 @@ docs/               你的规格与 ADR；docs/eos/ 是 EOS 手册（中文版�
 ## 环境要求与说明
 
 - **Node.js 20.10+ 和 Git** —— 别无其他。CI 在 Linux、macOS 和 Windows 上运行 Node 20 与 22。
+- **永远不需要 API key。** EOS 从不调用模型。每一项附加（Copilot、BMAD、BMAD 运行时）带来什么，以及已知局限，
+  见 [快速开始](docs/zh/quickstart.md#能力与依赖)。
 - **VS Code + GitHub Copilot 是可选的。** 只有当项目文件夹本身是工作区根目录时，Agent、提示词和
   hook 才会加载。hook 是 VS Code 的预览特性。
 - **一次性加固。** 真正的仓库建好后，在 Copilot Chat 中运行 `/eos-init`：分支保护、CODEOWNERS 与

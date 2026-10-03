@@ -185,6 +185,8 @@ docs/               your specs and ADRs; docs/eos/ is the EOS manual set (中文
 ## Requirements and notes
 
 - **Node.js 20.10+ and Git** — nothing else. CI runs Node 20 and 22 on Linux, macOS and Windows.
+- **No API key, ever.** EOS never calls a model. What each addition (Copilot, BMAD, the BMAD runtime) brings,
+  and the known limitations, are in the [quickstart](docs/eos/quickstart.md#what-you-need-for-what).
 - **VS Code with GitHub Copilot is optional.** The agents, prompts and hooks load when the project folder
   itself is the workspace root. Hooks are a VS Code preview feature.
 - **One-time hardening.** Once your real repository exists, run `/eos-init` in Copilot Chat: branch

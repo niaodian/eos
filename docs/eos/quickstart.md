@@ -44,6 +44,27 @@ core flow (hooks, validators, tests are all Node, and paths are normalized cross
 - **`build-pdf.sh`** (optional manual→PDF) is a Bash script — run it from **Git-Bash or WSL**, or just
   read `docs/eos/user-manual.md` directly.
 
+## What you need for what
+
+EOS itself never calls a model and needs no API key. Each row adds to the one above it:
+
+| You have | You get |
+|---|---|
+| **Node.js only** | the whole governance engine: `eos next` / `status` / `check` / `verify`, every gate, the ledger, policy locks, signed releases, the secret scan |
+| **+ VS Code with GitHub Copilot** | the guided flow: the `eos-*` agents, the `/eos-*` prompts, the always-on rules and the PreToolUse guardrail. The model is the one you pick in Copilot — nothing to configure |
+| **+ BMAD skills** (`bmad-*`) | the authoring workflow each stage orchestrates (PRD, architecture, stories, test design). Without them `eos next` still names every step and you do it by hand |
+| **+ the BMAD project runtime** (`_bmad/`, needs python3 and uv) | BMAD's project-level customization and session memory. Optional: the skills run on their shipped defaults without it |
+| **an agentic / LLM product** | your product's own model calls, which the eval harness exercises ([eval-starter](examples/eval-starter/README.md)). That is product code you write anyway, not EOS configuration |
+
+## Known limitations
+
+- **The PreToolUse guardrail is a speed bump, not the authority.** VS Code hooks are a Preview feature, differ per agent harness, run per machine and are not run in CI. A payload the hook cannot parse is scanned as text; an internal failure of the hook still lets the call through. CI, branch protection and review decide.
+- **Secret detection is heuristic.** Both guards match known key formats, credential assignments and literal fallbacks for secret-named environment variables; an obfuscated literal can pass. `gitleaks` (optional) adds vendor formats and entropy; neither replaces review.
+- **Until branch protection and CODEOWNERS exist, governance is contractual.** EOS cannot verify server-side protection from a laptop, so "a weakening needs a second person" holds only after the `/eos-init` hardening; `eos-doctor` reports `CONTRACTUAL` until then ([ADR-014](../adr/014-trust-chain.md)).
+- **Local evidence is honest but unattested.** Evidence recorded on a laptop is `UNATTESTED_LOCAL`; a Regulated release needs evidence produced in CI (`evidencePolicy`).
+- **"Any stack" is verified to different depths.** EOS's own CI exercises the Node path and the Python eval starter; the Python, Go, Java, Rust and .NET packs declare the commands EOS runs, and their toolchains are yours to install.
+- **Symlinks on Windows.** A checkout without symlink support turns a link into a plain file, so the product-tree digest differs from Linux and evidence recorded on one reads `STALE` on the other.
+
 ## Day-1 (copy-ready — the same sequence as the manual, §3.4)
 
 ```sh
