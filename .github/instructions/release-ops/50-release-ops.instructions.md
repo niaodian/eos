@@ -15,4 +15,5 @@ applyTo: "**/{Dockerfile,*.yml,*.yaml}"
   shipping to a controlled supply chain.
 - No release without: passing quality gate, rollback plan, canary strategy.
 - Every service exposes health/readiness endpoints.
-- Document operational steps in `ops/runbook-<service>.md`.
+- Document operational steps in `ops/runbook.md`, one section per service — the runbook the release
+  gate (G8) reads.

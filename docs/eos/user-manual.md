@@ -543,12 +543,12 @@ So EOS **never depends on "Rule A overriding Rule B"**. The only reliable contro
 | **Goal** | Release only after passing quality/security/rollback/canary/NFR gates |
 | **When to enter** | G7 passed |
 | **How to start** | Enter **`/eos-release-gate`** in Chat; if runbook is missing, run **`/eos-runbook <service>`** first |
-| **Input** | Test results, NFR verification results (`docs/evidence/nfr-summary.json` — measure each target and write it with [examples/nfr-summary](examples/nfr-summary/README.md)), `ops/runbook-*.md`. `eos status` has listed what G8 needs since the project was declared |
-| **Output** | Release-gate report (PASS/FAIL item by item), `ops/runbook-<service>.md` |
+| **Input** | Test results, NFR verification results (`docs/evidence/nfr-summary.json` — measure each target and write it with [examples/nfr-summary](examples/nfr-summary/README.md)), `ops/runbook.md`. `eos status` has listed what G8 needs since the project was declared |
+| **Output** | Release-gate report (PASS/FAIL item by item), `ops/runbook.md` (one section per service) |
 | **Decision gate G8 (hard gate)** | `node .github/eos/eos.mjs verify-release --release <id>` runs all 13 checks the prompt lists: ① the candidate is committed ② **the quality commands re-run ON THIS candidate** ③ stories VERIFIED ④ **each story's verification describes THIS tree** ⑤ spec alignment ⑥ secret scan ⑦ dependency audit ⑧ NFR evidence ⑨ compliance boundary ⑩ waivers ⑪ runbook: rollback **+ canary + health/readiness** ⑫ deployment-topology ADR ⑬ enforcement authority. **Any FAIL blocks release**; `DEFERRED` (an offline audit, an NFR with owner+trigger) is visible and never green |
 | **Must-check items** | Are rollback steps "exact executable steps" or empty words? Do deferred canary items have triggers? Does audit show 0 vulnerabilities? **Were NFR targets verified**? Note that `VERIFIED → APPROVED` needs an approval recorded by **someone other than whoever prepared the candidate** — no model, and no automation, can supply it |
 | **Anti-rework** | No rollback/no canary/unverified NFR means no launch--blocks "launching while sick". |
-| **Example** | `my-app/docs/release-gate.md` (all applicable items pass, `npm audit` 0 vulns), `my-app/docs/trace-matrix.md` (performance NFR item explicitly deferred+trigger), `my-app/ops/runbook-auth.md` (`FEATURE_LOGIN=off` rollback) |
+| **Example** | `my-app/docs/release-gate.md` (all applicable items pass, `npm audit` 0 vulns), `my-app/docs/trace-matrix.md` (performance NFR item explicitly deferred+trigger), `my-app/ops/runbook.md` (`FEATURE_LOGIN=off` rollback) |
 
 ---
 
@@ -676,7 +676,7 @@ The gate reads the *machine* result, not a hand-written PASS — and since eos-2
 
 ### Step 8–10: Release + observability + iteration
 ```
-/eos-runbook todo-api                  → ops/runbook-todo-api.md (including rollback steps)
+/eos-runbook todo-api                  → ops/runbook.md (rollback, gradual rollout, health checks)
 /eos-release-gate                      → G8 five gates (quality+audit+NFR+rollback+canary)
 /eos-telemetry-plan                    → telemetry (SaaS side: QPS/latency/5xx golden signals)
 (switch to agent) eos-review       → iteration writes back to PRD
@@ -974,7 +974,7 @@ them (§7.9).
 | `/eos-compliance` | Regulated-industry compliance pre-flight (regime selection + boundary controls, conditional; uses F-compliance) | `<regime name or domain description>` | `docs/compliance-profile.md` |
 | `/eos-telemetry-plan` | Design telemetry and align it with success metrics | — | `docs/telemetry-plan.md` |
 | `/eos-release-gate` | Run release gate (G8) | — | Gate report |
-| `/eos-runbook` | Generate operations runbook (including rollback steps) | `<service name>` | `ops/runbook-<service>.md` |
+| `/eos-runbook` | Generate operations runbook (rollback, gradual rollout, health/readiness) | `<service name>` | `ops/runbook.md` (one section per service) — the file G8 reads |
 | `/eos-validate-config` | EOS configuration static+semantic health check | — | Issue table (does not change code) |
 
 Since eos-2.2.0 every slash command is an **Agent Skill** in `.agents/skills/eos-*/SKILL.md` — the open format Copilot (VS Code, CLI, cloud agent), Codex, Cursor and Antigravity read natively; VS Code's Agent Host no longer loads prompt files. Claude Code reads only `.claude/skills/`, so EOS keeps a byte-identical copy there: edit the skill in `.agents/skills/`, then run `node .github/eos/eos.mjs agents sync --write` (CI runs `agents sync --check`). In Codex the commands are `$eos-spec`, `$eos-next` …; `/eos-next`, `/eos-resume`, `/eos-status`, `/eos-help` and `/eos-init` are described in Chapter 1 and §3.
@@ -1953,7 +1953,7 @@ A real dry-run that passed end to end (feature: user login), **12/12 gates passe
 | 5 Planning | `my-app/docs/stories/story-001-auth.md` |
 | 6 Development | `my-app/src/auth.js` (zero-dependency node:crypto) |
 | 7 Testing | `my-app/test/auth.test.js` (10 AC-traced, all green), `my-app/docs/trace-matrix.md` |
-| 8 Release | `my-app/docs/release-gate.md`, `my-app/ops/runbook-auth.md` |
+| 8 Release | `my-app/docs/release-gate.md`, `my-app/ops/runbook.md` |
 | 9 Observability | 5 `auth.*` events in `src/auth.js` |
 | 10 Iteration | `my-app/docs/prd.md §6` (CR-001 write-back) |
 | Acceptance report | `my-app/docs/eos/walkthrough.md` (full scorecard + reproduction commands) |

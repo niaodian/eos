@@ -15,7 +15,7 @@
 ## G.2 Decision items (fill in each)
 - [ ] **Chosen topology + NFR basis**: ____ (cite the SLO/RTO/RPO, peak QPS, growth, and scaling strategy in `C-nfr.md` — not a gut call or bandwagon)
 - [ ] **Rejected options + reasons**: ____ (especially "why not K8s" or "why not bare process")
-- [ ] **Rollback mechanism** (executable for the chosen topology): ____ → write into `ops/runbook-*.md`
+- [ ] **Rollback mechanism** (executable for the chosen topology): ____ → write into `ops/runbook.md`
 - [ ] **Canary / progressive-release mechanism** (for the chosen topology): ____ + rollback threshold ____
 - [ ] **health/readiness endpoints** — how the topology consumes them (probe / reverse proxy / LB health check): ____
 - [ ] **Config & secret injection** (12-factor: env / secret store, never in the image or repo; see `E-security.md`): ____

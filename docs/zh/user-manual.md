@@ -559,12 +559,12 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 | **目标** | 过质量/安全/回滚/灰度/NFR 门后才发布 |
 | **何时进入** | G7 通过 |
 | **怎么启动** | Chat 输入 **`/eos-release-gate`**；缺 runbook 就先 **`/eos-runbook <service>`** |
-| **输入** | 测试结果、NFR 验证结果（`docs/evidence/nfr-summary.json`——逐项测量目标，再用 [examples/nfr-summary](../eos/examples/nfr-summary/README.md) 写出）、`ops/runbook-*.md`。自项目声明之日起，`eos status` 就一直列着 G8 需要什么 |
-| **产出** | 发布门禁报告（逐项 PASS/FAIL）、`ops/runbook-<service>.md` |
+| **输入** | 测试结果、NFR 验证结果（`docs/evidence/nfr-summary.json`——逐项测量目标，再用 [examples/nfr-summary](../eos/examples/nfr-summary/README.md) 写出）、`ops/runbook.md`。自项目声明之日起，`eos status` 就一直列着 G8 需要什么 |
+| **产出** | 发布门禁报告（逐项 PASS/FAIL）、`ops/runbook.md`（每个服务一节） |
 | **决策门 G8（硬门）** | `node .github/eos/eos.mjs verify-release --release <id>` 会跑完提示词列出的全部 13 项：① 候选已提交 ② **质量命令在这个候选上重跑** ③ story 已 VERIFIED ④ **每个 story 的验证描述的就是这棵树** ⑤ 规格对齐 ⑥ 密钥扫描 ⑦ 依赖审计 ⑧ NFR 证据 ⑨ 合规边界 ⑩ Waiver ⑪ Runbook：回滚**+灰度+健康/就绪** ⑫ 部署拓扑 ADR ⑬ 执行权威。**任一 FAIL 阻断发布**；`DEFERRED`（离线审计、带负责人+触发条件的 NFR）可见且绝不算绿 |
 | **必查项** | 回滚步骤是"可执行的精确步骤"还是空话？灰度延后的有没有写 trigger？审计 0 漏洞吗？**NFR 目标验了没**？另外 `VERIFIED → APPROVED` 需要一位**不是候选准备者本人**记录的批准——任何模型、任何自动化都无法代劳 |
 | **防返工** | 无回滚/无灰度/NFR 未验不得上线——堵"带病上线"。 |
-| **样例** | `my-app/docs/release-gate.md`（适用项全过、`npm audit` 0 vulns）、`my-app/docs/trace-matrix.md`（性能 NFR 项显式 deferred+trigger）、`my-app/ops/runbook-auth.md`（`FEATURE_LOGIN=off` 回滚） |
+| **样例** | `my-app/docs/release-gate.md`（适用项全过、`npm audit` 0 vulns）、`my-app/docs/trace-matrix.md`（性能 NFR 项显式 deferred+trigger）、`my-app/ops/runbook.md`（`FEATURE_LOGIN=off` 回滚） |
 
 ---
 
@@ -699,7 +699,7 @@ SaaS 的 **G7** 要求：每条 AC ≥1 测试、**API 契约测试**（对 open
 
 ### 第 8–10 步：发布 + 观测 + 迭代
 ```
-/eos-runbook todo-api                  → ops/runbook-todo-api.md（含回滚步骤）
+/eos-runbook todo-api                  → ops/runbook.md（回滚、灰度、健康检查）
 /eos-release-gate                      → G8 五项门禁（质量+审计+NFR+回滚+灰度）
 /eos-telemetry-plan                    → 埋点（SaaS 侧：QPS/延迟/5xx 黄金信号）
 （切到 agent）eos-review            → 迭代回写 PRD
@@ -994,7 +994,7 @@ node .github/eos/eos.mjs handoff --scope story --id STORY-012   # 写出 .eos/ha
 | `/eos-compliance` | 受监管行业合规前置（制度选择+边界控制，条件用；走 F-compliance） | `<制度名 或 领域描述>` | `docs/compliance-profile.md` |
 | `/eos-telemetry-plan` | 设计埋点并对齐成功指标 | — | `docs/telemetry-plan.md` |
 | `/eos-release-gate` | 跑发布门禁（G8） | — | 门禁报告 |
-| `/eos-runbook` | 生成运维 runbook（含回滚步骤） | `<service 名>` | `ops/runbook-<service>.md` |
+| `/eos-runbook` | 生成运维 runbook（回滚、灰度发布、健康/就绪检查） | `<service 名>` | `ops/runbook.md`（每个服务一节）——G8 读取的文件 |
 | `/eos-validate-config` | EOS 配置静态+语义体检 | — | 问题表（不改代码） |
 
 自 eos-2.2.0 起，每个斜杠命令都是 `.agents/skills/eos-*/SKILL.md` 中的一个 **Agent Skill**——这是 Copilot（VS Code、CLI、云端 agent）、Codex、Cursor 与 Antigravity 原生读取的开放格式；VS Code 的 Agent Host 已不再加载 prompt 文件。Claude Code 只读取 `.claude/skills/`，因此 EOS 在那里保留一份逐字节相同的副本：请在 `.agents/skills/` 中修改技能，再运行 `node .github/eos/eos.mjs agents sync --write`（CI 会运行 `agents sync --check`）。在 Codex 中，命令写作 `$eos-spec`、`$eos-next` 等；`/eos-next`、`/eos-resume`、`/eos-status`、`/eos-help` 与 `/eos-init` 见第 1 章与 §3。
@@ -1951,7 +1951,7 @@ bmad-tea / bmad-testarch-*   # 阶段7：测试+追溯        → G7
 | 5 Planning | `my-app/docs/stories/story-001-auth.md` |
 | 6 Development | `my-app/src/auth.js`（零依赖 node:crypto） |
 | 7 Testing | `my-app/test/auth.test.js`（10 AC-traced，全绿）、`my-app/docs/trace-matrix.md` |
-| 8 Release | `my-app/docs/release-gate.md`、`my-app/ops/runbook-auth.md` |
+| 8 Release | `my-app/docs/release-gate.md`、`my-app/ops/runbook.md` |
 | 9 Observability | `src/auth.js` 5 个 `auth.*` 事件 |
 | 10 Iteration | `my-app/docs/prd.md §6`（CR-001 回写） |
 | 验收报告 | `my-app/docs/eos/walkthrough.md`（完整 scorecard + 复现命令） |
