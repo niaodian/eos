@@ -6,6 +6,16 @@
 > [GitHub Releases](https://github.com/niaodian/eos/releases). How often EOS releases, and what a
 > patch may contain: [CONTRIBUTING.md](../../CONTRIBUTING.md#release-cadence).
 
+## eos-2.3.0 — 2026-10-03
+
+- **Every agent platform is generated from one source** (ADR-019): `eos agents sync` writes the EOS MCP entry, the guardrail hook in each platform's own dialect and, where they do not collide, the orchestrator agents. Copilot, Claude Code and Antigravity get theirs by default — `.mcp.json`, `.claude/settings.json` and `.agents/…` are new in the template; Codex, Cursor, Gemini CLI and five Tier-2 platforms on demand: `eos agents sync --platform <name> --write`. Shared files keep everything that is not EOS's, and `eos upgrade` regenerates these files instead of comparing them.
+- **`eos mcp`** (ADR-018): EOS's read and verify commands as MCP tools — `eos_next`, `eos_check`, `eos_verify` and more. Approving, waiving and state changes stay CLI commands a person runs.
+- **Brownfield adoption** (ADR-020): `eos init <pack> --brownfield` puts an existing system on the `delivery-only` profile: it is documented as it is, and every change is a story held to G5, G7 and G8.
+- **`eos stage init <stage>`** writes a stage record's skeleton from its schema; every gate rejects it until each `TODO(eos)` is answered. Sample records are in `docs/eos/examples/stage-records`.
+- **`eos upgrade` prints this changelog** for the versions it crosses; CONTRIBUTING.md states the release cadence.
+- **CI requires gitleaks**, pinned and checksum-verified (`EOS_REQUIRE_GITLEAKS=1`); locally it stays optional.
+- **Fix:** the guardrail no longer blocks a download that sits next to an unrelated pipe (`curl … -o f && sha256sum f | …`).
+
 ## eos-2.2.0 — 2026-10-03
 
 - **Breaking — slash commands are Agent Skills** in `.agents/skills/eos-*` (ADR-017): `/spec` is now `/eos-spec`, `/requirements` is `/eos-requirements` and so on; `.github/prompts/` is removed. Claude Code gets a generated copy in `.claude/skills/` (`eos agents sync`).
@@ -13,6 +23,7 @@
 - **Starter packs declare `commands.audit`** (and `evidence.junit` where the runner writes JUnit); `eos status` previews what the release gate G8 will need.
 - **NFR summary example and helper** (`docs/eos/examples/nfr-summary`).
 - **The eval-starter scores a real model**: any OpenAI-compatible endpoint, record / replay; a replayed run is unattested.
+- **Fixed before release:** a test matched by name only must be declared in the file the trace matrix names, and in no other test file; a re-run that reproduces the recorded test results keeps `test-run.json`, so other stories stay verified; the release gate scores trace rows from `test-run.json`; `eos agents sync` never writes through a symbolic link; the eval-starter records project-relative paths on Windows.
 
 ## eos-2.1.0 — 2026-10-03
 

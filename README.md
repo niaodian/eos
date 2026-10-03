@@ -73,7 +73,7 @@ You need Node.js 20.10+ and Git. VS Code with GitHub Copilot is optional — the
 
 ```bash
 # 1. Start from a pinned release and make it your repository
-npx degit niaodian/eos#eos-2.2.0 my-app && cd my-app && git init
+npx degit niaodian/eos#eos-2.3.0 my-app && cd my-app && git init
 
 # 2. Declare the project — no code yet, so the stack is decided at architecture time
 npx --offline eos init config-only --write        # add --track regulated for the strict track
@@ -154,8 +154,8 @@ EOS releases are built and attested in GitHub Actions, the way EOS asks your rel
 yourself before you adopt it:
 
 ```bash
-gh release download eos-2.2.0 --repo niaodian/eos --pattern 'eos-2.2.0.tar.gz'
-gh attestation verify eos-2.2.0.tar.gz --repo niaodian/eos
+gh release download eos-2.3.0 --repo niaodian/eos --pattern 'eos-2.3.0.tar.gz'
+gh attestation verify eos-2.3.0.tar.gz --repo niaodian/eos
 ```
 
 Each release also ships its SBOM and a `SHA256SUMS` file.
@@ -181,7 +181,7 @@ docs/               your specs and ADRs; docs/eos/ is the EOS manual set (中文
 - [User manual](docs/eos/user-manual.md) — idea to launch to iteration, with step-by-step SaaS and Agentic tracks.
 - [Upgrading to eos-2.0.0](docs/eos/user-manual.md#105-upgrading-from-eos-122x-to-eos-200) — what changes and what to do.
 - [Upgrading to eos-2.0.1](docs/eos/user-manual.md#107-upgrading-from-eos-200-to-eos-201) — the secret-detection security patch.
-- [Upgrading to eos-2.2.0](docs/eos/user-manual.md#109-upgrading-from-eos-21x-to-eos-220) — slash commands become Agent Skills (`/spec` → `/eos-spec`), JUnit evidence, the release-gate preview.
+- [Upgrading to eos-2.3.0](docs/eos/user-manual.md#1010-upgrading-from-eos-22x-to-eos-230) — every agent platform generated from one source, `eos mcp`, brownfield adoption, `eos stage init`.
 - [Workflow contract](docs/eos/developer-experience.md) — the CLI, exit codes, JSON and diagnostics.
 - [Stack presets and tracks](docs/eos/stack-presets.md) — every supported stack, and how to choose a track.
 - [Design rationale](docs/eos/blueprint.md) and [architecture decisions](docs/adr/).

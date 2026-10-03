@@ -7,6 +7,16 @@
 > [GitHub Releases](https://github.com/niaodian/eos/releases)。EOS 多久发一次版、补丁版可以包含什么：
 > [CONTRIBUTING.md](../../CONTRIBUTING.md#release-cadence)。
 
+## eos-2.3.0 — 2026-10-03
+
+- **所有 agent 平台都从同一个源头生成**（ADR-019）：`eos agents sync` 写出 EOS 的 MCP 条目、按各平台自身格式运行的护栏钩子，以及不会冲突的编排 agent。Copilot、Claude Code 和 Antigravity 默认生成——模板新增了 `.mcp.json`、`.claude/settings.json` 和 `.agents/…`；Codex、Cursor、Gemini CLI 以及五个第二梯队平台按需生成：`eos agents sync --platform <名称> --write`。共享文件中不属于 EOS 的内容一律保留，`eos upgrade` 会重新生成这些文件，而不是拿它们做比较。
+- **`eos mcp`**（ADR-018）：把 EOS 的读取与验证命令作为 MCP 工具提供——`eos_next`、`eos_check`、`eos_verify` 等。批准、豁免和状态迁移仍是由人运行的 CLI 命令。
+- **存量项目接入**（ADR-020）：`eos init <pack> --brownfield` 让已有系统使用 `delivery-only` profile：按现状记录系统，每项改动都是一个受 G5、G7、G8 约束的 story。
+- **`eos stage init <阶段>`** 根据 schema 写出阶段记录的骨架；在每个 `TODO(eos)` 被回答之前，所有门禁都会拒绝它。样例记录见 `docs/eos/examples/stage-records`。
+- **`eos upgrade` 会打印本更新日志**中跨越的各版本条目；CONTRIBUTING.md 写明了发版节奏。
+- **CI 要求 gitleaks**，版本固定并校验 checksum（`EOS_REQUIRE_GITLEAKS=1`）；本地仍为可选。
+- **修复：** 护栏不再拦截与无关管道相邻的下载命令（`curl … -o f && sha256sum f | …`）。
+
 ## eos-2.2.0 — 2026-10-03
 
 - **破坏性变更——斜杠命令改为 Agent Skills**，位于 `.agents/skills/eos-*`（ADR-017）：`/spec` 现在是 `/eos-spec`，`/requirements` 是 `/eos-requirements`，依此类推；`.github/prompts/` 已移除。Claude Code 会在 `.claude/skills/` 中得到一份生成的副本（`eos agents sync`）。
@@ -14,6 +24,7 @@
 - **起步包声明了 `commands.audit`**（运行器能输出 JUnit 时还声明 `evidence.junit`）；`eos status` 会预告发布门禁 G8 将需要什么。
 - **NFR 摘要示例与辅助脚本**（`docs/eos/examples/nfr-summary`）。
 - **eval-starter 可评估真实模型**：任意 OpenAI 兼容端点、录制 / 回放；回放的结果标注为未经证明。
+- **发布前修复：** 仅按名称匹配的测试必须在 trace matrix 所指的文件中声明，且不得在其他测试文件中声明；重跑若复现了已记录的测试结果，就保留 `test-run.json`，其他 story 因此保持已验证；发布门禁根据 `test-run.json` 为 trace 行计分；`eos agents sync` 绝不透过符号链接写入；eval-starter 在 Windows 上也记录相对项目根的路径。
 
 ## eos-2.1.0 — 2026-10-03
 
