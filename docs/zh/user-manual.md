@@ -155,6 +155,11 @@ bmad-code-review                   → 审查无阻断项           (Gate G6)
 `~/.agents/skills/`，Antigravity 读 `~/.gemini/config/skills/`（IDE）或 `~/.gemini/antigravity-cli/skills/`
 （CLI）——按 §6.6.3 的方法把 BMAD 链接过去。
 
+`eos next` 和 `eos-doctor --deep` 会在上述每个目录中查找 BMAD——`~/.agents/skills/`、`~/.claude/skills/`、
+`~/.copilot/skills/`、`~/.gemini/config/skills/`、`~/.gemini/antigravity-cli/skills/` 以及 Antigravity IDE
+的旧目录 `~/.gemini/antigravity/skills/`——也会查找项目中的 `.agents/skills/`（自 eos-2.4.0 起）。
+技能在其中任何一个目录中存在即视为已安装；你所用的 agent 是否读取该目录，取决于上面的配置。
+
 ## 2.3 用户级 agents 目录（可选）
 
 若你想把某些 `eos-*.agent.md` 提升为"所有项目通用"，放到：
@@ -958,9 +963,10 @@ node .github/eos/eos.mjs handoff --scope story --id STORY-012   # 写出 .eos/ha
   `.github/instructions/**`。其他 agent 通过 `AGENTS.md` 找到这些规则（它指向规则所在位置）：请让 agent
   先阅读与它即将修改的文件对应的规则。
 - **Claude Code 以技能而非 EOS 子 agent 的方式运行工作流**（6.6.1）。
-- **BMAD 在每个 agent 中的位置不同**（6.6.0）。`eos-doctor --deep` 和 `eos next` 检查的是
-  `~/.agents/skills/`、`~/.claude/skills/` 和 `~/.copilot/skills/`，因此看不到只装在 Antigravity
-  目录中的 BMAD。
+- **BMAD 在每个 agent 中的位置不同**（6.6.0）。`eos-doctor --deep` 和 `eos next` 会检查所有这些目录，
+  包括 Antigravity 的目录（自 eos-2.4.0 起，见 §2.2），BMAD 装在其中任何一个都算已安装。它们无法判断你的
+  agent 读取哪个目录：只装在 `~/.agents/skills/` 中的 BMAD 能通过检查，但在你按 6.6.3 链接之前，
+  Antigravity 仍然看不到它。
 - **钩子是本地减速带。** 每个 agent 都会请你确认一次信任。如果钩子本身运行失败，有的 agent 会放行
   （Claude Code），有的会拒绝（VS Code）；CI 始终是最终权威（附录 D）。
 - **VS Code 的 agent 会话也会运行 Claude Code 的钩子。** 如果 VS Code agent 会话中的每次工具调用都以

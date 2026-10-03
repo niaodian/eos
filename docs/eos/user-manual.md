@@ -148,6 +148,12 @@ Other agents read user-level skills from their own folders: Claude Code from `~/
 mirror above), Codex from `~/.agents/skills/`, and Antigravity from `~/.gemini/config/skills/` (IDE) or
 `~/.gemini/antigravity-cli/skills/` (CLI) — link BMAD there as shown in §6.6.3.
 
+`eos next` and `eos-doctor --deep` look for BMAD in every one of these folders — `~/.agents/skills/`,
+`~/.claude/skills/`, `~/.copilot/skills/`, `~/.gemini/config/skills/`, `~/.gemini/antigravity-cli/skills/`
+and the Antigravity IDE's legacy `~/.gemini/antigravity/skills/` — and in the project's `.agents/skills/`
+(since eos-2.4.0). A skill found in any of them counts as installed; whether the agent you use reads
+that folder is the setup above.
+
 ## 2.3 User-level agents directory (optional)
 
 If you want to promote some `eos-*.agent.md` files to "available in all projects", put them in:
@@ -937,8 +943,9 @@ them (§7.9).
   points to them: ask the agent to read the rule for the files it is about to change.
 - **Claude Code runs the workflows as skills, not as EOS subagents** (6.6.1).
 - **BMAD lives in a different folder per agent** (6.6.0). `eos-doctor --deep` and `eos next` check
-  `~/.agents/skills/`, `~/.claude/skills/` and `~/.copilot/skills/`, so they do not see a BMAD
-  install that exists only in Antigravity's folder.
+  every one of them, Antigravity's included (since eos-2.4.0, §2.2), so a BMAD install in any of them
+  counts. They cannot tell which folder your agent reads: an install only in `~/.agents/skills/`
+  satisfies the check but stays invisible to Antigravity until you link it (6.6.3).
 - **Hooks are local speed bumps.** Each agent asks you to trust them once. If the hook itself fails,
   some agents let the call through (Claude Code) and some refuse it (VS Code); CI stays the authority
   (Appendix D).

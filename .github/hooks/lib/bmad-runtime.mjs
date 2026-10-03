@@ -15,11 +15,11 @@ import { existsSync, readFileSync, statSync, accessSync, constants } from 'node:
 import { join, delimiter } from 'node:path';
 import { validate } from '../../eos/lib/schema.mjs';
 import { foreignProjectReferences } from '../../eos/lib/project-context.mjs';
-import { PROJECT_SKILL_DIRS } from '../../eos/lib/skills.mjs';
+import { PROJECT_SKILL_DIRS, USER_SKILL_DIRS } from '../../eos/lib/skills.mjs';
 
 export const BMAD_LOCK_PATH = '.eos/bmad.lock.json';
 
-/** Every directory a Copilot/Claude/agent skill can be installed into. */
+/** Every directory a Copilot/Claude/Codex/Antigravity skill can be installed into. */
 export function skillRoots(root = null) {
   const dirs = [];
   // PROJECT FIRST. A skill that travels with the repository is this project's answer, and a
@@ -29,7 +29,7 @@ export function skillRoots(root = null) {
   for (const rel of PROJECT_SKILL_DIRS) if (root && existsSync(join(root, rel))) dirs.push(join(root, rel));
   const homes = [process.env.HOME, process.env.USERPROFILE].filter(Boolean);
   for (const home of homes) {
-    for (const rel of ['.agents/skills', '.claude/skills', '.copilot/skills']) {
+    for (const rel of USER_SKILL_DIRS) {
       const d = join(home, rel);
       if (existsSync(d)) dirs.push(d);
     }
@@ -103,7 +103,7 @@ export function bmadReadiness(root, { deep = false, roots = null, policy = 'defa
   if (!dirs.length) {
     return {
       status: 'UNCHECKED', skills: [], runtime: { checked: false }, problems: [], degraded: [],
-      notes: ['no skills directory found (~/.agents/skills, ~/.claude/skills, ~/.copilot/skills) — skill availability was not checked. EOS works without BMAD; `eos next` still names every step.'],
+      notes: [`no skills directory found (${USER_SKILL_DIRS.map((d) => `~/${d}`).join(', ')}) — skill availability was not checked. EOS works without BMAD; \`eos next\` still names every step.`],
     };
   }
 
