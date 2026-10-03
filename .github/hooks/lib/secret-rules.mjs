@@ -148,9 +148,13 @@ export const DESTRUCTIVE_RULES = [
   [/\bdd\s+if=/i, 'a raw disk write'],
   [/\bmkfs\b|>\s*\/dev\/sd[a-z]/i, 'formatting or writing a block device'],
   [/\bchmod\s+-?R?\s*777\b/i, 'making files world-writable'],
-  [/(curl|wget)\s+[^|]*\|\s*(sudo\s+)?(ba|z|k|c)?sh/i, 'a remote script piped into a shell'],
-  [/(curl|wget)\s+[^|]*\|\s*(sudo\s+)?(python3?|node|perl|ruby)\b/i, 'a remote script piped into an interpreter'],
-  [/base64\s+-d[^\n]*\|\s*(sudo\s+)?(ba|z)?sh/i, 'decoded content piped into a shell'],
+  // One logical command line: a backslash-newline continuation joins lines, while an unrelated later
+  // line does not — a download on one line and a checksum pipe on the next are not a remote script
+  // piped into a shell. And the shell is a whole word: piping into sha256sum, shasum or shellcheck is
+  // not piping into sh. (deny-dangerous.test.mjs pins both directions.)
+  [/(curl|wget)\s+(?:[^|\n]|\\\r?\n)*\|\s*(sudo\s+)?(ba|z|k|c)?sh\b/i, 'a remote script piped into a shell'],
+  [/(curl|wget)\s+(?:[^|\n]|\\\r?\n)*\|\s*(sudo\s+)?(python3?|node|perl|ruby)\b/i, 'a remote script piped into an interpreter'],
+  [/base64\s+-d[^\n]*\|\s*(sudo\s+)?(ba|z)?sh\b/i, 'decoded content piped into a shell'],
   [/\bnpm\s+(i|install|ci)\b[^\n]*--(unsafe-perm|no-verify)/i, 'disabling install-script safety'],
   [/\bpip\s+install\b[^\n]*--(trusted-host|index-url\s+http:)/i, 'installing from an untrusted index'],
 ];
