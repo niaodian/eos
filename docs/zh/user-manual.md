@@ -134,7 +134,7 @@ bmad-code-review                   → 审查无阻断项           (Gate G6)
 | VS Code | 较新版本（自定义 agent / hooks 需近版） | 关于面板查看真实版本（`code --version` 可能是 shim，不准） |
 | GitHub Copilot | 已登录（企业 license 仅作 license，不作配置依赖） | Chat 面板可用 |
 | 或其他 agent | 用 Claude Code、OpenAI Codex 或 Google Antigravity 代替 VS Code + Copilot——配置见 [第 6.6 章](#第-66-章-在-claude-code、codex-和-antigravity-中使用-eos) | 在项目文件夹中启动后，`/eos-next`（Codex：`$eos-next`）能给出结果 |
-| Node.js | 18+（验证器与 hooks 用） | `node -v` |
+| Node.js | 20.10+（CLI、验证器与 hooks 用）；请使用 22 或 24——Node 20 已于 2026-04-30 停止维护，只作为声明的最低版本保留 | `node -v` |
 | BMAD skills | 73 个 `bmad-*`（用户级） | macOS/Linux `ls ~/.agents/skills &#124; grep -c '^bmad-'` · Windows `(Get-ChildItem ~/.agents/skills -Filter 'bmad-*').Count` |
 
 > **在 Windows 或 Linux 上？** 核心流程完全一致 —— 所有 hooks/validators 都是 Node、路径已跨平台归一化，

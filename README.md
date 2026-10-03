@@ -8,7 +8,7 @@
 [![EOS CI](https://github.com/niaodian/eos/actions/workflows/eos-ci.yml/badge.svg?branch=main)](https://github.com/niaodian/eos/actions/workflows/eos-ci.yml)
 [![CI platforms](https://img.shields.io/badge/CI-Linux%20%7C%20macOS%20%7C%20Windows-informational)](.github/workflows/eos-ci.yml)
 [![Provenance](https://img.shields.io/badge/provenance-SLSA%20v1%20attested-2ea44f)](https://github.com/niaodian/eos/attestations)
-[![Node](https://img.shields.io/badge/node-20%20%7C%2022-339933?logo=node.js&logoColor=white)](package.json)
+[![Node](https://img.shields.io/badge/node-20%20%7C%2022%20%7C%2024-339933?logo=node.js&logoColor=white)](package.json)
 [![Dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)](package.json)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
@@ -74,7 +74,8 @@ shows it with the exact `eos policy lock --write --reason "<why>"` that acknowle
 
 ## Quickstart
 
-You need Node.js 20.10+ and Git. An AI agent is optional — the CLI works in any terminal.
+You need Node.js 20.10+ (22 or 24 recommended — Node 20 reached end of life on 2026-04-30) and Git. An
+AI agent is optional — the CLI works in any terminal.
 
 ```bash
 # 1. Start from a pinned release and make it your repository
@@ -206,7 +207,8 @@ docs/               your specs and ADRs; docs/eos/ is the EOS manual set (中文
 
 ## Requirements and notes
 
-- **Node.js 20.10+ and Git** — nothing else. CI runs Node 20 and 22 on Linux, macOS and Windows.
+- **Node.js 20.10+ and Git** — nothing else. Use Node 22 or 24: Node 20 reached end of life on 2026-04-30
+  and stays supported only as the declared minimum. CI runs Node 20, 22 and 24 on Linux, macOS and Windows.
 - **No API key, ever.** EOS never calls a model. What each addition (Copilot, BMAD, the BMAD runtime) brings,
   and the known limitations, are in the [quickstart](docs/eos/quickstart.md#what-you-need-for-what).
 - **An AI agent is optional.** GitHub Copilot (VS Code), Claude Code, OpenAI Codex and Google Antigravity are

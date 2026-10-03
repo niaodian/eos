@@ -128,7 +128,7 @@ bmad-code-review                   → review has no blockers  (Gate G6)
 | VS Code | Recent version (custom agent / hooks require a recent version) | Check the real version in the About panel (`code --version` may be a shim and is not reliable) |
 | GitHub Copilot | Logged in (enterprise license is only a license, not a configuration dependency) | Chat panel is usable |
 | Or another agent | Claude Code, OpenAI Codex or Google Antigravity instead of VS Code + Copilot — setup in [Chapter 6.6](#chapter-66-using-eos-with-claude-code-codex-and-antigravity) | it starts in the project folder, and `/eos-next` (Codex: `$eos-next`) answers |
-| Node.js | 18+ (used by validators and hooks) | `node -v` |
+| Node.js | 20.10+ (the CLI, validators and hooks); use 22 or 24 — Node 20 reached end of life on 2026-04-30 and remains only the declared minimum | `node -v` |
 | BMAD skills | 73 `bmad-*` (user-level) | macOS/Linux `ls ~/.agents/skills &#124; grep -c '^bmad-'` · Windows `(Get-ChildItem ~/.agents/skills -Filter 'bmad-*').Count` |
 
 > **On Windows or Linux?** The core flow is identical — all hooks/validators are Node and paths are

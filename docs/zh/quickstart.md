@@ -12,7 +12,7 @@
 ## 前置条件（local-first——无需任何企业设施）
 | 工具 | 用于 | 缺失时 |
 |---|---|---|
-| **Node.js**（20.10+） | `eos` CLI、验证器、hooks、JS/TS 测试与 eval | 必需——唯一的硬依赖（`npx --offline eos` 快捷方式需要 npm 10.9+，Node 22 自带） |
+| **Node.js**（20.10+；推荐 22 或 24——Node 20 已于 2026-04-30 停止维护） | `eos` CLI、验证器、hooks、JS/TS 测试与 eval | 必需——唯一的硬依赖（`npx --offline eos` 快捷方式需要 npm 10.9+，Node 22 自带） |
 | **一个 AI agent**——VS Code + GitHub Copilot、Claude Code、OpenAI Codex 或 Google Antigravity | `eos-*` 智能体、`/eos-*` 斜杠命令（技能；Codex 中为 `$eos-*`）与护栏；Copilot 还会自动应用按范围生效的编码规则 | 引导式流程需要其中之一——各 agent 的配置见[用户手册第 6.6 章](user-manual.md#第-66-章-在-claude-code、codex-和-antigravity-中使用-eos)；`eos.mjs` CLI 本身不依赖任何 agent |
 | **BMAD 技能**（`bmad-*`） | 各阶段工作流（`bmad-prd`、`bmad-architecture`、`bmad-create-story` 等） | 引导式流程必需——EOS 只做编排，不重复实现它们。用 `node .github/hooks/eos-doctor.mjs --deep` 核验 |
 | **`gh` CLI**（已登录） | 创建远端仓库，以及在 `/eos-init` 中验证分支保护 | **可选**：也可在 GitHub 网页端完成。用 `gh auth login` 配置 |

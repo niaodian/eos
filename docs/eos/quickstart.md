@@ -7,7 +7,7 @@
 ## Prerequisites (local-first — nothing enterprise required)
 | Tool | Needed for | If absent |
 |---|---|---|
-| **Node.js** (20.10+) | the `eos` CLI, validators, hooks, JS/TS tests & evals | required — the only hard dependency (npm 10.9+, bundled with Node 22, for the `npx --offline eos` shortcut) |
+| **Node.js** (20.10+; 22 or 24 recommended — Node 20 reached end of life on 2026-04-30) | the `eos` CLI, validators, hooks, JS/TS tests & evals | required — the only hard dependency (npm 10.9+, bundled with Node 22, for the `npx --offline eos` shortcut) |
 | **An AI agent** — VS Code + GitHub Copilot, Claude Code, OpenAI Codex or Google Antigravity | the `eos-*` agents, the `/eos-*` slash commands (skills, `$eos-*` in Codex) and the guardrail; Copilot also applies the scoped coding rules automatically | one of them for the guided flow — the setup for each is in the [user manual, Chapter 6.6](user-manual.md#chapter-66-using-eos-with-claude-code-codex-and-antigravity); the `eos.mjs` CLI itself works without any |
 | **BMAD skills** (`bmad-*`) | every stage workflow (`bmad-prd`, `bmad-architecture`, `bmad-create-story`, …) | required for the guided flow — EOS orchestrates them, it does not reimplement them. Verify with `node .github/hooks/eos-doctor.mjs --deep` |
 | **`gh` CLI**, authenticated | creating the remote, and verifying branch protection during `/eos-init` | **optional**: do it in the GitHub web UI instead. Set up with `gh auth login` |

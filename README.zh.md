@@ -8,7 +8,7 @@
 [![EOS CI](https://github.com/niaodian/eos/actions/workflows/eos-ci.yml/badge.svg?branch=main)](https://github.com/niaodian/eos/actions/workflows/eos-ci.yml)
 [![CI platforms](https://img.shields.io/badge/CI-Linux%20%7C%20macOS%20%7C%20Windows-informational)](.github/workflows/eos-ci.yml)
 [![Provenance](https://img.shields.io/badge/provenance-SLSA%20v1%20attested-2ea44f)](https://github.com/niaodian/eos/attestations)
-[![Node](https://img.shields.io/badge/node-20%20%7C%2022-339933?logo=node.js&logoColor=white)](package.json)
+[![Node](https://img.shields.io/badge/node-20%20%7C%2022%20%7C%2024-339933?logo=node.js&logoColor=white)](package.json)
 [![Dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)](package.json)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
@@ -70,7 +70,8 @@ GitHub Copilot、Claude Code、OpenAI Codex 或 Google Antigravity 里用，或�
 
 ## 快速开始
 
-你需要 Node.js 20.10+ 和 Git。AI agent 是可选的 —— CLI 在任何终端里都能用。
+你需要 Node.js 20.10+（推荐 22 或 24 —— Node 20 已于 2026-04-30 停止维护）和 Git。
+AI agent 是可选的 —— CLI 在任何终端里都能用。
 
 ```bash
 # 1. 从一个固定的发布版本开始，并把它变成你的仓库
@@ -198,7 +199,8 @@ docs/               你的规格与 ADR；docs/eos/ 是 EOS 手册（中文版�
 
 ## 环境要求与说明
 
-- **Node.js 20.10+ 和 Git** —— 别无其他。CI 在 Linux、macOS 和 Windows 上运行 Node 20 与 22。
+- **Node.js 20.10+ 和 Git** —— 别无其他。请使用 Node 22 或 24：Node 20 已于 2026-04-30 停止维护，
+  只作为声明的最低版本继续受支持。CI 在 Linux、macOS 和 Windows 上运行 Node 20、22 与 24。
 - **永远不需要 API key。** EOS 从不调用模型。每一项附加（Copilot、BMAD、BMAD 运行时）带来什么，以及已知局限，
   见 [快速开始](docs/zh/quickstart.md#能力与依赖)。
 - **AI agent 是可选的。** GitHub Copilot（VS Code）、Claude Code、OpenAI Codex 和 Google Antigravity 都有分步指导；
