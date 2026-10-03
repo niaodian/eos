@@ -2,7 +2,11 @@
 // EOS spec-alignment metric — zero external deps.
 // Quantifies how well the built artifact matches the spec — EOS's own meta-metric:
 //   - AC coverage %:   ACs in the PRD that appear in the trace matrix.
-//   - Traced-pass %:   trace-matrix rows marked passing (✅) over total rows.
+//   - Traced-pass %:   trace-matrix rows whose test passed, over total rows. When the machine
+//                      test-run summary exists (docs/evidence/test-run.json) it is the answer: a
+//                      "PASS" written in the matrix is a claim, and since eos-2.2.0 the matrix need
+//                      not carry one at all (the verified gate derives the summary from JUnit). Without
+//                      the summary the Result column is read, as before.
 //   - Spec drift:      ACs in docs/prd.md with NO trace-matrix row (spec says X, no proof).
 // Reads docs/prd.md + docs/trace-matrix.md. Advisory by default; --strict makes gaps exit 1.
 //   node .github/hooks/spec-align.mjs [--strict]
@@ -41,6 +45,30 @@ if (missing.length) {
 const prd = readFileSync(prdPath, 'utf8');
 const trace = readFileSync(tracePath, 'utf8');
 
+// The machine results, when there are any: AC id → the statuses recorded for it.
+const runPath = join(root, 'docs/evidence/test-run.json');
+let machine = null;
+if (existsSync(runPath)) {
+  let results = null;
+  try { results = JSON.parse(readFileSync(runPath, 'utf8')).results; } catch { /* reported below */ }
+  if (!Array.isArray(results)) {
+    console.log('EOS spec-alignment\n');
+    console.log('  ERROR docs/evidence/test-run.json is not a readable test-run summary (no "results" array)');
+    console.log('');
+    console.log(strict ? 'FAIL (--strict): the machine results cannot be read, so no traced row can be scored.' : 'ADVISORY — the machine results cannot be read.');
+    process.exit(strict ? 1 : 0);
+  }
+  machine = new Map();
+  for (const r of results) {
+    if (!r || typeof r.ac !== 'string') continue;
+    if (!machine.has(r.ac)) machine.set(r.ac, []);
+    machine.get(r.ac).push(r.status);
+  }
+}
+const rowPasses = (ac, resultCell) => (machine
+  ? (machine.get(ac) || []).length > 0 && machine.get(ac).every((st) => st === 'PASS')
+  : /✅|✓|PASS/i.test(resultCell));
+
 // AC ids look like AC1.1, AC12.3, etc.
 const AC = /\bAC\d+\.\d+\b/g;
 const prdACs = new Set((prd.match(AC) || []));
@@ -56,8 +84,7 @@ for (const line of trace.split('\n')) {
   if (!/^AC\d+\.\d+$/.test(acCell)) continue; // skip header/separator/non-AC rows
   tracedACs.add(acCell);
   rows++;
-  const result = cells[cells.length - 1];
-  if (/✅|✓|PASS/i.test(result)) passed++;
+  if (rowPasses(acCell, cells[cells.length - 1])) passed++;
 }
 
 const totalPrd = prdACs.size || 0;
@@ -72,7 +99,7 @@ const tracedPass = pct(passed, rows);
 console.log('EOS spec-alignment\n');
 console.log(`  PRD acceptance criteria:      ${totalPrd}`);
 console.log(`  Covered by trace matrix:      ${coveredCount}/${totalPrd}  (${coverage}%)`);
-console.log(`  Traced rows passing:          ${passed}/${rows}  (${tracedPass}%)`);
+console.log(`  Traced rows passing:          ${passed}/${rows}  (${tracedPass}%)${machine ? '  — from docs/evidence/test-run.json' : ''}`);
 if (drift.length) console.log(`  ⚠ Spec drift (AC without a trace row): ${drift.join(', ')}`);
 if (orphan.length) console.log(`  ⚠ Orphan rows (trace AC not in PRD):   ${orphan.join(', ')}`);
 console.log('');
@@ -90,7 +117,7 @@ if (!clean && strict) {
   if (rows === 0) why.push('docs/trace-matrix.md contains no AC rows');
   if (drift.length) why.push(`${drift.length} AC(s) with no trace row: ${drift.join(', ')}`);
   if (orphan.length) why.push(`${orphan.length} orphan row(s) not in the PRD (built beyond the approved spec): ${orphan.join(', ')}`);
-  if (rows > 0 && passed < rows) why.push(`${rows - passed} traced row(s) not passing`);
+  if (rows > 0 && passed < rows) why.push(`${rows - passed} traced row(s) not passing${machine ? ' in docs/evidence/test-run.json (a row passes when every result recorded for its AC is PASS)' : ''}`);
   for (const w of why) console.log('  ERROR ' + w);
   console.log('');
   console.log('FAIL (--strict): spec-alignment gaps present. Close drift, orphans and failing rows before release.');

@@ -887,7 +887,7 @@ LLM tracing（token/成本/context/tool-span）。
 | `project-gate.mjs` | 手动 / **被 CI 调用（权威）** | 跨栈产品质量门：按 `.eos/project.json` 真的执行 install/lint/typecheck/test/eval。**fail closed**——`application` 缺 `commands.test`、有栈清单却没声明、工具链没装（BLOCKED）都是 exit 1 |
 | `eos-doctor.mjs` | **PostToolUse（逐编辑，经 `config-check.json`）** / 手动 / 被 CI 调用 | 零依赖 SDLC 门诊：**D0 项目声明**、D1/D2 G-EVAL（以 `productParadigms` 声明为准，SDK/目录探测只是补网）、D3 G-UX、**D4 密钥扫描（调 `secret-scan.mjs`）**、**D5 合规数据边界（校验结构化 `docs/compliance-profile.json`，不再靠散文关键词）** |
 | `secret-scan.mjs` | 手动 / 被 eos-doctor + CI 调用 | 密钥扫描：内置零依赖正则（硬编码密钥/私钥、误提交 `.env`）**＋ 若装了 `gitleaks` 自动叠加深度扫描**（`.gitleaks.toml` 白名单）；命中 exit 1、输出脱敏 |
-| `spec-align.mjs` | 手动（`/eos-spec-align`）/ 被 CI 调用 | 规范对齐量化：解析 `prd.md`+`trace-matrix.md` → AC 覆盖率 / 一次过率 / 漂移；`--strict` **fail closed**：缺文件、PRD 无 AC、矩阵无行、漂移、孤儿行、失败行均 exit 1 |
+| `spec-align.mjs` | 手动（`/eos-spec-align`）/ 被 CI 调用 | 规范对齐量化：解析 `prd.md`+`trace-matrix.md` → AC 覆盖率 / 一次过率 / 漂移——某行是否通过，有 `docs/evidence/test-run.json` 时以它为准，没有时才读 Result 列（自 eos-2.2.0 起）；`--strict` **fail closed**：缺文件、PRD 无 AC、矩阵无行、漂移、孤儿行、失败行均 exit 1 |
 | `*.test.mjs` | `node --test` / CI | 门禁自身的回归测试（deny-dangerous / spec-align / project-gate / eos-doctor / check-doc-parity）——防止未来改动把这些语义悄悄改回"绿但空" |
 
 **手动测试护栏**（终端）：

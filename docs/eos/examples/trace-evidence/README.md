@@ -71,6 +71,8 @@ its own report, nothing else declared:
   only looks like a file name ("e.g.", "Node.js") is skipped unless it names a real file.
 - A run whose results match the recorded `test-run.json` except for timings keeps that file, so
   verifying one story does not make another story's evidence stale.
+- The Result column is for people. At the release gate, `spec-align --strict` scores each row from
+  `test-run.json` too: a row passes when every result recorded for its AC is `PASS`.
 
 ### Writing JUnit, per stack
 
