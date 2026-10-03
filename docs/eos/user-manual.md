@@ -770,6 +770,7 @@ rejected transition · `2` blocked/pending/stale · `3` EOS itself cannot be eva
 | `init [--write]` | Report or create local, non-destructive integration files |
 | `stage init <stage> [--write] [--interactive]` | The skeleton of a stage's machine record (`docs/<stage>.json`) and its document, generated from the schema: every required field with a `TODO(eos)` placeholder — every gate rejects the record until each is answered, so a skeleton never advances a stage. Samples: [examples/stage-records](examples/stage-records/README.md) (since eos-2.3.0) |
 | `stack sync [--write]` | Render the always-on workspace rule's `Local commands` from `.eos/project.json`, so the prose cannot disagree with what CI runs. Blocks rather than guessing when no stack is declared |
+| `mcp` | Serve the read and verify commands to an agent over the Model Context Protocol (stdio): `next`, `status`, `resume`, `health`, `explain`, `check`, `verify`, `release-status`, a stage skeleton, `product-tree`, `doctor`, `policy check`. Approving, waiving, transitions, release signing and everything that rewrites governance files are deliberately not tools ([ADR-018](../adr/018-mcp-server.md)). `eos agents sync` writes each platform's client configuration (since eos-2.3.0) |
 | `doctor` | Is EOS itself wired correctly? |
 
 **Gate ids** (`check --gate <id>`): `activation` · `discovery-ready` · `requirements-ready` ·

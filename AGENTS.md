@@ -10,6 +10,7 @@ In Copilot Chat use the `eos-guide` agent, or `/eos-next` · `/eos-resume` · `/
 - Always-on rules: [.github/copilot-instructions.md](.github/copilot-instructions.md)
 - Scoped rules: `.github/instructions/**` (auto-applied by `applyTo` globs)
 - Workflow commands (slash): Agent Skills in `.agents/skills/eos-*/` (`.claude/skills/` is a generated copy for Claude Code — edit the source, then `node .github/eos/eos.mjs agents sync --write`)
+- MCP: `node .github/eos/eos.mjs mcp` serves `eos_next`, `eos_status`, `eos_check`, `eos_verify` … as tools. It reads state and runs gates only; approving, waiving and state transitions stay CLI commands a person runs ([ADR-018](docs/adr/018-mcp-server.md))
 - Orchestrator agents (handoffs): `.github/agents/**`
 - BMAD reuse map: [docs/eos/agent-map.md](docs/eos/agent-map.md)
 - Quickstart: [docs/eos/quickstart.md](docs/eos/quickstart.md)

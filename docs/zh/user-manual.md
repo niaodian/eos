@@ -801,6 +801,7 @@ LLM tracing（token/成本/context/tool-span）。
 | `init [--write]` | 报告或创建本地的、非破坏性的集成文件 |
 | `stage init <stage> [--write] [--interactive]` | 根据 schema 生成某阶段机器记录（`docs/<stage>.json`）及其文档的骨架：每个必填字段都放一个 `TODO(eos)` 占位符——在逐一回答之前，所有门禁都会拒绝这份记录，因此骨架永远不会推进阶段。样例见 [examples/stage-records](../eos/examples/stage-records/README.md)（自 eos-2.3.0 起） |
 | `stack sync [--write]` | 依据 `.eos/project.json` 渲染常驻工作区规则的 `Local commands`，使散文不可能与 CI 实际执行的命令不一致。未声明技术栈时阻断而非猜测 |
+| `mcp` | 通过 Model Context Protocol（stdio）把读取与验证类命令提供给 agent：`next`、`status`、`resume`、`health`、`explain`、`check`、`verify`、`release-status`、阶段骨架、`product-tree`、`doctor`、`policy check`。批准、豁免、状态迁移、发布签名以及一切改写治理文件的命令都刻意不作为工具提供（[ADR-018](../adr/018-mcp-server.md)）。各平台的客户端配置由 `eos agents sync` 生成（自 eos-2.3.0 起） |
 | `doctor` | EOS 自身接线是否正确 |
 
 **门禁 id**（`check --gate <id>`）：`activation` · `discovery-ready` · `requirements-ready` ·
