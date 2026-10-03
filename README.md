@@ -79,7 +79,7 @@ AI agent is optional — the CLI works in any terminal.
 
 ```bash
 # 1. Start from a pinned release and make it your repository
-npx degit niaodian/eos#eos-2.3.0 my-app && cd my-app && git init
+npx degit niaodian/eos#eos-2.4.0 my-app && cd my-app && git init
 
 # 2. Declare the project — no code yet, so the stack is decided at architecture time
 npx --offline eos init config-only --write        # add --track regulated for the strict track
@@ -170,8 +170,8 @@ EOS releases are built and attested in GitHub Actions, the way EOS asks your rel
 yourself before you adopt it:
 
 ```bash
-gh release download eos-2.3.0 --repo niaodian/eos --pattern 'eos-2.3.0.tar.gz'
-gh attestation verify eos-2.3.0.tar.gz --repo niaodian/eos
+gh release download eos-2.4.0 --repo niaodian/eos --pattern 'eos-2.4.0.tar.gz'
+gh attestation verify eos-2.4.0.tar.gz --repo niaodian/eos
 ```
 
 Each release also ships its SBOM and a `SHA256SUMS` file.
@@ -200,7 +200,7 @@ docs/               your specs and ADRs; docs/eos/ is the EOS manual set (中文
 - [Using EOS with Claude Code, Codex and Antigravity](docs/eos/user-manual.md#chapter-66-using-eos-with-claude-code-codex-and-antigravity) — the one-time setup and the daily workflow in each agent.
 - [Upgrading to eos-2.0.0](docs/eos/user-manual.md#105-upgrading-from-eos-122x-to-eos-200) — what changes and what to do.
 - [Upgrading to eos-2.0.1](docs/eos/user-manual.md#107-upgrading-from-eos-200-to-eos-201) — the secret-detection security patch.
-- [Upgrading to eos-2.3.0](docs/eos/user-manual.md#1010-upgrading-from-eos-22x-to-eos-230) — every agent platform generated from one source, `eos mcp`, brownfield adoption, `eos stage init`.
+- [Upgrading to eos-2.4.0](docs/eos/user-manual.md#1011-upgrading-from-eos-23x-to-eos-240) — Node 24 tested everywhere, BMAD found for Antigravity, `eos next --exit-zero`, the runbook where the release gate reads it.
 - [Workflow contract](docs/eos/developer-experience.md) — the CLI, exit codes, JSON and diagnostics.
 - [Stack presets and tracks](docs/eos/stack-presets.md) — every supported stack, and how to choose a track.
 - [Design rationale](docs/eos/blueprint.md) and [architecture decisions](docs/adr/).
