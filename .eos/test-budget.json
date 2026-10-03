@@ -1,7 +1,7 @@
 {
   "$schema": "./schemas/test-budget.schema.json",
   "schemaVersion": 1,
-  "description": "Test layers and their wall-clock budgets. Run with `node .github/eos/run-tests.mjs`. A layer is a set of files that run in ONE `node --test` invocation, so Node parallelises them across cores. budgetMs is the ABSOLUTE ceiling everywhere, calibrated against the CI runner that enforces it (about 1.8x its observed time): the first budgets were set from a 16-core laptop, so on the 2-core runner audit-regression already sat at 95%. Slow creep below the ceiling is the job of the per-environment baseline (EOS_TEST_BASELINE_ENV, baselineTolerance). On a slow runner set EOS_TEST_BUDGET_SCALE instead of raising a budget, so the ratio a breach represents stays the same everywhere. Runner speed varies as much as the drift tolerance: the same commit (2daa3e3) took 20.6s and 31.2s for integration on two ubuntu-latest runs, every file scaled alike. So the ci-linux baselines are recorded from the slower runner class (eos-2.0.0: integration grew by four suites — first run, release signing, policy upstream, governance report), and each budget stays about 1.8x of it.",
+  "description": "Test layers and their wall-clock budgets. Run with `node .github/eos/run-tests.mjs`. A layer is a set of files that run in ONE `node --test` invocation, so Node parallelises them across cores. budgetMs is the ABSOLUTE ceiling everywhere, calibrated against the CI runner that enforces it (about 1.8x its observed time): the first budgets were set from a 16-core laptop, so on the 2-core runner audit-regression already sat at 95%. Slow creep below the ceiling is the job of the per-environment baseline (EOS_TEST_BASELINE_ENV, baselineTolerance). On a slow runner set EOS_TEST_BUDGET_SCALE instead of raising a budget, so the ratio a breach represents stays the same everywhere. Runner speed varies as much as the drift tolerance: the same commit (2daa3e3) took 20.6s and 31.2s for integration on two ubuntu-latest runs, every file scaled alike. So the ci-linux baselines are recorded from the slower runner class (eos-2.0.0: integration grew by four suites — first run, release signing, policy upstream, governance report), and each budget stays about 1.8x of it. eos-2.2.0/2.3.0 re-recorded integration, contract and audit-regression: six integration suites were added since 2.0.0 (JUnit evidence, skills, agent platforms, brownfield, stage init, MCP stop), the MCP contract suite, and the eval-starter replay cases; the slower runner class then measured integration 52.9s, contract 16.7s, and audit-regression 38.5s at most (its audit step was skipped after the integration step failed on drift), while a fast runner took 32.4s / 11.8s / 26.4s for the same commit.",
   "defaultScale": 1,
   "testTimeoutMs": 120000,
   "layerTimeoutMs": 900000,
@@ -9,9 +9,9 @@
   "baselineTolerance": 0.5,
   "baselines": {
     "ci-linux": {
-      "audit-regression": 29800,
-      "contract": 13300,
-      "integration": 31900,
+      "audit-regression": 38500,
+      "contract": 16800,
+      "integration": 53000,
       "journey": 4200,
       "unit": 9000
     }
@@ -51,7 +51,7 @@
     },
     "contract": {
       "description": "Published interfaces: the CLI's JSON contract and exit codes, the provider-adapter contract, and the offline boundary that both rest on.",
-      "budgetMs": 24000,
+      "budgetMs": 30000,
       "files": [
         ".github/eos/cli.test.mjs",
         ".github/eos/adapters.test.mjs",
@@ -63,7 +63,7 @@
     },
     "integration": {
       "description": "Several modules together through real fixtures: routing decisions, gate bypasses, cross-stack quality.",
-      "budgetMs": 58000,
+      "budgetMs": 95000,
       "files": [
         ".github/eos/bypass.test.mjs",
         ".github/eos/cross-branch.test.mjs",
@@ -92,7 +92,7 @@
     },
     "audit-regression": {
       "description": "One executable case per audit finding. Each test performs the reported bypass, then asserts it no longer works. A failure here means an audit finding has re-opened.",
-      "budgetMs": 55000,
+      "budgetMs": 70000,
       "files": [
         ".github/eos/audit-evidence.test.mjs",
         ".github/eos/audit-examples.test.mjs",
