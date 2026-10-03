@@ -26,7 +26,7 @@ export const agentsCommands = {
     // A skill that would not load is not copied anywhere: --write refuses, and --check fails, until it is fixed.
     const refused = flags.write && problems.length > 0;
     if (flags.write && !refused) applySkillSync(snapshot.root, changes);
-    const verb = { add: flags.write ? 'added' : 'would add', update: flags.write ? 'updated' : 'would update', remove: flags.write ? 'removed' : 'would remove' };
+    const verb = { add: flags.write ? 'added' : 'would add', update: flags.write ? 'updated' : 'would update', remove: flags.write ? 'removed' : 'would remove', unlink: flags.write ? 'unlinked' : 'would unlink' };
     const sources = listSkills(snapshot.root).filter(isEosSkill).length;
     const lines = ['EOS agents sync · skills', '',
       `  source     ${SKILLS_DIR}/ — ${sources} EOS skill(s)`,

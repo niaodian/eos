@@ -11,8 +11,11 @@
 //
 // `eos agents sync` writes the mirror, `--check` fails on drift (CI runs it). Only `eos-` directories
 // are ever written or removed: a team's own skills, wherever they live, are never touched. Copies,
-// not symlinks — Windows checkouts without symlink support turn a link into a plain file.
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+// not symlinks — Windows checkouts without symlink support turn a link into a plain file. And never
+// THROUGH a symlink: a mirror linked to the source would delete the source, and a link out of the
+// repository would be written outside it. A link where a copy belongs is replaced — the link itself
+// is removed, never what it points at.
+import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, rmSync, rmdirSync, unlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { AGENT_PLATFORMS } from '../../hooks/lib/project-config.mjs';
 
@@ -90,21 +93,34 @@ export function skillProblems(root, name, dir = SKILLS_DIR) {
 /** The platforms a project generates files for: declared `agentPlatforms`, or every one EOS knows. */
 export const platformsOf = (project) => (Array.isArray(project?.agentPlatforms) ? project.agentPlatforms : AGENT_PLATFORMS);
 
+/** Files under a directory, links included as leaves (never followed). */
 function filesUnder(root, rel, out = []) {
   const full = join(root, rel);
   for (const e of readdirSync(full, { withFileTypes: true })) {
     const child = `${rel}/${e.name}`;
     if (e.isDirectory()) filesUnder(root, child, out);
-    else if (e.isFile()) out.push(child);
+    else if (e.isFile() || e.isSymbolicLink()) out.push(child);
   }
   return out;
+}
+
+/** The first component of `rel` that is a symbolic link, or null (a missing component ends the search). */
+export function linkOnPath(root, rel) {
+  const parts = rel.split('/');
+  for (let i = 1; i <= parts.length; i++) {
+    const p = parts.slice(0, i).join('/');
+    let st;
+    try { st = lstatSync(join(root, p)); } catch { return null; }
+    if (st.isSymbolicLink()) return p;
+  }
+  return null;
 }
 
 const bytes = (root, rel) => { try { return readFileSync(join(root, rel)); } catch { return null; } };
 
 /**
  * What `eos agents sync` would do. Pure: reads, writes nothing.
- * @returns {{platforms: string[], rows: Array<{path:string, action:'current'|'add'|'update'|'remove', platform:string}>, problems: string[]}}
+ * @returns {{platforms: string[], rows: Array<{path:string, action:'current'|'add'|'update'|'remove'|'unlink', platform:string}>, problems: string[]}}
  */
 export function planSkillSync(root, project) {
   const platforms = platformsOf(project);
@@ -112,46 +128,76 @@ export function planSkillSync(root, project) {
   const problems = listSkills(root).flatMap((n) => skillProblems(root, n));
   const rows = [];
   for (const [platform, mirror] of Object.entries(SKILL_MIRRORS)) {
+    const declared = platforms.includes(platform);
+    // A linked mirror is not EOS's to write into or clean up — whatever it points at, the source
+    // included. A platform that needs the copy is told why it cannot have one; otherwise it is left be.
+    const mirrorLink = linkOnPath(root, mirror);
+    if (mirrorLink) {
+      if (declared) {
+        problems.push(`${mirrorLink} is a symbolic link — ${platform} gets a generated copy of ${SKILLS_DIR}/ there, and EOS never writes or deletes through a link (it could reach ${SKILLS_DIR}/ itself, or a path outside the repository). Replace the link with a directory, then run \`node .github/eos/eos.mjs agents sync --write\`.`);
+      }
+      continue;
+    }
     const wanted = new Map();
-    if (platforms.includes(platform)) {
+    if (declared) {
       for (const name of sources) {
+        // Reading the source through a link is harmless; only writing and deleting are guarded.
         for (const src of filesUnder(root, `${SKILLS_DIR}/${name}`)) wanted.set(`${mirror}${src.slice(SKILLS_DIR.length)}`, src);
       }
     }
+    const links = new Set();
     for (const [target, src] of wanted) {
+      const link = linkOnPath(root, target);
+      if (link) { links.add(link); rows.push({ platform, path: target, source: src, action: 'add' }); continue; }
       const have = bytes(root, target);
       const want = bytes(root, src);
       rows.push({ platform, path: target, source: src, action: have === null ? 'add' : have.equals(want) ? 'current' : 'update' });
     }
     // Only eos- directories are EOS's to remove; a team's own skills in the mirror stay.
     if (existsSync(join(root, mirror))) {
-      for (const name of readdirSync(join(root, mirror)).filter(isEosSkill)) {
-        if (!statSync(join(root, mirror, name)).isDirectory()) continue;
-        for (const f of filesUnder(root, `${mirror}/${name}`)) if (!wanted.has(f)) rows.push({ platform, path: f, action: 'remove' });
+      for (const e of readdirSync(join(root, mirror), { withFileTypes: true }).filter((x) => isEosSkill(x.name))) {
+        const rel = `${mirror}/${e.name}`;
+        if (e.isSymbolicLink()) { links.add(rel); continue; }
+        if (!e.isDirectory()) continue;
+        for (const f of filesUnder(root, rel)) {
+          if (lstatSync(join(root, f)).isSymbolicLink()) links.add(f);
+          else if (!wanted.has(f)) rows.push({ platform, path: f, action: 'remove' });
+        }
       }
     }
+    for (const link of links) rows.push({ platform, path: link, action: 'unlink' });
   }
   return { platforms, rows: rows.sort((a, b) => a.path.localeCompare(b.path)), problems };
 }
 
-/** Carry out a plan: copy what is missing or different, delete what no source produces any more. */
+/** Carry out a plan: drop links, copy what is missing or different, delete what no source produces any more. */
 export function applySkillSync(root, rows) {
+  // Links first, so nothing below is written through one. unlink removes the link, never its target.
+  for (const r of rows.filter((x) => x.action === 'unlink')) {
+    const full = join(root, r.path);
+    try { unlinkSync(full); } catch (e) {
+      if (e.code === 'ENOENT') continue;
+      // Windows removes a directory link with rmdir — which, for a link, removes only the link.
+      if (e.code === 'EPERM' || e.code === 'EISDIR') rmdirSync(full); else throw e;
+    }
+  }
   for (const r of rows) {
     const full = join(root, r.path);
     if (r.action === 'add' || r.action === 'update') {
+      const link = linkOnPath(root, r.path);
+      if (link) throw new Error(`${link} is a symbolic link — not writing ${r.path} through it`);
       mkdirSync(dirname(full), { recursive: true });
       writeFileSync(full, readFileSync(join(root, r.source)));
     } else if (r.action === 'remove') {
+      if (linkOnPath(root, r.path)) continue;
       rmSync(full, { force: true });
     }
   }
   // An eos- mirror directory left empty by removals goes too.
   for (const mirror of Object.values(SKILL_MIRRORS)) {
-    const dir = join(root, mirror);
-    if (!existsSync(dir)) continue;
-    for (const name of readdirSync(dir).filter(isEosSkill)) {
-      const d = join(dir, name);
-      try { if (statSync(d).isDirectory() && !filesUnder(root, `${mirror}/${name}`).length) rmSync(d, { recursive: true, force: true }); } catch { /* raced */ }
+    if (linkOnPath(root, mirror) || !existsSync(join(root, mirror))) continue;
+    for (const e of readdirSync(join(root, mirror), { withFileTypes: true }).filter((x) => isEosSkill(x.name) && x.isDirectory())) {
+      try { if (!filesUnder(root, `${mirror}/${e.name}`).length) rmSync(join(root, mirror, e.name), { recursive: true, force: true }); } catch { /* raced */ }
     }
   }
   return rows;

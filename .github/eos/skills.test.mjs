@@ -7,7 +7,8 @@
 //   node --test .github/eos/skills.test.mjs
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync, readdirSync, cpSync, rmSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, cpSync, rmSync, symlinkSync, lstatSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { project, write, run, runJson, cleanup, REPO_ROOT, APP_PROJECT } from './test-support.mjs';
 import { listSkills, skillProblems, skillFrontmatter, planSkillSync, SKILLS_DIR } from './lib/skills.mjs';
@@ -100,4 +101,52 @@ test('an unknown agent platform is refused by the declaration', () => {
   const dir = project({ '.eos/project.json': { ...APP_PROJECT, agentPlatforms: ['copilot', 'vim'] } }, { git: false });
   const r = run(dir, ['doctor']);
   assert.match(r.out, /unknown agent platform\(s\) "vim"/);
+});
+
+const POSIX_LINKS = process.platform === 'win32' && 'creating symlinks needs privileges on Windows';
+
+test('a mirror linked to the source is never written or emptied through the link', { skip: POSIX_LINKS }, () => {
+  const dir = withSkills({ ...APP_PROJECT, agentPlatforms: ['copilot', 'codex'] });
+  rmSync(join(dir, '.claude/skills'), { recursive: true });
+  symlinkSync('../.agents/skills', join(dir, '.claude/skills'));
+  const undeclared = runJson(dir, ['agents', 'sync', '--write']);
+  assert.equal(undeclared.code, 0, undeclared.out);
+  assert.deepEqual(undeclared.json.files, [], 'nothing is planned inside a linked mirror');
+  assert.ok(existsSync(join(dir, '.agents/skills/eos-adr/SKILL.md')), 'the source is intact');
+
+  write(dir, '.eos/project.json', APP_PROJECT);
+  const declared = runJson(dir, ['agents', 'sync', '--write']);
+  assert.equal(declared.code, 1, declared.out);
+  assert.match(declared.json.problems.join('\n'), /\.claude\/skills is a symbolic link .* Replace the link with a directory/);
+  assert.equal(run(dir, ['agents', 'sync', '--check']).code, 1);
+  assert.ok(existsSync(join(dir, '.agents/skills/eos-adr/SKILL.md')));
+});
+
+test('a link where a copy belongs is replaced — the link goes, never what it points at — and a broken one does not crash', { skip: POSIX_LINKS }, () => {
+  const dir = withSkills();
+  const outside = mkdtempSync(join(tmpdir(), 'eos-outside-'));
+  writeFileSync(join(outside, 'precious.md'), 'not EOS\'s\n');
+  rmSync(join(dir, '.claude/skills/eos-adr'), { recursive: true });
+  symlinkSync(outside, join(dir, '.claude/skills/eos-adr'));
+  rmSync(join(dir, '.claude/skills/eos-nfr'), { recursive: true });
+  symlinkSync('../../.github/skills/eos-nfr', join(dir, '.claude/skills/eos-nfr')); // broken, as a 2.1 layout would leave it
+  rmSync(join(dir, '.claude/skills/eos-next/SKILL.md'));
+  symlinkSync(join(outside, 'precious.md'), join(dir, '.claude/skills/eos-next/SKILL.md'));
+
+  const plan = runJson(dir, ['agents', 'sync']);
+  assert.equal(plan.code, 0, plan.out);
+  const rows = plan.json.files.map((f) => `${f.action} ${f.path}`);
+  for (const link of ['.claude/skills/eos-adr', '.claude/skills/eos-nfr', '.claude/skills/eos-next/SKILL.md']) assert.ok(rows.includes(`unlink ${link}`), `${link}: ${rows.join(', ')}`);
+  assert.ok(rows.includes('add .claude/skills/eos-next/SKILL.md'));
+  assert.equal(run(dir, ['agents', 'sync', '--check']).code, 1, 'a link is drift: the mirror holds copies');
+
+  assert.equal(run(dir, ['agents', 'sync', '--write']).code, 0);
+  assert.deepEqual(readdirSync(outside), ['precious.md'], 'nothing was written or deleted outside the repository');
+  assert.equal(readFileSync(join(outside, 'precious.md'), 'utf8'), 'not EOS\'s\n');
+  for (const name of ['eos-adr', 'eos-nfr', 'eos-next']) {
+    assert.equal(lstatSync(join(dir, '.claude/skills', name)).isSymbolicLink(), false, name);
+    assert.equal(readFileSync(join(dir, '.claude/skills', name, 'SKILL.md'), 'utf8'), readFileSync(join(dir, '.agents/skills', name, 'SKILL.md'), 'utf8'), name);
+  }
+  assert.equal(run(dir, ['agents', 'sync', '--check']).code, 0);
+  rmSync(outside, { recursive: true, force: true });
 });
