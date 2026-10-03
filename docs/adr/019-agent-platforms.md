@@ -38,16 +38,23 @@ their other servers.
    generated on demand, so a repository is not filled with a dozen dot-directories it does not use.
    `eos agents sync --platform <x> --write` adds one in a single command; because `.eos/project.json` is
    an input of every gate, it says that the recorded evidence needs a re-run.
-3. **EOS owns entries, not shared files.** It sets its own entry — the `eos` MCP server, the hook entry
-   that runs `deny-dangerous.js`, a marked `[mcp_servers.eos]` block in TOML, Gemini's `AGENTS.md`
-   context name — and leaves everything else as it was. Removing a platform removes only its entries,
-   and deletes a file only when nothing else is left in it. A file EOS cannot merge safely (JSON with
-   comments, an `[mcp_servers.eos]` of the team's own) is reported and nothing is written; nothing is
-   written or deleted through a symbolic link. Whole files are written only under EOS's own names
-   (`eos-*` agents, the Kiro hook, the Cline script, the OpenCode plugin).
+3. **EOS owns entries, not shared files.** It sets its own entry — the `eos` MCP server, the hook
+   *handlers* that run `deny-dangerous.js`, a marked `[mcp_servers.eos]` block in TOML, Gemini's
+   `AGENTS.md` context name — and leaves everything else as it was. Its own matcher group is updated
+   where it sits, so a team's hooks around it keep their order; a team group that already runs the
+   guardrail beside its own handlers is the team's arrangement. Removing a platform removes only the
+   guardrail handlers and EOS's entries, drops a group or a file only when nothing else is left in it,
+   and leaves alone a file it cannot read unless EOS's entry is inside. A file EOS cannot merge safely
+   (JSON with comments, a TOML that already defines `eos` in any spelling or makes `mcp_servers` an
+   inline table) is reported and nothing is written; nothing is written or deleted through a symbolic
+   link. A whole file EOS writes (`eos-*` agents, the Kiro hook, the Cline script, the OpenCode plugin)
+   is replaced or removed only while it carries EOS's mark: a team's own file at that path is never
+   touched — accepted as it is when it already runs the guardrail, reported otherwise.
 4. **One guardrail, many dialects.** `deny-dangerous.js --format <platform>` reads any platform's payload
    with the same rules and answers in that platform's dialect. It only ever denies: on allow it prints
-   no decision, because an explicit "allow" would skip the platform's own approval prompt.
+   no decision, because an explicit "allow" would skip the platform's own approval prompt. Where a
+   platform supports it (Claude Code), the hook is exec form — `node` with an argument list, no shell —
+   so the same entry runs on native Windows.
 5. **Agents where they do not collide.** Antigravity and Codex get the orchestrators rendered from
    `.github/agents/`. Claude Code does not: VS Code also reads `.claude/agents/`, so every orchestrator
    would be listed twice in Copilot, and Claude Code runs the same workflows as skills.

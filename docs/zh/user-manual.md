@@ -989,7 +989,7 @@ EOS 只写一次，再为团队使用的每个 agent 平台生成各自的文件
 | Kiro · Qwen Code · Windsurf / Devin Desktop · OpenCode · Cline *（第二梯队）* | `.kiro/…` · `.qwen/…` · `.devin/…` · `opencode.json` 与插件 · `.clinerules/hooks/PreToolUse` | 依据各厂商文档生成——**尚未在真实安装上验证** |
 
 - **选择平台**：在 `.eos/project.json` 中设置 `"agentPlatforms"`。未声明时生成默认集合（Copilot、Claude Code、Antigravity）：即 `.agents/`、`.github/`、`.claude/` 和 `.mcp.json` 中的文件；它们同时让 Codex、Cursor 和 Gemini CLI 读到技能与 `AGENTS.md`，并让 Cursor 用上 Claude 的钩子。一条命令即可加入一个平台：`node .github/eos/eos.mjs agents sync --platform codex --write`。它会修改 `agentPlatforms`，而该文件是每个门禁的输入，所以之后请重新运行 `eos verify`。
-- **共享文件仍归你所有。** EOS 只拥有自己的条目——`eos` 服务、运行 `deny-dangerous.js` 的钩子、带标记的 TOML 块——从不拥有 `.claude/settings.json` 或 `.mcp.json` 的其余内容。移除一个平台只删除它的条目；只有文件里不再剩任何其他内容时才删除该文件。EOS 无法安全合并的文件（带注释的 JSON、你自己的 `[mcp_servers.eos]`）会被拒绝，而不是写到一半；也绝不会透过符号链接写入。
+- **共享文件仍归你所有。** EOS 只拥有自己的条目——`eos` 服务、运行 `deny-dangerous.js` 的钩子处理器、带标记的 TOML 块——从不拥有 `.claude/settings.json` 或 `.mcp.json` 的其余内容，也从不拥有你的钩子：你的钩子在 EOS 的钩子前后保持原有顺序；你自己的、在自有处理器旁运行护栏的 matcher 组，保持你写的样子。移除一个平台只删除 EOS 的条目和处理器；只有文件里不再剩任何其他内容时才删除该文件。EOS 无法安全合并的文件（带注释的 JSON、已经定义了 `eos` 或把 `mcp_servers` 写成内联表的 TOML）会被拒绝，而不是写到一半；也绝不会透过符号链接写入。EOS 写出的整个文件（Cline 钩子脚本、`eos-*` agent ……）只有在仍带有 EOS 标记时才会被替换或删除；该路径上你自己的文件绝不会被改动。
 - **CI 运行 `agents sync --check`。** 请修改源头（`.agents/skills/`、`.github/agents/`、`.github/hooks/`），不要修改生成的文件。`eos upgrade` 会为你的平台重新生成这些文件，而不是拿它们与模板的副本比较。
 - **不生成的内容：** Claude Code 子代理（VS Code 也读取 `.claude/agents/`，每个编排 agent 会出现两次；Claude Code 用技能运行同样的工作流）；Cline 的 MCP 条目（Cline 只读取全局的 `~/.cline/mcp.json`）；Trae、CodeBuddy 和 Comate——它们的文档无法抓取，在实机验证之前由 `AGENTS.md` 和 CLI 提供支持。
 

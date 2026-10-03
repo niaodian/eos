@@ -7,10 +7,10 @@
 //   node --test .github/eos/agent-platforms.test.mjs
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawn } from 'node:child_process';
-import { project, write, run, runJson, cleanup, REPO_ROOT, APP_PROJECT, SPAWN_TIMEOUT_MS } from './test-support.mjs';
+import { project, write, run, runJson, cleanup, testEnv, REPO_ROOT, APP_PROJECT, SPAWN_TIMEOUT_MS } from './test-support.mjs';
 import { boundedSpawnSync, cleanEnv } from './test-spawn.mjs';
 import { planUpgrade, isGeneratedPath } from './lib/upgrade.mjs';
 import { CONFIG_FILES, OWNED_FILES } from './lib/agent-platforms.mjs';
@@ -63,7 +63,7 @@ test('a shared configuration file keeps everything that is not EOS\'s — and na
   assert.equal(run(dir, ['agents', 'sync', '--write']).code, 0);
   const settings = json(dir, '.claude/settings.json');
   assert.deepEqual(settings.permissions, mine.permissions);
-  assert.deepEqual(settings.hooks.PreToolUse.map((h) => h.matcher), ['Write', 'Bash|Write|Edit|MultiEdit|NotebookEdit']);
+  assert.deepEqual(settings.hooks.PreToolUse.map((h) => h.matcher), ['Write', 'Bash|PowerShell|Write|Edit|MultiEdit|NotebookEdit']);
   assert.deepEqual(Object.keys(json(dir, '.mcp.json').mcpServers), ['db', 'eos']);
 
   // A hand-edited EOS entry is drift; the team's own entries never are.
@@ -94,7 +94,7 @@ test('what EOS cannot merge safely is refused, not half-written', () => {
   const refused = runJson(dir, ['agents', 'sync', '--write']);
   assert.equal(refused.code, 1, refused.out);
   assert.match(refused.json.problems.join('\n'), /\.claude\/settings\.json is not plain JSON/);
-  assert.match(refused.json.problems.join('\n'), /\.codex\/config\.toml declares \[mcp_servers\.eos\] outside the EOS block/);
+  assert.match(refused.json.problems.join('\n'), /\.codex\/config\.toml defines the MCP server "eos" itself \(\[mcp_servers\.eos\]\)/);
   assert.equal(read(dir, '.codex/config.toml'), 'model = "o4"\n\n[mcp_servers.eos]\ncommand = "my-own-eos"\n');
   assert.equal(existsSync(join(dir, '.codex/hooks.json')), false, 'nothing at all is written while a problem stands');
   assert.equal(run(dir, ['agents', 'sync', '--check']).code, 1);
@@ -107,7 +107,6 @@ test('every generated hook runs the guardrail in its platform\'s dialect', { ski
   const payload = JSON.stringify({ tool_name: 'Bash', tool_input: { command: denied } });
   const sh = (command) => boundedSpawnSync('sh', ['-c', command], { cwd: dir, input: payload, encoding: 'utf8', env: cleanEnv({ ...process.env, CLAUDE_PROJECT_DIR: '' }) });
   const commandOf = {
-    claude: json(dir, '.claude/settings.json').hooks.PreToolUse.at(-1).hooks[0].command,
     codex: json(dir, '.codex/hooks.json').hooks.PreToolUse[0].hooks[0].command,
     cursor: json(dir, '.cursor/hooks.json').hooks.beforeShellExecution[0].command,
     antigravity: json(dir, '.agents/hooks.json')['eos-guardrail'].PreToolUse[0].hooks[0].command,
@@ -118,7 +117,6 @@ test('every generated hook runs the guardrail in its platform\'s dialect', { ski
     cline: './.clinerules/hooks/PreToolUse',
   };
   const denies = {
-    claude: (o) => o.hookSpecificOutput.permissionDecision === 'deny',
     codex: (o) => o.hookSpecificOutput.permissionDecision === 'deny',
     qwen: (o) => o.hookSpecificOutput.permissionDecision === 'deny',
     cursor: (o) => o.permission === 'deny',
@@ -137,9 +135,25 @@ test('every generated hook runs the guardrail in its platform\'s dialect', { ski
   assert.match(read(dir, '.opencode/plugins/eos-guardrail.js'), /from '\.\.\/\.\.\/\.github\/hooks\/lib\/secret-rules\.mjs'/);
 });
 
+test('the Claude Code hook is exec form — no shell, so it runs on native Windows too — and covers the PowerShell tool', () => {
+  const group = json(REPO_ROOT, '.claude/settings.json').hooks.PreToolUse.find((g) => JSON.stringify(g).includes('deny-dangerous.js'));
+  assert.ok(group.matcher.split('|').includes('PowerShell'), group.matcher);
+  const [handler] = group.hooks;
+  assert.equal(handler.command, 'node');
+  assert.ok(Array.isArray(handler.args), 'args present = exec form');
+  const denied = ['git', 'push', '--force'].join(' ');
+  for (const tool of ['Bash', 'PowerShell']) {
+    // What Claude Code does: substitute the placeholder into each argument and spawn, no shell.
+    const args = handler.args.map((a) => a.replace('${CLAUDE_PROJECT_DIR}', REPO_ROOT));
+    const r = boundedSpawnSync(process.execPath, args, { cwd: REPO_ROOT, input: JSON.stringify({ tool_name: tool, tool_input: { command: denied } }), encoding: 'utf8' });
+    assert.equal(r.status, 0, r.stderr);
+    assert.equal(JSON.parse(r.stdout).hookSpecificOutput.permissionDecision, 'deny', `${tool}: ${r.stdout}`);
+  }
+});
+
 test('the shipped .mcp.json starts a server that answers', async () => {
   const { mcpServers: { eos } } = json(REPO_ROOT, '.mcp.json');
-  const child = spawn(eos.command, eos.args, { cwd: REPO_ROOT, stdio: ['pipe', 'pipe', 'pipe'], timeout: SPAWN_TIMEOUT_MS, env: cleanEnv({ ...process.env }) });
+  const child = spawn(eos.command, eos.args, { cwd: REPO_ROOT, stdio: ['pipe', 'pipe', 'pipe'], timeout: SPAWN_TIMEOUT_MS, env: testEnv() });
   let out = '';
   child.stdout.on('data', (d) => { out += d; });
   const done = new Promise((resolveDone) => child.on('close', resolveDone));
@@ -158,4 +172,101 @@ test('eos upgrade leaves generated files out of its three-way comparison', () =>
   const rows = planUpgrade({ root: REPO_ROOT, next: REPO_ROOT, base: REPO_ROOT });
   assert.ok(rows.length > 100);
   assert.deepEqual(rows.filter((r) => isGeneratedPath(r.path)), []);
+});
+
+test('a file of the team\'s own where EOS writes one is never replaced or removed — and one that already runs the guardrail is accepted', () => {
+  const teamHook = '#!/bin/sh\n./scripts/team-audit.sh\n';
+  const dir = sandbox(APP_PROJECT, { '.clinerules/hooks/PreToolUse': teamHook });
+  // Cline is not declared (the default): the team's hook is not EOS's to remove.
+  const synced = runJson(dir, ['agents', 'sync', '--write']);
+  assert.equal(synced.code, 0, synced.out);
+  assert.ok(!synced.json.files.some((f) => f.path.startsWith('.clinerules/')), JSON.stringify(synced.json.files));
+  assert.equal(read(dir, '.clinerules/hooks/PreToolUse'), teamHook);
+  assert.equal(run(dir, ['agents', 'sync', '--check']).code, 0);
+  // Declared: refused, with the way out — never overwritten.
+  write(dir, '.eos/project.json', { ...APP_PROJECT, agentPlatforms: ['copilot', 'cline'] });
+  const refused = runJson(dir, ['agents', 'sync', '--write']);
+  assert.equal(refused.code, 1, refused.out);
+  assert.match(refused.json.problems.join('\n'), /\.clinerules\/hooks\/PreToolUse is your own .* make it run the guardrail yourself \(node \.github\/hooks\/deny-dangerous\.js --format cline\)/);
+  assert.equal(read(dir, '.clinerules/hooks/PreToolUse'), teamHook);
+  // The team wires the guardrail into its own script: accepted as it is.
+  const wired = `${teamHook}node .github/hooks/deny-dangerous.js --format cline\n`;
+  write(dir, '.clinerules/hooks/PreToolUse', wired);
+  assert.equal(run(dir, ['agents', 'sync', '--write']).code, 0);
+  assert.equal(read(dir, '.clinerules/hooks/PreToolUse'), wired);
+  assert.equal(run(dir, ['agents', 'sync', '--check']).code, 0);
+  // With no file of the team's there, EOS writes its own — and that one goes with its platform.
+  rmSync(join(dir, '.clinerules/hooks/PreToolUse'));
+  assert.equal(run(dir, ['agents', 'sync', '--write']).code, 0);
+  assert.match(read(dir, '.clinerules/hooks/PreToolUse'), /GENERATED by `eos agents sync`/);
+  write(dir, '.eos/project.json', { ...APP_PROJECT, agentPlatforms: ['copilot'] });
+  assert.equal(run(dir, ['agents', 'sync', '--write']).code, 0);
+  assert.equal(existsSync(join(dir, '.clinerules/hooks/PreToolUse')), false);
+});
+
+test('EOS owns its hook handlers, not a team\'s matcher group: mixed groups keep the team\'s hooks, and EOS\'s group stays where it sits', () => {
+  const team = { type: 'command', command: './scripts/team-audit.sh' };
+  const guard = { type: 'command', command: 'node .github/hooks/deny-dangerous.js --format claude' };
+  const mixed = { permissions: { allow: ['Bash(npm test)'] }, hooks: { PreToolUse: [{ matcher: 'Bash', hooks: [team, guard] }] } };
+  const dir = sandbox(APP_PROJECT, { '.claude/settings.json': mixed });
+  // The team already runs the guardrail in a group of its own: that arrangement is theirs.
+  assert.equal(run(dir, ['agents', 'sync', '--write']).code, 0);
+  assert.deepEqual(json(dir, '.claude/settings.json'), mixed);
+  assert.equal(run(dir, ['agents', 'sync', '--check']).code, 0);
+  // Claude is no longer declared: only the guardrail handler goes; the team's hook and file stay.
+  write(dir, '.eos/project.json', { ...APP_PROJECT, agentPlatforms: ['copilot'] });
+  assert.equal(run(dir, ['agents', 'sync', '--write']).code, 0);
+  assert.deepEqual(json(dir, '.claude/settings.json'), { permissions: mixed.permissions, hooks: { PreToolUse: [{ matcher: 'Bash', hooks: [team] }] } });
+
+  // EOS's own group, with a team group appended after it: no drift, and no reordering.
+  const fresh = sandbox();
+  assert.equal(run(fresh, ['agents', 'sync', '--write']).code, 0);
+  const settings = json(fresh, '.claude/settings.json');
+  settings.hooks.PreToolUse.push({ matcher: 'Write', hooks: [{ type: 'command', command: './scripts/team-lint.sh' }] });
+  write(fresh, '.claude/settings.json', settings);
+  assert.equal(run(fresh, ['agents', 'sync', '--check']).code, 0, 'the team\'s hook after EOS\'s is not drift');
+  // An outdated EOS group is updated in place: the team's group stays second.
+  settings.hooks.PreToolUse[0].hooks[0].timeout = 5;
+  write(fresh, '.claude/settings.json', settings);
+  assert.equal(run(fresh, ['agents', 'sync', '--write']).code, 0);
+  assert.deepEqual(json(fresh, '.claude/settings.json').hooks.PreToolUse.map((g) => g.matcher), ['Bash|PowerShell|Write|Edit|MultiEdit|NotebookEdit', 'Write']);
+  assert.equal(json(fresh, '.claude/settings.json').hooks.PreToolUse[0].hooks[0].timeout, 30);
+});
+
+test('a Codex config that already spells "eos" another way — or makes mcp_servers inline — is refused, never made invalid', () => {
+  for (const toml of [
+    '[mcp_servers]\neos = { command = "node", args = ["x"] }\ngithub = { command = "gh" }\n',
+    'mcp_servers.eos.command = "node"\n',
+    '[mcp_servers.eos.env]\nTOKEN_ENV = "X"\n',
+    'mcp_servers = { github = { command = "gh" } }\n',
+  ]) {
+    const dir = sandbox({ ...APP_PROJECT, agentPlatforms: ['codex'] }, { '.codex/config.toml': toml });
+    const r = runJson(dir, ['agents', 'sync', '--write']);
+    assert.equal(r.code, 1, `${toml}\n${r.out}`);
+    assert.match(r.json.problems.join('\n'), /\.codex\/config\.toml (defines the MCP server "eos" itself|declares mcp_servers as an inline table)/);
+    assert.equal(read(dir, '.codex/config.toml'), toml, 'nothing written');
+  }
+});
+
+test('an undeclared platform\'s config that EOS cannot read is none of its business — unless EOS\'s entry is stuck inside', () => {
+  const jsonc = '{\n  // Gemini CLI accepts comments\n  "theme": "dark"\n}\n';
+  const dir = sandbox(APP_PROJECT, { '.gemini/settings.json': jsonc });
+  assert.equal(run(dir, ['agents', 'sync', '--write']).code, 0);
+  assert.equal(read(dir, '.gemini/settings.json'), jsonc);
+  assert.equal(run(dir, ['agents', 'sync', '--check']).code, 0);
+  write(dir, '.gemini/settings.json', '{\n  // ours\n  "hooks": { "BeforeTool": [{ "hooks": [{ "command": "node .github/hooks/deny-dangerous.js --format gemini" }] }] }\n}\n');
+  const stuck = runJson(dir, ['agents', 'sync', '--check']);
+  assert.equal(stuck.code, 1);
+  assert.match(stuck.json.problems.join('\n'), /\.gemini\/settings\.json is not plain JSON .* still holds EOS's entry for gemini, which is no longer declared — remove that entry by hand/);
+});
+
+test('the upgrade dry run previews what --write will do to the agent-platform files, with the new generator', () => {
+  const dir = sandbox(APP_PROJECT, { '.clinerules/hooks/PreToolUse': '#!/bin/sh\n./mine.sh\n', '.mcp.json': { mcpServers: { db: { command: 'db-mcp' } } } });
+  const r = runJson(dir, ['upgrade', '--from', REPO_ROOT, '--base', REPO_ROOT]);
+  assert.equal(r.code, 0, r.out);
+  const preview = r.json.generated.preview;
+  assert.deepEqual(preview.platforms, ['copilot', 'claude', 'antigravity']);
+  assert.ok(preview.files.some((f) => f.path === '.mcp.json' && f.action === 'update'), JSON.stringify(preview.files));
+  assert.ok(!preview.files.some((f) => f.path.startsWith('.clinerules/')), 'the team\'s Cline hook is not in the plan');
+  assert.match(run(dir, ['upgrade', '--from', REPO_ROOT, '--base', REPO_ROOT]).out, /Not compared \(generated\)[^\n]*\n(?: {4}would [^\n]*\n)*? {4}would update {2}\.mcp\.json/);
 });

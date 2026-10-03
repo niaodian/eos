@@ -4,6 +4,7 @@
 import { existsSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { join, dirname, resolve } from 'node:path';
 import { planUpgrade, applyUpgrade, templateVersion, isTemplate, changelogBetween, generatedIn, PROJECT_OWNED } from '../lib/upgrade.mjs';
+import { planPlatformSync, declaredPlatforms } from '../lib/agent-platforms.mjs';
 import { gateInputs, gateCollections } from '../lib/state.mjs';
 import { evidenceIntegrity } from '../lib/gates.mjs';
 import { readIntent } from '../lib/record.mjs';
@@ -350,7 +351,13 @@ export const maintenanceCommands = {
     if (flags.write) applyUpgrade({ root: snapshot.root, next, rows });
     // Agent-platform files are regenerated, not compared: by the upgraded CLI, in its own process, so
     // the NEW generator writes them for this project's own agentPlatforms (ADR-019).
-    const generated = { inTemplate: generatedIn(next).length, regenerated: null, error: null };
+    const generated = { inTemplate: generatedIn(next).length, regenerated: null, error: null, preview: null };
+    if (!flags.write) {
+      // This is the NEW version's generator, so the preview is what --write will do to the shared
+      // configuration files (the skill copies follow .agents/skills once it is upgraded).
+      const plan = planPlatformSync(snapshot.root, declaredPlatforms(snapshot.project));
+      generated.preview = { platforms: declaredPlatforms(snapshot.project), files: plan.rows.filter((r) => r.action !== 'current').map(({ path, action }) => ({ path, action })), problems: plan.problems };
+    }
     if (flags.write) {
       const r = spawnSync(process.execPath, [join(snapshot.root, '.github/eos/eos.mjs'), 'agents', 'sync', '--write', '--json'], { cwd: snapshot.root, encoding: 'utf8', timeout: 120000 });
       let out = null;
@@ -375,11 +382,14 @@ export const maintenanceCommands = {
       '',
       `  ${counts.update} update · ${counts.add} add · ${counts.remove} remove · ${counts.kept} kept · ${counts.conflict} conflict · ${counts.current} current`,
       `  Never touched (owned by the project): ${PROJECT_OWNED.length} path rules — the declaration, evidence, ledger, waivers, stories, README…`,
-      !flags.write
-        ? `  Not compared (generated): the agent-platform files (.mcp.json, .claude/, the skill copies… — ${generated.inTemplate} in the new template). --write regenerates them for this project's agentPlatforms.`
-        : generated.error
+      ...(!flags.write
+        ? [`  Not compared (generated): the agent-platform files (${generated.inTemplate} in the new template). --write regenerates them for this project's platforms (${generated.preview.platforms.join(', ')}):`,
+          ...generated.preview.files.map((f) => `    would ${f.action.padEnd(7)} ${f.path}`),
+          ...(generated.preview.files.length ? [] : ['    nothing to change in the shared configuration files']),
+          ...generated.preview.problems.map((p) => `    ERROR ${p} — until this is fixed, --write upgrades but does not regenerate`)]
+        : [generated.error
           ? `  Agent-platform files were NOT regenerated: ${generated.error} — fix that, then run: node .github/eos/eos.mjs agents sync --write`
-          : `  Agent-platform files regenerated for this project's agentPlatforms: ${generated.regenerated.length ? generated.regenerated.join(', ') : 'already current'}`,
+          : `  Agent-platform files regenerated for this project's agentPlatforms: ${generated.regenerated.length ? generated.regenerated.join(', ') : 'already current'}`]),
       '',
       ...(flags.write
         ? [...(conflicts.length ? ['  Merge each parked file into its original by hand, then delete .eos/local/upgrade/.'] : []),
