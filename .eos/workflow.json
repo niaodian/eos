@@ -150,6 +150,153 @@
         }
       }
     },
+    "delivery-only": {
+      "description": "Brownfield adoption: an existing system enters EOS at the delivery gates. The running system is its own baseline — documented as it is (bmad-document-project → docs/index.md), not re-specified — so discovery, requirements, the PRD, UX and architecture are not gated, and neither are the post-release telemetry and write-back gates, which build on that baseline. Every change is still a story that must be ready (G5), verified against the code it changes (G7) and released through G8 under Standard's rules; until a PRD exists, a story's acceptance criteria stand on their own and the release gate aligns the trace matrix with the stories. Switch to standard-product once the product is re-baselined: that only strengthens the policy.",
+      "defaultChangeType": "FEATURE",
+      "changeTypes": {
+        "PRODUCT_BASELINE": {
+          "scope": "product",
+          "description": "The existing system is the baseline: documented as it is, not re-specified.",
+          "gates": {
+            "activation": "required",
+            "discovery-ready": "not_applicable",
+            "requirements-ready": "not_applicable",
+            "prd-ready": "not_applicable",
+            "ux-ready": "not_applicable",
+            "architecture-ready": "not_applicable",
+            "story-ready": "not_applicable",
+            "verified": "not_applicable",
+            "release-ready": "not_applicable",
+            "telemetry-ready": "not_applicable",
+            "iteration-ready": "not_applicable"
+          }
+        },
+        "FEATURE": {
+          "scope": "story",
+          "description": "New user-visible capability traced to approved PRD acceptance criteria.",
+          "gates": {
+            "activation": "required",
+            "discovery-ready": "not_applicable",
+            "requirements-ready": "not_applicable",
+            "prd-ready": "not_applicable",
+            "ux-ready": "not_applicable",
+            "architecture-ready": "not_applicable",
+            "story-ready": "required",
+            "verified": "required",
+            "release-ready": "not_applicable",
+            "telemetry-ready": "not_applicable",
+            "iteration-ready": "not_applicable"
+          }
+        },
+        "BUGFIX": {
+          "scope": "story",
+          "description": "Restore behaviour the PRD already specifies. No new acceptance criteria, so prd-ready does not re-apply.",
+          "gates": {
+            "activation": "required",
+            "discovery-ready": "not_applicable",
+            "requirements-ready": "not_applicable",
+            "prd-ready": "not_applicable",
+            "ux-ready": "not_applicable",
+            "architecture-ready": "not_applicable",
+            "story-ready": "required",
+            "verified": "required",
+            "release-ready": "not_applicable",
+            "telemetry-ready": "not_applicable",
+            "iteration-ready": "not_applicable"
+          }
+        },
+        "SPIKE": {
+          "scope": "story",
+          "description": "Time-boxed investigation. Nothing here may merge into the product path; the output is a decision record.",
+          "mergeable": false,
+          "requiresClassificationReason": true,
+          "gates": {
+            "activation": "required",
+            "discovery-ready": "not_applicable",
+            "requirements-ready": "not_applicable",
+            "prd-ready": "not_applicable",
+            "ux-ready": "not_applicable",
+            "architecture-ready": "not_applicable",
+            "story-ready": "not_applicable",
+            "verified": "not_applicable",
+            "release-ready": "not_applicable",
+            "telemetry-ready": "not_applicable",
+            "iteration-ready": "not_applicable"
+          }
+        },
+        "HOTFIX": {
+          "scope": "story",
+          "description": "Emergency production repair. story-ready is waivable under a recorded, expiring waiver; verification is never waivable.",
+          "gates": {
+            "activation": "required",
+            "discovery-ready": "not_applicable",
+            "requirements-ready": "not_applicable",
+            "prd-ready": "not_applicable",
+            "ux-ready": "not_applicable",
+            "architecture-ready": "not_applicable",
+            "story-ready": "waivable",
+            "verified": "required",
+            "release-ready": "not_applicable",
+            "telemetry-ready": "not_applicable",
+            "iteration-ready": "not_applicable"
+          }
+        },
+        "DOC_ONLY": {
+          "scope": "story",
+          "description": "Documentation-only change with no product-code or behaviour impact.",
+          "requiresClassificationReason": true,
+          "gates": {
+            "activation": "not_applicable",
+            "discovery-ready": "not_applicable",
+            "requirements-ready": "not_applicable",
+            "prd-ready": "not_applicable",
+            "ux-ready": "not_applicable",
+            "architecture-ready": "not_applicable",
+            "story-ready": "not_applicable",
+            "verified": "not_applicable",
+            "release-ready": "not_applicable",
+            "telemetry-ready": "not_applicable",
+            "iteration-ready": "not_applicable"
+          }
+        },
+        "GOVERNANCE": {
+          "scope": "product",
+          "description": "Change to EOS itself (gates, workflow, agent map, instructions). Invalidates prior evidence by design.",
+          "requiresClassificationReason": true,
+          "gates": {
+            "activation": "required",
+            "discovery-ready": "not_applicable",
+            "requirements-ready": "not_applicable",
+            "prd-ready": "not_applicable",
+            "ux-ready": "not_applicable",
+            "architecture-ready": "not_applicable",
+            "story-ready": "not_applicable",
+            "verified": "not_applicable",
+            "release-ready": "not_applicable",
+            "telemetry-ready": "not_applicable",
+            "iteration-ready": "not_applicable"
+          }
+        },
+        "RELEASE": {
+          "scope": "release",
+          "description": "Promote a candidate to production.",
+          "gates": {
+            "activation": "required",
+            "discovery-ready": "not_applicable",
+            "requirements-ready": "not_applicable",
+            "prd-ready": "not_applicable",
+            "ux-ready": "not_applicable",
+            "architecture-ready": "not_applicable",
+            "story-ready": "not_applicable",
+            "verified": "not_applicable",
+            "release-ready": "required",
+            "telemetry-ready": "not_applicable",
+            "iteration-ready": "not_applicable"
+          }
+        }
+      },
+      "baseline": "existing-system"
+    },
     "prototype": {
       "description": "Exploration-only profile: nothing is gated except local activation. Never use it for a product that ships.",
       "defaultChangeType": "SPIKE",

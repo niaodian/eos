@@ -226,6 +226,10 @@
     {
       "name": "bmad-advanced-elicitation",
       "purpose": "deeper critique of any EOS artifact"
+    },
+    {
+      "name": "bmad-document-project",
+      "purpose": "documents an existing system as it is — the first step of a brownfield (delivery-only) adoption"
     }
   ],
   "fallback": {

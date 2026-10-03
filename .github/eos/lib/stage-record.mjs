@@ -21,8 +21,29 @@ export const STAGE_RECORDS = {
 };
 
 /**
+ * What `eos stage init` writes where an answer belongs. A record that still holds one is not filled
+ * in: the gates report it as such instead of judging a sentence that only says "TODO".
+ */
+export const PLACEHOLDER = 'TODO(eos)';
+
+/** JSON paths of every string still holding the placeholder. */
+export function placeholdersIn(value, path = '') {
+  if (typeof value === 'string') return value.includes(PLACEHOLDER) ? [path || '(root)'] : [];
+  if (Array.isArray(value)) return value.flatMap((v, i) => placeholdersIn(v, `${path}[${i}]`));
+  if (value && typeof value === 'object') return Object.entries(value).flatMap(([k, v]) => placeholdersIn(v, path ? `${path}.${k}` : k));
+  return [];
+}
+
+/** The reason a record read with placeholders is not an answer yet, or null. */
+export function placeholderReason(r) {
+  const p = r?.placeholders || [];
+  if (!p.length) return null;
+  return `${r.path} still holds ${p.length} ${PLACEHOLDER} placeholder(s) from \`eos stage init\` — answer ${p.slice(0, 4).join(', ')}${p.length > 4 ? ` and ${p.length - 4} more` : ''}`;
+}
+
+/**
  * Read + schema-validate one stage record.
- * @returns {{present:boolean, path:string, data:object|null, errors:string[]}}
+ * @returns {{present:boolean, path:string, data:object|null, errors:string[], placeholders?:string[]}}
  */
 export function readStageRecord(root, kind) {
   const spec = STAGE_RECORDS[kind];
@@ -32,6 +53,10 @@ export function readStageRecord(root, kind) {
   try { parsed = JSON.parse(readFileSync(full, 'utf8')); } catch (e) {
     return { present: true, path: spec.path, data: null, errors: [`${spec.path}: invalid JSON (${e.message})`] };
   }
+  // Before the schema: a skeleton fails it by design (its numbers and booleans are placeholders), and
+  // "expected type number" would describe a symptom of the one real problem — nobody answered yet.
+  const placeholders = placeholdersIn(parsed);
+  if (placeholders.length) return { present: true, path: spec.path, data: null, errors: [], placeholders };
   // Fail closed: an absent schema disables validation, which would make deleting one file a way to
   // weaken the gate that reads this record.
   const { schema, error: schemaError } = loadSchema(root, spec.schema);

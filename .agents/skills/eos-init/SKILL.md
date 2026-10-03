@@ -60,6 +60,12 @@ mark an item `[x]` unless it is actually done or verified.
    `config-only` — because then the quality gate would be passing vacuously. Do not ask a user who
    has not designed the architecture yet to "just tell me the tech stack".
 
+   **An existing system is different.** If this repository already holds a product that runs, do not
+   walk them through discovery and architecture they already have: adopt it at the delivery gates with
+   `node .github/eos/eos.mjs init <pack> --brownfield --write` (Standard track). `eos next` then asks
+   for the as-is documentation (`bmad-document-project` → `docs/index.md`), and every change after
+   that is a story held to G5, G7 and G8 (manual §3.5).
+
 5. **Branch protection (SERVER-SIDE — you cannot do this for them).**
 
    First find out whether protection is even enforceable, because on GitHub Free **rulesets are not

@@ -6,7 +6,7 @@
 //  project with NO spec evidence at all passed the G8 hard gate.]
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -140,4 +140,66 @@ test('the machine test-run summary decides whether a traced row passed — a han
   const unreadable = run(project({ 'docs/prd.md': PRD_2AC, 'docs/trace-matrix.md': TRACE_2PASS, 'docs/evidence/test-run.json': '{"results": 3}' }), ['--strict']);
   assert.equal(unreadable.code, 1);
   assert.match(unreadable.out, /not a readable test-run summary/);
+});
+
+test('delivery-only (no PRD required): the stories are the spec — the release\'s stories are covered, any story\'s row is no orphan', () => {
+  const WORKFLOW = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', '..', '.eos/workflow.json'), 'utf8');
+  const storyWith = (id, ac) => `# ${id}\n\n| AC | Statement | Test |\n| --- | --- | --- |\n| ${ac} | does it | t.test.ts |\n`;
+  const files = (profile, extra = {}) => ({
+    '.eos/workflow.json': WORKFLOW,
+    '.eos/project.json': JSON.stringify({ workflowProfile: profile }),
+    'docs/stories/STORY-001.md': storyWith('STORY-001', 'AC1.1'),
+    'docs/stories/STORY-002.md': storyWith('STORY-002', 'AC2.1'),
+    'docs/trace-matrix.md': '| AC | Test | Result |\n| --- | --- | --- |\n| AC1.1 | a.test.ts | ✅ |\n',
+    ...extra,
+  });
+  // Every story is the spec without a release: AC2.1 has no row yet.
+  const all = run(project(files('delivery-only')), ['--strict']);
+  assert.equal(all.code, 1, all.out);
+  assert.match(all.out, /Story acceptance criteria:\s+2 {2}— no PRD/);
+  assert.match(all.out, /1 AC\(s\) with no trace row: AC2\.1/);
+  // The release ships STORY-001 only: covered. STORY-002's later row is no orphan; AC9.9 is.
+  const manifest = { '.eos/releases/R1.json': JSON.stringify({ includedStories: ['STORY-001'] }) };
+  const release = run(project(files('delivery-only', manifest)), ['--strict', '--release', 'R1']);
+  assert.equal(release.code, 0, release.out);
+  assert.match(release.out, /Story acceptance criteria \(R1\):\s+1/);
+  const rogue = run(project(files('delivery-only', { ...manifest, 'docs/trace-matrix.md': '| AC | Test | Result |\n| --- | --- | --- |\n| AC1.1 | a.test.ts | ✅ |\n| AC2.1 | b.test.ts | ✅ |\n| AC9.9 | c.test.ts | ✅ |\n' })), ['--strict', '--release', 'R1']);
+  assert.equal(rogue.code, 1);
+  assert.match(rogue.out, /1 orphan row\(s\) not in any story .*AC9\.9/);
+  // A profile that requires a PRD still fails without one: the stories are not its spec.
+  const standard = run(project(files('standard-product')), ['--strict']);
+  assert.equal(standard.code, 1);
+  assert.match(standard.out, /missing spec evidence: docs\/prd\.md/);
+});
+
+test('stories mode reads stories the way EOS does: nested, by front-matter id, criteria from the table — and a shipped story nobody declares fails', () => {
+  const WORKFLOW = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', '..', '.eos/workflow.json'), 'utf8');
+  const files = (trace, extra = {}) => ({
+    '.eos/workflow.json': WORKFLOW,
+    '.eos/project.json': JSON.stringify({ workflowProfile: 'delivery-only' }),
+    'docs/stories/README.md': '| AC9.1 | not a story |\n',
+    'docs/stories/STORY-001.md': '# Login\n\n| AC | Statement | Test |\n| --- | --- | --- |\n| AC1.1 | logs in | t.test.ts |\n',
+    // Named by its file, identified by its front matter, filed under an epic — as the manual shows.
+    'docs/stories/epic-1/story-002-login.md': '---\nid: STORY-002\n---\n# Sessions\n\nSee AC1.1 for login.\n\n| AC | Statement | Test |\n| --- | --- | --- |\n| AC2.1 | expires | t.test.ts |\n| AC2.2 | renews | t.test.ts |\n',
+    'docs/trace-matrix.md': trace,
+    ...extra,
+  });
+  const TRACE = (...acs) => `| AC | Test | Result |\n| --- | --- | --- |\n${acs.map((a) => `| ${a} | t.test.ts | ✅ |\n`).join('')}`;
+  const manifest = (ids) => ({ '.eos/releases/R1.json': JSON.stringify({ includedStories: ids }) });
+
+  // The release ships STORY-002, whose two criteria have no row: drift, not a PASS.
+  const missing = run(project(files(TRACE('AC1.1'), manifest(['STORY-002']))), ['--strict', '--release', 'R1']);
+  assert.equal(missing.code, 1, missing.out);
+  assert.match(missing.out, /Story acceptance criteria \(R1\):\s+2/);
+  assert.match(missing.out, /2 AC\(s\) with no trace row: AC2\.1, AC2\.2/);
+  // Covered: PASS. AC1.1 in STORY-002's prose is not one of its criteria; README.md is not a story.
+  const covered = run(project(files(TRACE('AC2.1', 'AC2.2'), manifest(['STORY-002']))), ['--strict', '--release', 'R1']);
+  assert.equal(covered.code, 0, covered.out);
+  assert.doesNotMatch(covered.out, /AC9\.1/);
+  // Without a release every story is the spec, nested ones included.
+  assert.equal(run(project(files(TRACE('AC1.1', 'AC2.1', 'AC2.2'))), ['--strict']).code, 0);
+  // A story the manifest ships but no file declares fails loudly.
+  const ghost = run(project(files(TRACE('AC2.1', 'AC2.2'), manifest(['STORY-002', 'STORY-404']))), ['--strict', '--release', 'R1']);
+  assert.equal(ghost.code, 1);
+  assert.match(ghost.out, /\.eos\/releases\/R1\.json ships STORY-404, but no story under docs\/stories\/ declares that id/);
 });

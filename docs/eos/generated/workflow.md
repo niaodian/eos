@@ -8,7 +8,7 @@
 
 # Workflow
 
-Profiles: `standard-product` · `prototype` · `controlled` · `regulated`. Default: `standard-product`.
+Profiles: `standard-product` · `delivery-only` · `prototype` · `controlled` · `regulated`. Default: `standard-product`.
 
 ## State machines
 
@@ -78,6 +78,21 @@ Full SDLC profile: a product baseline plus per-story feature work, with release 
 | `DOC_ONLY` | – | – | – | – | – | – | – | – | – | – | – |
 | `GOVERNANCE` | **required** | – | – | – | – | – | – | – | – | – | – |
 | `RELEASE` | **required** | – | – | – | – | – | – | – | **required** | **required** | **required** |
+
+### `delivery-only`
+
+Brownfield adoption: an existing system enters EOS at the delivery gates. The running system is its own baseline — documented as it is (bmad-document-project → docs/index.md), not re-specified — so discovery, requirements, the PRD, UX and architecture are not gated, and neither are the post-release telemetry and write-back gates, which build on that baseline. Every change is still a story that must be ready (G5), verified against the code it changes (G7) and released through G8 under Standard's rules; until a PRD exists, a story's acceptance criteria stand on their own and the release gate aligns the trace matrix with the stories. Switch to standard-product once the product is re-baselined: that only strengthens the policy.
+
+| Change type | `activation` | `discovery-ready` | `requirements-ready` | `prd-ready` | `ux-ready` | `architecture-ready` | `story-ready` | `verified` | `release-ready` | `telemetry-ready` | `iteration-ready` |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| `PRODUCT_BASELINE` | **required** | – | – | – | – | – | – | – | – | – | – |
+| `FEATURE` | **required** | – | – | – | – | – | **required** | **required** | – | – | – |
+| `BUGFIX` | **required** | – | – | – | – | – | **required** | **required** | – | – | – |
+| `SPIKE` | **required** | – | – | – | – | – | – | – | – | – | – |
+| `HOTFIX` | **required** | – | – | – | – | – | waivable | **required** | – | – | – |
+| `DOC_ONLY` | – | – | – | – | – | – | – | – | – | – | – |
+| `GOVERNANCE` | **required** | – | – | – | – | – | – | – | – | – | – |
+| `RELEASE` | **required** | – | – | – | – | – | – | – | **required** | – | – |
 
 ### `prototype`
 

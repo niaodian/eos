@@ -43,10 +43,15 @@ usage: node .github/eos/eos.mjs <command> [flags]
   handoff --scope <type> --id <id> [--verify]
   ledger [--verify] [--against <ref>] [--resolve [--write]]
   focus --scope <type> --id <id>          set this machine's local focus (no authority)
-  init [<pack>] [--track standard|regulated] [--write] [--force]
+  init [<pack>] [--track standard|regulated] [--brownfield] [--write] [--force]
                                           declare the project, choose its governance track, create local files
+                                          (--brownfield: an existing system, held to the delivery gates G5/G7/G8)
   stack sync [--write]                    render the always-on workspace rule from .eos/project.json
-  agents sync [--write|--check]           generate each agent platform's copy of the EOS skills (.agents/skills)
+  stage init <stage> [--write] [--interactive]
+                                          a stage record's skeleton from its schema (discovery … iteration)
+  agents sync [--platform <x>] [--write|--check]
+                                          generate what each agent platform reads: skills, MCP entry, guardrail hook
+  mcp                                     serve the read and verify commands as MCP tools on stdio
   new <pack> [--track …] [--write]        the pack half of init (the declaration only)
   sbom [--write] [--check]                software bill of materials, bound to the tree
   policy [diff|lock|check] [--against <ref>] [--write] [--reason <text>]
@@ -99,13 +104,14 @@ async function main() {
   // schema validator would otherwise reject its unknown properties and report a symptom instead of
   // the cause, sending people to edit a file whose format they are not the authority on.
   const ahead = compatibilityErrors(process.cwd());
-  if (ahead.length && !['migrate', 'doctor'].includes(command)) {
+  // `mcp` is only the transport: it starts anyway, so each tool call reports the problem itself.
+  if (ahead.length && !['migrate', 'doctor', 'mcp'].includes(command)) {
     console.log(['EOS ERROR — this repository was written by a newer version of EOS:', '',
       ...ahead.map((e) => `  ERROR ${e}`), '',
       '  Upgrade EOS, or run `node .github/eos/eos.mjs migrate` to see the version gap.', ''].join('\n'));
     return EXIT.ERROR;
   }
-  if (snapshot.errors.length && !['doctor', 'init', 'next', 'resume', 'status', 'ledger', 'migrate', 'upgrade'].includes(command)) {
+  if (snapshot.errors.length && !['doctor', 'init', 'next', 'resume', 'status', 'ledger', 'migrate', 'upgrade', 'mcp'].includes(command)) {
     console.log(['EOS ERROR — the configuration could not be evaluated:', '', ...snapshot.errors.map((e) => `  ERROR ${e}`), '',
       '  Fix the file(s) above, or run `node .github/eos/eos.mjs doctor`.', ''].join('\n'));
     return EXIT.ERROR;

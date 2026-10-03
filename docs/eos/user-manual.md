@@ -1,7 +1,7 @@
 # EOS User Manual (Engineering Operating System)
 
-> Version: synced with `docs/eos/VERSION` (current `eos-2.2.0`)
-> Applies to: recent VS Code + GitHub Copilot Chat (custom agent / hooks are recent-version capabilities; confirm the version in the "About VS Code" panel) + 73 installed `bmad-*` skills (user-level)
+> Version: synced with `docs/eos/VERSION` (current `eos-2.3.0`)
+> Applies to: recent VS Code + GitHub Copilot Chat (custom agent / hooks are recent-version capabilities; confirm the version in the "About VS Code" panel), or Claude Code, OpenAI Codex or Google Antigravity ([Chapter 6.6](#chapter-66-using-eos-with-claude-code-codex-and-antigravity)) + 73 installed `bmad-*` skills (user-level)
 > Positioning: this manual is an **operating guide (how to use it)**; for design rationale and trade-offs, see `blueprint.md` in the same directory (why it is designed this way).
 > Conventions: prose in English; file names / paths / commands / config keys kept verbatim.
 
@@ -16,10 +16,11 @@
 | Need to start a new project | [Chapter 3 New project Day-1](#chapter-3-new-project-day-1-bootstrap) |
 | Want to understand "what exactly are rules/prompts/agents/skills/hooks" | [Chapter 4 Core concepts](#chapter-4-core-concepts-five-mechanisms) |
 | **Need to go from idea all the way to post-launch iteration** | [Chapter 6 Full-lifecycle practice](#chapter-6-full-lifecycle-practice-idea-→-iteration) ← manual core |
+| Working in Claude Code, Codex or Antigravity instead of VS Code + Copilot | [Chapter 6.6 Using EOS with Claude Code, Codex and Antigravity](#chapter-66-using-eos-with-claude-code-codex-and-antigravity) |
 | Want to look up a slash command / agent / rule | [Chapter 7 Complete reference](#chapter-7-complete-reference-quick-reference) |
 | Configuration is broken / Agent is not working as expected | [Chapter 9 Failure localization](#chapter-9-failure-localization-and-troubleshooting) |
 | Want to move this system to another project/team | [Chapter 10 Cross-project reuse and distribution](#chapter-10-cross-project-reuse-and-distribution) |
-| Upgrading to `eos-2.0.0`, choosing a governance track, or signing releases | [§10.5 Upgrading](#105-upgrading-from-eos-122x-to-eos-200) · [§10.6 Tracks and signed releases](#106-governance-tracks-signed-releases-and-central-policy) · [§10.7 The 2.0.1 security patch](#107-upgrading-from-eos-200-to-eos-201) · [§10.8 `eos upgrade` and 2.1.0](#108-upgrading-from-eos-20x-to-eos-210) |
+| Upgrading to `eos-2.0.0`, choosing a governance track, or signing releases | [§10.5 Upgrading](#105-upgrading-from-eos-122x-to-eos-200) · [§10.6 Tracks and signed releases](#106-governance-tracks-signed-releases-and-central-policy) · [§10.7 The 2.0.1 security patch](#107-upgrading-from-eos-200-to-eos-201) · [§10.8 `eos upgrade` and 2.1.0](#108-upgrading-from-eos-20x-to-eos-210) · [§10.9 2.2.0](#109-upgrading-from-eos-21x-to-eos-220) · [§10.10 2.3.0](#1010-upgrading-from-eos-22x-to-eos-230) |
 
 ---
 
@@ -32,6 +33,7 @@
 - [Chapter 5 Mental model: layered rules + decision gates](#chapter-5-mental-model-layered-rules--decision-gates)
 - [Chapter 6 Full-lifecycle practice (idea → iteration)](#chapter-6-full-lifecycle-practice-idea-→-iteration)
 - [Chapter 6.5 Two onboarding paths (SaaS vs Agentic · beginner-friendly)](#chapter-65-two-onboarding-paths-saas-vs-agentic-·-beginner-friendly)
+- [Chapter 6.6 Using EOS with Claude Code, Codex and Antigravity](#chapter-66-using-eos-with-claude-code-codex-and-antigravity)
 - [Chapter 7 Complete reference (quick-reference)](#chapter-7-complete-reference-quick-reference)
 - [Chapter 8 Configuration QA and acceptance](#chapter-8-configuration-qa-and-acceptance)
 - [Chapter 9 Failure localization and troubleshooting](#chapter-9-failure-localization-and-troubleshooting)
@@ -82,6 +84,10 @@ node .github/eos/eos.mjs check --gate <id> --scope <id>   # prove the step, reco
 `npm run -s eos -- next` (any npm). Keep `--offline`: the public registry has an unrelated package
 named `eos`, and the flag guarantees that only this checkout runs.
 
+**In Claude Code, Codex or Antigravity** the loop is the same, typed in that agent: `/eos-resume`
+and `/eos-next` (Codex: `$eos-resume`, `$eos-next`), or just ask "what is next?" — the agent runs the
+same engine, in the terminal or through the `eos` MCP server. One-time setup: [Chapter 6.6](#chapter-66-using-eos-with-claude-code-codex-and-antigravity).
+
 The router names the agent, the prompt and the minimal
 BMAD skills for each step, so you never choose from the 73 installed skills yourself. The full
 contract (state model, gates, evidence, exit codes) is
@@ -121,6 +127,7 @@ bmad-code-review                   → review has no blockers  (Gate G6)
 | OS | macOS, Windows 10/11, or Linux — EOS is cross-platform; native Windows needs no WSL for the core flow | macOS `sw_vers` · Windows `winver` · Linux `uname -sr` |
 | VS Code | Recent version (custom agent / hooks require a recent version) | Check the real version in the About panel (`code --version` may be a shim and is not reliable) |
 | GitHub Copilot | Logged in (enterprise license is only a license, not a configuration dependency) | Chat panel is usable |
+| Or another agent | Claude Code, OpenAI Codex or Google Antigravity instead of VS Code + Copilot — setup in [Chapter 6.6](#chapter-66-using-eos-with-claude-code-codex-and-antigravity) | it starts in the project folder, and `/eos-next` (Codex: `$eos-next`) answers |
 | Node.js | 18+ (used by validators and hooks) | `node -v` |
 | BMAD skills | 73 `bmad-*` (user-level) | macOS/Linux `ls ~/.agents/skills &#124; grep -c '^bmad-'` · Windows `(Get-ChildItem ~/.agents/skills -Filter 'bmad-*').Count` |
 
@@ -137,6 +144,10 @@ bmad-code-review                   → review has no blockers  (Gate G6)
 ```
 These are **user-level** and shared across all projects. EOS invokes them by their `bmad-*` names in prompts/agents, and **does not require copying them into the project**.
 
+Other agents read user-level skills from their own folders: Claude Code from `~/.claude/skills/` (the
+mirror above), Codex from `~/.agents/skills/`, and Antigravity from `~/.gemini/config/skills/` (IDE) or
+`~/.gemini/antigravity-cli/skills/` (CLI) — link BMAD there as shown in §6.6.3.
+
 ## 2.3 User-level agents directory (optional)
 
 If you want to promote some `eos-*.agent.md` files to "available in all projects", put them in:
@@ -152,6 +163,7 @@ If you want to promote some `eos-*.agent.md` files to "available in all projects
 - EOS's 8 legal events (`SessionStart / UserPromptSubmit / PreToolUse / PostToolUse / PreCompact / SubagentStart / SubagentStop / Stop`) have been checked against the official `hooks-reference.md`; `deny-dangerous.js`'s `permissionDecision: allow/deny/ask` also matches the official PreToolUse schema.
 - **Confirm hooks are really effective in your session** ("exists ≠ effective"): in Copilot Chat (Agent mode), ask it to run `echo 'api_key="sk-EXAMPLEprobe1234567"'`. Hooks loaded → denied (hits the secret-literal rule); not loaded → it harmlessly prints the string. If it is not intercepted, you most likely opened the parent directory as the workspace root (see §9.3).
 - **Honest boundary**: `deny-dangerous.js` is a **local speed bump** (per-machine, Preview, parse-failure allows, CI does not call it), a defense-in-depth layer rather than authority. The real authoritative gates are the three CI hard checks + branch protection + human review (see Appendix D).
+- **Other agents** run the same script through their own hook files — `.claude/settings.json`, `.codex/hooks.json`, `.agents/hooks.json` (§7.9, Chapter 6.6). VS Code's agent sessions also run the one in `.claude/settings.json`; if they refuse every tool call with "hook errored", see §6.6.7.
 
 ---
 
@@ -162,7 +174,7 @@ If you want to promote some `eos-*.agent.md` files to "available in all projects
 **Method A — degit (recommended, fastest)**
 ```sh
 # Public template — plain degit works (no auth needed)
-npx degit niaodian/eos#eos-2.2.0 my-new-app
+npx degit niaodian/eos#eos-2.3.0 my-new-app
 cd my-new-app
 git init && git add -A && git commit -m "chore: scaffold from eos"
 ```
@@ -204,7 +216,7 @@ Open `.github/instructions/00-workspace.instructions.md` and change it to the re
 ## 3.4 Full Day-1 sequence (copy-ready)
 
 ```sh
-npx degit niaodian/eos#eos-2.2.0 my-new-app && cd my-new-app
+npx degit niaodian/eos#eos-2.3.0 my-new-app && cd my-new-app
 git init && git add -A && git commit -q -m "chore: scaffold from eos"
 node .github/hooks/validate-config.mjs
 node .github/eos/eos.mjs init config-only --write   # declare it: no code yet (or init <pack> [--track regulated])
@@ -215,6 +227,29 @@ code .
 # One-time hardening (make CI gates authoritative as merge blockers): run /eos-init in Copilot Chat,
 # then follow the guide to check off docs/eos/activation.md item by item (branch protection + CODEOWNERS + approval baseline; see Appendix D).
 ```
+
+**Not on VS Code?** Instead of `code .`, start your agent in the project folder — `claude` (Claude Code),
+`codex` (Codex, after `node .github/eos/eos.mjs agents sync --platform codex --write`), or open the folder
+in Antigravity — and run `/eos-init` there (Codex: `$eos-init`). [Chapter 6.6](#chapter-66-using-eos-with-claude-code-codex-and-antigravity) has the one-time
+setup for each.
+
+## 3.5 An existing system (brownfield)
+
+A system that already runs does not have to be re-specified before EOS can help. Adopt it at the **delivery gates** with the `delivery-only` workflow profile (since eos-2.3.0): the running system is the baseline, and every change from now on is a story that must be ready (G5), verified (G7) and released (G8).
+
+```sh
+npx degit niaodian/eos#eos-2.3.0 /tmp/eos                      # the template, outside your repository
+# copy into your repository: .eos/ .agents/ .github/{eos,hooks,agents,instructions}/ docs/eos/
+# and merge by hand what you already have: AGENTS.md, .github/copilot-instructions.md, .github/workflows/eos-ci.yml
+node .github/hooks/validate-config.mjs                          # S7 names anything still missing
+node .github/eos/eos.mjs init <pack> --brownfield --write       # Standard track; the pack names your stack
+node .github/eos/eos.mjs next                                   # → document the existing system
+```
+
+- **First, document what exists — do not re-specify it.** `eos next` hands you to the `eos-discovery` agent with `bmad-document-project`, which writes the as-is documentation into `docs/` with `docs/index.md` as its index. Once that file exists, `next` asks for the first story.
+- **Every change is a story.** Its acceptance criteria live in the story (until a PRD exists, they stand on their own), each with a test intent; `verified` runs your tests and traces each criterion to a passing one; the release gate checks the candidate as on the Standard track, and aligns the trace matrix with the stories the release ships.
+- **Not gated:** discovery, requirements, the PRD, UX, architecture, and the post-release telemetry and write-back gates — they build on a written baseline. Write a PRD whenever you like: once `docs/prd.md` exists, every story's criteria must resolve against it.
+- **Graduating** to the full lifecycle is setting `"workflowProfile": "standard-product"` once the product is re-baselined — that only strengthens the policy. The reverse, moving a Standard project onto `delivery-only`, is a weakening: `eos policy lock` records it with a reason and a second person. The Regulated track does not offer this path; it requires the baseline.
 
 ---
 
@@ -229,7 +264,7 @@ EOS uses 5 native VS Code + Copilot mechanisms to carry rules. **Understanding "
 | **Agents** | `.github/agents/*.agent.md` | On switch: continuously effective when you select an agent | Switch in Chat's agent selector | Phase orchestrators (persistent persona + tool limits + handoffs) |
 | **Skills** | `.agents/skills/*/SKILL.md` (project-level; `.github/skills/` and `.claude/skills/` are read too), `~/.agents/skills/bmad-*` (user-level) | Auto-loaded by relevance, or explicitly called by an agent | Agent uses them automatically, or write `bmad-xxx` in a request | Portable capabilities (reuse BMAD + new-build augmentation) |
 | **Hooks** | `.github/hooks/*.json` + scripts | Triggered by lifecycle events (PreToolUse, etc.) | Automatic; no manual action required | Deterministic guardrails (block dangerous operations, run quality gates) |
-| **MCP servers** | `.vscode/mcp.json.example` (top-level `"servers"`; opt-in copy to `.vscode/mcp.json`) | Client **eager-connects at session start**, workspace-global, **cannot be gated by phase** | **Inert by default** (`.example`); enable manually in Phase 7, keep active file local and uncommitted | Local tool extension (e.g., Playwright MCP drives browser self-checks; see 7.7) |
+| **MCP servers** | `.mcp.json` (EOS's own read-and-verify server, `eos mcp`, since eos-2.3.0; each client asks once to trust it) · `.vscode/mcp.json.example` (top-level `"servers"`; opt-in copy to `.vscode/mcp.json`) | Client **eager-connects at session start**, workspace-global, **cannot be gated by phase** | `eos` is light and useful from Phase 1, so it is declared; Playwright is **inert by default** (`.example`) — enable it manually in Phase 7, keep the active file local and uncommitted | Structured `eos next` / `check` / `verify` for the agent ([ADR-018](../adr/018-mcp-server.md)); local tool extension (e.g., Playwright MCP drives browser self-checks; see 7.7) |
 
 ## 4.1 Key recognition: there is no "native priority"
 
@@ -325,7 +360,7 @@ So EOS **never depends on "Rule A overriding Rule B"**. The only reliable contro
 | Item | Content |
 |---|---|
 | **Goal** | Get an empty project with healthy configuration from the template |
-| **How to start** | `npx degit niaodian/eos#eos-2.2.0 my-app && cd my-app`, then declare it: `node .github/eos/eos.mjs init config-only --write` (stack undecided) or `init <pack> --write` |
+| **How to start** | `npx degit niaodian/eos#eos-2.3.0 my-app && cd my-app`, then declare it: `node .github/eos/eos.mjs init config-only --write` (stack undecided) or `init <pack> --write` |
 | **Output** | Complete `.github/` + `docs/` skeleton |
 | **Gate** | `node .github/hooks/validate-config.mjs` → **PASS** |
 | **Must check** | PASS 0 errors. **If the stack is undecided, do not change** `00-workspace` yet--keep the Node placeholder; the stack is an irreversible decision, and the authority is locked in **Phase 4 (ADR)**. If the stack is known, copy `docs/eos/stack-presets.md` directly (fast path). |
@@ -588,7 +623,7 @@ So EOS **never depends on "Rule A overriding Rule B"**. The only reliable contro
 
 ### Step 0: Create project + choose stack (5 minutes)
 ```sh
-npx degit niaodian/eos#eos-2.2.0 todo-api && cd todo-api
+npx degit niaodian/eos#eos-2.3.0 todo-api && cd todo-api
 node .github/hooks/validate-config.mjs          # expect PASS
 node .github/eos/eos.mjs init node-service --write   # declare the stack (or python-service, go-service… — `eos init` lists them)
 ```
@@ -649,7 +684,7 @@ The gate reads the *machine* result, not a hand-written PASS — and since eos-2
 
 ### Step 0: Create project + create AI directories
 ```sh
-npx degit niaodian/eos#eos-2.2.0 cs-agent && cd cs-agent
+npx degit niaodian/eos#eos-2.3.0 cs-agent && cd cs-agent
 mkdir -p ai/prompts evals                       # AI code goes here; Agentic rules overlay automatically
 node .github/hooks/validate-config.mjs          # expect PASS
 node .github/eos/eos.mjs init rag-app --write    # the Python LLM pack: agentic paradigm + an eval command
@@ -722,6 +757,198 @@ When writing AI code, Agentic rules take effect **automatically**: prompts saved
 
 ---
 
+# Chapter 6.6 Using EOS with Claude Code, Codex and Antigravity
+
+EOS is not tied to VS Code. The engine, the gates, the evidence and the workflows are the same in
+every agent. What differs is where each agent reads its configuration, how you call a workflow, and
+which trust prompts it asks you to accept once. Since eos-2.3.0, `eos agents sync` writes every
+platform's configuration from one source ([ADR-019](../adr/019-agent-platforms.md)): a fresh copy of
+the template already works in **Claude Code** and **Google Antigravity**, and **OpenAI Codex** needs
+one command. This chapter is the setup and the daily workflow for those three; §7.9 lists every
+platform and file.
+
+> Whatever the agent, three things never change: `node .github/eos/eos.mjs next` decides the next
+> step, a gate passes only on recorded evidence, and approving, waiving and moving a state remain
+> commands a person runs. No agent, and no MCP tool, can do them for you.
+
+## 6.6.0 What is the same, and what differs
+
+| | VS Code + Copilot | Claude Code | OpenAI Codex | Google Antigravity |
+|---|---|---|---|---|
+| Generated by default | yes | yes | no — `eos agents sync --platform codex --write` | yes |
+| Project instructions | `AGENTS.md`, `.github/copilot-instructions.md`, `.github/instructions/` | `AGENTS.md`, while the repository has no `CLAUDE.md` | `AGENTS.md` | `AGENTS.md` |
+| EOS workflows (skills) | `.agents/skills/` · `/eos-next` | `.claude/skills/`, a generated copy · `/eos-next` | `.agents/skills/` · `$eos-next` | `.agents/skills/` · `/eos-next` |
+| BMAD skills (user level) | `~/.agents/skills/` (§2.2) | `~/.claude/skills/` | `~/.agents/skills/` | `~/.gemini/config/skills/` (IDE) · `~/.gemini/antigravity-cli/skills/` (CLI) — see 6.6.3 |
+| Stage orchestrators | `.github/agents/` — the agent picker and handoff buttons | none: run the step's skills, or hand over the handoff package (6.6.4) | `.codex/agents/` — ask Codex to spawn one | `.agents/agents/` — pick one as the agent, or run it as a subagent |
+| Guardrail hook | `.github/hooks/guardrails.json` | `.claude/settings.json` | `.codex/hooks.json` | `.agents/hooks.json` |
+| EOS MCP server | `.mcp.json` | `.mcp.json` | `.codex/config.toml` | `.agents/mcp_config.json` |
+| Trust you grant once | the workspace and the MCP server | the workspace and the MCP server | the project, then each hook (`/hooks`) | MCP tools ask on each call unless you allow them |
+
+## 6.6.1 Claude Code
+
+**Set up**
+
+1. Make BMAD visible: Claude Code reads personal skills from `~/.claude/skills/`, the mirror in §2.2.
+   EOS's own workflows travel with the repository in `.claude/skills/`.
+2. Start Claude Code in the project root, the folder that contains `.eos/` and `AGENTS.md`, and
+   accept the workspace trust dialog:
+   ```sh
+   cd my-app && claude
+   ```
+3. When Claude Code asks, approve the `eos` MCP server from `.mcp.json`. `/mcp` shows its status;
+   `claude mcp reset-project-choices` asks again.
+4. Type `/eos-next`. It runs `node .github/eos/eos.mjs next` and prints the one next action.
+
+**What is wired, and where**
+
+- `.claude/skills/eos-*` — the EOS workflows, a byte-identical copy of `.agents/skills/`. Edit the
+  source, then run `eos agents sync --write`; CI fails on a hand-edited copy.
+- `.claude/settings.json` — the guardrail, `node .github/hooks/deny-dangerous.js --format claude`,
+  before every `Bash`, `PowerShell`, `Write` and `Edit` call. Your own permissions and hooks in that
+  file are kept; EOS owns only its entry.
+- `.mcp.json` — the `eos` server. Ask "what is next?" and Claude can call `eos_next` instead of the
+  terminal.
+- `AGENTS.md` — read while the repository has no `CLAUDE.md`. If you add one, start it with
+  `@AGENTS.md`.
+
+**Working a stage.** Claude Code gets no EOS subagents: VS Code reads `.claude/agents/` too and would
+list every orchestrator twice. When `eos next` names an agent such as `eos-architecture`, run the
+BMAD skill it names (`/bmad-architecture`), or give Claude the handoff package (6.6.4) and ask it to
+follow `.github/agents/eos-architecture.agent.md`.
+
+## 6.6.2 OpenAI Codex
+
+**Set up**
+
+1. Generate the Codex files once, from the project root, and commit them:
+   ```sh
+   node .github/eos/eos.mjs agents sync --platform codex --write
+   node .github/eos/eos.mjs verify
+   ```
+   This adds `codex` to `agentPlatforms` in `.eos/project.json` — an input of every gate, hence the
+   `verify` — and writes `.codex/config.toml` (a marked `[mcp_servers.eos]` block),
+   `.codex/hooks.json` and `.codex/agents/eos-*.toml`. A `.codex/config.toml` you already have keeps
+   its content.
+2. Start Codex in the project root (`codex`, the IDE extension or the ChatGPT desktop app) and
+   **trust the project**: Codex reads `.codex/` only in a trusted project.
+3. Run `/hooks` and approve the EOS guardrail. Codex asks again whenever the hook changes.
+4. `/mcp` lists the `eos` server. BMAD skills in `~/.agents/skills/` are found as they are.
+5. Type `$eos-next`. Codex calls skills with `$`; `/skills` lists them.
+
+**What is wired, and where**
+
+- `.agents/skills/` — the EOS workflows, read natively in every directory up to the repository root.
+- `.codex/hooks.json` — the guardrail before `Bash` and `apply_patch`.
+- `.codex/config.toml` — the `eos` MCP server, in a block EOS marks and owns.
+- `.codex/agents/eos-*.toml` — the six orchestrators, rendered from `.github/agents/`.
+
+**Working a stage.** When `eos next` names an agent, ask Codex to spawn it: "Spawn the
+eos-architecture agent to design the architecture." Codex finds a custom agent by its name, and
+`/agent` switches between running agent threads. Skills are `$eos-requirements`,
+`$bmad-architecture` and so on.
+
+## 6.6.3 Google Antigravity
+
+**Set up**
+
+1. Open the project folder in the Antigravity IDE, or start the Antigravity CLI in it. Its files are
+   generated by default: `.agents/hooks.json`, `.agents/mcp_config.json` and `.agents/agents/`.
+2. Make BMAD visible. Antigravity reads global skills from `~/.gemini/config/skills/` (the IDE and
+   Antigravity 2.0) and `~/.gemini/antigravity-cli/skills/` (the CLI), not from `~/.agents/skills/`.
+   On macOS and Linux, link them once (for the CLI, link into its folder the same way):
+   ```sh
+   mkdir -p ~/.gemini/config/skills
+   ln -s ~/.agents/skills/bmad-* ~/.gemini/config/skills/
+   ```
+   On Windows, copy the `bmad-*` folders into `%USERPROFILE%\.gemini\config\skills\` instead.
+3. Type `/eos-next`. MCP tools ask before each call by default; `/mcp` opens the MCP manager (in the
+   IDE: **…** › **MCP Servers**).
+
+**What is wired, and where**
+
+- `.agents/skills/` — the EOS workflows, read natively.
+- `.agents/hooks.json` — the guardrail before every `run_command`.
+- `.agents/mcp_config.json` — the `eos` server.
+- `.agents/agents/eos-*.md` — the six orchestrators, rendered from `.github/agents/`.
+
+**Working a stage.** Pick the agent `eos next` names, `eos-architecture` for example, as the agent in
+the chat, or ask the main agent to run it as a subagent. It follows the same instructions as
+Copilot's `eos-architecture`; there are no handoff buttons, so it names the next agent instead.
+
+## 6.6.4 The lifecycle on each platform
+
+`eos next` describes each step the same way everywhere: a slash command, an agent, BMAD skills or a
+command. Read its **Start** block and translate it:
+
+| `eos next` names… | VS Code + Copilot | Claude Code | OpenAI Codex | Google Antigravity |
+|---|---|---|---|---|
+| slash command `eos-requirements` | `/eos-requirements` | `/eos-requirements` | `$eos-requirements` | `/eos-requirements` |
+| agent `eos-architecture` | switch to it, or click its handoff button | follow `.github/agents/eos-architecture.agent.md`, with the handoff package | "spawn the eos-architecture agent" | pick `eos-architecture`, or run it as a subagent |
+| skills `bmad-architecture` | the agent uses them | `/bmad-architecture` | `$bmad-architecture` | `/bmad-architecture` |
+| a command | run it | run it, or let Claude run it | run it, or let Codex run it | run it, or let the agent run it |
+
+**The handoff package works in every agent.** It names the goal, the agent and skills to use, the
+files that matter (hash-bound) and the command to come back with:
+
+```sh
+node .github/eos/eos.mjs handoff --scope story --id STORY-012   # writes .eos/handoffs/STORY-012.json
+```
+
+Then tell the agent: "Carry out `.eos/handoffs/STORY-012.json`; do not widen the scope." When it is
+done, `eos next` takes over again: the gate decides, not the agent.
+
+The Happy Path of §1.3, typed in Claude Code:
+
+```
+/eos-next                      → the first step: /bmad-brainstorming → docs/discovery.md     (G1)
+/eos-requirements "<feature>"  → docs/requirements.md                                         (G2)
+/eos-spec                      → docs/prd.md                                                  (G3)
+/eos-ux-spec                   → docs/DESIGN.md + docs/EXPERIENCE.md (skip for pure backend)
+/bmad-architecture             → docs/architecture.md + ADRs                                  (G4)
+/bmad-create-story             → docs/stories/*.md                                            (G5)
+/bmad-dev-story                → src/ code, then /bmad-code-review                            (G6)
+```
+
+In Codex, type `$` instead of `/`. In Antigravity, the stage agents can take the place of the skills.
+
+## 6.6.5 Check that everything is wired
+
+| Check | How | Expected |
+|---|---|---|
+| The guardrail runs | ask the agent to run the probe command from §2.4 | refused by the secret rule |
+| The workflows load | `/eos-next` (Codex: `$eos-next`) | six blocks: Current, Blockers, Recommended next, Why, Start, Done when |
+| The MCP server answers | ask "what is next?" | the agent calls `eos_next` after your one-time approval |
+| The generated files are current | `node .github/eos/eos.mjs agents sync --check` | `PASS`; CI runs the same check |
+
+## 6.6.6 Cursor, Gemini CLI and the Tier-2 agents
+
+The same command adds them: `node .github/eos/eos.mjs agents sync --platform cursor --write`, or
+`gemini`, `kiro`, `qwen`, `devin`, `opencode`, `cline`. Gemini CLI also gets `AGENTS.md` added to its
+context files, which it does not read by default. The Tier-2 files are generated from each vendor's
+documentation and are **not yet verified on a real installation**; check them before you rely on
+them (§7.9).
+
+## 6.6.7 Known differences
+
+- **Handoff buttons are Copilot's.** In other agents the orchestrator names the next agent or slash
+  command, and so does `eos next`.
+- **The scoped coding rules load automatically only in Copilot.** VS Code applies
+  `.github/instructions/**` by file glob. Other agents reach those rules through `AGENTS.md`, which
+  points to them: ask the agent to read the rule for the files it is about to change.
+- **Claude Code runs the workflows as skills, not as EOS subagents** (6.6.1).
+- **BMAD lives in a different folder per agent** (6.6.0). `eos-doctor --deep` and `eos next` check
+  `~/.agents/skills/`, `~/.claude/skills/` and `~/.copilot/skills/`, so they do not see a BMAD
+  install that exists only in Antigravity's folder.
+- **Hooks are local speed bumps.** Each agent asks you to trust them once. If the hook itself fails,
+  some agents let the call through (Claude Code) and some refuse it (VS Code); CI stays the authority
+  (Appendix D).
+- **VS Code's agent sessions also run the Claude Code hook.** If every tool call in a VS Code agent
+  session is refused with "hook errored", check that `.claude/settings.json` runs the plain command
+  line `node .github/hooks/deny-dangerous.js --format claude` (`eos agents sync --write` restores it),
+  then quit and reopen VS Code: reloading the window does not restart the agent host.
+
+---
+
 # Chapter 7 Complete reference (quick-reference)
 
 ## 7.1 Slash commands (EOS skills, `.agents/skills/`)
@@ -768,7 +995,10 @@ rejected transition · `2` blocked/pending/stale · `3` EOS itself cannot be eva
 | `ledger [--verify] [--against <ref>]` | Verify the append-only hash chain |
 | `focus --scope <type> --id <id>` | Set this machine's local focus (carries no authority) |
 | `init [--write]` | Report or create local, non-destructive integration files |
+| `stage init <stage> [--write] [--interactive]` | The skeleton of a stage's machine record (`docs/<stage>.json`) and its document, generated from the schema: every required field with a `TODO(eos)` placeholder — every gate rejects the record until each is answered, so a skeleton never advances a stage. Samples: [examples/stage-records](examples/stage-records/README.md) (since eos-2.3.0) |
 | `stack sync [--write]` | Render the always-on workspace rule's `Local commands` from `.eos/project.json`, so the prose cannot disagree with what CI runs. Blocks rather than guessing when no stack is declared |
+| `agents sync [--platform <x>] [--write] [--check]` | Generate what each agent platform reads from one source: skill copies, the EOS MCP entry, the guardrail hook in the platform's dialect, agents where they do not collide. Shared configuration files keep everything that is not EOS's; `--platform` adds a platform to `agentPlatforms`; CI runs `--check` (since eos-2.2.0; platforms since eos-2.3.0, see 7.9) |
+| `mcp` | Serve the read and verify commands to an agent over the Model Context Protocol (stdio): `next`, `status`, `resume`, `health`, `explain`, `check`, `verify`, `release-status`, a stage skeleton, `product-tree`, `doctor`, `policy check`. Approving, waiving, transitions, release signing and everything that rewrites governance files are deliberately not tools ([ADR-018](../adr/018-mcp-server.md)). `eos agents sync` writes each platform's client configuration (since eos-2.3.0) |
 | `doctor` | Is EOS itself wired correctly? |
 
 **Gate ids** (`check --gate <id>`): `activation` · `discovery-ready` · `requirements-ready` ·
@@ -809,6 +1039,9 @@ rejected transition · `2` blocked/pending/stale · `3` EOS itself cannot be eva
 >
 > **Alternative path** if they still do not appear: run the flow directly with slash commands--EOS skills such as `/eos-requirements`, `/eos-compliance`, `/eos-spec`, `/eos-ux-spec`, `/eos-eval-spec`, `/eos-release-gate` do not depend on the agent selector; type `/` to see them. Agents are only "orchestration personas", and their capabilities can all be manually triggered with the corresponding slash commands/skills (see 7.1 and `docs/eos/agent-map.md`).
 
+Codex and Antigravity get the same six orchestrators, generated from these files (`.codex/agents/`,
+`.agents/agents/`); Claude Code runs their steps as skills. See [Chapter 6.6](#chapter-66-using-eos-with-claude-code-codex-and-antigravity).
+
 ## 7.4 Rule files (`.github/instructions/`)
 
 | File | `applyTo` | Governs |
@@ -842,7 +1075,7 @@ rejected transition · `2` blocked/pending/stale · `3` EOS itself cannot be eva
 
 | File | Event | Purpose |
 |---|---|---|
-| `guardrails.json` + `deny-dangerous.js` | PreToolUse | Blocks dangerous operations + **supply-chain poisoning (`curl&#124;bash`/`--unsafe-perm`) + hardcoded secret literals** (outputs `permissionDecision:"deny"`) |
+| `guardrails.json` + `deny-dangerous.js` | PreToolUse | Blocks dangerous operations + **supply-chain poisoning (`curl&#124;bash`/`--unsafe-perm`) + hardcoded secret literals** (outputs `permissionDecision:"deny"`). Other agent platforms run the same script with `--format <platform>`, from the hook `eos agents sync` generates for them (see 7.9) |
 | `quality.json` | PostToolUse | Runs lint+typecheck+test quality gate after file writes (**advisory**, not the authoritative gate: it always exits 0; the authority is `project-gate.mjs` in CI) |
 | `config-check.json` | PostToolUse | Automatically runs `validate-config.mjs` after every edit (configuration S1–S14) **+ `eos-doctor.mjs` (SDLC clinic / G-EVAL wiring / secret scan)** (also advisory) |
 | `validate-config.mjs` | Manual/called by hook | Zero-dependency static validator (S1–S14: rule/agent/prompt frontmatter, glob, required paths, hook events, **S12 `.eos/project.json` declaration validity**, **S13 the `.eos/` workflow spine and its cross-references**, **S14 the always-on workspace rule must not describe a stack the project never declared**) |
@@ -907,6 +1140,25 @@ Want the "agent to personally open the browser, click around, and screenshot sel
 - The concrete UI for agent mode + MCP evolves by version, `【Verify in your version】`.
 
 ---
+
+## 7.9 Agent platforms (`eos agents sync`)
+
+EOS is written once and generated for each agent platform the team uses ([ADR-019](../adr/019-agent-platforms.md)). Three open standards carry most of it — `AGENTS.md`, Agent Skills in `.agents/skills/`, and the `eos mcp` server ([ADR-018](../adr/018-mcp-server.md)). `eos agents sync` writes the rest in each platform's own format: its MCP entry, its pre-tool hook (the same `deny-dangerous.js`, run with `--format <platform>`), and agents or skill copies where a platform reads only its own directory.
+
+| Platform | Generated for it | One-time trust step |
+|---|---|---|
+| GitHub Copilot *(default)* | `.mcp.json` — its agents, skills and `.github/hooks/guardrails.json` are the template's own | VS Code asks you to trust the MCP server before it first starts |
+| Claude Code *(default)* | `.claude/skills/` copy, the hook in `.claude/settings.json`, `.mcp.json` | Claude Code asks once to approve the project's MCP server |
+| Google Antigravity *(default)* | `.agents/hooks.json`, `.agents/mcp_config.json`, `.agents/agents/` | MCP tools ask per call |
+| OpenAI Codex | `.codex/config.toml` (a marked `[mcp_servers.eos]` block), `.codex/hooks.json`, `.codex/agents/*.toml` | Trust the project, and approve each hook once (`/hooks`) |
+| Cursor | `.cursor/hooks.json` (shell commands), `.cursor/mcp.json` | MCP asks per call (Run Modes) |
+| Gemini CLI | `.gemini/settings.json`: `AGENTS.md` added to `context.fileName`, the hook (`BeforeTool`), MCP | Trust the folder |
+| Kiro · Qwen Code · Windsurf / Devin Desktop · OpenCode · Cline *(Tier 2)* | `.kiro/…` · `.qwen/…` · `.devin/…` · `opencode.json` and a plugin · `.clinerules/hooks/PreToolUse` | Generated from each vendor's documentation — **not yet verified on a real installation** |
+
+- **Choose the platforms** in `.eos/project.json` → `"agentPlatforms"`. Absent, the default set is generated (Copilot, Claude Code, Antigravity): the files in `.agents/`, `.github/`, `.claude/` and `.mcp.json`, which also give Codex, Cursor and Gemini CLI the skills and `AGENTS.md`, and Cursor the Claude hook. One command adds a platform: `node .github/eos/eos.mjs agents sync --platform codex --write`. It edits `agentPlatforms`, an input of every gate, so re-run `eos verify` afterwards.
+- **Shared files stay yours.** EOS owns its entries — the `eos` server, the hook handlers that run `deny-dangerous.js`, a marked TOML block — never the rest of `.claude/settings.json` or `.mcp.json`, and never a hook of yours: your hooks keep their order around EOS's, and a group of yours that runs the guardrail beside your own handlers stays as you wrote it. Removing a platform removes only EOS's entries and handlers, and a file only when nothing else is left in it. A file EOS cannot merge safely (JSON with comments, a TOML that already defines `eos` or makes `mcp_servers` inline) is refused, not half-written, and nothing is written through a symbolic link. A whole file EOS writes (the Cline hook script, `eos-*` agents …) is replaced or removed only while it carries EOS's mark; your own file at that path is never touched.
+- **CI runs `agents sync --check`.** Edit the sources (`.agents/skills/`, `.github/agents/`, `.github/hooks/`), never a generated file. `eos upgrade` regenerates these files for your platforms instead of comparing them with the template's.
+- **Not generated:** Claude Code subagents (VS Code also reads `.claude/agents/` and would list every orchestrator twice; Claude Code runs the same workflows as skills); Cline's MCP entry (Cline reads only its global `~/.cline/mcp.json`); Trae, CodeBuddy and Comate, whose documentation could not be fetched — `AGENTS.md` and the CLI serve them until they are verified on a real machine.
 
 # Chapter 8 Configuration QA and acceptance
 
@@ -996,6 +1248,10 @@ Agent output does not match expectation
 - PreToolUse used the wrong schema (`decision:"block"` belongs to PostToolUse) → cannot block. Correct is `hookSpecificOutput.permissionDecision:"deny"`.
 - Multiple `applyTo:"**"` files are **not** conflicts (thin, complementary, single-responsibility); validator S3 exempts them.
 - Editing `docs/prd.md` does **not** invalidate every story. Story evidence is bound to the criteria each story *cites*, so adding or rewriting an unrelated `AC` leaves the rest of the backlog fresh; rewriting or deleting a criterion a story cites correctly makes that story `STALE`. Verification (G7) is bound to the product tree as well, so a PRD edit still re-opens it.
+- **Claude Code does not list `/eos-next`** → `.claude/skills/` is missing or out of date: run `node .github/eos/eos.mjs agents sync --write`, and check that `agentPlatforms` includes `claude`.
+- **Codex ignores `.codex/`** → the project is not trusted, or the hook is not approved yet: trust the project, then run `/hooks` (§6.6.2).
+- **Antigravity cannot find a BMAD skill** → it reads global skills from `~/.gemini/config/skills/`, not `~/.agents/skills/` (§6.6.3).
+- **Every tool call in a VS Code agent session is refused with "hook errored"** → the Claude Code hook in `.claude/settings.json` cannot run; see §6.6.7.
 
 ---
 
@@ -1016,12 +1272,12 @@ Agent output does not match expectation
 ```sh
 # Method A: degit (public repository — no auth needed)
 # Pin the release tag: the default branch moves, a tag does not.
-npx degit niaodian/eos#eos-2.2.0 my-app
+npx degit niaodian/eos#eos-2.3.0 my-app
 cd my-app && git init
 
 # Method B: git clone at the tag, into a fresh history
-git clone --depth 1 --branch eos-2.2.0 https://github.com/niaodian/eos.git my-app
-cd my-app && git checkout --orphan main && git commit -m "chore: start from eos-2.2.0"
+git clone --depth 1 --branch eos-2.3.0 https://github.com/niaodian/eos.git my-app
+cd my-app && git checkout --orphan main && git commit -m "chore: start from eos-2.3.0"
 
 # Either way, declare the project: the template's own declaration describes EOS, not you
 node .github/eos/eos.mjs init                       # the tracks, the packs, and what is declared
@@ -1030,7 +1286,7 @@ node .github/eos/eos.mjs init config-only --write   # no code yet — or <pack>,
 
 ## 10.3 Distribution to a team (purely local, no enterprise dependency)
 
-1. Everyone starts from the **same release tag** (`eos-2.2.0`). The default branch keeps moving, so
+1. Everyone starts from the **same release tag** (`eos-2.3.0`). The default branch keeps moving, so
    an unpinned copy is a slightly different EOS for every person who takes one.
 2. `【Needs org/GitHub settings】` The GitHub **template repository** setting is owner-level: EOS can
    neither apply nor verify it locally, so do not take this page's word for it —
@@ -1049,6 +1305,7 @@ node .github/eos/eos.mjs init config-only --write   # no code yet — or <pack>,
 
 - Every EOS configuration change: update `docs/eos/VERSION` (e.g., `eos-1.4.1`→`eos-1.6.0`), run `validate-config.mjs`, commit with Conventional Commits.
 - Upgrading existing projects (2.1.0+): `eos upgrade --from <new template> --base <the template you started from>` — a dry run by default, `--write` to apply. Per file it compares the two templates with your copy: what only EOS changed is updated, what only you changed is kept, and a file both changed is never overwritten — the new version is parked under `.eos/local/upgrade/` for a hand merge. Your declaration, evidence, ledger, waivers, stories and README are never touched. Fetch both templates yourself (degit or the attested release tarball) and run the NEW version's CLI; number your own ADRs from 100 ([ADR-015](../adr/015-three-way-upgrades.md)). User-level `bmad-*` upgrades independently.
+- What changed: `eos upgrade` prints the entries of [CHANGELOG.md](CHANGELOG.md) between your version and the new one (since eos-2.3.0). EOS releases on trains — at most one minor version a week, patches only for security fixes and regressions, breaking changes only in a minor — and the stable choice is the newest minor that has been out a week without a patch ([CONTRIBUTING.md](../../CONTRIBUTING.md#release-cadence)).
 
 ### 10.4.1 Upgrading from `eos-1.12.0` to `eos-1.13.0`
 
@@ -1526,6 +1783,29 @@ node /tmp/eos-next/.github/eos/eos.mjs upgrade --from /tmp/eos-next --base /tmp/
 node .github/eos/eos.mjs agents sync --write && node .github/eos/eos.mjs policy lock && node .github/eos/eos.mjs verify --full
 ```
 
+## 10.10 Upgrading from `eos-2.2.x` to `eos-2.3.0`
+
+Nothing gets stricter for a project that changes nothing. What is new is how much of EOS each agent platform gets, and two ways in that did not exist before: an MCP server and brownfield adoption.
+
+| What changed | What you will see | What to do |
+|---|---|---|
+| **Agent platforms are generated** ([ADR-019](../adr/019-agent-platforms.md)) | `.mcp.json`, `.claude/settings.json`, `.agents/hooks.json`, `.agents/mcp_config.json` and `.agents/agents/` appear — the default platforms are Copilot, Claude Code and Antigravity. The upgrade regenerates them for your platforms instead of comparing them with the template's | If you already had `.claude/settings.json` or `.mcp.json`, your content is kept and EOS adds only its entry. Using Codex, Cursor or Gemini CLI: `eos agents sync --platform <name> --write`. Declare `"agentPlatforms"` to generate less (§7.9) |
+| **`eos mcp`** ([ADR-018](../adr/018-mcp-server.md)) | Your agent may ask once to trust the `eos` MCP server | Approve it, or decline: the CLI works as before |
+| **A new workflow profile, `delivery-only`** ([ADR-020](../adr/020-brownfield-delivery-gates.md)) | `eos policy check` reports that the policy changed, and every recorded gate result is STALE (`.eos/workflow.json` changed) | `eos policy lock` shows one added profile and nothing weakened; re-lock with `--write`, then `eos verify --full`. For an existing system that has not adopted EOS yet, see §3.5 |
+| **`eos stage init`** | A stage record can start from a schema-generated skeleton | Optional; a skeleton with `TODO(eos)` placeholders never passes a gate |
+| **CI requires gitleaks** | `eos-ci.yml` installs a pinned, checksum-verified gitleaks and sets `EOS_REQUIRE_GITLEAKS=1` | Nothing, unless your CI cannot download it — then remove the variable and keep the built-in scan |
+| **The guardrail speaks each platform's dialect** | `deny-dangerous.js --format <platform>` | Nothing: the generated hooks pass it |
+
+**Upgrade steps**
+
+```sh
+npx degit niaodian/eos#eos-2.2.0 /tmp/eos-base    # the version you are on — see docs/eos/VERSION
+npx degit niaodian/eos#eos-2.3.0 /tmp/eos-next
+node /tmp/eos-next/.github/eos/eos.mjs upgrade --from /tmp/eos-next --base /tmp/eos-base          # review the plan
+node /tmp/eos-next/.github/eos/eos.mjs upgrade --from /tmp/eos-next --base /tmp/eos-base --write  # apply it, and regenerate the agent-platform files
+node .github/eos/eos.mjs policy lock --write && node .github/eos/eos.mjs verify --full
+```
+
 ---
 
 # Chapter 11 Adding a technology stack
@@ -1600,7 +1880,7 @@ EOS stack rules are **pluggable**. Adding a stack = add one `*.instructions.md` 
 
 ```
 # ── Terminal — the loop (this is all you need day to day) ──
-npx degit niaodian/eos#eos-2.2.0 my-app   # create new project
+npx degit niaodian/eos#eos-2.3.0 my-app   # create new project
 node .github/eos/eos.mjs init                       # what is declared, the two tracks, the starter packs
 node .github/eos/eos.mjs init <pack> --write        # declare it (config-only until the stack is decided; --track regulated)
 node .github/eos/eos.mjs init --write               # local VS Code tasks (never overwrites)
@@ -1617,6 +1897,12 @@ npx --offline eos <command>                         # the same CLI, shorter (npm
 node .github/hooks/validate-config.mjs              # config self-check (expect PASS)
 npm test                                            # run tests (same as quality gate)
 npm audit                                           # dependency audit before release
+
+# ── Claude Code · Codex · Antigravity (Chapter 6.6) ──
+/eos-next  /eos-resume  /eos-status     # Claude Code and Antigravity: the same skills
+$eos-next  $eos-resume  $eos-status     # Codex calls skills with $
+node .github/eos/eos.mjs agents sync --platform codex --write   # add a platform (once, then commit)
+node .github/eos/eos.mjs handoff --scope story --id <id>        # a step's context, for any agent
 
 # ── Copilot Chat (Agent mode) ──
 (agent) eos-guide            # unified entry point: reads the state, gives one action, hands off
@@ -1663,7 +1949,7 @@ A real dry-run that passed end to end (feature: user login), **12/12 gates passe
 
 **Reproduce** (terminal):
 ```sh
-npx degit niaodian/eos#eos-2.2.0 my-app && cd my-app
+npx degit niaodian/eos#eos-2.3.0 my-app && cd my-app
 node .github/hooks/validate-config.mjs        # PASS
 npm test                                      # 10/10 green
 echo '{"tool_input":{"command":"rm -rf /tmp/x"}}' | node .github/hooks/deny-dangerous.js  # deny
@@ -1727,7 +2013,7 @@ The following are **intentional design trade-offs** in EOS (inherent costs of lo
 | `bmad-*` skills are installed **user-level** and not pinned (audit H4/T6) | Skill versions/presence differ across machines → agentic behavior is not fully reproducible | Record the team's unified bmad version in `docs/`; critical skills may be vendored/submoduled |
 | Hooks are Preview, per-machine, allow on parse failure, and CI does not call them (audit G2) | Real-time interception of destructive operations is not authoritative and can be bypassed | Authority is D.1 CI hard gates + human review; hooks are only speed bumps |
 | agent has `editFiles` (audit H5) | In principle it can modify its own governance files | D.2 CODEOWNERS + D.1 required review (blocks once enabled) |
-| `gitleaks` deep scan is an **optional enhancement** (opt-in, never required); if absent it silently degrades | Running only zero-dependency built-in regexes is weaker than full gitleaks rules | Built-in `secret-scan.mjs` always runs as a CI hard gate (baseline); installing `gitleaks` in CI/local automatically adds deep scan |
+| `gitleaks` deep scan is an **optional enhancement locally**; if absent it degrades to the built-in rules | Running only zero-dependency built-in regexes is weaker than full gitleaks rules | Built-in `secret-scan.mjs` always runs as a CI hard gate (baseline). Since eos-2.3.0 EOS CI installs a pinned, checksum-verified `gitleaks` and sets `EOS_REQUIRE_GITLEAKS=1`, so there a missing gitleaks fails instead of degrading |
 | **Windows**: core hooks are Node (cross-platform); early `quality.json` once used `sh -c` (round-2 N1 changed it to `node .github/hooks/quality.mjs`, native Windows no longer needs WSL/Git-Bash) | Directory fallback traversal without `git` once showed absolute paths on Windows (normalized with `path.relative`); availability of external tools such as `bmad-*` and `act` (requires Docker Desktop) still varies by platform | Three core hooks + `quality.mjs` are implemented cross-platform; **authoritative quality gate is in CI (`ubuntu-latest`)**, independent of local OS |
 
 **Requires organization decision (template does not decide, `【Needs org standard】`)**: CI runner standard (currently `ubuntu-latest`), approved secret store, namespace/repository ownership, model pin/registration strategy, artifact integrity (SBOM/signing/SLSA). These are not violations; they are organization-standard questions.

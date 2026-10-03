@@ -3,8 +3,10 @@
 // Scans git-tracked text files (and the working tree if not a repo) for secret literals and
 // for a committed .env. Complements the PreToolUse guardrail (real-time) and CI (batch).
 //   node .github/hooks/secret-scan.mjs
-// If `gitleaks` is on PATH it ALSO runs a deeper scan (optional enhancement — never required;
-// absence degrades gracefully to the built-in patterns). Exit 1 on any finding. Matches redacted.
+// If `gitleaks` is on PATH it ALSO runs a deeper scan (optional enhancement locally — absence
+// degrades gracefully to the built-in patterns). EOS_REQUIRE_GITLEAKS=1 makes it required: CI
+// installs a pinned, checksum-verified gitleaks and sets it, so a missing or failing gitleaks fails
+// the run instead of falling back. Exit 1 on any finding. Matches redacted.
 // The rules are ./lib/secret-rules.mjs, shared with the PreToolUse hook. The import is static on
 // purpose: this scanner is an authority (CI, and the release-ready `secret-scan` check), so a
 // missing rule module must fail the run, never quietly scan nothing.
@@ -66,9 +68,11 @@ for (const rel of listFiles()) {
   });
 }
 
-// --- Optional deeper scan: gitleaks (if installed). Enhancement only — never required. ---
+// --- Deeper scan: gitleaks — optional, unless EOS_REQUIRE_GITLEAKS=1 (CI). ---
+const requireGitleaks = process.env.EOS_REQUIRE_GITLEAKS === '1';
 let gitleaksRan = false;
 let gitleaksFailed = false;
+let gitleaksError = null;
 function hasGitleaks() {
   try { execSync('gitleaks version', { stdio: 'ignore' }); return true; } catch { return false; }
 }
@@ -82,15 +86,23 @@ if (hasGitleaks()) {
   try {
     execSync(cmd, { cwd: root, stdio: 'ignore' });
   } catch (e) {
-    // gitleaks exits non-zero (2) when it finds leaks; treat as failure.
+    // gitleaks exits 2 when it finds leaks: a failure. Anything else is gitleaks failing to run —
+    // reported, and fatal only where the deeper scan is required.
     if (e && e.status === 2) gitleaksFailed = true;
-    else gitleaksFailed = false; // other errors (e.g. usage) shouldn't hard-fail the baseline
+    else gitleaksError = `gitleaks did not complete (exit ${e?.status ?? 'unknown'})`;
   }
+} else if (requireGitleaks) {
+  gitleaksError = 'gitleaks is not on PATH';
 }
 
 console.log('EOS secret scan\n');
 const engine = gitleaksRan ? 'built-in patterns + gitleaks' : 'built-in patterns (install gitleaks for deeper scan)';
 console.log(`  engine: ${engine}`);
+if (gitleaksError) console.log(`  ${requireGitleaks ? 'ERROR' : 'NOTE '} ${gitleaksError}${requireGitleaks ? ' — EOS_REQUIRE_GITLEAKS=1 makes the deeper scan required here' : ' — the built-in patterns ran'}`);
+if (requireGitleaks && gitleaksError) {
+  console.log('\nFAIL: the required gitleaks scan did not run.');
+  process.exit(1);
+}
 if (findings.length || gitleaksFailed) {
   for (const f of findings) console.log(`  LEAK  ${f.file}:${f.line}  ${f.kind}${f.sample ? `  (${f.sample})` : ''}`);
   if (gitleaksFailed) console.log('  LEAK  gitleaks reported findings — run `gitleaks dir . --redact` for details.');

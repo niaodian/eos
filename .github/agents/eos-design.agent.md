@@ -34,6 +34,8 @@ a reason). Every user-facing PRD requirement has a screen/flow, all states
 `DESIGN.md`. These contracts are the source of truth for the frontend rules and for
 telemetry of user actions; they win over any later mock or import.
 
+Start from the skeleton — `node .github/eos/eos.mjs stage init design --write` — and replace every `TODO(eos)`: the gate rejects the record while one remains.
+
 Output: `docs/DESIGN.md`, `docs/EXPERIENCE.md`, `docs/design.json`
 (schema `.eos/schemas/design.schema.json`). Verify with
 `node .github/eos/eos.mjs check --gate ux-ready`.

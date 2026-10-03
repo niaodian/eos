@@ -1,0 +1,20 @@
+{
+  "$schema": "../../../../.eos/schemas/architecture.schema.json",
+  "schemaVersion": 1,
+  "decisions": {
+    "techStack": { "status": "DECIDED", "summary": "Node 22 service with PostgreSQL", "adr": "docs/adr/101-tech-stack.md" },
+    "deploymentTopology": { "status": "DECIDED", "summary": "containers on a managed PaaS, rolling deployment behind its load balancer", "adr": "docs/adr/102-deployment-topology.md" },
+    "authz": { "status": "DECIDED", "summary": "session cookie; every repository call takes the member's household id" },
+    "security": { "status": "DECIDED", "summary": "TLS in transit, database encryption at rest, no PII beyond display names" },
+    "audit": { "status": "DECIDED", "summary": "membership changes written to the audit sink with actor and time" },
+    "rollback": { "status": "DECIDED", "summary": "feature flag shared_lists, and the previous image redeployed" },
+    "disasterRecovery": { "status": "DECIDED", "summary": "point-in-time recovery with a 5 minute RPO and a 1 hour RTO" },
+    "dataModel": { "status": "DECIDED", "summary": "households, members, items; household_id on every row" },
+    "apiContract": { "status": "DECIDED", "summary": "REST resources documented in api/openapi.yaml" },
+    "eventContract": { "status": "NOT_APPLICABLE", "reason": "the service publishes no domain events; it only emits telemetry" }
+  },
+  "nfrLandingPoints": [
+    { "nfr": "NFR1", "component": "list repository", "mechanism": "one indexed query per list read, household_id leading the index" },
+    { "nfr": "NFR2", "component": "repository layer", "mechanism": "household id is a required argument of every query, taken from the session" }
+  ]
+}

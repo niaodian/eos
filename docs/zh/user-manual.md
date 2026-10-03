@@ -5,8 +5,8 @@
 
 # EOS 用户手册（Engineering Operating System User Manual）
 
-> 版本：与 `docs/eos/VERSION` 同步（当前 `eos-2.2.0`）
-> 适用：较新版本的 VS Code + GitHub Copilot Chat（自定义 agent / hooks 属近版能力，用「关于 VS Code」面板确认版本）+ 已安装 73 个 `bmad-*` skill（用户级）
+> 版本：与 `docs/eos/VERSION` 同步（当前 `eos-2.3.0`）
+> 适用：较新版本的 VS Code + GitHub Copilot Chat（自定义 agent / hooks 属近版能力，用「关于 VS Code」面板确认版本），或 Claude Code、OpenAI Codex、Google Antigravity（[第 6.6 章](#第-66-章-在-claude-code、codex-和-antigravity-中使用-eos)）+ 已安装 73 个 `bmad-*` skill（用户级）
 > 定位：本手册是**操作指南（怎么用）**；设计原理与取舍见同目录 `blueprint.md`（为什么这么设计）。
 > 约定：正文中文；文件名/路径/命令/配置键保留英文原文。
 
@@ -21,10 +21,11 @@
 | 要开一个新项目 | [第 3 章 新项目 Day-1](#第-3-章-新项目-day-1-bootstrap) |
 | 想搞懂"规则/prompt/agent/skill/hook 到底啥区别" | [第 4 章 核心概念](#第-4-章-核心概念（五种机制）) |
 | **要从 idea 一路做到上线后迭代** | [第 6 章 全生命周期实操](#第-6-章-全生命周期实操（idea-→-迭代）) ← 手册核心 |
+| 用 Claude Code、Codex 或 Antigravity 代替 VS Code + Copilot | [第 6.6 章 在 Claude Code、Codex 和 Antigravity 中使用 EOS](#第-66-章-在-claude-code、codex-和-antigravity-中使用-eos) |
 | 想查某个斜杠命令 / agent / 规则 | [第 7 章 完整参考](#第-7-章-完整参考（速查）) |
 | 配置坏了 / Agent 不按预期工作 | [第 9 章 故障定位](#第-9-章-故障定位与排错) |
 | 想把这套搬到别的项目/团队 | [第 10 章 跨项目复用与分发](#第-10-章-跨项目复用与分发) |
-| 升级到 `eos-2.0.0`、选择治理轨道或为发布签名 | [§10.5 升级](#105-从-eos-122x-升级到-eos-200) · [§10.6 轨道与签名发布](#106-治理轨道、签名发布与中心策略) · [§10.7 2.0.1 安全补丁](#107-从-eos-200-升级到-eos-201) · [§10.8 `eos upgrade` 与 2.1.0](#108-从-eos-20x-升级到-eos-210) |
+| 升级到 `eos-2.0.0`、选择治理轨道或为发布签名 | [§10.5 升级](#105-从-eos-122x-升级到-eos-200) · [§10.6 轨道与签名发布](#106-治理轨道、签名发布与中心策略) · [§10.7 2.0.1 安全补丁](#107-从-eos-200-升级到-eos-201) · [§10.8 `eos upgrade` 与 2.1.0](#108-从-eos-20x-升级到-eos-210) · [§10.9 2.2.0](#109-从-eos-21x-升级到-eos-220) · [§10.10 2.3.0](#1010-从-eos-22x-升级到-eos-230) |
 
 ---
 
@@ -37,6 +38,7 @@
 - [第 5 章 心智模型：分层规则 + 决策门](#第-5-章-心智模型：分层规则--决策门)
 - [第 6 章 全生命周期实操（idea → 迭代）](#第-6-章-全生命周期实操（idea-→-迭代）)
 - [第 6.5 章 两条上手路径（SaaS vs Agentic · 小白友好）](#第-65-章-两条上手路径（saas-vs-agentic-·-小白友好）)
+- [第 6.6 章 在 Claude Code、Codex 和 Antigravity 中使用 EOS](#第-66-章-在-claude-code、codex-和-antigravity-中使用-eos)
 - [第 7 章 完整参考（速查）](#第-7-章-完整参考（速查）)
 - [第 8 章 配置质检与验收](#第-8-章-配置质检与验收)
 - [第 9 章 故障定位与排错](#第-9-章-故障定位与排错)
@@ -88,6 +90,10 @@ node .github/eos/eos.mjs check --gate <id> --scope <id>   # 证明这一步，�
 `npm run -s eos -- next`（任意 npm）。请保留 `--offline`：公共 npm 仓库里有一个同名但无关的
 `eos` 包，这个参数保证只运行当前检出的代码。
 
+**在 Claude Code、Codex 或 Antigravity 中**，循环完全相同，只是在对应 agent 里输入：`/eos-resume`
+和 `/eos-next`（Codex：`$eos-resume`、`$eos-next`），或者直接问"下一步做什么？"——agent 会运行同一个
+引擎，通过终端或 `eos` MCP 服务。一次性配置见 [第 6.6 章](#第-66-章-在-claude-code、codex-和-antigravity-中使用-eos)。
+
 Router 会为每一步点名 agent、prompt 和最小
 BMAD skill 链，所以你永远不用自己从 73 个已安装 skill 里挑。完整契约（状态模型、门禁、证据、
 退出码）见 [developer-experience.md](developer-experience.md)。
@@ -127,6 +133,7 @@ bmad-code-review                   → 审查无阻断项           (Gate G6)
 | OS | macOS、Windows 10/11 或 Linux —— EOS 跨平台；原生 Windows 跑核心流程无需 WSL | macOS `sw_vers` · Windows `winver` · Linux `uname -sr` |
 | VS Code | 较新版本（自定义 agent / hooks 需近版） | 关于面板查看真实版本（`code --version` 可能是 shim，不准） |
 | GitHub Copilot | 已登录（企业 license 仅作 license，不作配置依赖） | Chat 面板可用 |
+| 或其他 agent | 用 Claude Code、OpenAI Codex 或 Google Antigravity 代替 VS Code + Copilot——配置见 [第 6.6 章](#第-66-章-在-claude-code、codex-和-antigravity-中使用-eos) | 在项目文件夹中启动后，`/eos-next`（Codex：`$eos-next`）能给出结果 |
 | Node.js | 18+（验证器与 hooks 用） | `node -v` |
 | BMAD skills | 73 个 `bmad-*`（用户级） | macOS/Linux `ls ~/.agents/skills &#124; grep -c '^bmad-'` · Windows `(Get-ChildItem ~/.agents/skills -Filter 'bmad-*').Count` |
 
@@ -143,6 +150,10 @@ bmad-code-review                   → 审查无阻断项           (Gate G6)
 ```
 这些是**用户级**、跨所有项目共享的。EOS 通过 prompt/agent 里的 `bmad-*` 名称来调用它们，
 **不需要把它们复制进项目**。
+
+其他 agent 从各自的目录读取用户级技能：Claude Code 读 `~/.claude/skills/`（即上面的镜像），Codex 读
+`~/.agents/skills/`，Antigravity 读 `~/.gemini/config/skills/`（IDE）或 `~/.gemini/antigravity-cli/skills/`
+（CLI）——按 §6.6.3 的方法把 BMAD 链接过去。
 
 ## 2.3 用户级 agents 目录（可选）
 
@@ -167,6 +178,7 @@ bmad-code-review                   → 审查无阻断项           (Gate G6)
   只会无害地打印这行字符串。若没被拦截，多半是把父目录当成了工作区根（见 §9.3）。
 - **诚实边界**：`deny-dangerous.js` 是**本地减速带**（逐机器、Preview、解析失败放行、CI 不调用），
   是纵深防御而非权威。真正的权威门是 CI 三道硬检查 + 分支保护 + 人工评审（见附录 D）。
+- **其他 agent** 通过各自的钩子文件运行同一个脚本——`.claude/settings.json`、`.codex/hooks.json`、`.agents/hooks.json`（§7.9、第 6.6 章）。VS Code 的 agent 会话也会运行 `.claude/settings.json` 中的钩子；如果它们以 "hook errored" 拒绝每次工具调用，见 §6.6.7。
 
 ---
 
@@ -177,7 +189,7 @@ bmad-code-review                   → 审查无阻断项           (Gate G6)
 **方式 A — degit（推荐，最快）**
 ```sh
 # public 模板 —— 直接 degit（无需鉴权）
-npx degit niaodian/eos#eos-2.2.0 my-new-app
+npx degit niaodian/eos#eos-2.3.0 my-new-app
 cd my-new-app
 git init && git add -A && git commit -m "chore: scaffold from eos"
 ```
@@ -218,7 +230,7 @@ node .github/hooks/validate-config.mjs      # 期望：PASS
 ## 3.4 Day-1 完整序列（复制即用）
 
 ```sh
-npx degit niaodian/eos#eos-2.2.0 my-new-app && cd my-new-app
+npx degit niaodian/eos#eos-2.3.0 my-new-app && cd my-new-app
 git init && git add -A && git commit -q -m "chore: scaffold from eos"
 node .github/hooks/validate-config.mjs
 node .github/eos/eos.mjs init config-only --write   # 声明项目：还没有代码（或 init <pack> [--track regulated]）
@@ -229,6 +241,28 @@ code .
 # 一次性硬化（让 CI 门具备"合并阻断"权威）：在 Copilot Chat 里跑 /eos-init，
 # 按引导逐项勾掉 docs/eos/activation.md（分支保护 + CODEOWNERS + 审批基线；详见附录 D）。
 ```
+
+**不用 VS Code？** 不必运行 `code .`，而是在项目文件夹中启动你的 agent——`claude`（Claude Code）、
+`codex`（Codex，需先运行 `node .github/eos/eos.mjs agents sync --platform codex --write`），或在 Antigravity
+中打开该文件夹——然后在其中运行 `/eos-init`（Codex：`$eos-init`）。各平台的一次性配置见 [第 6.6 章](#第-66-章-在-claude-code、codex-和-antigravity-中使用-eos)。
+
+## 3.5 已有系统（存量项目）
+
+已经在运行的系统，不必先重写规范才能用上 EOS。用 `delivery-only` 工作流 profile 在**交付门禁**处接入（自 eos-2.3.0 起）：正在运行的系统就是基线，此后的每一项改动都是一个 story，必须就绪（G5）、经过验证（G7）并通过发布门禁（G8）。
+
+```sh
+npx degit niaodian/eos#eos-2.3.0 /tmp/eos                      # 模板，放在你的仓库之外
+# 复制到你的仓库：.eos/ .agents/ .github/{eos,hooks,agents,instructions}/ docs/eos/
+# 已有的文件请手工合并：AGENTS.md、.github/copilot-instructions.md、.github/workflows/eos-ci.yml
+node .github/hooks/validate-config.mjs                          # S7 会点名仍缺少的内容
+node .github/eos/eos.mjs init <pack> --brownfield --write       # Standard 轨道；pack 对应你的技术栈
+node .github/eos/eos.mjs next                                   # → 为现有系统写文档
+```
+
+- **先记录现状，不要重写规范。** `eos next` 会把你交给 `eos-discovery` agent 和 `bmad-document-project`，后者把现状文档写进 `docs/`，以 `docs/index.md` 为索引。该文件存在后，`next` 会请你写第一个 story。
+- **每项改动都是一个 story。** 它的验收标准写在 story 里（在 PRD 出现之前，它们独立成立），每条都带测试意图；`verified` 运行你的测试，并把每条标准追溯到一个通过的测试；发布门禁按 Standard 轨道检查候选版本，并把 trace matrix 与本次发布包含的 story 对齐。
+- **不设门禁的部分：** discovery、requirements、PRD、UX、架构，以及发布后的遥测与回写门禁——它们都建立在成文的基线之上。你随时可以补写 PRD：一旦 `docs/prd.md` 存在，每个 story 的标准都必须能在其中找到。
+- **毕业**到完整生命周期，只需在产品重新基线化后把 `"workflowProfile"` 设为 `"standard-product"`——这只会加强策略。反过来，把 Standard 项目改到 `delivery-only` 是一种削弱：`eos policy lock` 会连同理由和第二个人一起记录。Regulated 轨道不提供这条路径，它要求先有基线。
 
 ---
 
@@ -243,7 +277,7 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 | **Agents（角色）** | `.github/agents/*.agent.md` | 切换：你选中某 agent 时持续生效 | Chat 的 agent 选择器切换 | 阶段编排者（持久 persona + 工具限制 + handoffs） |
 | **Skills（能力）** | `.agents/skills/*/SKILL.md`（项目级；`.github/skills/` 与 `.claude/skills/` 也会被读取）、`~/.agents/skills/bmad-*`（用户级） | 按相关性自动加载，或被 agent 点名调用 | Agent 自动用，或在请求里写 `bmad-xxx` | 可移植能力（复用 BMAD + 新建补强） |
 | **Hooks（护栏）** | `.github/hooks/*.json` + 脚本 | 生命周期事件触发（PreToolUse 等） | 自动；无需手动 | 确定性护栏（拦危险操作、跑质量门） |
-| **MCP servers（工具扩展）** | `.vscode/mcp.json.example`（顶层 `"servers"`；opt-in 复制成 `.vscode/mcp.json`） | 客户端**会话启动即 eager 连接**、workspace 全局、**不可按阶段门控** | **默认 inert**（`.example`）；阶段 7 手动启用，活动文件留本地不提交 | 本地工具扩展（如 Playwright MCP 驱动浏览器自测，见 7.7） |
+| **MCP servers（工具扩展）** | `.mcp.json`（EOS 自带的只读与验证服务 `eos mcp`，自 eos-2.3.0 起；各客户端会请你确认信任一次）· `.vscode/mcp.json.example`（顶层 `"servers"`；opt-in 复制成 `.vscode/mcp.json`） | 客户端**会话启动即 eager 连接**、workspace 全局、**不可按阶段门控** | `eos` 很轻量，从阶段 1 起就有用，因此默认声明；Playwright **默认 inert**（`.example`）——阶段 7 手动启用，活动文件留本地不提交 | 为 agent 提供结构化的 `eos next` / `check` / `verify`（[ADR-018](../adr/018-mcp-server.md)）；本地工具扩展（如 Playwright MCP 驱动浏览器自测，见 7.7） |
 
 ## 4.1 关键认知：没有"原生优先级"
 
@@ -339,7 +373,7 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 | 项 | 内容 |
 |---|---|
 | **目标** | 从模板得到一个配置健康的空项目 |
-| **怎么启动** | `npx degit niaodian/eos#eos-2.2.0 my-app && cd my-app`，然后声明项目：`node .github/eos/eos.mjs init config-only --write`（未定栈）或 `init <pack> --write` |
+| **怎么启动** | `npx degit niaodian/eos#eos-2.3.0 my-app && cd my-app`，然后声明项目：`node .github/eos/eos.mjs init config-only --write`（未定栈）或 `init <pack> --write` |
 | **产出** | 完整 `.github/` + `docs/` 骨架 |
 | **门** | `node .github/hooks/validate-config.mjs` → **PASS** |
 | **必查** | PASS 0 errors。**栈未定则先别改** `00-workspace`——保留 Node 占位即可；栈是不可逆决策，权威锁定在**阶段 4（ADR）**。已知栈可即抄 `docs/eos/stack-presets.md`（快路径）。 |
@@ -610,7 +644,7 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 
 ### 第 0 步：建项目 + 选栈（5 分钟）
 ```sh
-npx degit niaodian/eos#eos-2.2.0 todo-api && cd todo-api
+npx degit niaodian/eos#eos-2.3.0 todo-api && cd todo-api
 node .github/hooks/validate-config.mjs          # 期望 PASS
 node .github/eos/eos.mjs init node-service --write   # 声明技术栈（或 python-service、go-service…——`eos init` 会列出全部）
 ```
@@ -675,7 +709,7 @@ SaaS 的 **G7** 要求：每条 AC ≥1 测试、**API 契约测试**（对 open
 
 ### 第 0 步：建项目 + 建 AI 目录
 ```sh
-npx degit niaodian/eos#eos-2.2.0 cs-agent && cd cs-agent
+npx degit niaodian/eos#eos-2.3.0 cs-agent && cd cs-agent
 mkdir -p ai/prompts evals                       # AI 代码放这里，自动叠加 Agentic 规则
 node .github/hooks/validate-config.mjs          # 期望 PASS
 node .github/eos/eos.mjs init rag-app --write    # Python 的 LLM 包：agentic 范式 + eval 命令
@@ -754,6 +788,188 @@ LLM tracing（token/成本/context/tool-span）。
 
 ---
 
+# 第 6.6 章 在 Claude Code、Codex 和 Antigravity 中使用 EOS
+
+EOS 并不绑定 VS Code。引擎、门禁、证据和工作流在每个 agent 里都完全相同；不同的只是各 agent
+从哪里读取配置、怎样调用工作流，以及需要你一次性确认哪些信任提示。自 eos-2.3.0 起，
+`eos agents sync` 从同一个源头为每个平台写出各自的配置（[ADR-019](../adr/019-agent-platforms.md)）：
+从模板新建的项目在 **Claude Code** 和 **Google Antigravity** 中开箱即用，**OpenAI Codex** 只需一条命令。
+本章介绍这三个平台的配置与日常开发流程；所有平台及其文件的完整列表见 §7.9。
+
+> 无论使用哪个 agent，有三件事永远不变：下一步由 `node .github/eos/eos.mjs next` 决定；门禁只凭已记录的
+> 证据通过；批准、豁免和状态迁移始终是由人运行的命令。任何 agent、任何 MCP 工具都无法替你完成。
+
+## 6.6.0 相同之处与不同之处
+
+| | VS Code + Copilot | Claude Code | OpenAI Codex | Google Antigravity |
+|---|---|---|---|---|
+| 默认生成 | 是 | 是 | 否——`eos agents sync --platform codex --write` | 是 |
+| 项目指令 | `AGENTS.md`、`.github/copilot-instructions.md`、`.github/instructions/` | `AGENTS.md`（仓库中没有 `CLAUDE.md` 时） | `AGENTS.md` | `AGENTS.md` |
+| EOS 工作流（技能） | `.agents/skills/` · `/eos-next` | `.claude/skills/`（生成的副本）· `/eos-next` | `.agents/skills/` · `$eos-next` | `.agents/skills/` · `/eos-next` |
+| BMAD 技能（用户级） | `~/.agents/skills/`（§2.2） | `~/.claude/skills/` | `~/.agents/skills/` | `~/.gemini/config/skills/`（IDE）· `~/.gemini/antigravity-cli/skills/`（CLI）——见 6.6.3 |
+| 阶段编排 agent | `.github/agents/`——agent 选择器与 handoff 按钮 | 无：运行该步骤的技能，或交给它 handoff 包（6.6.4） | `.codex/agents/`——让 Codex 派生（spawn）对应 agent | `.agents/agents/`——选为当前 agent，或作为子 agent 运行 |
+| 护栏钩子 | `.github/hooks/guardrails.json` | `.claude/settings.json` | `.codex/hooks.json` | `.agents/hooks.json` |
+| EOS MCP 服务 | `.mcp.json` | `.mcp.json` | `.codex/config.toml` | `.agents/mcp_config.json` |
+| 需要你一次性授予的信任 | 工作区与 MCP 服务 | 工作区与 MCP 服务 | 项目，以及每个钩子（`/hooks`） | MCP 工具每次调用都会询问，除非你放行 |
+
+## 6.6.1 Claude Code
+
+**配置**
+
+1. 让 BMAD 可见：Claude Code 从 `~/.claude/skills/` 读取个人技能，即 §2.2 中的镜像目录。
+   EOS 自己的工作流随仓库提供，位于 `.claude/skills/`。
+2. 在项目根目录（包含 `.eos/` 和 `AGENTS.md` 的那一层）启动 Claude Code，并接受工作区信任对话框：
+   ```sh
+   cd my-app && claude
+   ```
+3. Claude Code 询问时，批准 `.mcp.json` 中的 `eos` MCP 服务。`/mcp` 显示其状态；
+   `claude mcp reset-project-choices` 可以让它重新询问。
+4. 输入 `/eos-next`。它会运行 `node .github/eos/eos.mjs next`，并给出唯一的下一步。
+
+**接线情况与位置**
+
+- `.claude/skills/eos-*`——EOS 工作流，是 `.agents/skills/` 的逐字节副本。请修改源头，再运行
+  `eos agents sync --write`；手工改动副本会导致 CI 失败。
+- `.claude/settings.json`——护栏 `node .github/hooks/deny-dangerous.js --format claude`，在每次
+  `Bash`、`PowerShell`、`Write` 和 `Edit` 调用之前运行。该文件中你自己的权限和钩子都会保留；EOS 只拥有自己的条目。
+- `.mcp.json`——`eos` 服务。问一句"下一步做什么？"，Claude 就可以调用 `eos_next`，而不必走终端。
+- `AGENTS.md`——仓库中没有 `CLAUDE.md` 时会被读取。如果你新增了 `CLAUDE.md`，请在第一行写上
+  `@AGENTS.md`。
+
+**推进一个阶段。** Claude Code 不生成 EOS 子 agent：VS Code 也会读取 `.claude/agents/`，每个编排
+agent 都会出现两次。当 `eos next` 点名某个 agent（例如 `eos-architecture`）时，运行它点名的
+BMAD 技能（`/bmad-architecture`），或者把 handoff 包（6.6.4）交给 Claude，让它按照
+`.github/agents/eos-architecture.agent.md` 执行。
+
+## 6.6.2 OpenAI Codex
+
+**配置**
+
+1. 在项目根目录一次性生成 Codex 所需文件，并提交：
+   ```sh
+   node .github/eos/eos.mjs agents sync --platform codex --write
+   node .github/eos/eos.mjs verify
+   ```
+   这会把 `codex` 加入 `.eos/project.json` 的 `agentPlatforms`——该文件是每个门禁的输入，所以随后要运行
+   `verify`——并写出 `.codex/config.toml`（带标记的 `[mcp_servers.eos]` 块）、`.codex/hooks.json`
+   和 `.codex/agents/eos-*.toml`。你原有的 `.codex/config.toml` 内容会保留。
+2. 在项目根目录启动 Codex（`codex`、IDE 扩展或 ChatGPT 桌面应用），并**信任该项目**：Codex 只在
+   受信任的项目中读取 `.codex/`。
+3. 运行 `/hooks`，批准 EOS 护栏。钩子每次变化后，Codex 都会再次询问。
+4. `/mcp` 会列出 `eos` 服务。`~/.agents/skills/` 中的 BMAD 技能可以直接被找到。
+5. 输入 `$eos-next`。Codex 用 `$` 调用技能；`/skills` 可以列出全部技能。
+
+**接线情况与位置**
+
+- `.agents/skills/`——EOS 工作流，Codex 会在从当前目录到仓库根的每一层原生读取。
+- `.codex/hooks.json`——在 `Bash` 和 `apply_patch` 之前运行的护栏。
+- `.codex/config.toml`——`eos` MCP 服务，位于 EOS 标记并拥有的块中。
+- `.codex/agents/eos-*.toml`——六个编排 agent，由 `.github/agents/` 渲染生成。
+
+**推进一个阶段。** 当 `eos next` 点名某个 agent 时，让 Codex 派生它："Spawn the eos-architecture
+agent to design the architecture." Codex 按名称查找自定义 agent，`/agent` 可以在运行中的 agent 线程之间切换。
+技能写作 `$eos-requirements`、`$bmad-architecture` 等。
+
+## 6.6.3 Google Antigravity
+
+**配置**
+
+1. 在 Antigravity IDE 中打开项目文件夹，或在其中启动 Antigravity CLI。它所需的文件已默认生成：
+   `.agents/hooks.json`、`.agents/mcp_config.json` 和 `.agents/agents/`。
+2. 让 BMAD 可见。Antigravity 从 `~/.gemini/config/skills/`（IDE 与 Antigravity 2.0）和
+   `~/.gemini/antigravity-cli/skills/`（CLI）读取全局技能，而不是 `~/.agents/skills/`。
+   在 macOS 和 Linux 上一次性建立链接（CLI 的目录同理）：
+   ```sh
+   mkdir -p ~/.gemini/config/skills
+   ln -s ~/.agents/skills/bmad-* ~/.gemini/config/skills/
+   ```
+   在 Windows 上，请改为把 `bmad-*` 文件夹复制到 `%USERPROFILE%\.gemini\config\skills\`。
+3. 输入 `/eos-next`。MCP 工具默认在每次调用前询问；`/mcp` 打开 MCP 管理器（在 IDE 中：
+   **…** › **MCP Servers**）。
+
+**接线情况与位置**
+
+- `.agents/skills/`——EOS 工作流，原生读取。
+- `.agents/hooks.json`——在每次 `run_command` 之前运行的护栏。
+- `.agents/mcp_config.json`——`eos` 服务。
+- `.agents/agents/eos-*.md`——六个编排 agent，由 `.github/agents/` 渲染生成。
+
+**推进一个阶段。** 在对话中把 `eos next` 点名的 agent（例如 `eos-architecture`）选为当前 agent，
+或者让主 agent 把它作为子 agent 运行。它遵循的指令与 Copilot 中的 `eos-architecture` 相同；
+由于没有 handoff 按钮，它会直接说出下一个 agent。
+
+## 6.6.4 各平台上的完整生命周期
+
+`eos next` 在所有平台上用同一种方式描述每一步：一个斜杠命令、一个 agent、若干 BMAD 技能或一条命令。
+阅读它的 **Start** 块，然后按下表换算：
+
+| `eos next` 点名的是…… | VS Code + Copilot | Claude Code | OpenAI Codex | Google Antigravity |
+|---|---|---|---|---|
+| 斜杠命令 `eos-requirements` | `/eos-requirements` | `/eos-requirements` | `$eos-requirements` | `/eos-requirements` |
+| agent `eos-architecture` | 切换到它，或点击它的 handoff 按钮 | 带上 handoff 包，按 `.github/agents/eos-architecture.agent.md` 执行 | "spawn the eos-architecture agent" | 选择 `eos-architecture`，或作为子 agent 运行 |
+| 技能 `bmad-architecture` | agent 会自动使用 | `/bmad-architecture` | `$bmad-architecture` | `/bmad-architecture` |
+| 一条命令 | 运行它 | 运行它，或让 Claude 运行 | 运行它，或让 Codex 运行 | 运行它，或让 agent 运行 |
+
+**handoff 包在任何 agent 中都适用。** 它写明目标、要使用的 agent 和技能、相关文件（按哈希绑定），
+以及完成后返回用的命令：
+
+```sh
+node .github/eos/eos.mjs handoff --scope story --id STORY-012   # 写出 .eos/handoffs/STORY-012.json
+```
+
+然后对 agent 说："执行 `.eos/handoffs/STORY-012.json`，不要扩大范围。"完成后，由 `eos next`
+接手：门禁说了算，而不是 agent。
+
+在 Claude Code 中输入 §1.3 的 Happy Path：
+
+```
+/eos-next                      → 第一步：/bmad-brainstorming → docs/discovery.md               (G1)
+/eos-requirements "<feature>"  → docs/requirements.md                                         (G2)
+/eos-spec                      → docs/prd.md                                                  (G3)
+/eos-ux-spec                   → docs/DESIGN.md + docs/EXPERIENCE.md（纯后端可跳过）
+/bmad-architecture             → docs/architecture.md + ADR                                   (G4)
+/bmad-create-story             → docs/stories/*.md                                            (G5)
+/bmad-dev-story                → src/ 代码，然后 /bmad-code-review                             (G6)
+```
+
+在 Codex 中把 `/` 换成 `$`。在 Antigravity 中，可以用阶段 agent 代替直接点名技能。
+
+## 6.6.5 检查各项是否接好
+
+| 检查项 | 做法 | 预期结果 |
+|---|---|---|
+| 护栏在运行 | 让 agent 运行 §2.4 中的探测命令 | 被密钥规则拒绝 |
+| 工作流已加载 | `/eos-next`（Codex：`$eos-next`） | 六个块：Current、Blockers、Recommended next、Why、Start、Done when |
+| MCP 服务有响应 | 问"下一步做什么？" | 在你一次性批准后，agent 会调用 `eos_next` |
+| 生成的文件是最新的 | `node .github/eos/eos.mjs agents sync --check` | `PASS`；CI 运行同一项检查 |
+
+## 6.6.6 Cursor、Gemini CLI 与第二梯队 agent
+
+用同一条命令加入：`node .github/eos/eos.mjs agents sync --platform cursor --write`，或换成
+`gemini`、`kiro`、`qwen`、`devin`、`opencode`、`cline`。Gemini CLI 默认不读取 `AGENTS.md`，EOS 会把它
+加入 Gemini 的上下文文件列表。第二梯队的文件依据各厂商文档生成，**尚未在真实安装上验证**；
+在依赖它们之前请先检查（§7.9）。
+
+## 6.6.7 已知差异
+
+- **handoff 按钮是 Copilot 独有的。** 在其他 agent 中，编排 agent 会直接说出下一个 agent 或斜杠命令，
+  `eos next` 也会。
+- **按范围生效的编码规则只在 Copilot 中自动加载。** VS Code 按文件 glob 应用
+  `.github/instructions/**`。其他 agent 通过 `AGENTS.md` 找到这些规则（它指向规则所在位置）：请让 agent
+  先阅读与它即将修改的文件对应的规则。
+- **Claude Code 以技能而非 EOS 子 agent 的方式运行工作流**（6.6.1）。
+- **BMAD 在每个 agent 中的位置不同**（6.6.0）。`eos-doctor --deep` 和 `eos next` 检查的是
+  `~/.agents/skills/`、`~/.claude/skills/` 和 `~/.copilot/skills/`，因此看不到只装在 Antigravity
+  目录中的 BMAD。
+- **钩子是本地减速带。** 每个 agent 都会请你确认一次信任。如果钩子本身运行失败，有的 agent 会放行
+  （Claude Code），有的会拒绝（VS Code）；CI 始终是最终权威（附录 D）。
+- **VS Code 的 agent 会话也会运行 Claude Code 的钩子。** 如果 VS Code agent 会话中的每次工具调用都以
+  "hook errored" 被拒绝，请检查 `.claude/settings.json` 运行的是普通命令行
+  `node .github/hooks/deny-dangerous.js --format claude`（`eos agents sync --write` 可以恢复它），
+  然后完全退出并重新打开 VS Code：重新加载窗口不会重启 agent host。
+
+---
+
 # 第 7 章 完整参考（速查）
 
 ## 7.1 斜杠命令（EOS 技能，`.agents/skills/`）
@@ -799,7 +1015,10 @@ LLM tracing（token/成本/context/tool-span）。
 | `ledger [--verify] [--against <ref>]` | 校验只追加的哈希链 |
 | `focus --scope <type> --id <id>` | 设置本机的本地关注点（不携带任何权威） |
 | `init [--write]` | 报告或创建本地的、非破坏性的集成文件 |
+| `stage init <stage> [--write] [--interactive]` | 根据 schema 生成某阶段机器记录（`docs/<stage>.json`）及其文档的骨架：每个必填字段都放一个 `TODO(eos)` 占位符——在逐一回答之前，所有门禁都会拒绝这份记录，因此骨架永远不会推进阶段。样例见 [examples/stage-records](../eos/examples/stage-records/README.md)（自 eos-2.3.0 起） |
 | `stack sync [--write]` | 依据 `.eos/project.json` 渲染常驻工作区规则的 `Local commands`，使散文不可能与 CI 实际执行的命令不一致。未声明技术栈时阻断而非猜测 |
+| `agents sync [--platform <x>] [--write] [--check]` | 从同一个源头生成各 agent 平台读取的内容：技能副本、EOS 的 MCP 条目、以平台自身格式运行的护栏钩子，以及不会冲突的 agent。共享配置文件中不属于 EOS 的内容一律保留；`--platform` 把平台加入 `agentPlatforms`；CI 运行 `--check`（自 eos-2.2.0 起；多平台自 eos-2.3.0 起，见 7.9） |
+| `mcp` | 通过 Model Context Protocol（stdio）把读取与验证类命令提供给 agent：`next`、`status`、`resume`、`health`、`explain`、`check`、`verify`、`release-status`、阶段骨架、`product-tree`、`doctor`、`policy check`。批准、豁免、状态迁移、发布签名以及一切改写治理文件的命令都刻意不作为工具提供（[ADR-018](../adr/018-mcp-server.md)）。各平台的客户端配置由 `eos agents sync` 生成（自 eos-2.3.0 起） |
 | `doctor` | EOS 自身接线是否正确 |
 
 **门禁 id**（`check --gate <id>`）：`activation` · `discovery-ready` · `requirements-ready` ·
@@ -847,6 +1066,9 @@ LLM tracing（token/成本/context/tool-span）。
 > `/eos-release-gate` 等 EOS 技能不依赖 agent 选择器，输入 `/` 即可看到。agent 只是"编排 persona"，
 > 其能力都能用对应的斜杠命令/skill 手动触发（见 7.1 与 `docs/eos/agent-map.md`）。
 
+Codex 和 Antigravity 会得到同样的六个编排 agent，由这些文件生成（`.codex/agents/`、`.agents/agents/`）；
+Claude Code 以技能方式运行它们的步骤。见 [第 6.6 章](#第-66-章-在-claude-code、codex-和-antigravity-中使用-eos)。
+
 ## 7.4 规则文件（`.github/instructions/`）
 
 | 文件 | `applyTo` | 管什么 |
@@ -880,7 +1102,7 @@ LLM tracing（token/成本/context/tool-span）。
 
 | 文件 | 事件 | 作用 |
 |---|---|---|
-| `guardrails.json` + `deny-dangerous.js` | PreToolUse | 拦截危险操作 + **供应链投毒（`curl\|bash`/`--unsafe-perm`）+ 硬编码密钥字面量**（输出 `permissionDecision:"deny"`） |
+| `guardrails.json` + `deny-dangerous.js` | PreToolUse | 拦截危险操作 + **供应链投毒（`curl\|bash`/`--unsafe-perm`）+ 硬编码密钥字面量**（输出 `permissionDecision:"deny"`）。其他 agent 平台用 `--format <平台>` 运行同一个脚本，钩子由 `eos agents sync` 为它们生成（见 7.9） |
 | `quality.json` | PostToolUse | 写文件后跑 lint+typecheck+test 质量门（**提示性**，非权威门禁：固定 exit 0；权威门禁是 CI 里的 `project-gate.mjs`） |
 | `config-check.json` | PostToolUse | 每次编辑后自动跑 `validate-config.mjs`（配置 S1–S14）**＋ `eos-doctor.mjs`（SDLC 门诊 / G-EVAL 连线 / 密钥扫描）**（同样是提示性的） |
 | `validate-config.mjs` | 手动/被 hook 调用 | 零依赖静态验证器（S1–S14：规则/agent/prompt frontmatter、glob、必需路径、hook 事件、**S12 `.eos/project.json` 项目声明有效性**、**S13 `.eos/` 工作流主干及其交叉引用**、**S14 常驻工作区规则不得描述本项目从未声明过的技术栈**） |
@@ -952,6 +1174,25 @@ Playwright MCP：
 - agent 模式 + MCP 的具体 UI 随版本演进，`【需在你的版本中核实】`。
 
 ---
+
+## 7.9 Agent 平台（`eos agents sync`）
+
+EOS 只写一次，再为团队使用的每个 agent 平台生成各自的文件（[ADR-019](../adr/019-agent-platforms.md)）。大部分工作由三个开放标准承担——`AGENTS.md`、`.agents/skills/` 中的 Agent Skills，以及 `eos mcp` 服务（[ADR-018](../adr/018-mcp-server.md)）。其余部分由 `eos agents sync` 按各平台自己的格式写出：MCP 条目、工具调用前的钩子（同一个 `deny-dangerous.js`，以 `--format <平台>` 运行），以及在平台只读自家目录时生成的 agent 或技能副本。
+
+| 平台 | 为它生成的内容 | 一次性信任步骤 |
+|---|---|---|
+| GitHub Copilot *（默认）* | `.mcp.json`——它的 agent、技能和 `.github/hooks/guardrails.json` 是模板自带的 | VS Code 在首次启动 MCP 服务前请你确认信任 |
+| Claude Code *（默认）* | `.claude/skills/` 副本、`.claude/settings.json` 中的钩子、`.mcp.json` | Claude Code 会请你批准一次项目的 MCP 服务 |
+| Google Antigravity *（默认）* | `.agents/hooks.json`、`.agents/mcp_config.json`、`.agents/agents/` | MCP 工具每次调用都会询问 |
+| OpenAI Codex | `.codex/config.toml`（带标记的 `[mcp_servers.eos]` 块）、`.codex/hooks.json`、`.codex/agents/*.toml` | 信任该项目，并逐个批准钩子一次（`/hooks`） |
+| Cursor | `.cursor/hooks.json`（shell 命令）、`.cursor/mcp.json` | MCP 每次调用询问（Run Modes） |
+| Gemini CLI | `.gemini/settings.json`：把 `AGENTS.md` 加入 `context.fileName`、钩子（`BeforeTool`）、MCP | 信任该文件夹 |
+| Kiro · Qwen Code · Windsurf / Devin Desktop · OpenCode · Cline *（第二梯队）* | `.kiro/…` · `.qwen/…` · `.devin/…` · `opencode.json` 与插件 · `.clinerules/hooks/PreToolUse` | 依据各厂商文档生成——**尚未在真实安装上验证** |
+
+- **选择平台**：在 `.eos/project.json` 中设置 `"agentPlatforms"`。未声明时生成默认集合（Copilot、Claude Code、Antigravity）：即 `.agents/`、`.github/`、`.claude/` 和 `.mcp.json` 中的文件；它们同时让 Codex、Cursor 和 Gemini CLI 读到技能与 `AGENTS.md`，并让 Cursor 用上 Claude 的钩子。一条命令即可加入一个平台：`node .github/eos/eos.mjs agents sync --platform codex --write`。它会修改 `agentPlatforms`，而该文件是每个门禁的输入，所以之后请重新运行 `eos verify`。
+- **共享文件仍归你所有。** EOS 只拥有自己的条目——`eos` 服务、运行 `deny-dangerous.js` 的钩子处理器、带标记的 TOML 块——从不拥有 `.claude/settings.json` 或 `.mcp.json` 的其余内容，也从不拥有你的钩子：你的钩子在 EOS 的钩子前后保持原有顺序；你自己的、在自有处理器旁运行护栏的 matcher 组，保持你写的样子。移除一个平台只删除 EOS 的条目和处理器；只有文件里不再剩任何其他内容时才删除该文件。EOS 无法安全合并的文件（带注释的 JSON、已经定义了 `eos` 或把 `mcp_servers` 写成内联表的 TOML）会被拒绝，而不是写到一半；也绝不会透过符号链接写入。EOS 写出的整个文件（Cline 钩子脚本、`eos-*` agent ……）只有在仍带有 EOS 标记时才会被替换或删除；该路径上你自己的文件绝不会被改动。
+- **CI 运行 `agents sync --check`。** 请修改源头（`.agents/skills/`、`.github/agents/`、`.github/hooks/`），不要修改生成的文件。`eos upgrade` 会为你的平台重新生成这些文件，而不是拿它们与模板的副本比较。
+- **不生成的内容：** Claude Code 子代理（VS Code 也读取 `.claude/agents/`，每个编排 agent 会出现两次；Claude Code 用技能运行同样的工作流）；Cline 的 MCP 条目（Cline 只读取全局的 `~/.cline/mcp.json`）；Trae、CodeBuddy 和 Comate——它们的文档无法抓取，在实机验证之前由 `AGENTS.md` 和 CLI 提供支持。
 
 # 第 8 章 配置质检与验收
 
@@ -1042,6 +1283,10 @@ Agent 输出不符预期
 - PreToolUse 用错 schema（`decision:"block"` 是 PostToolUse 的）→ 拦不住。正确是 `hookSpecificOutput.permissionDecision:"deny"`。
 - 多个 `applyTo:"**"` 文件**不是**冲突（薄、互补、单一职责），验证器 S3 已豁免。
 - 改 `docs/prd.md` **不会**让所有 story 失效。story 证据只绑定它**自己引用**的那些验收标准，因此新增或改写无关的 `AC` 不会影响 backlog 其余部分；而改写或删除某个 story 引用的标准，才会正确地让该 story 变 `STALE`。验证（G7）同时绑定产品树，所以改 PRD 仍会重新打开它。
+- **Claude Code 中看不到 `/eos-next`** → `.claude/skills/` 缺失或已过期：运行 `node .github/eos/eos.mjs agents sync --write`，并确认 `agentPlatforms` 包含 `claude`。
+- **Codex 忽略了 `.codex/`** → 项目尚未被信任，或钩子尚未批准：先信任该项目，再运行 `/hooks`（§6.6.2）。
+- **Antigravity 找不到某个 BMAD 技能** → 它从 `~/.gemini/config/skills/` 读取全局技能，而不是 `~/.agents/skills/`（§6.6.3）。
+- **VS Code agent 会话中的每次工具调用都以 "hook errored" 被拒绝** → `.claude/settings.json` 中的 Claude Code 钩子无法运行；见 §6.6.7。
 
 ---
 
@@ -1062,12 +1307,12 @@ Agent 输出不符预期
 ```sh
 # 方式 A：degit（public 仓库，无需鉴权）
 # 固定到 release tag：默认分支会移动，tag 不会。
-npx degit niaodian/eos#eos-2.2.0 my-app
+npx degit niaodian/eos#eos-2.3.0 my-app
 cd my-app && git init
 
 # 方式 B：在 tag 上 clone，并开一段全新历史
-git clone --depth 1 --branch eos-2.2.0 https://github.com/niaodian/eos.git my-app
-cd my-app && git checkout --orphan main && git commit -m "chore: start from eos-2.2.0"
+git clone --depth 1 --branch eos-2.3.0 https://github.com/niaodian/eos.git my-app
+cd my-app && git checkout --orphan main && git commit -m "chore: start from eos-2.3.0"
 
 # 两种方式之后都要声明项目：模板自带的声明描述的是 EOS，而不是你的项目
 node .github/eos/eos.mjs init                       # 两条轨道、所有起步包，以及当前的声明
@@ -1076,7 +1321,7 @@ node .github/eos/eos.mjs init config-only --write   # 还没有代码——或 <
 
 ## 10.3 分发给团队（纯本地、无企业依赖）
 
-1. 所有人从**同一个 release tag**（`eos-2.2.0`）开始。默认分支会持续变动，
+1. 所有人从**同一个 release tag**（`eos-2.3.0`）开始。默认分支会持续变动，
    不固定版本就意味着每个人拿到的都是略有差异的 EOS。
 2. `【需组织/GitHub 设置】` GitHub **template repository** 属于所有者级设置：EOS 既无法替你设置，
    也无法在本地验证，所以别信本页面的说法——
@@ -1095,6 +1340,7 @@ node .github/eos/eos.mjs init config-only --write   # 还没有代码——或 <
 
 - 每次改 EOS 配置：改 `docs/eos/VERSION`（如 `eos-1.4.1`→`eos-1.6.0`），跑 `validate-config.mjs`，Conventional Commits 提交。
 - 升级既有项目（2.1.0 起）：`eos upgrade --from <新版模板> --base <你当初起步的模板>`——默认只预览，加 `--write` 才执行。它逐个文件比较两份模板与你的副本：只有 EOS 改过的会更新，只有你改过的会保留，双方都改过的绝不覆盖——新版本放进 `.eos/local/upgrade/` 供手工合并。你的声明、证据、账本、豁免、story 与 README 永远不会被触碰。两份模板由你自己获取（degit 或带证明的发布 tarball），并用**新版本**的 CLI 运行；你自己的 ADR 从 100 起编号（[ADR-015](../adr/015-three-way-upgrades.md)）。用户级 `bmad-*` 独立升级。
+- 变了什么：`eos upgrade` 会打印 [CHANGELOG.md](CHANGELOG.md) 中你的版本与新版本之间的条目（自 eos-2.3.0 起）。EOS 按发布火车发版——每周至多一个次版本，补丁版只包含安全修复与回归修复，破坏性变更只出现在次版本中——稳定之选是已发布满一周且没有补丁的最新次版本（[CONTRIBUTING.md](../../CONTRIBUTING.md#release-cadence)）。
 
 ### 10.4.1 从 `eos-1.12.0` 升级到 `eos-1.13.0`
 
@@ -1537,6 +1783,29 @@ node /tmp/eos-next/.github/eos/eos.mjs upgrade --from /tmp/eos-next --base /tmp/
 node .github/eos/eos.mjs agents sync --write && node .github/eos/eos.mjs policy lock && node .github/eos/eos.mjs verify --full
 ```
 
+## 10.10 从 `eos-2.2.x` 升级到 `eos-2.3.0`
+
+对于什么都不改的项目，没有任何东西变得更严。新的是每个 agent 平台能从 EOS 得到多少，以及两条以前没有的接入路径：MCP 服务与存量项目接入。
+
+| 变化 | 你会看到 | 你要做什么 |
+|---|---|---|
+| **Agent 平台的文件改为生成**（[ADR-019](../adr/019-agent-platforms.md)） | 出现 `.mcp.json`、`.claude/settings.json`、`.agents/hooks.json`、`.agents/mcp_config.json` 和 `.agents/agents/`——默认平台是 Copilot、Claude Code 和 Antigravity。升级会为你的平台重新生成它们，而不是拿它们与模板的副本比较 | 如果你原本就有 `.claude/settings.json` 或 `.mcp.json`，你的内容会保留，EOS 只加入自己的条目。使用 Codex、Cursor 或 Gemini CLI：`eos agents sync --platform <名称> --write`。声明 `"agentPlatforms"` 可以少生成一些（§7.9） |
+| **`eos mcp`**（[ADR-018](../adr/018-mcp-server.md)） | 你的 agent 可能会请你确认一次是否信任 `eos` MCP 服务 | 确认，或者拒绝：CLI 照常可用 |
+| **新的工作流 profile：`delivery-only`**（[ADR-020](../adr/020-brownfield-delivery-gates.md)） | `eos policy check` 报告策略已变化，所有已记录的门禁结果都变为 STALE（`.eos/workflow.json` 变了） | `eos policy lock` 会显示新增了一个 profile、没有任何削弱；用 `--write` 重新锁定，然后运行 `eos verify --full`。尚未接入 EOS 的已有系统，见 §3.5 |
+| **`eos stage init`** | 阶段记录可以从 schema 生成的骨架起步 | 可选；带 `TODO(eos)` 占位符的骨架永远不会通过门禁 |
+| **CI 要求 gitleaks** | `eos-ci.yml` 会安装版本固定、校验过 checksum 的 gitleaks，并设置 `EOS_REQUIRE_GITLEAKS=1` | 无需操作，除非你的 CI 无法下载它——那就去掉这个变量，保留内置扫描 |
+| **护栏能说各平台的"方言"** | `deny-dangerous.js --format <平台>` | 无需操作：生成的钩子会传入它 |
+
+**升级步骤**
+
+```sh
+npx degit niaodian/eos#eos-2.2.0 /tmp/eos-base    # 你当前的版本——见 docs/eos/VERSION
+npx degit niaodian/eos#eos-2.3.0 /tmp/eos-next
+node /tmp/eos-next/.github/eos/eos.mjs upgrade --from /tmp/eos-next --base /tmp/eos-base          # 先审阅计划
+node /tmp/eos-next/.github/eos/eos.mjs upgrade --from /tmp/eos-next --base /tmp/eos-base --write  # 再执行，并重新生成各 agent 平台的文件
+node .github/eos/eos.mjs policy lock --write && node .github/eos/eos.mjs verify --full
+```
+
 ---
 
 # 第 11 章 新增技术栈
@@ -1611,7 +1880,7 @@ EOS 的栈规则是**可插拔**的。新增一个栈 = 加一个 `*.instruction
 
 ```
 # ── 终端 —— 唯一循环（日常只需要这些）──
-npx degit niaodian/eos#eos-2.2.0 my-app   # 新建项目
+npx degit niaodian/eos#eos-2.3.0 my-app   # 新建项目
 node .github/eos/eos.mjs init                       # 当前声明、两条轨道、所有起步包
 node .github/eos/eos.mjs init <pack> --write        # 声明项目（未定栈时用 config-only；--track regulated）
 node .github/eos/eos.mjs init --write               # 本地 VS Code 任务（绝不覆盖已有文件）
@@ -1628,6 +1897,12 @@ npx --offline eos <command>                         # 同一个 CLI，更短的�
 node .github/hooks/validate-config.mjs              # 配置自检（期望 PASS）
 npm test                                            # 跑测试（质量门同款）
 npm audit                                           # 发布前依赖审计
+
+# ── Claude Code · Codex · Antigravity（第 6.6 章）──
+/eos-next  /eos-resume  /eos-status     # Claude Code 与 Antigravity：同样的技能
+$eos-next  $eos-resume  $eos-status     # Codex 用 $ 调用技能
+node .github/eos/eos.mjs agents sync --platform codex --write   # 加入一个平台（一次即可，然后提交）
+node .github/eos/eos.mjs handoff --scope story --id <id>        # 某一步的上下文，供任何 agent 使用
 
 # ── Copilot Chat（Agent 模式）──
 （agent）eos-guide            # 统一入口：读状态、给一个动作、负责交接
@@ -1674,7 +1949,7 @@ bmad-tea / bmad-testarch-*   # 阶段7：测试+追溯        → G7
 
 **复现**（终端）：
 ```sh
-npx degit niaodian/eos#eos-2.2.0 my-app && cd my-app
+npx degit niaodian/eos#eos-2.3.0 my-app && cd my-app
 node .github/hooks/validate-config.mjs        # PASS
 npm test                                       # 10/10 green
 echo '{"tool_input":{"command":"rm -rf /tmp/x"}}' | node .github/hooks/deny-dangerous.js  # deny
@@ -1743,7 +2018,7 @@ cp .vscode/settings.json.example .vscode/settings.json    # 活跃文件保持�
 | `bmad-*` 技能装在**用户级**、未 pin 版本（审计 H4/T6） | 不同机器技能版本/存否不一 → agentic 行为不完全可复现 | 在 `docs/` 记录团队统一的 bmad 版本；关键技能可 vendor/子模块化 |
 | Hooks 是 Preview、逐机器、解析失败放行、CI 不调用（审计 G2） | 破坏性操作实时拦截非权威，可绕过 | 权威在 D.1 的 CI 硬门 + 人工评审；hooks 仅作减速带 |
 | agent 具 `editFiles`（审计 H5） | 原则上可改自身治理文件 | D.2 CODEOWNERS + D.1 必审（开启后即阻断） |
-| `gitleaks` 深扫是**可选增强**（opt-in、never required），未装即静默降级 | 只跑零依赖内置正则时，覆盖弱于 gitleaks 全量规则 | 内置 `secret-scan.mjs` 始终作为 CI 硬门运行（保底）；CI/本机装 `gitleaks` 即自动叠加深扫 |
+| `gitleaks` 深扫在**本地是可选增强**，未装即回退到内置规则 | 只跑零依赖内置正则时，覆盖弱于 gitleaks 全量规则 | 内置 `secret-scan.mjs` 始终作为 CI 硬门运行（保底）。自 eos-2.3.0 起，EOS CI 会安装固定版本、校验过校验和的 `gitleaks` 并设置 `EOS_REQUIRE_GITLEAKS=1`，因此在 CI 中缺少 gitleaks 会失败而不是降级 |
 | **Windows**：核心 hook 为 Node（跨平台）；早期 `quality.json` 曾用 `sh -c`（round-2 N1 已改为 `node .github/hooks/quality.mjs`，原生 Windows 无需 WSL/Git-Bash） | 无 `git` 时的目录回退遍历在 Windows 上曾显示绝对路径（已用 `path.relative` 归一化）；`bmad-*` 与 `act`（需 Docker Desktop）等外部工具的可用性仍随平台 | 三个核心 hook + `quality.mjs` 已按跨平台实现；**权威质量门在 CI（`ubuntu-latest`）**，与本机 OS 无关 |
 
 **须组织决策（模板不代做，`【需组织标准】`）**：CI runner 标准（现 `ubuntu-latest`）、批准的密钥库、

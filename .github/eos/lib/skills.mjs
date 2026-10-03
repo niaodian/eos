@@ -17,11 +17,14 @@
 // is removed, never what it points at.
 import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, rmSync, rmdirSync, unlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { AGENT_PLATFORMS } from '../../hooks/lib/project-config.mjs';
+import { DEFAULT_AGENT_PLATFORMS } from '../../hooks/lib/project-config.mjs';
 
 export const SKILLS_DIR = '.agents/skills';
-/** Platform → where it needs its own copy of the skills (platforms not listed read SKILLS_DIR). */
-export const SKILL_MIRRORS = { claude: '.claude/skills' };
+/**
+ * Platform → where it needs its own copy of the skills. The others read SKILLS_DIR, except Cline,
+ * which reads .claude/skills — declare claude as well for it.
+ */
+export const SKILL_MIRRORS = { claude: '.claude/skills', qwen: '.qwen/skills' };
 /** Every project-level directory an agent may load skills from, the source first. */
 export const PROJECT_SKILL_DIRS = [SKILLS_DIR, '.github/skills', '.claude/skills'];
 
@@ -90,8 +93,8 @@ export function skillProblems(root, name, dir = SKILLS_DIR) {
   return problems;
 }
 
-/** The platforms a project generates files for: declared `agentPlatforms`, or every one EOS knows. */
-export const platformsOf = (project) => (Array.isArray(project?.agentPlatforms) ? project.agentPlatforms : AGENT_PLATFORMS);
+/** The platforms a project generates files for: declared `agentPlatforms`, or the default set. */
+export const platformsOf = (project) => (Array.isArray(project?.agentPlatforms) ? project.agentPlatforms : DEFAULT_AGENT_PLATFORMS);
 
 /** Files under a directory, links included as leaves (never followed). */
 function filesUnder(root, rel, out = []) {

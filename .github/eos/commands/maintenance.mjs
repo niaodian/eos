@@ -3,7 +3,8 @@
 // Registered in ./index.mjs. A handler receives (snapshot, flags) and returns an exit code (./shared.mjs).
 import { existsSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { join, dirname, resolve } from 'node:path';
-import { planUpgrade, applyUpgrade, templateVersion, isTemplate, PROJECT_OWNED } from '../lib/upgrade.mjs';
+import { planUpgrade, applyUpgrade, templateVersion, isTemplate, changelogBetween, generatedIn, PROJECT_OWNED } from '../lib/upgrade.mjs';
+import { planPlatformSync, declaredPlatforms } from '../lib/agent-platforms.mjs';
 import { gateInputs, gateCollections } from '../lib/state.mjs';
 import { evidenceIntegrity } from '../lib/gates.mjs';
 import { readIntent } from '../lib/record.mjs';
@@ -25,6 +26,7 @@ import { fetchBaseline } from '../adapters/policy-upstream.mjs';
 import { signDocument, verifyDocument, loadPublicKey, keyId } from '../lib/signing.mjs';
 import { loadSchema, validate } from '../lib/schema.mjs';
 import { buildReport, renderReportMarkdown, buildOrgReport, renderOrgMarkdown, readReports } from '../lib/report.mjs';
+import { spawnSync } from 'node:child_process';
 
 const CLI = 'node .github/eos/eos.mjs';
 
@@ -91,8 +93,12 @@ const describe = (d) => `${d.projectType} · ${(d.stacks || []).join(', ') || 'n
 
 /**
  *   eos init                                   what is declared, the tracks, the packs, the local files
- *   eos init <pack> [--track standard|regulated] [--write] [--force]
- *   eos new <pack> [--track …] [--write]       the same declaration, without the local files
+ *   eos init <pack> [--track standard|regulated] [--brownfield] [--write] [--force]
+ *   eos new <pack> [--track …] [--brownfield] [--write]   the same declaration, without the local files
+ *
+ * --brownfield adopts an existing system at the delivery gates (workflowProfile "delivery-only"):
+ * its baseline is the system that runs, documented as it is, and every change is a story held to
+ * G5, G7 and G8. Like the track, it carries over when a later init only adds a stack.
  */
 function declareProject(snapshot, flags, verb) {
   const packId = flags._[1];
@@ -119,11 +125,15 @@ function declareProject(snapshot, flags, verb) {
     if (detected.length) lines.push(`  product code detected — ${detected.join(', ')} manifest(s); packs that match: ${matching.join(', ') || 'none (see docs/eos/stack-presets.md)'}`);
     lines.push('', 'Governance tracks');
     for (const t of Object.values(TRACKS)) lines.push(`  ${t.name.padEnd(10)} ${t.title} — ${t.summary}`);
+    lines.push('', 'Adoption',
+      '  new product       the product baseline first (discovery → requirements → PRD → UX → architecture), then stories',
+      '  --brownfield      an existing system: document it as it is, then every change is a story held to the',
+      '                    delivery gates — ready (G5), verified (G7), released (G8). Standard track only.');
     lines.push('', 'Starter packs (each writes a correct .eos/project.json; none scaffolds application code)');
     for (const id of packIds()) lines.push(`  ${id.padEnd(16)} ${PACKS[id].title}`);
     if (files.length) { lines.push('', 'Local files'); for (const r of files) lines.push(`  ${r.action.padEnd(12)} ${r.path}${r.action === 'kept' ? ' (already exists — never overwritten)' : ''}`); }
     lines.push('');
-    if (state !== 'declared') lines.push(`  Declare it:  ${CLI} ${verb} <pack> --track standard|regulated --write`);
+    if (state !== 'declared') lines.push(`  Declare it:  ${CLI} ${verb} <pack> --track standard|regulated [--brownfield] --write`);
     else if (awaitingStack) lines.push(`  ${detected.length ? 'Declare the stack' : 'When code lands'}:  ${CLI} ${verb} <pack> --write   (no --force needed — the ${trackOf(existing).title} track carries over)`);
     if (verb === 'init' && !flags.write) lines.push('  Nothing was written. Re-run with --write to create the local files.');
     lines.push(`  Next:        ${CLI} next`, '');
@@ -144,6 +154,16 @@ function declareProject(snapshot, flags, verb) {
   const packTrack = trackOf(pack).name;
   const declaration = applyTrack(pack, track || (packTrack !== 'standard' ? packTrack : keptTrack));
   const chosen = trackOf(declaration);
+  // Brownfield adoption carries over like the track (--force starts over without it).
+  const keptBrownfield = state === 'declared' && existing?.workflowProfile === 'delivery-only' && !flags.force;
+  const brownfield = !!flags.brownfield || keptBrownfield;
+  if (brownfield && chosen.name === 'regulated') {
+    console.log(['EOS ' + verb + ' · refused  --brownfield adopts EOS at the delivery gates, on the Standard track.',
+      '  The Regulated track requires the product baseline (discovery → architecture) before any story ships:',
+      '  write it — bmad-document-project gives you a head start — or adopt on the Standard track first.', ''].join('\n'));
+    return EXIT.FAIL;
+  }
+  if (brownfield) declaration.workflowProfile = 'delivery-only';
   const lines = [`EOS ${verb} · ${packId} — ${PACKS[packId].title} · ${chosen.title} track`, ''];
   // A config-only declaration has no stack to lose: when code lands it takes a pack without --force,
   // as long as the track stays what the project chose. Anything else the project declared is its own.
@@ -178,13 +198,15 @@ function declareProject(snapshot, flags, verb) {
     lines.push('Next', `  1. ${CLI} next                 (start the guided loop)`,
       `  2. When code lands: ${CLI} init <pack> --write — this track carries over`, '');
     if (!flags.write) lines.push('  Nothing was written. Re-run with --write to apply.', '');
-    emit(flags, { pack: packId, track: chosen.name, written: !!flags.write, replaced: state, declaration, notes: PACKS[packId].notes, localFiles: files }, lines.join('\n'));
+    emit(flags, { pack: packId, track: chosen.name, brownfield, written: !!flags.write, replaced: state, declaration, notes: PACKS[packId].notes, localFiles: files }, lines.join('\n'));
     return EXIT.OK;
   }
   lines.push('Next',
     '  1. Replace the commands above with what CI actually runs — an unrunnable command fails closed.',
     `  2. ${CLI} stack sync --write   (put the stack in the always-on rule)`);
-  if (chosen.name === 'regulated') {
+  if (brownfield) {
+    lines.push(`  3. ${CLI} next                 (brownfield: it asks for the as-is documentation — bmad-document-project → docs/index.md — then the first story)`);
+  } else if (chosen.name === 'regulated') {
     lines.push(`  3. ${CLI} release keygen       (the key your releases will be signed with)`,
       '     node .github/hooks/eos-doctor.mjs        (release pre-flight: what a regulated release still lacks)',
       `  4. ${CLI} next`);
@@ -193,7 +215,7 @@ function declareProject(snapshot, flags, verb) {
   }
   lines.push('');
   if (!flags.write) lines.push('  Nothing was written. Re-run with --write to apply.', '');
-  emit(flags, { pack: packId, track: chosen.name, written: !!flags.write, replaced: state, declaration, notes: PACKS[packId].notes, localFiles: files }, lines.join('\n'));
+  emit(flags, { pack: packId, track: chosen.name, brownfield, written: !!flags.write, replaced: state, declaration, notes: PACKS[packId].notes, localFiles: files }, lines.join('\n'));
   return EXIT.OK;
 }
 
@@ -327,29 +349,59 @@ export const maintenanceCommands = {
     const nextVersion = templateVersion(next);
     const rows = planUpgrade({ root: snapshot.root, next, base });
     if (flags.write) applyUpgrade({ root: snapshot.root, next, rows });
+    // Agent-platform files are regenerated, not compared: by the upgraded CLI, in its own process, so
+    // the NEW generator writes them for this project's own agentPlatforms (ADR-019).
+    const generated = { inTemplate: generatedIn(next).length, regenerated: null, error: null, preview: null };
+    if (!flags.write) {
+      // This is the NEW version's generator, so the preview is what --write will do to the shared
+      // configuration files (the skill copies follow .agents/skills once it is upgraded).
+      const plan = planPlatformSync(snapshot.root, declaredPlatforms(snapshot.project));
+      generated.preview = { platforms: declaredPlatforms(snapshot.project), files: plan.rows.filter((r) => r.action !== 'current').map(({ path, action }) => ({ path, action })), problems: plan.problems };
+    }
+    if (flags.write) {
+      const r = spawnSync(process.execPath, [join(snapshot.root, '.github/eos/eos.mjs'), 'agents', 'sync', '--write', '--json'], { cwd: snapshot.root, encoding: 'utf8', timeout: 120000 });
+      let out = null;
+      try { out = JSON.parse(r.stdout); } catch { /* reported below */ }
+      if (r.status === 0 && out) generated.regenerated = out.files.map((f) => `${f.action} ${f.path}`);
+      else generated.error = out?.problems?.join('; ') || (r.stdout || r.stderr || r.error?.message || `exit ${r.status}`).trim();
+    }
     const counts = Object.fromEntries(['update', 'add', 'remove', 'kept', 'conflict', 'current'].map((a) => [a, rows.filter((r) => r.action === a).length]));
     const conflicts = rows.filter((r) => r.action === 'conflict');
-    const json = { from: baseVersion, to: nextVersion, write: !!flags.write, counts, files: rows.filter((r) => r.action !== 'current') };
+    // What changed, from the new template's own changelog — read before anything is applied.
+    const changelog = changelogBetween(next, baseVersion, nextVersion, { language: snapshot.project?.language });
+    const json = { from: baseVersion, to: nextVersion, write: !!flags.write, counts, files: rows.filter((r) => r.action !== 'current'), changelog: changelog.entries, generated };
+    const news = changelog.entries.length
+      ? [`What changes for you (${changelog.path} of ${nextVersion})`,
+        ...changelog.entries.flatMap((e) => [`  ${e.version}${e.title ? ` — ${e.title}` : ''}`, ...e.lines.map((l) => `    · ${l.replace(/\*\*/g, '')}`)]), '']
+      : [];
     const verb = { update: flags.write ? 'updated' : 'would update', add: flags.write ? 'added' : 'would add', remove: flags.write ? 'removed' : 'would remove', kept: 'kept (only you changed it)', conflict: flags.write ? 'conflict — the new version is parked' : 'conflict — both changed it' };
     const text = [
       `EOS upgrade ${baseVersion} → ${nextVersion}${flags.write ? '' : ' (dry run)'}`, '',
+      ...news,
       ...json.files.map((r) => `  ${r.action.padEnd(8)} ${r.path}${r.parked ? `  → ${r.parked}` : ''}   ${verb[r.action]}`),
       '',
       `  ${counts.update} update · ${counts.add} add · ${counts.remove} remove · ${counts.kept} kept · ${counts.conflict} conflict · ${counts.current} current`,
       `  Never touched (owned by the project): ${PROJECT_OWNED.length} path rules — the declaration, evidence, ledger, waivers, stories, README…`,
+      ...(!flags.write
+        ? [`  Not compared (generated): the agent-platform files (${generated.inTemplate} in the new template). --write regenerates them for this project's platforms (${generated.preview.platforms.join(', ')}):`,
+          ...generated.preview.files.map((f) => `    would ${f.action.padEnd(7)} ${f.path}`),
+          ...(generated.preview.files.length ? [] : ['    nothing to change in the shared configuration files']),
+          ...generated.preview.problems.map((p) => `    ERROR ${p} — until this is fixed, --write upgrades but does not regenerate`)]
+        : [generated.error
+          ? `  Agent-platform files were NOT regenerated: ${generated.error} — fix that, then run: node .github/eos/eos.mjs agents sync --write`
+          : `  Agent-platform files regenerated for this project's agentPlatforms: ${generated.regenerated.length ? generated.regenerated.join(', ') : 'already current'}`]),
       '',
       ...(flags.write
         ? [...(conflicts.length ? ['  Merge each parked file into its original by hand, then delete .eos/local/upgrade/.'] : []),
           '  Next: node .github/eos/eos.mjs policy lock   (see what the upgrade changed in the policy; re-lock with --write)',
           '        node .github/eos/eos.mjs docs --write',
-          '        node .github/eos/eos.mjs agents sync --write   (regenerate the agent platforms\' copies of the skills)',
           '        node .github/eos/eos.mjs verify --full',
           `  Read the upgrade notes for ${nextVersion} in docs/eos/user-manual.md §10.`]
         : ['  Nothing was changed. Re-run with --write to apply.']),
       '',
     ].join('\n');
     emit(flags, json, text);
-    return flags.write && conflicts.length ? EXIT.BLOCKED : EXIT.OK;
+    return flags.write && (conflicts.length || generated.error) ? EXIT.BLOCKED : EXIT.OK;
   },
   /**
    * `eos report [--format json|markdown] [--out <file>]`: this repository's governance report.

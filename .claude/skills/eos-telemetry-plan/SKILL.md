@@ -19,6 +19,8 @@ description: Design the telemetry and analytics plan and close it against the su
 | `docs/telemetry-plan.md` | people: what is instrumented and why |
 | `docs/telemetry.json` | the machine: schema `.eos/schemas/telemetry.schema.json` |
 
+Start from the skeleton — `node .github/eos/eos.mjs stage init telemetry --write` — and replace every `TODO(eos)`: the gate rejects the record while one remains.
+
 `telemetry-ready` requires: the **discovery success metric** emitted as a named signal, at least one
 dashboard, at least one alert **with a `routesTo`** (an alert nobody receives is not an alert), the
 sensitive-operation audit decision, a `rollbackTrigger`, and a named `owner`.

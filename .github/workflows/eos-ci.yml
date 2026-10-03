@@ -103,7 +103,31 @@ jobs:
         # fail on their first activation step. [EOS-AUD-002]
         run: node .github/hooks/eos-doctor.mjs --deep
 
-      - name: EOS secret scan (built-in patterns + gitleaks if available)
+      - name: Install gitleaks (pinned version, verified checksum)
+        # The secret scan always runs EOS's built-in rules; gitleaks adds vendor key formats and
+        # entropy detection on top. This step used to read "gitleaks if available" while nothing
+        # installed it, so the deeper scan never ran where it mattered. A scanner that guards the
+        # supply chain must not itself be a floating download: the version is pinned and the archive
+        # is checked against the SHA-256 the gitleaks release publishes (also the digest GitHub
+        # records for the asset) before it runs. CI tooling only — EOS Core stays zero-dependency.
+        env:
+          GITLEAKS_VERSION: 8.30.1
+          GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+        run: |
+          set -euo pipefail
+          archive="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/$archive" "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${archive}"
+          echo "${GITLEAKS_SHA256}  $RUNNER_TEMP/$archive" | sha256sum --check --strict
+          mkdir -p "$RUNNER_TEMP/gitleaks"
+          tar -xzf "$RUNNER_TEMP/$archive" -C "$RUNNER_TEMP/gitleaks" gitleaks
+          echo "$RUNNER_TEMP/gitleaks" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/gitleaks/gitleaks" version
+
+      - name: EOS secret scan (built-in patterns + gitleaks)
+        # EOS_REQUIRE_GITLEAKS: here the deeper scan is not optional — a missing or failing gitleaks
+        # fails the step instead of quietly falling back to the built-in rules.
+        env:
+          EOS_REQUIRE_GITLEAKS: '1'
         run: node .github/hooks/secret-scan.mjs
 
       - name: EOS spec-alignment (advisory — AC coverage / first-pass rate)

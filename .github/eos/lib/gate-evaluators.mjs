@@ -18,7 +18,7 @@ import { gatePolicy, changeTypeOf, scopeState, gateInputs, gateCollections, ARTI
 import { hashInputs, GOVERNANCE_INPUTS, writeEvidence, readEvidence, evidenceFreshness, evidenceFile, sha256File } from './evidence.mjs';
 import { currentProductTree, compareProductTree, uncommittedProductChanges } from './product-tree.mjs';
 import { readSummary, summaryTreeMismatch, producerTrust, SUMMARY_PATHS } from './machine-summary.mjs';
-import { readStageRecord, emptyDocReason, decisionProblem, openBlockers, substantive, STAGE_RECORDS } from './stage-record.mjs';
+import { readStageRecord, emptyDocReason, decisionProblem, openBlockers, substantive, placeholderReason, STAGE_RECORDS } from './stage-record.mjs';
 import { readManifest, manifestProblems, manifestPath } from './release.mjs';
 import { resolve as applyProviderVerdict } from '../adapters/contract.mjs';
 import { lastGateEvent } from './ledger.mjs';
@@ -160,6 +160,8 @@ export const evaluators = {
   uxApplicabilityDecided(ctx) {
     const r = readStageRecord(ctx.root, 'design');
     if (r.errors.length) return { status: 'ERROR', detail: r.errors.join('; ') };
+    const unanswered = placeholderReason(r);
+    if (unanswered) return fail(unanswered, r.path);
     if (!r.present) {
       return fail(`${STAGE_RECORDS.design.path} does not exist — a product must state whether it has a user-facing surface. A non-UI product records { "userInterface": false, "skipReason": "…" }; run ${STAGE_RECORDS.design.prompt}.`);
     }
@@ -672,7 +674,8 @@ export const evaluators = {
       : ok(`${included.length} story/stories verified`);
   },
   releaseSpecAlignment(ctx) {
-    const r = runHook(ctx, '.github/hooks/spec-align.mjs', ['--strict']);
+    // The release scope tells spec-align which stories ship, for a profile whose stories are the spec.
+    const r = runHook(ctx, '.github/hooks/spec-align.mjs', ['--strict', ...(ctx.scopeType === 'release' ? ['--release', String(ctx.scopeId)] : [])]);
     if (r.command) ctx.commands.push(r.command);
     if (r.status === 'PASS') return ok('spec-align --strict passes');
     if (r.status === 'BLOCKED' || r.status === 'ERROR') return { status: r.status, detail: r.detail };
@@ -917,6 +920,8 @@ export const evaluators = {
   iterationWriteBack(ctx) {
     const r = readStageRecord(ctx.root, 'iteration');
     if (r.errors.length) return { status: 'ERROR', detail: r.errors.join('; ') };
+    const unanswered = placeholderReason(r);
+    if (unanswered) return fail(unanswered, r.path);
     if (!r.present) return fail(`${STAGE_RECORDS.iteration.path} does not exist — what production taught has not been written back, so the specs and the running system are already drifting apart (${STAGE_RECORDS.iteration.prompt})`);
     if (!r.data) return blocked(`${r.path} could not be read`);
     // The record names a release. If nobody checks it, one write-back closes the loop for every

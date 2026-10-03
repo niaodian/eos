@@ -9,22 +9,79 @@
 //                      the summary the Result column is read, as before.
 //   - Spec drift:      ACs in docs/prd.md with NO trace-matrix row (spec says X, no proof).
 // Reads docs/prd.md + docs/trace-matrix.md. Advisory by default; --strict makes gaps exit 1.
-//   node .github/hooks/spec-align.mjs [--strict]
+//   node .github/hooks/spec-align.mjs [--strict] [--release <id>]
+//
+// Without a PRD, a profile whose FEATURE changes do not require one (delivery-only — brownfield
+// adoption, eos-2.3.0) keeps the acceptance criteria in the stories, so the stories are the spec:
+// coverage and drift are measured over the stories the release ships (`--release <id>` reads
+// .eos/releases/<id>.json; without it, every story), and an orphan is a row no story declares.
 //
 // STRICT IS FAIL-CLOSED: missing evidence is a FAILURE, not a skip. `--strict` is the G8 release
 // gate, and "no PRD / no trace matrix" is the emptiest possible spec alignment — exiting 0 there
 // produced a green-but-empty release gate. Advisory mode (every-push CI) still skips loudly.
 // [audit EOS-001 · locked by spec-align.test.mjs]
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 const root = process.cwd();
 const strict = process.argv.includes('--strict');
+const releaseAt = process.argv.indexOf('--release');
+const releaseId = releaseAt === -1 ? null : process.argv[releaseAt + 1] || null;
 const prdPath = join(root, 'docs/prd.md');
 const tracePath = join(root, 'docs/trace-matrix.md');
+const storiesDir = join(root, 'docs/stories');
+
+/** Does the declared workflow profile keep acceptance criteria in the stories (no PRD required)? */
+function storiesAreTheSpec() {
+  try {
+    const project = JSON.parse(readFileSync(join(root, '.eos/project.json'), 'utf8'));
+    const workflow = JSON.parse(readFileSync(join(root, '.eos/workflow.json'), 'utf8'));
+    const profile = workflow.profiles?.[project.workflowProfile || workflow.defaultProfile || 'standard-product'];
+    return profile?.changeTypes?.FEATURE?.gates?.['prd-ready'] === 'not_applicable';
+  } catch {
+    return false;
+  }
+}
+/**
+ * The stories, read the way EOS reads them (.github/eos/lib/story.mjs — restated here because a hook
+ * runs without the engine): every *.md under docs/stories/, recursively, except README.md; the id from
+ * the front matter, else the file name; the acceptance criteria are the table rows whose first cell is
+ * an AC id, outside code fences.
+ */
+function readStories() {
+  const out = [];
+  const walk = (dir) => {
+    let entries;
+    try { entries = readdirSync(dir, { withFileTypes: true }); } catch { return; }
+    for (const e of entries.sort((a, b) => a.name.localeCompare(b.name))) {
+      const full = join(dir, e.name);
+      if (e.isDirectory()) { walk(full); continue; }
+      if (!e.name.endsWith('.md') || e.name === 'README.md') continue;
+      let text;
+      try { text = readFileSync(full, 'utf8'); } catch { continue; }
+      if (!text.length) continue;
+      const fm = /^---\r?\n([\s\S]*?)\r?\n---/.exec(text);
+      const declared = fm && /^id:\s*(.*)$/m.exec(fm[1]);
+      const id = (declared && declared[1].trim().replace(/^["']|["']$/g, '')) || e.name.replace(/\.md$/, '');
+      const acs = [];
+      let inFence = false;
+      for (const line of text.split(/\r?\n/)) {
+        if (/^\s*(```|~~~)/.test(line)) { inFence = !inFence; continue; }
+        if (inFence || !/^\s*\|/.test(line)) continue;
+        const first = line.split('|')[1]?.trim() || '';
+        if (/^AC\d+\.\d+$/.test(first)) acs.push(first);
+      }
+      out.push({ id, acs });
+    }
+  };
+  walk(storiesDir);
+  return out;
+}
+const stories = !existsSync(prdPath) && storiesAreTheSpec() ? readStories() : [];
+const fromStories = stories.length > 0;
 
 const missing = [
-  ...(existsSync(prdPath) ? [] : ['docs/prd.md']),
+  ...(existsSync(prdPath) || fromStories ? [] : ['docs/prd.md']),
   ...(existsSync(tracePath) ? [] : ['docs/trace-matrix.md']),
 ];
 if (missing.length) {
@@ -42,7 +99,6 @@ if (missing.length) {
   process.exit(0);
 }
 
-const prd = readFileSync(prdPath, 'utf8');
 const trace = readFileSync(tracePath, 'utf8');
 
 // The machine results, when there are any: AC id → the statuses recorded for it.
@@ -71,7 +127,31 @@ const rowPasses = (ac, resultCell) => (machine
 
 // AC ids look like AC1.1, AC12.3, etc.
 const AC = /\bAC\d+\.\d+\b/g;
-const prdACs = new Set((prd.match(AC) || []));
+// specACs: what this run must cover. knownACs: everything a row may legitimately trace.
+let specACs;
+let knownACs;
+let specLabel = 'PRD acceptance criteria';
+let specSource = 'docs/prd.md';
+const unknownStories = [];
+if (fromStories) {
+  let included = null;
+  if (releaseId) {
+    try {
+      included = JSON.parse(readFileSync(join(root, '.eos/releases', `${releaseId.replace(/[^A-Za-z0-9._-]/g, '_')}.json`), 'utf8')).includedStories;
+    } catch { /* no readable manifest: every story is the spec (the release gate reports the manifest itself) */ }
+  }
+  const shipped = Array.isArray(included) ? stories.filter((st) => included.includes(st.id)) : stories;
+  // A story the release says it ships but no file declares cannot be covered — never quietly dropped.
+  if (Array.isArray(included)) unknownStories.push(...included.filter((id) => !stories.some((st) => st.id === id)));
+  specACs = new Set(shipped.flatMap((st) => st.acs));
+  knownACs = new Set(stories.flatMap((st) => st.acs));
+  specLabel = Array.isArray(included) ? `Story acceptance criteria (${releaseId})` : 'Story acceptance criteria';
+  specSource = 'the stories';
+} else {
+  specACs = new Set(readFileSync(prdPath, 'utf8').match(AC) || []);
+  knownACs = specACs;
+}
+const prdACs = specACs;
 
 // Parse trace-matrix table rows by splitting on '|' (robust vs. greedy regex).
 const tracedACs = new Set();
@@ -90,33 +170,35 @@ for (const line of trace.split('\n')) {
 const totalPrd = prdACs.size || 0;
 const coveredCount = [...prdACs].filter((a) => tracedACs.has(a)).length;
 const drift = [...prdACs].filter((a) => !tracedACs.has(a));
-const orphan = [...tracedACs].filter((a) => !prdACs.has(a)); // in matrix, not in PRD
+const orphan = [...tracedACs].filter((a) => !knownACs.has(a)); // in matrix, in no spec
 
 const pct = (n, d) => (d ? Math.round((n / d) * 1000) / 10 : 0);
 const coverage = pct(coveredCount, totalPrd);
 const tracedPass = pct(passed, rows);
 
 console.log('EOS spec-alignment\n');
-console.log(`  PRD acceptance criteria:      ${totalPrd}`);
+console.log(`  ${`${specLabel}:`.padEnd(29)} ${totalPrd}${fromStories ? '  — no PRD: this workflow profile keeps them in the stories' : ''}`);
 console.log(`  Covered by trace matrix:      ${coveredCount}/${totalPrd}  (${coverage}%)`);
 console.log(`  Traced rows passing:          ${passed}/${rows}  (${tracedPass}%)${machine ? '  — from docs/evidence/test-run.json' : ''}`);
 if (drift.length) console.log(`  ⚠ Spec drift (AC without a trace row): ${drift.join(', ')}`);
-if (orphan.length) console.log(`  ⚠ Orphan rows (trace AC not in PRD):   ${orphan.join(', ')}`);
+if (orphan.length) console.log(`  ⚠ Orphan rows (trace AC not in ${fromStories ? 'any story' : 'PRD'}):   ${orphan.join(', ')}`);
 console.log('');
 
 // A tidy one-line record you can append to a trend log for first-pass-rate tracking.
 console.log(`  RECORD spec-align coverage=${coverage}% traced_pass=${tracedPass}% drift=${drift.length} orphan=${orphan.length}`);
 console.log('');
 
+if (unknownStories.length) console.log(`  ⚠ In the release, but no story declares them: ${unknownStories.join(', ')}`);
 const clean = drift.length === 0 && orphan.length === 0 && totalPrd > 0 && rows > 0
-  && coverage === 100 && tracedPass === 100;
+  && coverage === 100 && tracedPass === 100 && unknownStories.length === 0;
 if (!clean && strict) {
   // Name the reason: "gaps present" alone made an empty PRD indistinguishable from a failing row.
   const why = [];
-  if (totalPrd === 0) why.push('docs/prd.md contains no acceptance criteria (expected AC<n>.<n> ids)');
+  if (totalPrd === 0) why.push(`${specSource} contain${fromStories ? '' : 's'} no acceptance criteria (expected AC<n>.<n> ids)`);
   if (rows === 0) why.push('docs/trace-matrix.md contains no AC rows');
   if (drift.length) why.push(`${drift.length} AC(s) with no trace row: ${drift.join(', ')}`);
-  if (orphan.length) why.push(`${orphan.length} orphan row(s) not in the PRD (built beyond the approved spec): ${orphan.join(', ')}`);
+  if (orphan.length) why.push(`${orphan.length} orphan row(s) not in ${fromStories ? 'any story' : 'the PRD'} (built beyond the approved spec): ${orphan.join(', ')}`);
+  if (unknownStories.length) why.push(`.eos/releases/${releaseId}.json ships ${unknownStories.join(', ')}, but no story under docs/stories/ declares ${unknownStories.length === 1 ? 'that id' : 'those ids'}`);
   if (rows > 0 && passed < rows) why.push(`${rows - passed} traced row(s) not passing${machine ? ' in docs/evidence/test-run.json (a row passes when every result recorded for its AC is PASS)' : ''}`);
   for (const w of why) console.log('  ERROR ' + w);
   console.log('');

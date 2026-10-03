@@ -54,8 +54,9 @@ remain anonymous) via a GitHub Security Advisory.
 ## Built-in security hygiene
 
 EOS ships local guardrails you can (and should) run before every commit:
-- `node .github/hooks/secret-scan.mjs` — built-in secret patterns, with optional deeper scanning if
-  [`gitleaks`](https://github.com/gitleaks/gitleaks) is installed (scans tracked files only).
+- `node .github/hooks/secret-scan.mjs` — built-in secret patterns, with deeper scanning when
+  [`gitleaks`](https://github.com/gitleaks/gitleaks) is installed (scans tracked files only). EOS CI
+  installs a pinned, checksum-verified gitleaks and requires it (`EOS_REQUIRE_GITLEAKS=1`).
 - `.github/hooks/deny-dangerous.js` — a PreToolUse speed-bump against destructive commands (fail-open;
   not an authority boundary).
 - `node .github/hooks/eos-doctor.mjs` — SDLC gate + secret-hygiene advisories.

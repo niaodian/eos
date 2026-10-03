@@ -116,6 +116,26 @@ You can run the whole batch gate the way CI does (needs Docker): `act push -j ve
 
 ---
 
+## Release cadence
+
+Every release is an upgrade someone has to do, so EOS releases on a cadence rather than on every merge
+(eighteen versions reached adopters in the first weeks, seven of them in one day).
+
+- **Release trains.** Changes land on `main` continuously; a release bundles what is ready, at most one
+  minor version (`eos-2.x.0`) a week. A change that misses a train takes the next one.
+- **Patch releases** (`eos-2.x.y`) carry security fixes and regressions only, and never change a gate,
+  the policy, an evidence format or a command name.
+- **Breaking changes** — a renamed command, a removed file, a gate that gets stricter for a project
+  that changed nothing — only in a minor or major version, marked **Breaking** in the changelog and
+  given an upgrade section in the user manual's Chapter 10.
+- **Every release updates [`docs/eos/CHANGELOG.md`](docs/eos/CHANGELOG.md)** and its Chinese mirror,
+  one line per change that matters to a project: `eos upgrade` prints the entries between the version
+  a project is on and the one it moves to.
+- **Stable line.** Pin a release tag (`npx degit niaodian/eos#eos-x.y.z`); tags never move. The stable
+  choice is the newest minor version that has been out a week without a patch — or its latest patch.
+
+---
+
 ## Reporting bugs & requesting features
 
 - **Bugs / proposals:** open an issue using the provided forms.

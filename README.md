@@ -19,8 +19,9 @@ English · [简体中文](README.zh.md)
 AI assistants now write code faster than any team can review it. EOS keeps that speed honest. Every
 stage of delivery — problem, requirements, design, architecture, stories, code, release — passes a
 machine-checked gate; every verdict is bound to the exact commit it judged; every release can prove
-what it contains and where it was built. It runs entirely on your machine, inside VS Code with GitHub
-Copilot or from any terminal, with no services, no accounts and no dependencies.
+what it contains and where it was built. It runs entirely on your machine — with GitHub Copilot in VS Code,
+Claude Code, OpenAI Codex or Google Antigravity, or from any terminal — with no services, no accounts and
+no dependencies.
 
 ## Why EOS
 
@@ -48,6 +49,10 @@ into hard requirements. No fork, no second tool, no migration when you grow into
   so a prompt can never promise a gate, command or transition that does not exist.
 - **Evidence you can audit.** Each verdict records the commit, the gate version and the input hashes.
   `eos report` turns the ledger into a governance report for one repository or a whole organisation.
+- **Works in the agent you already use.** The workflows, the guardrail and an MCP server are written once
+  and generated for each agent: GitHub Copilot, Claude Code and Google Antigravity out of the box; OpenAI
+  Codex, Cursor and Gemini CLI with one command. In every agent, approving, waiving and promoting work
+  remain commands a person runs.
 - **Any stack, both paradigms.** Node, Python, Go, Java, Rust and .NET; deterministic SaaS and
   probabilistic LLM or agentic products with eval-driven gates — kept explicitly isolated.
 
@@ -69,11 +74,11 @@ shows it with the exact `eos policy lock --write --reason "<why>"` that acknowle
 
 ## Quickstart
 
-You need Node.js 20.10+ and Git. VS Code with GitHub Copilot is optional — the CLI works in any terminal.
+You need Node.js 20.10+ and Git. An AI agent is optional — the CLI works in any terminal.
 
 ```bash
 # 1. Start from a pinned release and make it your repository
-npx degit niaodian/eos#eos-2.2.0 my-app && cd my-app && git init
+npx degit niaodian/eos#eos-2.3.0 my-app && cd my-app && git init
 
 # 2. Declare the project — no code yet, so the stack is decided at architecture time
 npx --offline eos init config-only --write        # add --track regulated for the strict track
@@ -94,8 +99,14 @@ npx --offline eos verify                          # re-run every gate your chang
 - **Already have code?** `npx --offline eos init` lists the starter packs (`node-service`,
   `python-service`, `go-service`, `java-service`, `rag-app`, `agentic-app`, `data-pipeline`, `library`,
   `regulated-app`) and names the ones that match the code it finds.
-- **In Copilot Chat** the same loop is the **eos-guide** agent, or `/eos-next` · `/eos-resume` ·
-  `/eos-status`. Open the project folder itself as the workspace root, or the agents stay inactive.
+- **In your agent** the same loop is one slash command away. The one-time setup for each agent is in the
+  [user manual, Chapter 6.6](docs/eos/user-manual.md#chapter-66-using-eos-with-claude-code-codex-and-antigravity):
+  - **GitHub Copilot (VS Code):** the **eos-guide** agent, or `/eos-next` · `/eos-resume` · `/eos-status`.
+    Open the project folder itself as the workspace root, or the agents stay inactive.
+  - **Claude Code:** run `claude` in the project folder, approve the `eos` MCP server once, then `/eos-next`.
+  - **OpenAI Codex:** run `npx --offline eos agents sync --platform codex --write` once and commit it, trust
+    the project, approve the guardrail with `/hooks`, then `$eos-next`.
+  - **Google Antigravity:** open the folder, then `/eos-next`, or pick a stage agent such as `eos-architecture`.
 
 ## How it works
 
@@ -144,6 +155,10 @@ flowchart LR
 | `eos report --format markdown` | a governance report: gates, waivers, evidence, SBOM and signatures |
 | `eos health` · `eos doctor` | one-screen project health; whether EOS itself is wired correctly |
 | `eos upgrade --from <new> --base <old>` | move to a new EOS version — three-way per file, never overwrites your edits |
+| `eos agents sync --platform <name>` | generate what an agent reads: the skills, the `eos` MCP entry, the guardrail hook and the stage agents |
+| `eos mcp` | the read and verify commands as MCP tools for your agent; approving and waiving stay CLI commands |
+| `eos init <pack> --brownfield` | adopt EOS in a system that already runs, at the delivery gates |
+| `eos stage init <stage>` | a stage record's skeleton from its schema; no gate passes until every answer is given |
 
 Add `--json` for machine-readable output; exit codes and diagnostics follow one documented contract:
 [docs/eos/developer-experience.md](docs/eos/developer-experience.md).
@@ -154,8 +169,8 @@ EOS releases are built and attested in GitHub Actions, the way EOS asks your rel
 yourself before you adopt it:
 
 ```bash
-gh release download eos-2.2.0 --repo niaodian/eos --pattern 'eos-2.2.0.tar.gz'
-gh attestation verify eos-2.2.0.tar.gz --repo niaodian/eos
+gh release download eos-2.3.0 --repo niaodian/eos --pattern 'eos-2.3.0.tar.gz'
+gh attestation verify eos-2.3.0.tar.gz --repo niaodian/eos
 ```
 
 Each release also ships its SBOM and a `SHA256SUMS` file.
@@ -167,10 +182,12 @@ Each release also ships its SBOM and a `SHA256SUMS` file.
                     evidence, waivers, the ledger, the policy lock and release manifests
 .github/eos/        the CLI and its deterministic engine (zero dependencies), with its tests
 .github/hooks/      validators and guardrails: config, doc parity, secrets, the product gate
-.github/agents/     eos-guide and the stage orchestrators for Copilot Chat
+.github/agents/     eos-guide and the stage orchestrators (Copilot; generated for Codex and Antigravity)
 .github/instructions/ the scoped coding rules, applied by file glob
 .agents/skills/     the slash-command workflows, as Agent Skills (/eos-next, /eos-spec …);
                     .claude/skills/ is a generated copy for Claude Code
+.mcp.json, .claude/settings.json, .agents/hooks.json, .agents/mcp_config.json, .agents/agents/
+                    generated by `eos agents sync` for each declared agent platform — never edit by hand
 .github/workflows/  eos-ci.yml (Linux, macOS, Windows) and eos-release.yml (attested releases)
 docs/               your specs and ADRs; docs/eos/ is the EOS manual set (中文 in docs/zh/)
 ```
@@ -179,9 +196,10 @@ docs/               your specs and ADRs; docs/eos/ is the EOS manual set (中文
 
 - [Quickstart](docs/eos/quickstart.md) — prerequisites and your first day.
 - [User manual](docs/eos/user-manual.md) — idea to launch to iteration, with step-by-step SaaS and Agentic tracks.
+- [Using EOS with Claude Code, Codex and Antigravity](docs/eos/user-manual.md#chapter-66-using-eos-with-claude-code-codex-and-antigravity) — the one-time setup and the daily workflow in each agent.
 - [Upgrading to eos-2.0.0](docs/eos/user-manual.md#105-upgrading-from-eos-122x-to-eos-200) — what changes and what to do.
 - [Upgrading to eos-2.0.1](docs/eos/user-manual.md#107-upgrading-from-eos-200-to-eos-201) — the secret-detection security patch.
-- [Upgrading to eos-2.2.0](docs/eos/user-manual.md#109-upgrading-from-eos-21x-to-eos-220) — slash commands become Agent Skills (`/spec` → `/eos-spec`), JUnit evidence, the release-gate preview.
+- [Upgrading to eos-2.3.0](docs/eos/user-manual.md#1010-upgrading-from-eos-22x-to-eos-230) — every agent platform generated from one source, `eos mcp`, brownfield adoption, `eos stage init`.
 - [Workflow contract](docs/eos/developer-experience.md) — the CLI, exit codes, JSON and diagnostics.
 - [Stack presets and tracks](docs/eos/stack-presets.md) — every supported stack, and how to choose a track.
 - [Design rationale](docs/eos/blueprint.md) and [architecture decisions](docs/adr/).
@@ -191,9 +209,11 @@ docs/               your specs and ADRs; docs/eos/ is the EOS manual set (中文
 - **Node.js 20.10+ and Git** — nothing else. CI runs Node 20 and 22 on Linux, macOS and Windows.
 - **No API key, ever.** EOS never calls a model. What each addition (Copilot, BMAD, the BMAD runtime) brings,
   and the known limitations, are in the [quickstart](docs/eos/quickstart.md#what-you-need-for-what).
-- **VS Code with GitHub Copilot is optional.** The agents, skills and hooks load when the project folder
-  itself is the workspace root. Hooks are a VS Code preview feature.
-- **One-time hardening.** Once your real repository exists, run `/eos-init` in Copilot Chat: branch
+- **An AI agent is optional.** GitHub Copilot (VS Code), Claude Code, OpenAI Codex and Google Antigravity are
+  covered step by step; Cursor, Gemini CLI and five Tier-2 agents are added with `eos agents sync --platform`.
+  Start the agent in the project folder itself, or its skills and hooks are not found. Hooks are local speed
+  bumps; CI is the authority.
+- **One-time hardening.** Once your real repository exists, run `/eos-init` in your agent (`$eos-init` in Codex): branch
   protection, CODEOWNERS and approvals, tracked in [docs/eos/activation.md](docs/eos/activation.md).
 - **Local CI.** `act push` runs [eos-ci.yml](.github/workflows/eos-ci.yml) in Docker; without Docker,
   `npm run verify` runs the core checks.

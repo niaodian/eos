@@ -23,7 +23,7 @@ import { gatePolicy, changeTypeOf, scopeState, gateInputs, gateCollections, ARTI
 import { hashInputs, GOVERNANCE_INPUTS, writeEvidence, readEvidence, evidenceFreshness, evidenceFile, sha256File } from './evidence.mjs';
 import { currentProductTree, compareProductTree, uncommittedProductChanges } from './product-tree.mjs';
 import { readSummary, summaryTreeMismatch, producerTrust, SUMMARY_PATHS } from './machine-summary.mjs';
-import { readStageRecord, emptyDocReason, decisionProblem, openBlockers, substantive, STAGE_RECORDS } from './stage-record.mjs';
+import { readStageRecord, emptyDocReason, decisionProblem, openBlockers, substantive, placeholderReason, STAGE_RECORDS } from './stage-record.mjs';
 import { readManifest, manifestProblems, manifestPath } from './release.mjs';
 import { resolve as applyProviderVerdict } from '../adapters/contract.mjs';
 import { lastGateEvent } from './ledger.mjs';
@@ -205,6 +205,8 @@ export function stageDocCheck(ctx, kind, minWords) {
   if (docProblem) return fail(`${docProblem} — run ${spec.prompt}`, spec.doc);
   const r = readStageRecord(ctx.root, kind);
   if (r.errors.length) return { status: 'ERROR', detail: r.errors.join('; '), artifact: spec.path };
+  const unanswered = placeholderReason(r);
+  if (unanswered) return fail(unanswered, spec.path);
   if (!r.present) {
     return fail(`${spec.doc} exists but ${spec.path} does not. Markdown is what people read; the record is what promotes — a gate that reads only prose can be talked past. Run ${spec.prompt}.`, spec.path);
   }
