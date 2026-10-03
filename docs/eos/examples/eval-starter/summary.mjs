@@ -7,9 +7,9 @@
 // The gate recomputes every verdict from `observed` and `threshold`; a case reported PASS whose
 // numbers say otherwise still fails.
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { dirname, join, relative } from 'node:path';
+import { dirname, join, relative, resolve } from 'node:path';
 
 export const SUMMARY_PATH = 'docs/evidence/eval-summary.json';
 
@@ -47,7 +47,11 @@ export function evalCase(id, metric, comparator, threshold, observed, sampleSize
  * a release whose evidencePolicy requires CI evidence cannot rest on it.
  */
 export function writeSummary({ root, cases, files, model, modelVersion, parameters, unattested = false }) {
-  const rel = (f) => relative(root, f).split('\\').join('/');
+  // Both sides resolved first: Windows hands out a short (8.3) temp path in one place and the long
+  // one in another (C:\Users\RUNNER~1 vs C:\Users\runneradmin), and macOS links /var to
+  // /private/var, so a plain relative() walked up and back down the same directory.
+  const real = (p) => { try { return realpathSync.native(p); } catch { return resolve(p); } };
+  const rel = (f) => relative(real(root), real(f)).split('\\').join('/');
   const ci = process.env.GITHUB_ACTIONS === 'true' && !unattested;
   const summary = {
     $schema: 'https://eos.local/schemas/eval-summary.schema.json',

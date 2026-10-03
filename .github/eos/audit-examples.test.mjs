@@ -8,7 +8,8 @@
 //   node --test .github/eos/audit-examples.test.mjs
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { cpSync, readFileSync, writeFileSync } from 'node:fs';
+import { cpSync, readFileSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs';
+import { pathToFileURL } from 'node:url';
 import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
 import { join } from 'node:path';
@@ -177,6 +178,29 @@ test('without a key the LLM agent replays its recording — and the summary says
   assert.equal(summary.producer.type, 'local', 'a replayed recording is never CI evidence');
   assert.match(summary.producer.name, /unattested/);
   assert.equal(producerTrust(summary).level, 'UNATTESTED_LOCAL');
+});
+
+test('the summary records each file relative to the project root however the root is spelled (a link, a Windows short name)', { skip: process.platform === 'win32' && 'creating symlinks needs privileges on Windows' }, async () => {
+  // On the Windows runner the working directory came as C:\\Users\\RUNNER~1\\… and the module's own path
+  // as C:\\Users\\runneradmin\\…: promptRef became ../../../../../RUNNER~1/…/evals/prompt.md. A link to the
+  // project is the same mismatch on every platform.
+  const dir = llmProject();
+  const { writeSummary } = await import(pathToFileURL(join(dir, 'evals/summary.mjs')).href);
+  const linked = `${dir}-linked`;
+  symlinkSync(dir, linked);
+  try {
+    writeSummary({
+      root: linked,
+      cases: [{ id: 'EVAL-1', metric: 'task_success_rate', comparator: '>=', threshold: 0.95, observed: 1, sampleSize: 3, status: 'PASS' }],
+      files: { prompt: join(dir, 'evals/prompt.md'), dataset: join(dir, 'evals/dataset.json'), grader: join(dir, 'evals/graders.mjs') },
+      model: 'replay-model',
+      parameters: { mode: 'replay' },
+    });
+  } finally {
+    unlinkSync(linked);
+  }
+  const { subject } = readSummary(dir, 'evalSummary').data;
+  assert.deepEqual([subject.promptRef, subject.datasetRef, subject.graderRef], ['evals/prompt.md', 'evals/dataset.json', 'evals/graders.mjs']);
 });
 
 test('a replay that has never seen the request fails closed — editing the prompt needs a new recording', () => {
