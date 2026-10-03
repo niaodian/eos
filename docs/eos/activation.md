@@ -54,7 +54,7 @@
     individual, to avoid a single person's leave blocking review). (See Appendix D.2)
   - **Verify**: `grep -n '@niaodian' .github/CODEOWNERS` should print nothing.
 
-- [ ] Approval baseline: `cp .vscode/settings.json.example .vscode/settings.json`
+- [ ] Approval baseline: `node .github/eos/eos.mjs init --write` (creates `.vscode/settings.json` from the committed example; `eos-doctor` checks its values)
   - **Why**: pins the safe auto-approval baseline to this machine — `chat.tools.global.autoApprove:false`
     (no /yolo) + a terminal dangerous-command denylist (defense-in-depth with `deny-dangerous.js`).
   - **Steps**: run the `cp` above (the active file is git-ignored, so it won't flow back to the template).

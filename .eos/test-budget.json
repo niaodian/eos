@@ -75,6 +75,7 @@
         ".github/eos/policy.test.mjs",
         ".github/eos/router.test.mjs",
         ".github/eos/transaction.test.mjs",
+        ".github/eos/upgrade.test.mjs",
         ".github/hooks/eos-doctor.test.mjs",
         ".github/hooks/project-gate.test.mjs"
       ]
@@ -91,6 +92,7 @@
       "budgetMs": 55000,
       "files": [
         ".github/eos/audit-evidence.test.mjs",
+        ".github/eos/audit-examples.test.mjs",
         ".github/eos/audit-gates.test.mjs",
         ".github/eos/audit-release.test.mjs",
         ".github/eos/audit-review.test.mjs",

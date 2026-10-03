@@ -2,7 +2,8 @@
 //
 // Registered in ./index.mjs. A handler receives (snapshot, flags) and returns an exit code (./shared.mjs).
 import { existsSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { join, dirname, resolve } from 'node:path';
+import { planUpgrade, applyUpgrade, templateVersion, isTemplate, PROJECT_OWNED } from '../lib/upgrade.mjs';
 import { gateInputs, gateCollections } from '../lib/state.mjs';
 import { evidenceIntegrity } from '../lib/gates.mjs';
 import { readIntent } from '../lib/record.mjs';
@@ -55,6 +56,10 @@ const VSCODE_TASKS = JSON.stringify({
 // without --force; the template's own may be replaced, because it was never this project's.
 const LOCAL_FILES = [
   { path: '.vscode/tasks.json', body: VSCODE_TASKS },
+  // The approval baseline: never auto-approve every tool, never auto-run workspace npm scripts. It is a
+  // personal, gitignored file, so it is created from the committed example and never overwritten —
+  // before 2.1.0 it existed only as the example, so a fresh copy ran on VS Code's looser defaults.
+  { path: '.vscode/settings.json', from: '.vscode/settings.json.example' },
   { path: '.eos/local/.gitkeep', body: '' },
 ];
 
@@ -63,7 +68,11 @@ function localFiles(root, write) {
   for (const f of LOCAL_FILES) {
     const full = join(root, f.path);
     if (existsSync(full)) { rows.push({ path: f.path, action: 'kept' }); continue; }
-    if (write) { mkdirSync(dirname(full), { recursive: true }); writeFileSync(full, f.body, 'utf8'); }
+    if (f.from && !existsSync(join(root, f.from))) { rows.push({ path: f.path, action: `skipped — ${f.from} is missing` }); continue; }
+    if (write) {
+      mkdirSync(dirname(full), { recursive: true });
+      writeFileSync(full, f.from ? readFileSync(join(root, f.from), 'utf8') : f.body, 'utf8');
+    }
     rows.push({ path: f.path, action: write ? 'created' : 'would create' });
   }
   return rows;
@@ -289,6 +298,58 @@ async function policySync(snapshot, flags) {
 }
 
 export const maintenanceCommands = {
+  /**
+   * `eos upgrade --from <new template> --base <template you started from> [--write]`: move this
+   * project to a new EOS version by a three-way comparison per file (lib/upgrade.mjs, ADR-015).
+   * A dry run by default. Never touches what the project owns, never overwrites a file the project
+   * changed: when both sides changed one, the new version is parked under .eos/local/upgrade/.
+   */
+  upgrade(snapshot, flags) {
+    const current = templateVersion(snapshot.root);
+    const next = typeof flags.from === 'string' ? resolve(flags.from) : null;
+    const base = typeof flags.base === 'string' ? resolve(flags.base) : null;
+    if (!next || !base) {
+      console.log(['eos upgrade needs two copies of the template, fetched by you — EOS Core downloads nothing:', '',
+        `  npx degit niaodian/eos#${current || '<the version you started from>'} /tmp/eos-base   # the template this project started from`,
+        '  npx degit niaodian/eos#<new version> /tmp/eos-next',
+        `  node /tmp/eos-next/.github/eos/eos.mjs upgrade --from /tmp/eos-next --base /tmp/eos-base`, '',
+        'Run the NEW version\'s CLI: an older EOS does not have this command. Add --write to apply.', ''].join('\n'));
+      return EXIT.FAIL;
+    }
+    for (const [flag, dir] of [['--from', next], ['--base', base]]) {
+      if (!isTemplate(dir)) { console.log(`EOS ERROR — ${flag} ${dir} is not a copy of the EOS template (no .github/eos/eos.mjs and docs/eos/VERSION)`); return EXIT.ERROR; }
+    }
+    const baseVersion = templateVersion(base);
+    if (current && baseVersion !== current) {
+      console.log(`eos upgrade: --base is ${baseVersion}, but this project says it is ${current} (docs/eos/VERSION). The base must be the template this project started from — otherwise your own edits and EOS's look alike.`);
+      return EXIT.FAIL;
+    }
+    const nextVersion = templateVersion(next);
+    const rows = planUpgrade({ root: snapshot.root, next, base });
+    if (flags.write) applyUpgrade({ root: snapshot.root, next, rows });
+    const counts = Object.fromEntries(['update', 'add', 'remove', 'kept', 'conflict', 'current'].map((a) => [a, rows.filter((r) => r.action === a).length]));
+    const conflicts = rows.filter((r) => r.action === 'conflict');
+    const json = { from: baseVersion, to: nextVersion, write: !!flags.write, counts, files: rows.filter((r) => r.action !== 'current') };
+    const verb = { update: flags.write ? 'updated' : 'would update', add: flags.write ? 'added' : 'would add', remove: flags.write ? 'removed' : 'would remove', kept: 'kept (only you changed it)', conflict: flags.write ? 'conflict — the new version is parked' : 'conflict — both changed it' };
+    const text = [
+      `EOS upgrade ${baseVersion} → ${nextVersion}${flags.write ? '' : ' (dry run)'}`, '',
+      ...json.files.map((r) => `  ${r.action.padEnd(8)} ${r.path}${r.parked ? `  → ${r.parked}` : ''}   ${verb[r.action]}`),
+      '',
+      `  ${counts.update} update · ${counts.add} add · ${counts.remove} remove · ${counts.kept} kept · ${counts.conflict} conflict · ${counts.current} current`,
+      `  Never touched (owned by the project): ${PROJECT_OWNED.length} path rules — the declaration, evidence, ledger, waivers, stories, README…`,
+      '',
+      ...(flags.write
+        ? [...(conflicts.length ? ['  Merge each parked file into its original by hand, then delete .eos/local/upgrade/.'] : []),
+          '  Next: node .github/eos/eos.mjs policy lock   (see what the upgrade changed in the policy; re-lock with --write)',
+          '        node .github/eos/eos.mjs docs --write',
+          '        node .github/eos/eos.mjs verify --full',
+          `  Read the upgrade notes for ${nextVersion} in docs/eos/user-manual.md §10.`]
+        : ['  Nothing was changed. Re-run with --write to apply.']),
+      '',
+    ].join('\n');
+    emit(flags, json, text);
+    return flags.write && conflicts.length ? EXIT.BLOCKED : EXIT.OK;
+  },
   /**
    * `eos report [--format json|markdown] [--out <file>]`: this repository's governance report.
    * `eos report --org <report.json>… [--format …] [--out <file>]`: many repositories, aggregated.

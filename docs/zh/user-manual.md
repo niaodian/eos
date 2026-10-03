@@ -5,7 +5,7 @@
 
 # EOS 用户手册（Engineering Operating System User Manual）
 
-> 版本：与 `docs/eos/VERSION` 同步（当前 `eos-2.0.1`）
+> 版本：与 `docs/eos/VERSION` 同步（当前 `eos-2.1.0`）
 > 适用：较新版本的 VS Code + GitHub Copilot Chat（自定义 agent / hooks 属近版能力，用「关于 VS Code」面板确认版本）+ 已安装 73 个 `bmad-*` skill（用户级）
 > 定位：本手册是**操作指南（怎么用）**；设计原理与取舍见同目录 `blueprint.md`（为什么这么设计）。
 > 约定：正文中文；文件名/路径/命令/配置键保留英文原文。
@@ -24,7 +24,7 @@
 | 想查某个斜杠命令 / agent / 规则 | [第 7 章 完整参考](#第-7-章-完整参考（速查）) |
 | 配置坏了 / Agent 不按预期工作 | [第 9 章 故障定位](#第-9-章-故障定位与排错) |
 | 想把这套搬到别的项目/团队 | [第 10 章 跨项目复用与分发](#第-10-章-跨项目复用与分发) |
-| 升级到 `eos-2.0.0`、选择治理轨道或为发布签名 | [§10.5 升级](#105-从-eos-122x-升级到-eos-200) · [§10.6 轨道与签名发布](#106-治理轨道、签名发布与中心策略) · [§10.7 2.0.1 安全补丁](#107-从-eos-200-升级到-eos-201) |
+| 升级到 `eos-2.0.0`、选择治理轨道或为发布签名 | [§10.5 升级](#105-从-eos-122x-升级到-eos-200) · [§10.6 轨道与签名发布](#106-治理轨道、签名发布与中心策略) · [§10.7 2.0.1 安全补丁](#107-从-eos-200-升级到-eos-201) · [§10.8 `eos upgrade` 与 2.1.0](#108-从-eos-20x-升级到-eos-210) |
 
 ---
 
@@ -177,7 +177,7 @@ bmad-code-review                   → 审查无阻断项           (Gate G6)
 **方式 A — degit（推荐，最快）**
 ```sh
 # public 模板 —— 直接 degit（无需鉴权）
-npx degit niaodian/eos#eos-2.0.1 my-new-app
+npx degit niaodian/eos#eos-2.1.0 my-new-app
 cd my-new-app
 git init && git add -A && git commit -m "chore: scaffold from eos"
 ```
@@ -218,7 +218,7 @@ node .github/hooks/validate-config.mjs      # 期望：PASS
 ## 3.4 Day-1 完整序列（复制即用）
 
 ```sh
-npx degit niaodian/eos#eos-2.0.1 my-new-app && cd my-new-app
+npx degit niaodian/eos#eos-2.1.0 my-new-app && cd my-new-app
 git init && git add -A && git commit -q -m "chore: scaffold from eos"
 node .github/hooks/validate-config.mjs
 node .github/eos/eos.mjs init config-only --write   # 声明项目：还没有代码（或 init <pack> [--track regulated]）
@@ -339,7 +339,7 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 | 项 | 内容 |
 |---|---|
 | **目标** | 从模板得到一个配置健康的空项目 |
-| **怎么启动** | `npx degit niaodian/eos#eos-2.0.1 my-app && cd my-app`，然后声明项目：`node .github/eos/eos.mjs init config-only --write`（未定栈）或 `init <pack> --write` |
+| **怎么启动** | `npx degit niaodian/eos#eos-2.1.0 my-app && cd my-app`，然后声明项目：`node .github/eos/eos.mjs init config-only --write`（未定栈）或 `init <pack> --write` |
 | **产出** | 完整 `.github/` + `docs/` 骨架 |
 | **门** | `node .github/hooks/validate-config.mjs` → **PASS** |
 | **必查** | PASS 0 errors。**栈未定则先别改** `00-workspace`——保留 Node 占位即可；栈是不可逆决策，权威锁定在**阶段 4（ADR）**。已知栈可即抄 `docs/eos/stack-presets.md`（快路径）。 |
@@ -610,7 +610,7 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 
 ### 第 0 步：建项目 + 选栈（5 分钟）
 ```sh
-npx degit niaodian/eos#eos-2.0.1 todo-api && cd todo-api
+npx degit niaodian/eos#eos-2.1.0 todo-api && cd todo-api
 node .github/hooks/validate-config.mjs          # 期望 PASS
 node .github/eos/eos.mjs init node-service --write   # 声明技术栈（或 python-service、go-service…——`eos init` 会列出全部）
 ```
@@ -656,6 +656,7 @@ bmad-tea / bmad-testarch-*         → 单元 + 集成测试
 ```
 SaaS 的 **G7** 要求：每条 AC ≥1 测试、**API 契约测试**（对 openapi.yaml）、**DB 状态集成测试**
 （事务 commit/rollback、约束、幂等）、NFR 目标已验证。
+门禁读取的是*机器*结果，而不是手写的 PASS：你的测试命令还必须写出 `docs/evidence/test-run.json`（AC → 测试文件 → selector → PASS，并绑定 `eos product-tree --json`）。这是你自己测试运行器里约 30 行的映射步骤——见 [examples/trace-evidence](../eos/examples/trace-evidence/README.md)。
 
 ### 第 8–10 步：发布 + 观测 + 迭代
 ```
@@ -674,7 +675,7 @@ SaaS 的 **G7** 要求：每条 AC ≥1 测试、**API 契约测试**（对 open
 
 ### 第 0 步：建项目 + 建 AI 目录
 ```sh
-npx degit niaodian/eos#eos-2.0.1 cs-agent && cd cs-agent
+npx degit niaodian/eos#eos-2.1.0 cs-agent && cd cs-agent
 mkdir -p ai/prompts evals                       # AI 代码放这里，自动叠加 Agentic 规则
 node .github/hooks/validate-config.mjs          # 期望 PASS
 node .github/eos/eos.mjs init rag-app --write    # Python 的 LLM 包：agentic 范式 + eval 命令
@@ -716,8 +717,9 @@ node .github/eos/eos.mjs init rag-app --write    # Python 的 LLM 包：agentic 
 ```
 bmad-dev-story                     → ai/ 下的 agent/tools/chains + ai/prompts/ 版本化 prompt
 bmad-code-review
-node --test evals/*.test.mjs       → 跑评估基线（G-EVAL 机器强制：达标才能过）
+node --test evals/eval.test.mjs    → 跑评估基线（G-EVAL 机器强制：达标才能过）
 ```
+`evals/` 从 [examples/eval-starter](../eos/examples/eval-starter/README.md) 起步（Node；Python 栈用其中的 `python/`），并把同一条命令声明为 `commands.eval`。starter 会写出 `docs/evidence/eval-summary.json`——数值、阈值、模型、数据集与评分器，并绑定产品树——G-EVAL 读的正是它；仅仅退出码为 0 的评估命令不会通过。
 写 AI 代码时**自动生效**的 Agentic 规则：prompt 存成文件（不内联字符串）、工具 typed schema、
 temperature=0 可复现、把模型输出当**不可信**（防注入、输出审核、不放密钥/PII 进 prompt）、
 LLM tracing（token/成本/context/tool-span）。
@@ -1057,12 +1059,12 @@ Agent 输出不符预期
 ```sh
 # 方式 A：degit（public 仓库，无需鉴权）
 # 固定到 release tag：默认分支会移动，tag 不会。
-npx degit niaodian/eos#eos-2.0.1 my-app
+npx degit niaodian/eos#eos-2.1.0 my-app
 cd my-app && git init
 
 # 方式 B：在 tag 上 clone，并开一段全新历史
-git clone --depth 1 --branch eos-2.0.1 https://github.com/niaodian/eos.git my-app
-cd my-app && git checkout --orphan main && git commit -m "chore: start from eos-2.0.1"
+git clone --depth 1 --branch eos-2.1.0 https://github.com/niaodian/eos.git my-app
+cd my-app && git checkout --orphan main && git commit -m "chore: start from eos-2.1.0"
 
 # 两种方式之后都要声明项目：模板自带的声明描述的是 EOS，而不是你的项目
 node .github/eos/eos.mjs init                       # 两条轨道、所有起步包，以及当前的声明
@@ -1071,7 +1073,7 @@ node .github/eos/eos.mjs init config-only --write   # 还没有代码——或 <
 
 ## 10.3 分发给团队（纯本地、无企业依赖）
 
-1. 所有人从**同一个 release tag**（`eos-2.0.1`）开始。默认分支会持续变动，
+1. 所有人从**同一个 release tag**（`eos-2.1.0`）开始。默认分支会持续变动，
    不固定版本就意味着每个人拿到的都是略有差异的 EOS。
 2. `【需组织/GitHub 设置】` GitHub **template repository** 属于所有者级设置：EOS 既无法替你设置，
    也无法在本地验证，所以别信本页面的说法——
@@ -1089,7 +1091,7 @@ node .github/eos/eos.mjs init config-only --write   # 还没有代码——或 <
 ## 10.4 版本化与升级
 
 - 每次改 EOS 配置：改 `docs/eos/VERSION`（如 `eos-1.4.1`→`eos-1.6.0`），跑 `validate-config.mjs`，Conventional Commits 提交。
-- 升级既有项目：从新版模板 diff `.github/`，挑选合并；用户级 `bmad-*` 独立升级。
+- 升级既有项目（2.1.0 起）：`eos upgrade --from <新版模板> --base <你当初起步的模板>`——默认只预览，加 `--write` 才执行。它逐个文件比较两份模板与你的副本：只有 EOS 改过的会更新，只有你改过的会保留，双方都改过的绝不覆盖——新版本放进 `.eos/local/upgrade/` 供手工合并。你的声明、证据、账本、豁免、story 与 README 永远不会被触碰。两份模板由你自己获取（degit 或带证明的发布 tarball），并用**新版本**的 CLI 运行；你自己的 ADR 从 100 起编号（[ADR-015](../adr/015-three-way-upgrades.md)）。用户级 `bmad-*` 独立升级。
 
 ### 10.4.1 从 `eos-1.12.0` 升级到 `eos-1.13.0`
 
@@ -1478,6 +1480,28 @@ node .github/eos/eos.mjs report --org team-a.json team-b.json --format markdown
 node .github/hooks/secret-scan.mjs
 ```
 
+## 10.8 从 `eos-2.0.x` 升级到 `eos-2.1.0`
+
+这是第一个可以用 `eos upgrade` 本身完成的升级——用 2.1.0 的 CLI 对你的项目运行它。门禁、策略与证据格式
+都没有变化；变化的是 EOS 为满足它们提供给你的东西。
+
+| 变化 | 你会看到什么 | 你需要做什么 |
+|---|---|---|
+| **`eos upgrade`**（[ADR-015](../adr/015-three-way-upgrades.md)） | 升级是逐文件的三方比较：更新、保留，或放进 `.eos/local/upgrade/` 等待手工合并——绝不覆盖 | 这次升级（见下）以及以后每次升级都用它。你自己的 ADR 从 100 起编号 |
+| **eval-starter 会写出 G-EVAL 读取的摘要** | `docs/evidence/eval-summary.json`，绑定产品树；`python/` 中附带仅用标准库的 Python 版 | Agentic 产品：重新复制 starter（或把 `summary.mjs` 及其 `writeSummary` 调用加入你的运行器），并在 story 中引用它的 `EVAL-n` 编号 |
+| **`init --write` 生成审批基线** | 从已提交的示例生成 `.vscode/settings.json`；缺失或被放宽时 `eos-doctor` 的 D8 会警告 | 每台机器运行一次 `node .github/eos/eos.mjs init --write` |
+| **文档** | 快速开始新增*能力与依赖*与*已知局限*；ADR-014（信任链）；SaaS 第 7 步与 Agentic 第 6–7 步写明门禁读取的机器摘要 | 读一遍已知局限 |
+
+**升级步骤**
+
+```sh
+npx degit niaodian/eos#eos-2.0.1 /tmp/eos-base    # 你当前的版本——见 docs/eos/VERSION
+npx degit niaodian/eos#eos-2.1.0 /tmp/eos-next
+node /tmp/eos-next/.github/eos/eos.mjs upgrade --from /tmp/eos-next --base /tmp/eos-base          # 先看计划
+node /tmp/eos-next/.github/eos/eos.mjs upgrade --from /tmp/eos-next --base /tmp/eos-base --write  # 再执行
+node .github/eos/eos.mjs policy lock && node .github/eos/eos.mjs verify --full
+```
+
 ---
 
 # 第 11 章 新增技术栈
@@ -1552,7 +1576,7 @@ EOS 的栈规则是**可插拔**的。新增一个栈 = 加一个 `*.instruction
 
 ```
 # ── 终端 —— 唯一循环（日常只需要这些）──
-npx degit niaodian/eos#eos-2.0.1 my-app   # 新建项目
+npx degit niaodian/eos#eos-2.1.0 my-app   # 新建项目
 node .github/eos/eos.mjs init                       # 当前声明、两条轨道、所有起步包
 node .github/eos/eos.mjs init <pack> --write        # 声明项目（未定栈时用 config-only；--track regulated）
 node .github/eos/eos.mjs init --write               # 本地 VS Code 任务（绝不覆盖已有文件）
@@ -1615,7 +1639,7 @@ bmad-tea / bmad-testarch-*   # 阶段7：测试+追溯        → G7
 
 **复现**（终端）：
 ```sh
-npx degit niaodian/eos#eos-2.0.1 my-app && cd my-app
+npx degit niaodian/eos#eos-2.1.0 my-app && cd my-app
 node .github/hooks/validate-config.mjs        # PASS
 npm test                                       # 10/10 green
 echo '{"tool_input":{"command":"rm -rf /tmp/x"}}' | node .github/hooks/deny-dangerous.js  # deny

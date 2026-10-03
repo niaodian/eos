@@ -53,9 +53,10 @@ export function readSummary(root, kind) {
 
 /**
  * Does a summary describe the tree we are standing on?
- * `productTree` is optional in the schema so a first-time integration is not blocked on wiring the
- * digest — but when it IS recorded, a mismatch is decisive: those results describe other code.
- * @returns {string|null} a reason, or null when the binding holds (or was not claimed)
+ * The schema leaves `productTree` optional so a summary can be PARSED before the digest is wired,
+ * but the gates require it: a summary that records no digest is STALE, and one that records a
+ * different digest describes other code.
+ * @returns {string|null} a reason, or null only when the recorded digest equals the current tree
  */
 export function summaryTreeMismatch(summary, currentDigest) {
   const claimed = summary?.productTree?.digest;

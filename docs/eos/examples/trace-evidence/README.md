@@ -39,11 +39,13 @@ EOS checks that:
 3. `testPath` **exists on disk**,
 4. `selector` actually appears in that file,
 5. the trace-matrix row points at the same test file,
-6. `productTree.digest` (when present) equals the current tree — results produced against other code
-   do not certify this code.
+6. `productTree.digest` equals the current tree — results produced against other code do not
+   certify this code.
 
-`productTree` is optional so a first integration is not blocked on wiring it, but **record it**: it
-is what stops a summary from outliving the source it described.
+`productTree.digest` is **required** by the gate, even though the schema can parse a summary without
+it: a summary that records no digest is reported `STALE` ("it records no productTree.digest"), not
+accepted. It is what stops a summary from outliving the source it described — so emit it from your
+runner on every run (see *Getting the digest* below), never paste it by hand.
 
 ## Producing it
 
@@ -79,8 +81,11 @@ exist without the evidence:
 
 ```sh
 node .github/eos/eos.mjs product-tree --json
-# → { "productTree": { "digest": "…" } }   — copy it into the summary you emit
+# → { "productTree": { "digest": "…" } }   — read it in your mapping step on every run
 ```
+
+Read it programmatically, as `docs/eos/examples/eval-starter/summary.mjs` does: a digest pasted by
+hand is stale after the next edit, and the gate will say so.
 
 ## Why does EOS not run the tests and collect this itself?
 

@@ -1,6 +1,6 @@
 # EOS User Manual (Engineering Operating System)
 
-> Version: synced with `docs/eos/VERSION` (current `eos-2.0.1`)
+> Version: synced with `docs/eos/VERSION` (current `eos-2.1.0`)
 > Applies to: recent VS Code + GitHub Copilot Chat (custom agent / hooks are recent-version capabilities; confirm the version in the "About VS Code" panel) + 73 installed `bmad-*` skills (user-level)
 > Positioning: this manual is an **operating guide (how to use it)**; for design rationale and trade-offs, see `blueprint.md` in the same directory (why it is designed this way).
 > Conventions: prose in English; file names / paths / commands / config keys kept verbatim.
@@ -19,7 +19,7 @@
 | Want to look up a slash command / agent / rule | [Chapter 7 Complete reference](#chapter-7-complete-reference-quick-reference) |
 | Configuration is broken / Agent is not working as expected | [Chapter 9 Failure localization](#chapter-9-failure-localization-and-troubleshooting) |
 | Want to move this system to another project/team | [Chapter 10 Cross-project reuse and distribution](#chapter-10-cross-project-reuse-and-distribution) |
-| Upgrading to `eos-2.0.0`, choosing a governance track, or signing releases | [§10.5 Upgrading](#105-upgrading-from-eos-122x-to-eos-200) · [§10.6 Tracks and signed releases](#106-governance-tracks-signed-releases-and-central-policy) · [§10.7 The 2.0.1 security patch](#107-upgrading-from-eos-200-to-eos-201) |
+| Upgrading to `eos-2.0.0`, choosing a governance track, or signing releases | [§10.5 Upgrading](#105-upgrading-from-eos-122x-to-eos-200) · [§10.6 Tracks and signed releases](#106-governance-tracks-signed-releases-and-central-policy) · [§10.7 The 2.0.1 security patch](#107-upgrading-from-eos-200-to-eos-201) · [§10.8 `eos upgrade` and 2.1.0](#108-upgrading-from-eos-20x-to-eos-210) |
 
 ---
 
@@ -162,7 +162,7 @@ If you want to promote some `eos-*.agent.md` files to "available in all projects
 **Method A — degit (recommended, fastest)**
 ```sh
 # Public template — plain degit works (no auth needed)
-npx degit niaodian/eos#eos-2.0.1 my-new-app
+npx degit niaodian/eos#eos-2.1.0 my-new-app
 cd my-new-app
 git init && git add -A && git commit -m "chore: scaffold from eos"
 ```
@@ -204,7 +204,7 @@ Open `.github/instructions/00-workspace.instructions.md` and change it to the re
 ## 3.4 Full Day-1 sequence (copy-ready)
 
 ```sh
-npx degit niaodian/eos#eos-2.0.1 my-new-app && cd my-new-app
+npx degit niaodian/eos#eos-2.1.0 my-new-app && cd my-new-app
 git init && git add -A && git commit -q -m "chore: scaffold from eos"
 node .github/hooks/validate-config.mjs
 node .github/eos/eos.mjs init config-only --write   # declare it: no code yet (or init <pack> [--track regulated])
@@ -325,7 +325,7 @@ So EOS **never depends on "Rule A overriding Rule B"**. The only reliable contro
 | Item | Content |
 |---|---|
 | **Goal** | Get an empty project with healthy configuration from the template |
-| **How to start** | `npx degit niaodian/eos#eos-2.0.1 my-app && cd my-app`, then declare it: `node .github/eos/eos.mjs init config-only --write` (stack undecided) or `init <pack> --write` |
+| **How to start** | `npx degit niaodian/eos#eos-2.1.0 my-app && cd my-app`, then declare it: `node .github/eos/eos.mjs init config-only --write` (stack undecided) or `init <pack> --write` |
 | **Output** | Complete `.github/` + `docs/` skeleton |
 | **Gate** | `node .github/hooks/validate-config.mjs` → **PASS** |
 | **Must check** | PASS 0 errors. **If the stack is undecided, do not change** `00-workspace` yet--keep the Node placeholder; the stack is an irreversible decision, and the authority is locked in **Phase 4 (ADR)**. If the stack is known, copy `docs/eos/stack-presets.md` directly (fast path). |
@@ -588,7 +588,7 @@ So EOS **never depends on "Rule A overriding Rule B"**. The only reliable contro
 
 ### Step 0: Create project + choose stack (5 minutes)
 ```sh
-npx degit niaodian/eos#eos-2.0.1 todo-api && cd todo-api
+npx degit niaodian/eos#eos-2.1.0 todo-api && cd todo-api
 node .github/hooks/validate-config.mjs          # expect PASS
 node .github/eos/eos.mjs init node-service --write   # declare the stack (or python-service, go-service… — `eos init` lists them)
 ```
@@ -631,6 +631,7 @@ bmad-tea / bmad-testarch-*         → unit + integration tests
 /spec-align                        → quantify: AC coverage / first-pass rate / drift
 ```
 SaaS **G7** requires: every AC has ≥1 test, **API contract tests** (against openapi.yaml), **DB state integration tests** (transaction commit/rollback, constraints, idempotency), and NFR targets verified.
+The gate reads the *machine* result, not a hand-written PASS: your test command must also write `docs/evidence/test-run.json` (AC → test file → selector → PASS, bound to `eos product-tree --json`). It is a ~30-line mapping step in your own runner — see [examples/trace-evidence](examples/trace-evidence/README.md).
 
 ### Step 8–10: Release + observability + iteration
 ```
@@ -648,7 +649,7 @@ SaaS **G7** requires: every AC has ≥1 test, **API contract tests** (against op
 
 ### Step 0: Create project + create AI directories
 ```sh
-npx degit niaodian/eos#eos-2.0.1 cs-agent && cd cs-agent
+npx degit niaodian/eos#eos-2.1.0 cs-agent && cd cs-agent
 mkdir -p ai/prompts evals                       # AI code goes here; Agentic rules overlay automatically
 node .github/hooks/validate-config.mjs          # expect PASS
 node .github/eos/eos.mjs init rag-app --write    # the Python LLM pack: agentic paradigm + an eval command
@@ -688,8 +689,9 @@ At **G4**, the architecture agent forces Agentic design to include:
 ```
 bmad-dev-story                     → agent/tools/chains under ai/ + versioned prompts under ai/prompts/
 bmad-code-review
-node --test evals/*.test.mjs       → run eval baseline (G-EVAL machine-enforced: must meet threshold)
+node --test evals/eval.test.mjs    → run eval baseline (G-EVAL machine-enforced: must meet threshold)
 ```
+Start `evals/` from [examples/eval-starter](examples/eval-starter/README.md) (Node, or `python/` for Python stacks) and declare the same command as `commands.eval`. The starter writes `docs/evidence/eval-summary.json` — the numbers, thresholds, model, dataset and grader, bound to the product tree — which is what G-EVAL reads; an eval command that merely exits 0 does not pass.
 When writing AI code, Agentic rules take effect **automatically**: prompts saved as files (not inline strings), tool typed schema, temperature=0 for reproducibility, treat model output as **untrusted** (anti-injection, output review, do not put secrets/PII into prompts), LLM tracing (token/cost/context/tool-span).
 
 > **Key**: LLM output **cannot be tested with exact-match unit tests** (it is probabilistic)--you must use **evaluation set + grader + regression baseline**.
@@ -1011,12 +1013,12 @@ Agent output does not match expectation
 ```sh
 # Method A: degit (public repository — no auth needed)
 # Pin the release tag: the default branch moves, a tag does not.
-npx degit niaodian/eos#eos-2.0.1 my-app
+npx degit niaodian/eos#eos-2.1.0 my-app
 cd my-app && git init
 
 # Method B: git clone at the tag, into a fresh history
-git clone --depth 1 --branch eos-2.0.1 https://github.com/niaodian/eos.git my-app
-cd my-app && git checkout --orphan main && git commit -m "chore: start from eos-2.0.1"
+git clone --depth 1 --branch eos-2.1.0 https://github.com/niaodian/eos.git my-app
+cd my-app && git checkout --orphan main && git commit -m "chore: start from eos-2.1.0"
 
 # Either way, declare the project: the template's own declaration describes EOS, not you
 node .github/eos/eos.mjs init                       # the tracks, the packs, and what is declared
@@ -1025,7 +1027,7 @@ node .github/eos/eos.mjs init config-only --write   # no code yet — or <pack>,
 
 ## 10.3 Distribution to a team (purely local, no enterprise dependency)
 
-1. Everyone starts from the **same release tag** (`eos-2.0.1`). The default branch keeps moving, so
+1. Everyone starts from the **same release tag** (`eos-2.1.0`). The default branch keeps moving, so
    an unpinned copy is a slightly different EOS for every person who takes one.
 2. `【Needs org/GitHub settings】` The GitHub **template repository** setting is owner-level: EOS can
    neither apply nor verify it locally, so do not take this page's word for it —
@@ -1043,7 +1045,7 @@ node .github/eos/eos.mjs init config-only --write   # no code yet — or <pack>,
 ## 10.4 Versioning and upgrades
 
 - Every EOS configuration change: update `docs/eos/VERSION` (e.g., `eos-1.4.1`→`eos-1.6.0`), run `validate-config.mjs`, commit with Conventional Commits.
-- Upgrading existing projects: diff `.github/` from the new template version, selectively merge; user-level `bmad-*` upgrades independently.
+- Upgrading existing projects (2.1.0+): `eos upgrade --from <new template> --base <the template you started from>` — a dry run by default, `--write` to apply. Per file it compares the two templates with your copy: what only EOS changed is updated, what only you changed is kept, and a file both changed is never overwritten — the new version is parked under `.eos/local/upgrade/` for a hand merge. Your declaration, evidence, ledger, waivers, stories and README are never touched. Fetch both templates yourself (degit or the attested release tarball) and run the NEW version's CLI; number your own ADRs from 100 ([ADR-015](../adr/015-three-way-upgrades.md)). User-level `bmad-*` upgrades independently.
 
 ### 10.4.1 Upgrading from `eos-1.12.0` to `eos-1.13.0`
 
@@ -1465,6 +1467,29 @@ does, a hardcoded value was hiding there.
 node .github/hooks/secret-scan.mjs
 ```
 
+## 10.8 Upgrading from `eos-2.0.x` to `eos-2.1.0`
+
+The first upgrade you can do with `eos upgrade` itself — run the 2.1.0 CLI against your project. The
+gates, the policy and the evidence formats do not change; what changes is what EOS gives you to
+satisfy them.
+
+| What changed | What you will see | What to do |
+|---|---|---|
+| **`eos upgrade`** ([ADR-015](../adr/015-three-way-upgrades.md)) | An upgrade is a three-way comparison per file: updated, kept, or parked under `.eos/local/upgrade/` for a hand merge — never overwritten | Use it for this upgrade (below) and every later one. Number your own ADRs from 100 |
+| **The eval-starter writes the summary G-EVAL reads** | `docs/evidence/eval-summary.json`, bound to the product tree; a stdlib-only Python twin in `python/` | Agentic products: re-copy the starter (or add `summary.mjs` and its `writeSummary` call to your runner) and cite its `EVAL-n` ids in your stories |
+| **`init --write` creates the approval baseline** | `.vscode/settings.json` from the committed example; `eos-doctor` D8 warns when it is missing or loosened | Run `node .github/eos/eos.mjs init --write` once on each machine |
+| **Docs** | The quickstart's *What you need for what* and *Known limitations*; ADR-014 (the trust chain); SaaS step 7 and Agentic steps 6–7 now name the machine summaries the gates read | Read the known limitations once |
+
+**Upgrade steps**
+
+```sh
+npx degit niaodian/eos#eos-2.0.1 /tmp/eos-base    # the version you are on — see docs/eos/VERSION
+npx degit niaodian/eos#eos-2.1.0 /tmp/eos-next
+node /tmp/eos-next/.github/eos/eos.mjs upgrade --from /tmp/eos-next --base /tmp/eos-base          # review the plan
+node /tmp/eos-next/.github/eos/eos.mjs upgrade --from /tmp/eos-next --base /tmp/eos-base --write  # apply it
+node .github/eos/eos.mjs policy lock && node .github/eos/eos.mjs verify --full
+```
+
 ---
 
 # Chapter 11 Adding a technology stack
@@ -1539,7 +1564,7 @@ EOS stack rules are **pluggable**. Adding a stack = add one `*.instructions.md` 
 
 ```
 # ── Terminal — the loop (this is all you need day to day) ──
-npx degit niaodian/eos#eos-2.0.1 my-app   # create new project
+npx degit niaodian/eos#eos-2.1.0 my-app   # create new project
 node .github/eos/eos.mjs init                       # what is declared, the two tracks, the starter packs
 node .github/eos/eos.mjs init <pack> --write        # declare it (config-only until the stack is decided; --track regulated)
 node .github/eos/eos.mjs init --write               # local VS Code tasks (never overwrites)
@@ -1602,7 +1627,7 @@ A real dry-run that passed end to end (feature: user login), **12/12 gates passe
 
 **Reproduce** (terminal):
 ```sh
-npx degit niaodian/eos#eos-2.0.1 my-app && cd my-app
+npx degit niaodian/eos#eos-2.1.0 my-app && cd my-app
 node .github/hooks/validate-config.mjs        # PASS
 npm test                                      # 10/10 green
 echo '{"tool_input":{"command":"rm -rf /tmp/x"}}' | node .github/hooks/deny-dangerous.js  # deny

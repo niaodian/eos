@@ -398,6 +398,38 @@ const bmadOut = [];
   }
 }
 
+// --- D8 Approval baseline (2.1.0) — the VALUES, not just the file. Per machine, so advisory: WARN only. ---
+// VS Code settings are JSONC; comments are removed outside strings before parsing.
+function stripJsonc(text) {
+  let out = '';
+  let inString = false;
+  for (let i = 0; i < text.length; i += 1) {
+    const c = text[i];
+    if (inString) {
+      out += c;
+      if (c === '\\') { out += text[i + 1] ?? ''; i += 1; } else if (c === '"') inString = false;
+    } else if (c === '"') { inString = true; out += c; }
+    else if (c === '/' && text[i + 1] === '/') { while (i < text.length && text[i] !== '\n') i += 1; out += '\n'; }
+    else if (c === '/' && text[i + 1] === '*') { i += 2; while (i < text.length && !(text[i] === '*' && text[i + 1] === '/')) i += 1; i += 1; }
+    else out += c;
+  }
+  return out.replace(/,(\s*[}\]])/g, '$1');
+}
+{
+  const settingsPath = join(root, '.vscode/settings.json');
+  if (existsSync(settingsPath)) {
+    let settings = null;
+    try { settings = JSON.parse(stripJsonc(readFileSync(settingsPath, 'utf8'))); }
+    catch { warns.push('D8 Approval baseline: .vscode/settings.json could not be parsed, so its approval settings were not checked.'); }
+    if (settings) {
+      if (settings['chat.tools.global.autoApprove'] === true) warns.push('D8 Approval baseline: "chat.tools.global.autoApprove" is true — every tool in every workspace runs without asking. Set it to false (see .vscode/settings.json.example).');
+      if (settings['chat.tools.terminal.autoApproveWorkspaceNpmScripts'] !== false) warns.push('D8 Approval baseline: "chat.tools.terminal.autoApproveWorkspaceNpmScripts" is not false — VS Code then runs package.json scripts without asking. Set it to false (see .vscode/settings.json.example).');
+    }
+  } else if (existsSync(join(root, '.vscode/settings.json.example'))) {
+    warns.push('D8 Approval baseline: no .vscode/settings.json, so VS Code runs on its looser defaults. `node .github/eos/eos.mjs init --write` creates it from the committed example.');
+  }
+}
+
 // --- Report (same shape as validate-config.mjs) ---
 say('EOS SDLC gate doctor\n');
 for (const line of activationOut) say(line);

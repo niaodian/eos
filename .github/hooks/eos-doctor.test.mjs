@@ -466,3 +466,27 @@ test('D7: a private key inside the repository is an error on every track', () =>
   assert.equal(code, 1, out);
   assert.match(out, /D7 Release pre-flight: \.eos\/keys\/release\.pem is a PRIVATE key inside the repository/);
 });
+
+// ---------- D8 approval baseline (2.1.0): the values, not just the file ----------
+const DECLARED = { '.eos/project.json': { projectType: 'library', stacks: ['node'], productParadigms: ['deterministic'], commands: { test: 'node --version' } } };
+
+test('D8: a settings.json that auto-approves every tool, or workspace npm scripts, is a warning — never an error', () => {
+  const { out } = run(project({
+    ...DECLARED,
+    '.vscode/settings.json': '{\n  // personal\n  "chat.tools.global.autoApprove": true,\n  "chat.tools.terminal.autoApproveWorkspaceNpmScripts": true,\n}\n',
+  }));
+  assert.match(out, /WARN\s+D8 Approval baseline: "chat\.tools\.global\.autoApprove" is true/);
+  assert.match(out, /WARN\s+D8 Approval baseline: "chat\.tools\.terminal\.autoApproveWorkspaceNpmScripts" is not false/);
+  assert.doesNotMatch(out, /ERROR\s+D8/);
+});
+
+test('D8: the shipped baseline (JSONC: comments, URLs, trailing commas) passes', () => {
+  const example = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../../.vscode/settings.json.example'), 'utf8');
+  const { out } = run(project({ ...DECLARED, '.vscode/settings.json': example }));
+  assert.doesNotMatch(out, /D8/);
+});
+
+test('D8: with the committed example but no settings.json, doctor names the command that creates it', () => {
+  const { out } = run(project({ ...DECLARED, '.vscode/settings.json.example': '{}\n' }));
+  assert.match(out, /D8 Approval baseline: no \.vscode\/settings\.json.*init --write/);
+});

@@ -50,7 +50,7 @@
     避免单人休假阻塞评审）。（详见附录 D.2）
   - **验证**：`grep -n '@niaodian' .github/CODEOWNERS` 应无输出。
 
-- [ ] 审批基线: `cp .vscode/settings.json.example .vscode/settings.json`
+- [ ] 审批基线: `node .github/eos/eos.mjs init --write`（从已提交的示例生成 `.vscode/settings.json`；`eos-doctor` 会检查其中的值）
   - **为什么**：把安全的自动审批基线固定到本机——`chat.tools.global.autoApprove:false`（不开 /yolo）+
     终端危险命令 denylist（与 `deny-dangerous.js` 纵深防御）。
   - **步骤**：执行上面的 `cp`（活跃文件是 git-ignored，不会回流模板）。（详见附录 D.3）

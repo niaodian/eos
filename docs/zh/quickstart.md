@@ -49,10 +49,31 @@ EOS **原生在 Windows 上运行**（PowerShell 或 Command Prompt）——核�
 - **`build-pdf.sh`**（可选的 手册→PDF）是 Bash 脚本——用 **Git-Bash 或 WSL** 运行，或直接
   读 `docs/eos/user-manual.md`。
 
+## 能力与依赖
+
+EOS 本身从不调用任何模型，也不需要任何 API key。每一行都在上一行的基础上叠加：
+
+| 你具备 | 你得到 |
+|---|---|
+| **只有 Node.js** | 完整的治理引擎：`eos next` / `status` / `check` / `verify`、全部门禁、账本、策略锁、签名发布、密钥扫描 |
+| **+ VS Code 与 GitHub Copilot** | 引导式流程：`eos-*` agent、`/eos-*` prompt、常驻规则与 PreToolUse 护栏。所用模型就是你在 Copilot 里选的那个——无需任何配置 |
+| **+ BMAD 技能**（`bmad-*`） | 各阶段编排的撰写工作流（PRD、架构、story、测试设计）。没有它们，`eos next` 仍会点名每一步，由你手工完成 |
+| **+ BMAD 项目运行时**（`_bmad/`，需要 python3 与 uv） | BMAD 的项目级定制与会话记忆。可选：没有它，技能按自带默认值运行 |
+| **一个 agentic / LLM 产品** | 你产品自己的模型调用，由评估工具链来检验（[eval-starter](../eos/examples/eval-starter/README.md)）。那是你本来就要写的产品代码，不是 EOS 的配置 |
+
+## 已知局限
+
+- **PreToolUse 护栏是减速带，不是权威。** VS Code hooks 是预览功能，不同 agent harness 的行为不同，按机器生效，CI 也不会运行它。钩子读不懂的负载会按文本扫描；钩子自身出错时仍会放行。真正做决定的是 CI、分支保护与评审。
+- **密钥检测是启发式的。** 两道防线匹配已知的密钥格式、凭据赋值，以及为敏感命名的环境变量写的字面量回退；经过混淆的字面量可能漏过。`gitleaks`（可选）补充厂商格式与熵检测；两者都不能替代评审。
+- **在分支保护与 CODEOWNERS 就位之前，治理是契约式的。** EOS 无法在本机验证服务端保护，因此"放宽需要第二个人"只有在完成 `/eos-init` 加固后才成立；在此之前 `eos-doctor` 会报告 `CONTRACTUAL`（[ADR-014](../adr/014-trust-chain.md)）。
+- **本地证据诚实，但未经证明。** 在笔记本上记录的证据是 `UNATTESTED_LOCAL`；Regulated 发布需要 CI 产出的证据（`evidencePolicy`）。
+- **"任意技术栈"的验证深度不同。** EOS 自身的 CI 覆盖 Node 路径与 Python 评估起步包；Python、Go、Java、Rust 与 .NET 起步包声明的是 EOS 会运行的命令，对应的工具链需要你自行安装。
+- **Windows 上的符号链接。** 不支持符号链接的检出会把链接变成普通文件，于是产品树指纹与 Linux 不同，在一边记录的证据在另一边读作 `STALE`。
+
 ## Day-1（可直接复制——与用户手册 §3.4 完全一致的序列）
 
 ```sh
-npx degit niaodian/eos#eos-2.0.1 my-new-app && cd my-new-app
+npx degit niaodian/eos#eos-2.1.0 my-new-app && cd my-new-app
 git init && git add -A && git commit -q -m "chore: scaffold from eos"
 node .github/hooks/validate-config.mjs        # 期望 PASS
 node .github/eos/eos.mjs init config-only --write   # 声明项目：还没有代码（或 init <pack>；--track regulated）
