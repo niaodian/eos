@@ -59,7 +59,7 @@ EOS itself never calls a model and needs no API key. Each row adds to the one ab
 ## Known limitations
 
 - **The PreToolUse guardrail is a speed bump, not the authority.** VS Code hooks are a Preview feature, differ per agent harness, run per machine and are not run in CI. A payload the hook cannot parse is scanned as text; an internal failure of the hook still lets the call through. CI, branch protection and review decide.
-- **Secret detection is heuristic.** Both guards match known key formats, credential assignments and literal fallbacks for secret-named environment variables; an obfuscated literal can pass. `gitleaks` (optional) adds vendor formats and entropy; neither replaces review.
+- **Secret detection is heuristic.** Both guards match known key formats, credential assignments and literal fallbacks for secret-named environment variables; an obfuscated literal can pass. `gitleaks` adds vendor formats and entropy — optional locally, required in EOS CI, which installs a pinned, checksum-verified version (since eos-2.3.0); neither replaces review.
 - **Until branch protection and CODEOWNERS exist, governance is contractual.** EOS cannot verify server-side protection from a laptop, so "a weakening needs a second person" holds only after the `/eos-init` hardening; `eos-doctor` reports `CONTRACTUAL` until then ([ADR-014](../adr/014-trust-chain.md)).
 - **Local evidence is honest but unattested.** Evidence recorded on a laptop is `UNATTESTED_LOCAL`; a Regulated release needs evidence produced in CI (`evidencePolicy`).
 - **"Any stack" is verified to different depths.** EOS's own CI exercises the Node path and the Python eval starter; the Python, Go, Java, Rust and .NET packs declare the commands EOS runs, and their toolchains are yours to install.

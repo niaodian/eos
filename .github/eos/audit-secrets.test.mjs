@@ -7,7 +7,7 @@
 //   node --test .github/eos/audit-secrets.test.mjs
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { boundedSpawnSync } from './test-spawn.mjs';
@@ -86,4 +86,31 @@ test('deny-dangerous: a double-quoted, JSON-key or YAML credential is denied (it
 test('deny-dangerous: words on different lines are not one command (the reported false positive)', () => {
   const text = `${'fi' + 'nd'} . -name x\nconsole.log(${Q}${'-' + 'delete'}${Q})`;
   assert.equal(hook({ tool_name: 'Write', tool_input: { path: 'x.js', file_text: text } }), 'allow');
+});
+
+// eos-2.0.0 evaluation, finding I: CI's step said "gitleaks if available" and nothing installed it,
+// so the deeper scan never ran where it mattered. CI now installs a pinned, checksum-verified
+// gitleaks and sets EOS_REQUIRE_GITLEAKS=1 — under which a missing gitleaks fails instead of quietly
+// falling back to the built-in rules.
+test('finding I: where gitleaks is required, its absence fails the scan rather than passing on the built-in rules', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'eos-secrets-'));
+  dirs.push(dir);
+  writeFileSync(join(dir, 'clean.txt'), 'nothing to see\n');
+  // A PATH without gitleaks. Every case variant goes first: Windows spells it "Path".
+  const bare = Object.fromEntries(Object.entries(process.env).filter(([k]) => k.toUpperCase() !== 'PATH'));
+  bare.PATH = ['/usr/bin', '/bin'].join(process.platform === 'win32' ? ';' : ':');
+  const optional = boundedSpawnSync(process.execPath, [SCAN], { cwd: dir, encoding: 'utf8', env: bare });
+  assert.equal(optional.status, 0, optional.stdout);
+  assert.match(optional.stdout, /built-in patterns \(install gitleaks for deeper scan\)/);
+  const required = boundedSpawnSync(process.execPath, [SCAN], { cwd: dir, encoding: 'utf8', env: { ...bare, EOS_REQUIRE_GITLEAKS: '1' } });
+  assert.equal(required.status, 1, required.stdout);
+  assert.match(required.stdout, /ERROR gitleaks is not on PATH — EOS_REQUIRE_GITLEAKS=1/);
+});
+
+test('finding I: CI installs a pinned gitleaks, verifies its checksum, and requires it', () => {
+  const ci = readFileSync(join(REPO_ROOT, '.github/workflows/eos-ci.yml'), 'utf8');
+  assert.match(ci, /GITLEAKS_VERSION: \d+\.\d+\.\d+\n/, 'a pinned version, never "latest"');
+  assert.match(ci, /GITLEAKS_SHA256: [0-9a-f]{64}\n/);
+  assert.match(ci, /sha256sum --check --strict/);
+  assert.match(ci, /EOS_REQUIRE_GITLEAKS: '1'\n\s+run: node \.github\/hooks\/secret-scan\.mjs/);
 });

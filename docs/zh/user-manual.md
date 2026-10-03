@@ -1743,7 +1743,7 @@ cp .vscode/settings.json.example .vscode/settings.json    # 活跃文件保持�
 | `bmad-*` 技能装在**用户级**、未 pin 版本（审计 H4/T6） | 不同机器技能版本/存否不一 → agentic 行为不完全可复现 | 在 `docs/` 记录团队统一的 bmad 版本；关键技能可 vendor/子模块化 |
 | Hooks 是 Preview、逐机器、解析失败放行、CI 不调用（审计 G2） | 破坏性操作实时拦截非权威，可绕过 | 权威在 D.1 的 CI 硬门 + 人工评审；hooks 仅作减速带 |
 | agent 具 `editFiles`（审计 H5） | 原则上可改自身治理文件 | D.2 CODEOWNERS + D.1 必审（开启后即阻断） |
-| `gitleaks` 深扫是**可选增强**（opt-in、never required），未装即静默降级 | 只跑零依赖内置正则时，覆盖弱于 gitleaks 全量规则 | 内置 `secret-scan.mjs` 始终作为 CI 硬门运行（保底）；CI/本机装 `gitleaks` 即自动叠加深扫 |
+| `gitleaks` 深扫在**本地是可选增强**，未装即回退到内置规则 | 只跑零依赖内置正则时，覆盖弱于 gitleaks 全量规则 | 内置 `secret-scan.mjs` 始终作为 CI 硬门运行（保底）。自 eos-2.3.0 起，EOS CI 会安装固定版本、校验过校验和的 `gitleaks` 并设置 `EOS_REQUIRE_GITLEAKS=1`，因此在 CI 中缺少 gitleaks 会失败而不是降级 |
 | **Windows**：核心 hook 为 Node（跨平台）；早期 `quality.json` 曾用 `sh -c`（round-2 N1 已改为 `node .github/hooks/quality.mjs`，原生 Windows 无需 WSL/Git-Bash） | 无 `git` 时的目录回退遍历在 Windows 上曾显示绝对路径（已用 `path.relative` 归一化）；`bmad-*` 与 `act`（需 Docker Desktop）等外部工具的可用性仍随平台 | 三个核心 hook + `quality.mjs` 已按跨平台实现；**权威质量门在 CI（`ubuntu-latest`）**，与本机 OS 无关 |
 
 **须组织决策（模板不代做，`【需组织标准】`）**：CI runner 标准（现 `ubuntu-latest`）、批准的密钥库、
