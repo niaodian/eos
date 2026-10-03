@@ -3,7 +3,7 @@
 // Registered in ./index.mjs. A handler receives (snapshot, flags) and returns an exit code (./shared.mjs).
 import { existsSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { join, dirname, resolve } from 'node:path';
-import { planUpgrade, applyUpgrade, templateVersion, isTemplate, changelogBetween, PROJECT_OWNED } from '../lib/upgrade.mjs';
+import { planUpgrade, applyUpgrade, templateVersion, isTemplate, changelogBetween, generatedIn, PROJECT_OWNED } from '../lib/upgrade.mjs';
 import { gateInputs, gateCollections } from '../lib/state.mjs';
 import { evidenceIntegrity } from '../lib/gates.mjs';
 import { readIntent } from '../lib/record.mjs';
@@ -25,6 +25,7 @@ import { fetchBaseline } from '../adapters/policy-upstream.mjs';
 import { signDocument, verifyDocument, loadPublicKey, keyId } from '../lib/signing.mjs';
 import { loadSchema, validate } from '../lib/schema.mjs';
 import { buildReport, renderReportMarkdown, buildOrgReport, renderOrgMarkdown, readReports } from '../lib/report.mjs';
+import { spawnSync } from 'node:child_process';
 
 const CLI = 'node .github/eos/eos.mjs';
 
@@ -327,11 +328,21 @@ export const maintenanceCommands = {
     const nextVersion = templateVersion(next);
     const rows = planUpgrade({ root: snapshot.root, next, base });
     if (flags.write) applyUpgrade({ root: snapshot.root, next, rows });
+    // Agent-platform files are regenerated, not compared: by the upgraded CLI, in its own process, so
+    // the NEW generator writes them for this project's own agentPlatforms (ADR-019).
+    const generated = { inTemplate: generatedIn(next).length, regenerated: null, error: null };
+    if (flags.write) {
+      const r = spawnSync(process.execPath, [join(snapshot.root, '.github/eos/eos.mjs'), 'agents', 'sync', '--write', '--json'], { cwd: snapshot.root, encoding: 'utf8', timeout: 120000 });
+      let out = null;
+      try { out = JSON.parse(r.stdout); } catch { /* reported below */ }
+      if (r.status === 0 && out) generated.regenerated = out.files.map((f) => `${f.action} ${f.path}`);
+      else generated.error = out?.problems?.join('; ') || (r.stdout || r.stderr || r.error?.message || `exit ${r.status}`).trim();
+    }
     const counts = Object.fromEntries(['update', 'add', 'remove', 'kept', 'conflict', 'current'].map((a) => [a, rows.filter((r) => r.action === a).length]));
     const conflicts = rows.filter((r) => r.action === 'conflict');
     // What changed, from the new template's own changelog — read before anything is applied.
     const changelog = changelogBetween(next, baseVersion, nextVersion, { language: snapshot.project?.language });
-    const json = { from: baseVersion, to: nextVersion, write: !!flags.write, counts, files: rows.filter((r) => r.action !== 'current'), changelog: changelog.entries };
+    const json = { from: baseVersion, to: nextVersion, write: !!flags.write, counts, files: rows.filter((r) => r.action !== 'current'), changelog: changelog.entries, generated };
     const news = changelog.entries.length
       ? [`What changes for you (${changelog.path} of ${nextVersion})`,
         ...changelog.entries.flatMap((e) => [`  ${e.version}${e.title ? ` — ${e.title}` : ''}`, ...e.lines.map((l) => `    · ${l.replace(/\*\*/g, '')}`)]), '']
@@ -344,19 +355,23 @@ export const maintenanceCommands = {
       '',
       `  ${counts.update} update · ${counts.add} add · ${counts.remove} remove · ${counts.kept} kept · ${counts.conflict} conflict · ${counts.current} current`,
       `  Never touched (owned by the project): ${PROJECT_OWNED.length} path rules — the declaration, evidence, ledger, waivers, stories, README…`,
+      !flags.write
+        ? `  Not compared (generated): the agent-platform files (.mcp.json, .claude/, the skill copies… — ${generated.inTemplate} in the new template). --write regenerates them for this project's agentPlatforms.`
+        : generated.error
+          ? `  Agent-platform files were NOT regenerated: ${generated.error} — fix that, then run: node .github/eos/eos.mjs agents sync --write`
+          : `  Agent-platform files regenerated for this project's agentPlatforms: ${generated.regenerated.length ? generated.regenerated.join(', ') : 'already current'}`,
       '',
       ...(flags.write
         ? [...(conflicts.length ? ['  Merge each parked file into its original by hand, then delete .eos/local/upgrade/.'] : []),
           '  Next: node .github/eos/eos.mjs policy lock   (see what the upgrade changed in the policy; re-lock with --write)',
           '        node .github/eos/eos.mjs docs --write',
-          '        node .github/eos/eos.mjs agents sync --write   (regenerate the agent platforms\' copies of the skills)',
           '        node .github/eos/eos.mjs verify --full',
           `  Read the upgrade notes for ${nextVersion} in docs/eos/user-manual.md §10.`]
         : ['  Nothing was changed. Re-run with --write to apply.']),
       '',
     ].join('\n');
     emit(flags, json, text);
-    return flags.write && conflicts.length ? EXIT.BLOCKED : EXIT.OK;
+    return flags.write && (conflicts.length || generated.error) ? EXIT.BLOCKED : EXIT.OK;
   },
   /**
    * `eos report [--format json|markdown] [--out <file>]`: this repository's governance report.

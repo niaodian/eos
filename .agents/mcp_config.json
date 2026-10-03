@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "eos": {
+      "command": "node",
+      "args": [
+        ".github/eos/eos.mjs",
+        "mcp"
+      ]
+    }
+  }
+}

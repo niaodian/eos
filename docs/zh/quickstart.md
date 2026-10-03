@@ -57,6 +57,7 @@ EOS 本身从不调用任何模型，也不需要任何 API key。每一行都�
 |---|---|
 | **只有 Node.js** | 完整的治理引擎：`eos next` / `status` / `check` / `verify`、全部门禁、账本、策略锁、签名发布、密钥扫描 |
 | **+ VS Code 与 GitHub Copilot** | 引导式流程：`eos-*` agent、`/eos-*` 斜杠命令（技能）、常驻规则与 PreToolUse 护栏。所用模型就是你在 Copilot 里选的那个——无需任何配置 |
+| **或其他 agent**（Claude Code、Codex、Cursor、Antigravity、Gemini CLI …） | 同样的技能与 `AGENTS.md`、EOS 的 MCP 服务，以及按该 agent 自身钩子格式运行的护栏。Claude Code 与 Antigravity 开箱即用；其他平台用 `node .github/eos/eos.mjs agents sync --platform <名称> --write` 加入（[手册 §7.9](user-manual.md)） |
 | **+ BMAD 技能**（`bmad-*`） | 各阶段编排的撰写工作流（PRD、架构、story、测试设计）。没有它们，`eos next` 仍会点名每一步，由你手工完成 |
 | **+ BMAD 项目运行时**（`_bmad/`，需要 python3 与 uv） | BMAD 的项目级定制与会话记忆。可选：没有它，技能按自带默认值运行 |
 | **一个 agentic / LLM 产品** | 你产品自己的模型调用，由评估工具链来检验（[eval-starter](../eos/examples/eval-starter/README.md)）。那是你本来就要写的产品代码，不是 EOS 的配置 |

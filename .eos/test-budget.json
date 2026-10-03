@@ -66,6 +66,7 @@
       "description": "Several modules together through real fixtures: routing decisions, gate bypasses, cross-stack quality.",
       "budgetMs": 95000,
       "files": [
+        ".github/eos/agent-platforms.test.mjs",
         ".github/eos/bypass.test.mjs",
         ".github/eos/cross-branch.test.mjs",
         ".github/eos/first-run.test.mjs",

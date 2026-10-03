@@ -52,6 +52,7 @@ EOS itself never calls a model and needs no API key. Each row adds to the one ab
 |---|---|
 | **Node.js only** | the whole governance engine: `eos next` / `status` / `check` / `verify`, every gate, the ledger, policy locks, signed releases, the secret scan |
 | **+ VS Code with GitHub Copilot** | the guided flow: the `eos-*` agents, the `/eos-*` slash commands (skills), the always-on rules and the PreToolUse guardrail. The model is the one you pick in Copilot — nothing to configure |
+| **or another agent** (Claude Code, Codex, Cursor, Antigravity, Gemini CLI …) | the same skills and `AGENTS.md`, the EOS MCP server and the guardrail in that agent's own hook format. Claude Code and Antigravity work out of the box; add another with `node .github/eos/eos.mjs agents sync --platform <name> --write` ([manual §7.9](user-manual.md)) |
 | **+ BMAD skills** (`bmad-*`) | the authoring workflow each stage orchestrates (PRD, architecture, stories, test design). Without them `eos next` still names every step and you do it by hand |
 | **+ the BMAD project runtime** (`_bmad/`, needs python3 and uv) | BMAD's project-level customization and session memory. Optional: the skills run on their shipped defaults without it |
 | **an agentic / LLM product** | your product's own model calls, which the eval harness exercises ([eval-starter](examples/eval-starter/README.md)). That is product code you write anyway, not EOS configuration |

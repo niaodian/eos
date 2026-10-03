@@ -243,7 +243,7 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 | **Agents（角色）** | `.github/agents/*.agent.md` | 切换：你选中某 agent 时持续生效 | Chat 的 agent 选择器切换 | 阶段编排者（持久 persona + 工具限制 + handoffs） |
 | **Skills（能力）** | `.agents/skills/*/SKILL.md`（项目级；`.github/skills/` 与 `.claude/skills/` 也会被读取）、`~/.agents/skills/bmad-*`（用户级） | 按相关性自动加载，或被 agent 点名调用 | Agent 自动用，或在请求里写 `bmad-xxx` | 可移植能力（复用 BMAD + 新建补强） |
 | **Hooks（护栏）** | `.github/hooks/*.json` + 脚本 | 生命周期事件触发（PreToolUse 等） | 自动；无需手动 | 确定性护栏（拦危险操作、跑质量门） |
-| **MCP servers（工具扩展）** | `.vscode/mcp.json.example`（顶层 `"servers"`；opt-in 复制成 `.vscode/mcp.json`） | 客户端**会话启动即 eager 连接**、workspace 全局、**不可按阶段门控** | **默认 inert**（`.example`）；阶段 7 手动启用，活动文件留本地不提交 | 本地工具扩展（如 Playwright MCP 驱动浏览器自测，见 7.7） |
+| **MCP servers（工具扩展）** | `.mcp.json`（EOS 自带的只读与验证服务 `eos mcp`，自 eos-2.3.0 起；各客户端会请你确认信任一次）· `.vscode/mcp.json.example`（顶层 `"servers"`；opt-in 复制成 `.vscode/mcp.json`） | 客户端**会话启动即 eager 连接**、workspace 全局、**不可按阶段门控** | `eos` 很轻量，从阶段 1 起就有用，因此默认声明；Playwright **默认 inert**（`.example`）——阶段 7 手动启用，活动文件留本地不提交 | 为 agent 提供结构化的 `eos next` / `check` / `verify`（[ADR-018](../adr/018-mcp-server.md)）；本地工具扩展（如 Playwright MCP 驱动浏览器自测，见 7.7） |
 
 ## 4.1 关键认知：没有"原生优先级"
 
@@ -801,6 +801,7 @@ LLM tracing（token/成本/context/tool-span）。
 | `init [--write]` | 报告或创建本地的、非破坏性的集成文件 |
 | `stage init <stage> [--write] [--interactive]` | 根据 schema 生成某阶段机器记录（`docs/<stage>.json`）及其文档的骨架：每个必填字段都放一个 `TODO(eos)` 占位符——在逐一回答之前，所有门禁都会拒绝这份记录，因此骨架永远不会推进阶段。样例见 [examples/stage-records](../eos/examples/stage-records/README.md)（自 eos-2.3.0 起） |
 | `stack sync [--write]` | 依据 `.eos/project.json` 渲染常驻工作区规则的 `Local commands`，使散文不可能与 CI 实际执行的命令不一致。未声明技术栈时阻断而非猜测 |
+| `agents sync [--platform <x>] [--write] [--check]` | 从同一个源头生成各 agent 平台读取的内容：技能副本、EOS 的 MCP 条目、以平台自身格式运行的护栏钩子，以及不会冲突的 agent。共享配置文件中不属于 EOS 的内容一律保留；`--platform` 把平台加入 `agentPlatforms`；CI 运行 `--check`（自 eos-2.2.0 起；多平台自 eos-2.3.0 起，见 7.9） |
 | `mcp` | 通过 Model Context Protocol（stdio）把读取与验证类命令提供给 agent：`next`、`status`、`resume`、`health`、`explain`、`check`、`verify`、`release-status`、阶段骨架、`product-tree`、`doctor`、`policy check`。批准、豁免、状态迁移、发布签名以及一切改写治理文件的命令都刻意不作为工具提供（[ADR-018](../adr/018-mcp-server.md)）。各平台的客户端配置由 `eos agents sync` 生成（自 eos-2.3.0 起） |
 | `doctor` | EOS 自身接线是否正确 |
 
@@ -882,7 +883,7 @@ LLM tracing（token/成本/context/tool-span）。
 
 | 文件 | 事件 | 作用 |
 |---|---|---|
-| `guardrails.json` + `deny-dangerous.js` | PreToolUse | 拦截危险操作 + **供应链投毒（`curl\|bash`/`--unsafe-perm`）+ 硬编码密钥字面量**（输出 `permissionDecision:"deny"`） |
+| `guardrails.json` + `deny-dangerous.js` | PreToolUse | 拦截危险操作 + **供应链投毒（`curl\|bash`/`--unsafe-perm`）+ 硬编码密钥字面量**（输出 `permissionDecision:"deny"`）。其他 agent 平台用 `--format <平台>` 运行同一个脚本，钩子由 `eos agents sync` 为它们生成（见 7.9） |
 | `quality.json` | PostToolUse | 写文件后跑 lint+typecheck+test 质量门（**提示性**，非权威门禁：固定 exit 0；权威门禁是 CI 里的 `project-gate.mjs`） |
 | `config-check.json` | PostToolUse | 每次编辑后自动跑 `validate-config.mjs`（配置 S1–S14）**＋ `eos-doctor.mjs`（SDLC 门诊 / G-EVAL 连线 / 密钥扫描）**（同样是提示性的） |
 | `validate-config.mjs` | 手动/被 hook 调用 | 零依赖静态验证器（S1–S14：规则/agent/prompt frontmatter、glob、必需路径、hook 事件、**S12 `.eos/project.json` 项目声明有效性**、**S13 `.eos/` 工作流主干及其交叉引用**、**S14 常驻工作区规则不得描述本项目从未声明过的技术栈**） |
@@ -954,6 +955,25 @@ Playwright MCP：
 - agent 模式 + MCP 的具体 UI 随版本演进，`【需在你的版本中核实】`。
 
 ---
+
+## 7.9 Agent 平台（`eos agents sync`）
+
+EOS 只写一次，再为团队使用的每个 agent 平台生成各自的文件（[ADR-019](../adr/019-agent-platforms.md)）。大部分工作由三个开放标准承担——`AGENTS.md`、`.agents/skills/` 中的 Agent Skills，以及 `eos mcp` 服务（[ADR-018](../adr/018-mcp-server.md)）。其余部分由 `eos agents sync` 按各平台自己的格式写出：MCP 条目、工具调用前的钩子（同一个 `deny-dangerous.js`，以 `--format <平台>` 运行），以及在平台只读自家目录时生成的 agent 或技能副本。
+
+| 平台 | 为它生成的内容 | 一次性信任步骤 |
+|---|---|---|
+| GitHub Copilot *（默认）* | `.mcp.json`——它的 agent、技能和 `.github/hooks/guardrails.json` 是模板自带的 | VS Code 在首次启动 MCP 服务前请你确认信任 |
+| Claude Code *（默认）* | `.claude/skills/` 副本、`.claude/settings.json` 中的钩子、`.mcp.json` | Claude Code 会请你批准一次项目的 MCP 服务 |
+| Google Antigravity *（默认）* | `.agents/hooks.json`、`.agents/mcp_config.json`、`.agents/agents/` | MCP 工具每次调用都会询问 |
+| OpenAI Codex | `.codex/config.toml`（带标记的 `[mcp_servers.eos]` 块）、`.codex/hooks.json`、`.codex/agents/*.toml` | 信任该项目，并逐个批准钩子一次（`/hooks`） |
+| Cursor | `.cursor/hooks.json`（shell 命令）、`.cursor/mcp.json` | MCP 每次调用询问（Run Modes） |
+| Gemini CLI | `.gemini/settings.json`：把 `AGENTS.md` 加入 `context.fileName`、钩子（`BeforeTool`）、MCP | 信任该文件夹 |
+| Kiro · Qwen Code · Windsurf / Devin Desktop · OpenCode · Cline *（第二梯队）* | `.kiro/…` · `.qwen/…` · `.devin/…` · `opencode.json` 与插件 · `.clinerules/hooks/PreToolUse` | 依据各厂商文档生成——**尚未在真实安装上验证** |
+
+- **选择平台**：在 `.eos/project.json` 中设置 `"agentPlatforms"`。未声明时生成默认集合（Copilot、Claude Code、Antigravity）：即 `.agents/`、`.github/`、`.claude/` 和 `.mcp.json` 中的文件；它们同时让 Codex、Cursor 和 Gemini CLI 读到技能与 `AGENTS.md`，并让 Cursor 用上 Claude 的钩子。一条命令即可加入一个平台：`node .github/eos/eos.mjs agents sync --platform codex --write`。它会修改 `agentPlatforms`，而该文件是每个门禁的输入，所以之后请重新运行 `eos verify`。
+- **共享文件仍归你所有。** EOS 只拥有自己的条目——`eos` 服务、运行 `deny-dangerous.js` 的钩子、带标记的 TOML 块——从不拥有 `.claude/settings.json` 或 `.mcp.json` 的其余内容。移除一个平台只删除它的条目；只有文件里不再剩任何其他内容时才删除该文件。EOS 无法安全合并的文件（带注释的 JSON、你自己的 `[mcp_servers.eos]`）会被拒绝，而不是写到一半；也绝不会透过符号链接写入。
+- **CI 运行 `agents sync --check`。** 请修改源头（`.agents/skills/`、`.github/agents/`、`.github/hooks/`），不要修改生成的文件。`eos upgrade` 会为你的平台重新生成这些文件，而不是拿它们与模板的副本比较。
+- **不生成的内容：** Claude Code 子代理（VS Code 也读取 `.claude/agents/`，每个编排 agent 会出现两次；Claude Code 用技能运行同样的工作流）；Cline 的 MCP 条目（Cline 只读取全局的 `~/.cline/mcp.json`）；Trae、CodeBuddy 和 Comate——它们的文档无法抓取，在实机验证之前由 `AGENTS.md` 和 CLI 提供支持。
 
 # 第 8 章 配置质检与验收
 

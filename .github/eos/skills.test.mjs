@@ -52,6 +52,10 @@ function withSkills(declaration = APP_PROJECT) {
     '.claude/skills/team-notes/SKILL.md': '---\nname: team-notes\ndescription: Our notes. Use when asked.\n---\n# ours\n',
   });
   cpSync(join(REPO_ROOT, '.claude/skills'), join(dir, '.claude/skills'), { recursive: true });
+  // The rest of what the template generates for its default platforms (ADR-019).
+  for (const p of ['.mcp.json', '.claude/settings.json', '.agents/hooks.json', '.agents/mcp_config.json', '.agents/agents']) {
+    cpSync(join(REPO_ROOT, p), join(dir, p), { recursive: true });
+  }
   return dir;
 }
 
@@ -62,7 +66,7 @@ test('agents sync --check fails on a hand-edited copy and names it; --write rest
   const drift = runJson(dir, ['agents', 'sync', '--check']);
   assert.equal(drift.code, 1, drift.out);
   assert.deepEqual(drift.json.files.map((f) => `${f.action} ${f.path}`), ['update .claude/skills/eos-next/SKILL.md']);
-  assert.match(run(dir, ['agents', 'sync', '--check']).out, /Edit the skill there, never the copy/);
+  assert.match(run(dir, ['agents', 'sync', '--check']).out, /Edit the source \(\.agents\/skills\/.*never the copy/);
   assert.equal(run(dir, ['agents', 'sync', '--write']).code, 0);
   assert.equal(readFileSync(join(dir, '.claude/skills/eos-next/SKILL.md'), 'utf8'), readFileSync(join(dir, '.agents/skills/eos-next/SKILL.md'), 'utf8'));
 });
@@ -111,7 +115,7 @@ test('a mirror linked to the source is never written or emptied through the link
   symlinkSync('../.agents/skills', join(dir, '.claude/skills'));
   const undeclared = runJson(dir, ['agents', 'sync', '--write']);
   assert.equal(undeclared.code, 0, undeclared.out);
-  assert.deepEqual(undeclared.json.files, [], 'nothing is planned inside a linked mirror');
+  assert.deepEqual(undeclared.json.files.filter((f) => /^\.(claude|agents)\/skills\//.test(f.path)), [], 'nothing is planned inside a linked mirror');
   assert.ok(existsSync(join(dir, '.agents/skills/eos-adr/SKILL.md')), 'the source is intact');
 
   write(dir, '.eos/project.json', APP_PROJECT);

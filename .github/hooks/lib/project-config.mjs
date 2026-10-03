@@ -19,11 +19,13 @@ export const PARADIGMS = ['deterministic', 'agentic'];
 export const STACKS = ['node', 'python', 'go', 'java', 'rust', 'dotnet', 'other'];
 export const STEPS = ['install', 'lint', 'typecheck', 'test', 'eval', 'audit'];
 /**
- * The agent platforms EOS generates files for (ADR-017). `agentPlatforms` in the declaration narrows
- * it; absent, every one is served. Today only "claude" changes what is written — Claude Code reads
- * skills from .claude/skills alone, so it gets a mirror; the others read .agents/skills natively.
+ * The agent platforms EOS generates files for (ADR-017, ADR-019): Tier 1, then Tier 2 (generated
+ * from each vendor's documentation, not yet verified on a real installation). `agentPlatforms` in the
+ * declaration chooses them; absent, DEFAULT_AGENT_PLATFORMS — the files in .agents/, .github/,
+ * .claude/ and .mcp.json, which also serve most of what Codex, Cursor and Gemini CLI read.
  */
-export const AGENT_PLATFORMS = ['copilot', 'claude', 'codex', 'cursor', 'antigravity', 'gemini'];
+export const AGENT_PLATFORMS = ['copilot', 'claude', 'codex', 'cursor', 'antigravity', 'gemini', 'kiro', 'qwen', 'devin', 'opencode', 'cline'];
+export const DEFAULT_AGENT_PLATFORMS = ['copilot', 'claude', 'antigravity'];
 /** `release`: what ships and the key it is signed with. Paths stay inside the repository. */
 function releaseOf(raw, errors) {
   if (raw === undefined) return undefined;

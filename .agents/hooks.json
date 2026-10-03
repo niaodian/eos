@@ -1,0 +1,16 @@
+{
+  "eos-guardrail": {
+    "PreToolUse": [
+      {
+        "matcher": "run_command",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .github/hooks/deny-dangerous.js --format antigravity",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}

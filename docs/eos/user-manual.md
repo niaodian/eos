@@ -229,7 +229,7 @@ EOS uses 5 native VS Code + Copilot mechanisms to carry rules. **Understanding "
 | **Agents** | `.github/agents/*.agent.md` | On switch: continuously effective when you select an agent | Switch in Chat's agent selector | Phase orchestrators (persistent persona + tool limits + handoffs) |
 | **Skills** | `.agents/skills/*/SKILL.md` (project-level; `.github/skills/` and `.claude/skills/` are read too), `~/.agents/skills/bmad-*` (user-level) | Auto-loaded by relevance, or explicitly called by an agent | Agent uses them automatically, or write `bmad-xxx` in a request | Portable capabilities (reuse BMAD + new-build augmentation) |
 | **Hooks** | `.github/hooks/*.json` + scripts | Triggered by lifecycle events (PreToolUse, etc.) | Automatic; no manual action required | Deterministic guardrails (block dangerous operations, run quality gates) |
-| **MCP servers** | `.vscode/mcp.json.example` (top-level `"servers"`; opt-in copy to `.vscode/mcp.json`) | Client **eager-connects at session start**, workspace-global, **cannot be gated by phase** | **Inert by default** (`.example`); enable manually in Phase 7, keep active file local and uncommitted | Local tool extension (e.g., Playwright MCP drives browser self-checks; see 7.7) |
+| **MCP servers** | `.mcp.json` (EOS's own read-and-verify server, `eos mcp`, since eos-2.3.0; each client asks once to trust it) · `.vscode/mcp.json.example` (top-level `"servers"`; opt-in copy to `.vscode/mcp.json`) | Client **eager-connects at session start**, workspace-global, **cannot be gated by phase** | `eos` is light and useful from Phase 1, so it is declared; Playwright is **inert by default** (`.example`) — enable it manually in Phase 7, keep the active file local and uncommitted | Structured `eos next` / `check` / `verify` for the agent ([ADR-018](../adr/018-mcp-server.md)); local tool extension (e.g., Playwright MCP drives browser self-checks; see 7.7) |
 
 ## 4.1 Key recognition: there is no "native priority"
 
@@ -770,6 +770,7 @@ rejected transition · `2` blocked/pending/stale · `3` EOS itself cannot be eva
 | `init [--write]` | Report or create local, non-destructive integration files |
 | `stage init <stage> [--write] [--interactive]` | The skeleton of a stage's machine record (`docs/<stage>.json`) and its document, generated from the schema: every required field with a `TODO(eos)` placeholder — every gate rejects the record until each is answered, so a skeleton never advances a stage. Samples: [examples/stage-records](examples/stage-records/README.md) (since eos-2.3.0) |
 | `stack sync [--write]` | Render the always-on workspace rule's `Local commands` from `.eos/project.json`, so the prose cannot disagree with what CI runs. Blocks rather than guessing when no stack is declared |
+| `agents sync [--platform <x>] [--write] [--check]` | Generate what each agent platform reads from one source: skill copies, the EOS MCP entry, the guardrail hook in the platform's dialect, agents where they do not collide. Shared configuration files keep everything that is not EOS's; `--platform` adds a platform to `agentPlatforms`; CI runs `--check` (since eos-2.2.0; platforms since eos-2.3.0, see 7.9) |
 | `mcp` | Serve the read and verify commands to an agent over the Model Context Protocol (stdio): `next`, `status`, `resume`, `health`, `explain`, `check`, `verify`, `release-status`, a stage skeleton, `product-tree`, `doctor`, `policy check`. Approving, waiving, transitions, release signing and everything that rewrites governance files are deliberately not tools ([ADR-018](../adr/018-mcp-server.md)). `eos agents sync` writes each platform's client configuration (since eos-2.3.0) |
 | `doctor` | Is EOS itself wired correctly? |
 
@@ -844,7 +845,7 @@ rejected transition · `2` blocked/pending/stale · `3` EOS itself cannot be eva
 
 | File | Event | Purpose |
 |---|---|---|
-| `guardrails.json` + `deny-dangerous.js` | PreToolUse | Blocks dangerous operations + **supply-chain poisoning (`curl&#124;bash`/`--unsafe-perm`) + hardcoded secret literals** (outputs `permissionDecision:"deny"`) |
+| `guardrails.json` + `deny-dangerous.js` | PreToolUse | Blocks dangerous operations + **supply-chain poisoning (`curl&#124;bash`/`--unsafe-perm`) + hardcoded secret literals** (outputs `permissionDecision:"deny"`). Other agent platforms run the same script with `--format <platform>`, from the hook `eos agents sync` generates for them (see 7.9) |
 | `quality.json` | PostToolUse | Runs lint+typecheck+test quality gate after file writes (**advisory**, not the authoritative gate: it always exits 0; the authority is `project-gate.mjs` in CI) |
 | `config-check.json` | PostToolUse | Automatically runs `validate-config.mjs` after every edit (configuration S1–S14) **+ `eos-doctor.mjs` (SDLC clinic / G-EVAL wiring / secret scan)** (also advisory) |
 | `validate-config.mjs` | Manual/called by hook | Zero-dependency static validator (S1–S14: rule/agent/prompt frontmatter, glob, required paths, hook events, **S12 `.eos/project.json` declaration validity**, **S13 the `.eos/` workflow spine and its cross-references**, **S14 the always-on workspace rule must not describe a stack the project never declared**) |
@@ -909,6 +910,25 @@ Want the "agent to personally open the browser, click around, and screenshot sel
 - The concrete UI for agent mode + MCP evolves by version, `【Verify in your version】`.
 
 ---
+
+## 7.9 Agent platforms (`eos agents sync`)
+
+EOS is written once and generated for each agent platform the team uses ([ADR-019](../adr/019-agent-platforms.md)). Three open standards carry most of it — `AGENTS.md`, Agent Skills in `.agents/skills/`, and the `eos mcp` server ([ADR-018](../adr/018-mcp-server.md)). `eos agents sync` writes the rest in each platform's own format: its MCP entry, its pre-tool hook (the same `deny-dangerous.js`, run with `--format <platform>`), and agents or skill copies where a platform reads only its own directory.
+
+| Platform | Generated for it | One-time trust step |
+|---|---|---|
+| GitHub Copilot *(default)* | `.mcp.json` — its agents, skills and `.github/hooks/guardrails.json` are the template's own | VS Code asks you to trust the MCP server before it first starts |
+| Claude Code *(default)* | `.claude/skills/` copy, the hook in `.claude/settings.json`, `.mcp.json` | Claude Code asks once to approve the project's MCP server |
+| Google Antigravity *(default)* | `.agents/hooks.json`, `.agents/mcp_config.json`, `.agents/agents/` | MCP tools ask per call |
+| OpenAI Codex | `.codex/config.toml` (a marked `[mcp_servers.eos]` block), `.codex/hooks.json`, `.codex/agents/*.toml` | Trust the project, and approve each hook once (`/hooks`) |
+| Cursor | `.cursor/hooks.json` (shell commands), `.cursor/mcp.json` | MCP asks per call (Run Modes) |
+| Gemini CLI | `.gemini/settings.json`: `AGENTS.md` added to `context.fileName`, the hook (`BeforeTool`), MCP | Trust the folder |
+| Kiro · Qwen Code · Windsurf / Devin Desktop · OpenCode · Cline *(Tier 2)* | `.kiro/…` · `.qwen/…` · `.devin/…` · `opencode.json` and a plugin · `.clinerules/hooks/PreToolUse` | Generated from each vendor's documentation — **not yet verified on a real installation** |
+
+- **Choose the platforms** in `.eos/project.json` → `"agentPlatforms"`. Absent, the default set is generated (Copilot, Claude Code, Antigravity): the files in `.agents/`, `.github/`, `.claude/` and `.mcp.json`, which also give Codex, Cursor and Gemini CLI the skills and `AGENTS.md`, and Cursor the Claude hook. One command adds a platform: `node .github/eos/eos.mjs agents sync --platform codex --write`. It edits `agentPlatforms`, an input of every gate, so re-run `eos verify` afterwards.
+- **Shared files stay yours.** EOS owns its entries — the `eos` server, the hook that runs `deny-dangerous.js`, a marked TOML block — never the rest of `.claude/settings.json` or `.mcp.json`. Removing a platform removes only its entries, and a file only when nothing else is left in it. A file EOS cannot merge safely (JSON with comments, your own `[mcp_servers.eos]`) is refused, not half-written, and nothing is written through a symbolic link.
+- **CI runs `agents sync --check`.** Edit the sources (`.agents/skills/`, `.github/agents/`, `.github/hooks/`), never a generated file. `eos upgrade` regenerates these files for your platforms instead of comparing them with the template's.
+- **Not generated:** Claude Code subagents (VS Code also reads `.claude/agents/` and would list every orchestrator twice; Claude Code runs the same workflows as skills); Cline's MCP entry (Cline reads only its global `~/.cline/mcp.json`); Trae, CodeBuddy and Comate, whose documentation could not be fetched — `AGENTS.md` and the CLI serve them until they are verified on a real machine.
 
 # Chapter 8 Configuration QA and acceptance
 

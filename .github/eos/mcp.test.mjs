@@ -241,3 +241,14 @@ test('SIGTERM stops the server and the command it was running', { skip: process.
   assert.equal(code, 0, 'the server handled the signal and exited cleanly');
   assert.ok(!s.messages.some((m) => m.id === 'slow'), 'the interrupted call is not answered');
 });
+
+test('started outside an EOS project — a client with no cwd setting — the server answers for the repository of its CLI', async () => {
+  const { serverRoot } = await import('./commands/mcp.mjs');
+  assert.equal(serverRoot(REPO_ROOT), REPO_ROOT);
+  const elsewhere = project({}, { withGovernance: false, git: false });
+  assert.equal(serverRoot(elsewhere), REPO_ROOT, 'no .eos/ here: the CLI\'s own repository');
+  const s = server(elsewhere);
+  const next = await s.request('tools/call', { name: 'eos_explain', arguments: { gate: 'G1' } });
+  assert.equal(next.result.structuredContent.verdict, 'PASS', JSON.stringify(next.result.structuredContent));
+  assert.equal((await s.close()).code, 0);
+});

@@ -19,6 +19,7 @@
 import { createHash } from 'node:crypto';
 import { chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync, unlinkSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { isGeneratedPath } from './agent-platforms.mjs';
 
 /** Paths a project owns by design: never upgraded, whatever either template contains. */
 export const PROJECT_OWNED = [
@@ -33,6 +34,7 @@ const SKIP_DIRS = new Set(['.git', 'node_modules']);
 export const PARK_DIR = '.eos/local/upgrade';
 
 const owned = (p) => PROJECT_OWNED.some((re) => re.test(p));
+export { isGeneratedPath };
 
 function walk(dir, prefix = '', out = []) {
   if (!existsSync(dir)) return out;
@@ -98,7 +100,10 @@ export function changelogBetween(nextDir, fromVersion, toVersion, { language = n
  * @returns {{path: string, action: 'current'|'update'|'add'|'remove'|'kept'|'conflict'}[]}
  */
 export function planUpgrade({ root, next, base }) {
-  const paths = [...new Set([...walk(next), ...walk(base)])].filter((p) => !owned(p)).sort();
+  // Agent-platform files are generated for THIS project's platforms (ADR-019): comparing them with
+  // the template's, generated for the template's, would add files for platforms the project does not
+  // use. They are regenerated after the upgrade instead (`eos agents sync --write`).
+  const paths = [...new Set([...walk(next), ...walk(base)])].filter((p) => !owned(p) && !isGeneratedPath(p)).sort();
   return paths.map((path) => {
     const n = digest(join(next, path));
     const b = digest(join(base, path));
@@ -111,6 +116,9 @@ export function planUpgrade({ root, next, base }) {
     return { path, action };
   });
 }
+
+/** The template's generated agent-platform files, which the plan leaves out. */
+export const generatedIn = (dir) => walk(dir).filter(isGeneratedPath);
 
 /** Carry out a plan. Returns the plan rows, with `parked` set on conflicts NEXT was parked for. */
 export function applyUpgrade({ root, next, rows }) {
