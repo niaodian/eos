@@ -176,7 +176,13 @@ export function currentProductTree(root) {
   if (!cache.has(root)) cache.set(root, computeProductTree(root));
   return cache.get(root);
 }
-export const clearProductTreeCache = () => cache.clear();
+const pathCache = new Map();
+/** The paths of every product file (memoised per process); null when git cannot enumerate the tree. */
+export function productFilePaths(root) {
+  if (!pathCache.has(root)) pathCache.set(root, productFiles(root)?.map((f) => f.path) ?? null);
+  return pathCache.get(root);
+}
+export const clearProductTreeCache = () => { cache.clear(); pathCache.clear(); };
 
 /**
  * Name the files behind a digest mismatch. The digest DECIDES; this only explains, so it is allowed

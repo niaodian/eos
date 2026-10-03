@@ -6,6 +6,7 @@
   runner output — narrowed to "EOS parses no runner-*specific* output"
 - Depends on: ADR-004 (evidence trust), ADR-014 (trust chain — what the policy lock covers)
 - Governs: `.eos/project.json` `evidence.junit`, `.github/eos/lib/junit.mjs`, `.github/eos/lib/test-evidence.mjs`,
+  `.github/eos/lib/test-source.mjs`,
   the `verified` gate's `tests-executed` and `trace-complete` checks, `eos evidence junit`
 
 ## Context
@@ -45,15 +46,26 @@ Options considered:
    a name that embeds its ancestry; never as a substring. When the report records where a case lives
    (`file`, a path or dotted module in `classname`, a file-named suite), only cases in the row's file
    count (`"match": "file"`). When it does not — node:test writes `classname="test"` and no file — the
-   name alone matches and the result is marked `"match": "name"`; file ownership is then guaranteed by
-   the gate's existing check that the selector appears in the file the matrix names. Several matching
-   cases all count, and the worst outcome wins: one failure fails the row, and skipped is never PASS.
-   A row with no match is reported with the name that was looked for.
+   name alone matches and the result is marked `"match": "name"`. Which file it ran from is then
+   settled from the source (`test-source.mjs`), and is an ERROR when it cannot be: the named file must
+   declare the test — as a string literal or a function name, outside comments, so "valid password"
+   inside "invalid password" or a commented-out test does not count — and no other test file may
+   declare the same name, because the passing case could be that file's. A qualified selector
+   (`suite > name`) narrows both. Several matching cases all count, and the worst outcome wins: one
+   failure fails the row, and skipped is never PASS. A row with no match is reported with the name that
+   was looked for. When the matrix has a header, references are read from its "Test" column; a
+   file-only reference that names no file ("e.g.", "Node.js") is prose and is skipped.
 3. **Freshness by mechanism.** A project declares `"evidence": { "junit": ["reports/junit/*.xml"] }`.
    The `verified` gate inventories the matching files, runs the declared quality commands as before,
    and reads only the reports that run created or changed. It then writes `docs/evidence/test-run.json`
    bound to the product tree measured before the run, the command (`commandDigest`) and the producer
-   (local, or the CI it detects — self-reported, as every producer is). No step per story.
+   (local, or the CI it detects — self-reported, as every producer is). No step per story. Every
+   story's `verified` evidence binds this one file, so a run whose results differ from the recorded
+   ones only in timings (`generatedAt`, `runId`, durations) keeps the file instead of rewriting it —
+   otherwise verifying one story would make every other story's evidence STALE.
+   - Discovery follows the pattern: a literal or wildcard segment reads one directory, and only `**`
+     descends further (bounded). Reading is bounded by total size (256 MB), not file count, because
+     Surefire and Gradle write one report per test class.
    - Tests that run in another CI step use `eos evidence junit [<files>…] [--write]`, where freshness is
      the weaker mechanical rule that a report older than any product file is refused (STALE).
    - A report git does not ignore is refused: it would be part of the product tree, so writing it would
@@ -79,3 +91,5 @@ Options considered:
   and hostile inputs (`junit.test.mjs`, `test-evidence.test.mjs`); growing it requires amending this ADR.
 - `match: "name"` is weaker than a file match. It is accepted because the alternative — refusing
   node:test, the template's own runner — would push those projects back to hand-written summaries.
+  Reading source to settle it is a heuristic, so it errs one way only: a name it cannot attribute to
+  exactly one test file is an ERROR asking for a unique name or a qualified selector, never a PASS.

@@ -21,7 +21,8 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, isAbsolute, relative } from 'node:path';
 import { parseJUnit, answerReference, JUNIT_MAX_BYTES } from './junit.mjs';
-import { parseTraceMatrix, insideRepo } from './gate-primitives.mjs';
+import { parseTraceMatrix, insideRepo, repoFileExists } from './gate-primitives.mjs';
+import { nameOnlyOwnership } from './test-source.mjs';
 import { currentProductTree, productTreeMembers, newestProductFile } from './product-tree.mjs';
 import { SUMMARY_PATHS, commandDigestOf } from './machine-summary.mjs';
 import { ARTIFACTS } from './state.mjs';
@@ -29,9 +30,14 @@ import { loadSchema, validate } from './schema.mjs';
 import { writeFileAtomic } from './atomic.mjs';
 import { posix } from './registry.mjs';
 
-/** Bounds on discovery, so a pattern like `**\/*.xml` cannot walk a monorepo unbounded. */
-const MAX_REPORTS = 500;
+/**
+ * Bounds on discovery and reading. Discovery follows the pattern, so only `**` can walk far, and
+ * that walk is bounded. Reading is bounded by size rather than count: Surefire and Gradle write one
+ * report per test class, so a large service legitimately has thousands of small files.
+ */
+const MAX_REPORTS = 20000;
 const MAX_SCANNED = 50000;
+const MAX_TOTAL_BYTES = 256 * 1024 * 1024;
 const SKIP_DIRS = new Set(['.git', 'node_modules']);
 
 /** The declared report patterns, or null when the project does not use JUnit evidence. */
@@ -57,34 +63,55 @@ const literalDir = (pattern) => {
   return literal.join('/');
 };
 
+const segmentRe = (seg) => new RegExp(`^${seg.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '[^/]*').replace(/\?/g, '[^/]')}$`);
+
 /**
- * Every file matching the patterns, repository-relative and sorted. Walks only from each pattern's
- * literal prefix, so `reports/junit/*.xml` reads one directory.
+ * Every file matching the patterns, repository-relative and sorted.
+ *
+ * The walk follows the pattern one segment at a time: a literal segment is looked up, a wildcard
+ * segment reads one directory, and only `**` descends further. So `junit.xml` reads the repository
+ * root and nothing below it, and `reports/junit/*.xml` reads one directory.
  * @returns {{files: string[], error: string|null}}
  */
-export function findReports(root, patterns) {
+export function findReports(root, patterns, { maxScanned = MAX_SCANNED } = {}) {
   const found = new Set();
   let scanned = 0;
+  const list = (rel) => { try { return readdirSync(rel ? join(root, rel) : root, { withFileTypes: true }); } catch { return []; } };
+  const counted = () => {
+    if (++scanned > maxScanned) throw new Error(`more than ${maxScanned} files under the evidence.junit patterns — narrow the ** in them to the directory your runner writes to`);
+  };
+  const childOf = (rel, name) => (rel ? `${rel}/${name}` : name);
   for (const pattern of patterns) {
-    const re = globToRegExp(pattern);
-    const start = literalDir(pattern);
-    const walk = (rel) => {
-      const full = rel ? join(root, rel) : root;
-      let entries;
-      try { entries = readdirSync(full, { withFileTypes: true }); } catch { return; }
-      for (const e of entries) {
-        if (SKIP_DIRS.has(e.name)) continue;
-        if (++scanned > MAX_SCANNED) throw new Error(`more than ${MAX_SCANNED} files under the evidence.junit patterns — narrow them to the directory your runner writes to`);
-        const child = rel ? `${rel}/${e.name}` : e.name;
-        if (e.isDirectory()) walk(child);
-        else if (e.isFile() && re.test(child)) found.add(child);
+    const segs = pattern.split('/');
+    const walk = (rel, i) => {
+      const seg = segs[i];
+      const last = i === segs.length - 1;
+      if (seg === '**') {
+        if (!last) walk(rel, i + 1); // `**` may stand for no directory at all
+        for (const e of list(rel)) {
+          if (last && e.isFile()) { counted(); found.add(childOf(rel, e.name)); continue; }
+          if (!e.isDirectory() || SKIP_DIRS.has(e.name)) continue;
+          counted();
+          walk(childOf(rel, e.name), i);
+        }
+        return;
+      }
+      if (!/[*?]/.test(seg)) {
+        const child = childOf(rel, seg);
+        let st;
+        try { st = statSync(join(root, child)); } catch { return; }
+        if (last ? st.isFile() : st.isDirectory()) { if (last) found.add(child); else walk(child, i + 1); }
+        return;
+      }
+      const re = segmentRe(seg);
+      for (const e of list(rel)) {
+        if (!re.test(e.name)) continue;
+        counted();
+        if (last && e.isFile()) found.add(childOf(rel, e.name));
+        else if (!last && e.isDirectory()) walk(childOf(rel, e.name), i + 1);
       }
     };
-    try {
-      if (!start || existsSync(join(root, start))) walk(start);
-    } catch (e) {
-      return { files: [], error: e.message };
-    }
+    try { walk('', 0); } catch (e) { return { files: [], error: e.message }; }
   }
   const files = [...found].sort();
   if (files.length > MAX_REPORTS) return { files: [], error: `${files.length} files match evidence.junit — more than ${MAX_REPORTS}; narrow the patterns` };
@@ -102,11 +129,14 @@ const stampOf = (root, rel) => {
  */
 export function readReports(root, files) {
   const cases = [];
+  let total = 0;
   for (const rel of files) {
     const full = join(root, rel);
     let size;
     try { size = statSync(full).size; } catch (e) { return { cases: [], error: `${rel}: cannot be read (${e.code || e.message})` }; }
     if (size > JUNIT_MAX_BYTES) return { cases: [], error: `${rel}: larger than ${JUNIT_MAX_BYTES / (1024 * 1024)} MB — refused rather than read` };
+    total += size;
+    if (total > MAX_TOTAL_BYTES) return { cases: [], error: `the ${files.length} matching reports add up to more than ${MAX_TOTAL_BYTES / (1024 * 1024)} MB — refused rather than read; narrow evidence.junit` };
     const parsed = parseJUnit(readFileSync(full, 'utf8'));
     if (!parsed.ok) return { cases: [], error: `${rel}: not a JUnit report EOS can read — ${parsed.error}` };
     for (const c of parsed.cases) cases.push({ ...c, report: rel });
@@ -138,11 +168,19 @@ function splitRef(ref) {
   return at === -1 ? { testPath: ref, selector: '' } : { testPath: ref.slice(0, at), selector: ref.slice(at + 2).trim() };
 }
 
-/** Answer every trace-matrix reference from the parsed testcases. */
-export function deriveResults(rows, cases) {
+/**
+ * Answer every trace-matrix reference from the parsed testcases.
+ *
+ * A row's references come from the header's "Test" column(s) when the table has one, otherwise from
+ * every cell. Given `exists`, a file-only reference that names no file is prose that looks like one
+ * ("e.g.", "Node.js") and is dropped — unless it is all the row has, so its ERROR says what is wrong.
+ */
+export function deriveResults(rows, cases, { exists = null } = {}) {
   const results = [];
   for (const [ac, row] of rows) {
-    for (const ref of row.testRefs) {
+    const named = row.testColumnRefs?.length ? row.testColumnRefs : row.testRefs;
+    const real = exists ? named.filter((ref) => ref.includes('::') || exists(ref)) : named;
+    for (const ref of real.length ? real : named) {
       const { testPath, selector } = splitRef(ref);
       const a = answerReference(cases, testPath, selector);
       results.push({
@@ -155,6 +193,12 @@ export function deriveResults(rows, cases) {
   }
   return results;
 }
+
+const readJson = (full) => { try { return JSON.parse(readFileSync(full, 'utf8')); } catch { return null; } };
+
+/** The same results for the same tree, command and producer — differing only in when and how long. */
+const stableForm = (s) => JSON.stringify({ ...s, generatedAt: null, runId: null, results: (s.results || []).map(({ durationMs, ...r }) => r) });
+const sameResults = (prior, next) => !!prior && typeof prior === 'object' && !Array.isArray(prior) && stableForm(prior) === stableForm(next);
 
 /**
  * Turn fresh reports into docs/evidence/test-run.json. Shared by the gate and the CLI; they differ
@@ -176,7 +220,14 @@ export function convertReports(root, files, { project, producerName, env = proce
   if (!existsSync(matrixPath)) {
     return { status: 'SKIPPED', detail: `${ARTIFACTS.traceMatrix} does not exist, so there is no reference to answer from ${files.length} JUnit report(s)` };
   }
-  const results = deriveResults(parseTraceMatrix(readFileSync(matrixPath, 'utf8')), cases);
+  // A name-only match is settled from the source: the named file declares the test, and no other
+  // test file does (test-source.mjs). What cannot be settled is an ERROR, never a PASS.
+  const results = deriveResults(parseTraceMatrix(readFileSync(matrixPath, 'utf8')), cases, { exists: (rel) => repoFileExists(root, rel) })
+    .map((r) => {
+      if (r.match !== 'name') return r;
+      const owned = nameOnlyOwnership(root, r.testPath, r.selector);
+      return owned.ok ? r : { ...r, status: 'ERROR', detail: owned.detail };
+    });
   if (!results.length) return { status: 'FAIL', detail: `${ARTIFACTS.traceMatrix} names no test for any acceptance criterion, so the reports answer nothing` };
   const tree = currentProductTree(root);
   if (!tree.available) return { status: 'BLOCKED', detail: tree.reason };
@@ -198,12 +249,17 @@ export function convertReports(root, files, { project, producerName, env = proce
   if (!schema) return { status: 'ERROR', detail: `${schemaError} — the test-run summary cannot be validated, so it is not written` };
   const v = validate(schema, summary, { label: SUMMARY_PATHS.testRun });
   if (!v.valid) return { status: 'ERROR', detail: `the derived ${SUMMARY_PATHS.testRun} does not match its schema: ${v.errors.slice(0, 3).join('; ')}` };
-  if (write) writeFileAtomic(join(root, SUMMARY_PATHS.testRun), `${JSON.stringify(summary, null, 2)}\n`);
+  // Every story's verified evidence binds this one file. Rewriting it when only the timings moved
+  // would make each verification invalidate every other story's, so an identical result is kept.
+  const unchanged = write && sameResults(readJson(join(root, SUMMARY_PATHS.testRun)), summary);
+  if (write && !unchanged) writeFileAtomic(join(root, SUMMARY_PATHS.testRun), `${JSON.stringify(summary, null, 2)}\n`);
   const passing = results.filter((r) => r.status === 'PASS').length;
   return {
     status: write ? 'WRITTEN' : 'PLANNED',
-    detail: `${results.length} trace-matrix reference(s) answered from ${files.length} JUnit report(s) (${files.join(', ')}): ${passing} PASS, ${results.length - passing} not passing`,
-    summary,
+    unchanged,
+    detail: `${results.length} trace-matrix reference(s) answered from ${files.length} JUnit report(s) (${files.join(', ')}): ${passing} PASS, ${results.length - passing} not passing`
+      + (unchanged ? ` — identical to the recorded ${SUMMARY_PATHS.testRun} apart from timings, which is kept so no other story's evidence goes stale` : ''),
+    summary: unchanged ? readJson(join(root, SUMMARY_PATHS.testRun)) : summary,
     reports: files,
   };
 }

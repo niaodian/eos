@@ -47,9 +47,9 @@ export const evidenceCommands = {
     }
     if (results.length) lines.push('');
     lines.push(`  ${r.detail}`, '');
-    if (r.status === 'WRITTEN') lines.push(`  written ${SUMMARY_PATHS.testRun}`, '');
+    if (r.status === 'WRITTEN') lines.push(r.unchanged ? `  kept ${SUMMARY_PATHS.testRun} — it already holds these results` : `  written ${SUMMARY_PATHS.testRun}`, '');
     if (r.status === 'PLANNED') lines.push('  Nothing was written. Re-run with --write to apply.', '');
-    emit(flags, { status, reports: r.reports || inputs, written: r.status === 'WRITTEN', detail: r.detail, results }, lines.join('\n'));
+    emit(flags, { status, reports: r.reports || inputs, written: r.status === 'WRITTEN' && !r.unchanged, unchanged: !!r.unchanged, detail: r.detail, results }, lines.join('\n'));
     return status === 'FAIL' ? EXIT.FAIL : EXIT_OF[r.status] ?? EXIT.ERROR;
   },
 };

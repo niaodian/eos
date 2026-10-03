@@ -8,7 +8,7 @@ import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync, utimesSync } from 'node:fs';
 import { join } from 'node:path';
-import { project, run, runJson, write, cleanup, storyFiles, APP_PROJECT, commitAll } from './test-support.mjs';
+import { project, run, runJson, write, cleanup, storyFiles, story, APP_PROJECT, TRACE_MATRIX, commitAll } from './test-support.mjs';
 
 after(cleanup);
 
@@ -157,4 +157,51 @@ test('without evidence.junit nothing changes — a summary the project writes is
   assert.equal(trace.status, 'PASS', trace.detail);
   assert.doesNotMatch(trace.detail, /JUnit/);
   assert.equal(existsSync(join(dir, 'reports')), false, 'no report directory is created for a project that declares none');
+});
+
+test('a name-only match belongs to the file the matrix names: not a longer name there, not a comment, not a twin elsewhere', () => {
+  const dir = junitProject({
+    test: NODE_TEST('tests/login.test.mjs tests/reset.test.mjs'),
+    files: {
+      'tests/login.test.mjs': "import { test } from 'node:test';\ntest('invalid password', () => {});\n// test('valid password', () => {});\n",
+      'tests/reset.test.mjs': "import { test } from 'node:test';\ntest('valid password', () => {});\n",
+    },
+  });
+  // The only "valid password" that ran is reset's: login has a longer name and a comment.
+  const borrowed = check(verify(dir), 'trace-complete');
+  assert.equal(borrowed.status, 'FAIL', borrowed.detail);
+  assert.match(borrowed.detail, /tests\/login\.test\.mjs does not declare a test of that name/);
+  assert.equal(testRun(dir).results[0].status, 'ERROR');
+
+  // Declared in both files, and the report cannot say which one passed.
+  write(dir, 'tests/login.test.mjs', "import { test } from 'node:test';\ntest('valid password', () => {});\n");
+  commitAll(dir, 'declare it');
+  const twin = check(verify(dir), 'trace-complete');
+  assert.equal(twin.status, 'FAIL', twin.detail);
+  assert.match(twin.detail, /declared in tests\/login\.test\.mjs and also in tests\/reset\.test\.mjs/);
+
+  // Qualified by its suite, the row names exactly one test.
+  write(dir, 'tests/login.test.mjs', "import { describe, test } from 'node:test';\ndescribe('login', () => { test('valid password', () => {}); });\n");
+  write(dir, 'docs/trace-matrix.md', TRACE_MATRIX.replace('tests/login.test.mjs::valid password', 'tests/login.test.mjs::login > valid password'));
+  commitAll(dir, 'qualify it');
+  const qualified = check(verify(dir), 'trace-complete');
+  assert.equal(qualified.status, 'PASS', qualified.detail);
+});
+
+test('verifying one story leaves another story\'s evidence fresh: an identical result is kept, not rewritten', () => {
+  const dir = junitProject({
+    files: {
+      'tests/login.test.mjs': "import { test } from 'node:test';\ntest('valid password', () => {});\ntest('logs out', () => {});\n",
+      'docs/stories/STORY-002.md': story({ id: 'STORY-002', title: 'Logout', rows: [['AC1.2', 'user can log out', 'tests/login.test.mjs::logs out', '—']] }),
+      'docs/trace-matrix.md': TRACE_MATRIX.replace('| AC1.1 | tests/login.test.mjs::valid password | PASS |', '| AC1.1 | tests/login.test.mjs::valid password | PASS |\n| AC1.2 | tests/login.test.mjs::logs out | PASS |'),
+    },
+  });
+  assert.equal(check(verify(dir), 'trace-complete').status, 'PASS');
+  const recorded = readFileSync(join(dir, 'docs/evidence/test-run.json'), 'utf8');
+  const second = check(runJson(dir, ['check', '--gate', 'verified', '--scope', 'STORY-002'], LOCAL), 'trace-complete');
+  assert.equal(second.status, 'PASS', second.detail);
+  assert.match(second.detail, /this run reproduced it exactly/);
+  assert.equal(readFileSync(join(dir, 'docs/evidence/test-run.json'), 'utf8'), recorded, 'only the timings moved, so the file every story binds is kept');
+  const stale = runJson(dir, ['health'], LOCAL).json.staleEvidence.filter((s) => s.gate === 'verified');
+  assert.deepEqual(stale, [], 'STORY-001 is still verified after STORY-002 was');
 });

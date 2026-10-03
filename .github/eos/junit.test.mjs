@@ -5,10 +5,18 @@
 // and JunitXml.TestLogger write. A parser that only ever saw hand-written XML would be tested
 // against the reports nobody produces.
 //   node --test .github/eos/junit.test.mjs
-import { test } from 'node:test';
+import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { parseJUnit, answerReference, nameMatches, locationVerdict, JUNIT_MAX_BYTES } from './lib/junit.mjs';
-import { globToRegExp, deriveResults, producerFromEnv } from './lib/test-evidence.mjs';
+import { globToRegExp, deriveResults, producerFromEnv, findReports } from './lib/test-evidence.mjs';
+import { sourceTokens, declaresSelector, TEST_PATH } from './lib/test-source.mjs';
+import { parseTraceMatrix } from './lib/gate-primitives.mjs';
+
+const temps = [];
+after(() => { for (const d of temps) rmSync(d, { recursive: true, force: true }); });
 
 const NODE = `<?xml version="1.0" encoding="utf-8"?>
 <testsuites>
@@ -198,4 +206,90 @@ test('the producer says where the run happened, and claims nothing it cannot', (
   assert.deepEqual(producerFromEnv({ GITHUB_ACTIONS: 'true', GITHUB_REPOSITORY: 'acme/app', GITHUB_RUN_ID: '42' }, 'x'),
     { type: 'ci', name: 'github-actions', runRef: 'https://github.com/acme/app/actions/runs/42' });
   assert.equal(producerFromEnv({ CI: 'true' }, 'x').name, 'ci');
+});
+
+test('a test is declared by a literal or a function name — never by a comment, and never inside a longer name', () => {
+  const js = sourceTokens([
+    "import { test, describe } from 'node:test';",
+    "test('invalid password', () => {});",
+    "// test('valid password', () => {});",
+    "/* test('commented block', () => {}); */",
+    "describe('session', () => { test(\"expires after 30 minutes\", () => {}); });",
+    "test('it\\'s escaped', () => {});",
+    "const re = /'not a string/; test('after a regex', () => {});",
+    "test.each([[1, 2]])('adds %i + %i', (a, b) => {});",
+    'test(`templated ${name}`, () => {});',
+    '',
+  ].join('\n'), 'mjs');
+  assert.equal(declaresSelector(js, 'valid password'), false, 'a substring of "invalid password" is not a declaration');
+  assert.equal(declaresSelector(js, 'invalid password'), true);
+  assert.equal(declaresSelector(js, 'commented block'), false);
+  assert.equal(declaresSelector(js, 'session > expires after 30 minutes'), true, 'a qualified selector: every part declared');
+  assert.equal(declaresSelector(js, 'billing > expires after 30 minutes'), false);
+  assert.equal(declaresSelector(js, "it's escaped"), true);
+  assert.equal(declaresSelector(js, 'after a regex'), true, 'a quote inside a regex literal does not open a string');
+  assert.equal(declaresSelector(js, 'adds 1 + 2'), true, 'a parametrised name template declares its instances');
+  assert.equal(declaresSelector(js, 'adds 1 + 2', { strict: true }), false, 'but not when ruling out a second declaration');
+  assert.equal(declaresSelector(js, 'templated login'), true);
+
+  const py = sourceTokens([
+    '# def test_commented(): pass',
+    'class TestSession:',
+    '    def test_expires(self):',
+    "        '''test_in_docstring is text, not a function'''",
+    '        assert True',
+    'def helper(): test_called_only()',
+    '',
+  ].join('\n'), 'py');
+  assert.equal(declaresSelector(py, 'test_commented'), false);
+  assert.equal(declaresSelector(py, 'TestSession::test_expires'), true);
+  assert.equal(declaresSelector(py, 'test_expires[1]'), true, 'a parameter suffix is not part of the declared name');
+  assert.equal(declaresSelector(py, 'test_in_docstring', { strict: true }), false);
+  assert.equal(declaresSelector(py, 'test_called_only', { strict: true }), false, 'a call is not a declaration');
+  assert.equal(declaresSelector(sourceTokens('func TestLogin(t *testing.T) {}\n', 'go'), 'TestLogin', { strict: true }), true);
+  assert.ok(TEST_PATH.test('tests/login.test.mjs') && TEST_PATH.test('pkg/auth/login_test.go') && TEST_PATH.test('src/LoginTests.cs'));
+  assert.ok(!TEST_PATH.test('src/login.mjs'));
+});
+
+test('a trace matrix with a Test column is read from that column; prose that looks like a file name is dropped', () => {
+  const rows = parseTraceMatrix([
+    '| AC | Statement | Test | Result |', '| --- | --- | --- | --- |',
+    '| AC1.1 | user logs in with SSO (e.g. Okta, via settings.yaml) | tests/login.test.mjs::valid password | PASS |',
+    '', 'Another table without a test header:', '',
+    '| AC | Covered by |', '| --- | --- |',
+    '| AC1.2 | tests/logout.test.mjs::logs out (see Node.js docs) |',
+  ].join('\n'));
+  assert.deepEqual(rows.get('AC1.1').testColumnRefs, ['tests/login.test.mjs::valid password']);
+  assert.deepEqual(rows.get('AC1.1').testRefs, ['e.g', 'settings.yaml', 'tests/login.test.mjs::valid password'], 'the gate still sees every cell');
+  assert.equal(rows.get('AC1.2').testColumnRefs, undefined);
+
+  const cases = parseJUnit('<testsuites><testcase name="valid password" classname="test"/><testcase name="logs out" classname="test"/></testsuites>').cases.map((c) => ({ ...c, report: 'r.xml' }));
+  const exists = (rel) => ['tests/login.test.mjs', 'tests/logout.test.mjs'].includes(rel);
+  const prose = new Map([['AC1.2', { testRefs: ['tests/logout.test.mjs::logs out', 'Node.js'] }]]);
+  assert.deepEqual(deriveResults(new Map([...rows].filter(([ac]) => ac === 'AC1.1')), cases, { exists }).map((r) => `${r.ac} ${r.testPath} ${r.status}`),
+    ['AC1.1 tests/login.test.mjs PASS'], 'only the Test column is read');
+  assert.deepEqual(deriveResults(prose, cases, { exists }).map((r) => `${r.ac} ${r.testPath} ${r.status}`),
+    ['AC1.2 tests/logout.test.mjs PASS'], '"Node.js" names no file, so it is prose');
+  const onlyProse = new Map([['AC1.3', { testRefs: ['e.g'] }]]);
+  assert.deepEqual(deriveResults(onlyProse, cases, { exists }).map((r) => `${r.testPath} ${r.status}`), ['e.g ERROR'], 'a row with nothing else keeps it, so its ERROR explains');
+});
+
+test('report discovery follows the pattern: a root file reads one directory, and per-class reports are not capped by count', () => {
+  const root = mkdtempSync(join(tmpdir(), 'eos-junit-find-'));
+  temps.push(root);
+  mkdirSync(join(root, 'deep/a/b'), { recursive: true });
+  for (let i = 0; i < 30; i += 1) writeFileSync(join(root, 'deep/a/b', `f${i}.xml`), '<testsuites/>');
+  writeFileSync(join(root, 'junit.xml'), '<testsuites/>');
+  writeFileSync(join(root, 'deep/junit.xml'), '<testsuites/>');
+  assert.deepEqual(findReports(root, ['junit.xml'], { maxScanned: 5 }), { files: ['junit.xml'], error: null }, 'nothing below the root is read');
+  assert.match(findReports(root, ['**/*.xml'], { maxScanned: 5 }).error, /more than 5 files/);
+  assert.deepEqual(findReports(root, ['**/junit.xml']).files, ['deep/junit.xml', 'junit.xml']);
+  assert.deepEqual(findReports(root, ['deep/*/b/f1.xml']).files, ['deep/a/b/f1.xml']);
+  assert.equal(findReports(root, ['deep/**']).files.length, 31);
+
+  mkdirSync(join(root, 'target/surefire-reports'), { recursive: true });
+  for (let i = 0; i < 600; i += 1) writeFileSync(join(root, 'target/surefire-reports', `TEST-com.example.C${i}.xml`), '<testsuites/>');
+  const surefire = findReports(root, ['target/surefire-reports/TEST-*.xml']);
+  assert.equal(surefire.error, null);
+  assert.equal(surefire.files.length, 600, 'one report per test class is how Surefire works');
 });

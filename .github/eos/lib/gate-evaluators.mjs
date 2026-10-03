@@ -26,6 +26,7 @@ import { findWaiver, expiredWaivers } from './waivers.mjs';
 import { AC_ID, opsDecisionProblem } from './story.mjs';
 import { verifyRelease } from './release-integrity.mjs';
 import { beginCapture, finishCapture } from './test-evidence.mjs';
+import { nameOnlyOwnership } from './test-source.mjs';
 import {
   STATUSES, SEVERITY, EXPENSIVE, isBlocking, insideRepo, parseTraceMatrix,
   ok, fail, blocked, na, awaiting, runHook, runProjectGate, refMatches, selectorPresent,
@@ -446,8 +447,13 @@ export const evaluators = {
       //     cheapest possible fake, and a summary can name it just as cheaply.
       for (const r of executed) {
         if (!repoFileExists(ctx.root, r.testPath)) { problems.push(`${ac.id}: the executed test path "${r.testPath}" does not exist inside this repository`); continue; }
-        // (4) The selector, when the file is readable text, must actually appear in it.
-        if (r.selector && !selectorPresent(ctx.root, r.testPath, r.selector)) {
+        // (4) The selector must belong to the file. A JUnit report that records only the name is
+        //     settled from the source (declared there, and in no other test file); a summary the
+        //     project wrote itself is held to the best-effort substring check.
+        if (r.selector && r.match === 'name') {
+          const owned = nameOnlyOwnership(ctx.root, r.testPath, r.selector);
+          if (!owned.ok) problems.push(`${ac.id}: ${owned.detail}`);
+        } else if (r.selector && !selectorPresent(ctx.root, r.testPath, r.selector)) {
           problems.push(`${ac.id}: "${r.selector}" was reported as executed but does not appear in ${r.testPath}`);
         }
       }
@@ -465,7 +471,7 @@ export const evaluators = {
     }
     return problems.length
       ? fail(`trace evidence incomplete: ${problems.slice(0, 4).join(' · ')}${problems.length > 4 ? ` · +${problems.length - 4} more` : ''}`)
-      : ok(`${ctx.story.acs.length} criteria traced to executed, passing tests (run ${run.data.runId || run.data.generatedAt}${run.data.source?.format === 'junit' ? `, derived from ${run.data.source.reports.length} JUnit report(s)` : ''})`);
+      : ok(`${ctx.story.acs.length} criteria traced to executed, passing tests (run ${run.data.runId || run.data.generatedAt}${run.data.source?.format === 'junit' ? `, derived from ${run.data.source.reports.length} JUnit report(s)` : ''}${ctx.junit?.unchanged ? '; this run reproduced it exactly' : ''})`);
   },
   evalThreshold(ctx) {
     if (!ctx.snapshot.agentic) return na('this product is not declared agentic');
