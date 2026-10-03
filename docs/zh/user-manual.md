@@ -719,7 +719,7 @@ bmad-dev-story                     → ai/ 下的 agent/tools/chains + ai/prompt
 bmad-code-review
 node --test evals/eval.test.mjs    → 跑评估基线（G-EVAL 机器强制：达标才能过）
 ```
-`evals/` 从 [examples/eval-starter](../eos/examples/eval-starter/README.md) 起步（Node；Python 栈用其中的 `python/`），并把同一条命令声明为 `commands.eval`。starter 会写出 `docs/evidence/eval-summary.json`——数值、阈值、模型、数据集与评分器，并绑定产品树——G-EVAL 读的正是它；仅仅退出码为 0 的评估命令不会通过。
+`evals/` 从 [examples/eval-starter](../eos/examples/eval-starter/README.md) 起步（Node；Python 栈用其中的 `python/`），并把同一条命令声明为 `commands.eval`。starter 会写出 `docs/evidence/eval-summary.json`——数值、阈值、模型、数据集与评分器，并绑定产品树——G-EVAL 读的正是它；仅仅退出码为 0 的评估命令不会通过。要评估你真实的模型而不是桩实现，用 `EVAL_AGENT=llm` 运行：通过 Node 内置 `fetch`（或 Python 标准库）调用任意 OpenAI 兼容端点，key 取自环境变量 / CI secret，并支持录制 / 回放——没有 key 时回放已提交的录制，摘要会标注为未经证明（unattested）（自 eos-2.2.0 起；见 starter 的 *Connect a real model*）。
 写 AI 代码时**自动生效**的 Agentic 规则：prompt 存成文件（不内联字符串）、工具 typed schema、
 temperature=0 可复现、把模型输出当**不可信**（防注入、输出审核、不放密钥/PII 进 prompt）、
 LLM tracing（token/成本/context/tool-span）。

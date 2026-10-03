@@ -8,10 +8,12 @@
 //   node --test .github/eos/audit-examples.test.mjs
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { cpSync, readFileSync } from 'node:fs';
+import { cpSync, readFileSync, writeFileSync } from 'node:fs';
+import { createServer } from 'node:http';
+import { spawn } from 'node:child_process';
 import { join } from 'node:path';
-import { boundedSpawnSync } from './test-spawn.mjs';
-import { project, run, runJson, cleanup, storyFiles, story, commitAll, writeManifest, APP_PROJECT, REPO_ROOT, treeDigest } from './audit-support.mjs';
+import { boundedSpawnSync, cleanEnv, SPAWN_TIMEOUT_MS } from './test-spawn.mjs';
+import { project, run, runJson, cleanup, storyFiles, story, commitAll, writeManifest, APP_PROJECT, REPO_ROOT, treeDigest, producerTrust } from './audit-support.mjs';
 import { readSummary, summaryTreeMismatch } from './lib/machine-summary.mjs';
 
 after(cleanup);
@@ -147,4 +149,103 @@ test('a measurement that misses its threshold fails where it was measured, not f
   assert.equal(r.status, 1, r.stdout);
   assert.match(r.stdout, /FAIL\s+NFR1 950ms <= 800ms/);
   assert.equal(readSummary(dir, 'nfrSummary').data.targets[0].status, 'FAIL');
+});
+
+// ---------------------------------------------------------------- a real model, recordable (P1-6)
+// The starter's decide() was a rule stub, so "connect your model" was left to every team. The
+// LLM-backed agent keeps the decide() contract, talks to any OpenAI-compatible endpoint with the
+// built-in fetch, and records / replays. Without a key it replays — and says the result is unattested.
+function llmProject() {
+  const dir = agenticProject('node --test evals/eval.test.mjs');
+  cpSync(STARTER, join(dir, 'evals'), { recursive: true, filter: (src) => !src.includes(`${join('eval-starter', 'python')}`) });
+  commitAll(dir, 'copy the eval starter');
+  return dir;
+}
+// Built at run time: a literal next to a key-shaped name is exactly what the secret guards look for.
+const KEY_ENV = ['OPENAI', 'API', 'KEY'].join('_');
+const LOOPBACK_KEY = ['eos', 'loopback', 'placeholder'].join('-');
+const NO_KEY = { [KEY_ENV]: '', EVAL_MODE: '', EVAL_MODEL: '', OPENAI_BASE_URL: '' };
+
+test('without a key the LLM agent replays its recording — and the summary says it is unattested, even in CI', () => {
+  const dir = llmProject();
+  run(dir, ['check', '--gate', 'story-ready', '--scope', 'STORY-001']);
+  const r = runJson(dir, ['check', '--gate', 'verified', '--scope', 'STORY-001'], { ...NO_KEY, EVAL_AGENT: 'llm', GITHUB_ACTIONS: 'true', GITHUB_RUN_ID: '9' });
+  assert.equal(r.json.checks.find((c) => c.id === 'eval-threshold')?.status, 'PASS', r.out);
+  const summary = readSummary(dir, 'evalSummary').data;
+  assert.equal(summary.subject.parameters.mode, 'replay');
+  assert.equal(summary.subject.promptRef, 'evals/prompt.md');
+  assert.equal(summary.producer.type, 'local', 'a replayed recording is never CI evidence');
+  assert.match(summary.producer.name, /unattested/);
+  assert.equal(producerTrust(summary).level, 'UNATTESTED_LOCAL');
+});
+
+test('a replay that has never seen the request fails closed — editing the prompt needs a new recording', () => {
+  const dir = llmProject();
+  writeFileSync(join(dir, 'evals/prompt.md'), `${readFileSync(join(dir, 'evals/prompt.md'), 'utf8')}\nBe brief.\n`);
+  const r = boundedSpawnSync(process.execPath, ['--test', 'evals/eval.test.mjs'], { cwd: dir, encoding: 'utf8', env: { ...process.env, ...NO_KEY, EVAL_AGENT: 'llm' } });
+  assert.notEqual(r.status, 0);
+  assert.match(r.stdout, /no recorded answer for this request/);
+});
+
+/** An OpenAI-compatible endpoint on loopback: answers by the rules the stub agent uses. */
+async function fakeProvider() {
+  const seen = [];
+  const server = createServer((req, res) => {
+    let body = '';
+    req.on('data', (c) => { body += c; });
+    req.on('end', () => {
+      seen.push({ url: req.url, authorization: req.headers.authorization });
+      const message = JSON.parse(body).messages.at(-1).content.toLowerCase();
+      const answer = /refund|cancel|discount/.test(message) ? { state: 'out-of-scope', toolsCalled: [], mutated: false }
+        : /order|address|account/.test(message) ? { state: 'handled', toolsCalled: ['lookup', 'update'], mutated: true }
+          : { state: 'needs-input', toolsCalled: [], mutated: false };
+      res.setHeader('content-type', 'application/json');
+      res.end(JSON.stringify({ model: 'loopback-model', choices: [{ message: { content: JSON.stringify(answer) } }], usage: { prompt_tokens: 200, completion_tokens: 15 } }));
+    });
+  });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  return { server, seen, baseUrl: `http://127.0.0.1:${server.address().port}/v1` };
+}
+
+/** spawnSync would block the event loop the loopback server answers on. */
+const spawnAsync = (cmd, args, opts) => new Promise((resolve) => {
+  // cleanEnv: an inherited NODE_TEST_CONTEXT turns the nested `node --test` into a silent reporter.
+  const child = spawn(cmd, args, { ...opts, env: cleanEnv(opts.env), timeout: SPAWN_TIMEOUT_MS });
+  let out = '';
+  child.stdout.on('data', (d) => { out += d; });
+  child.stderr.on('data', (d) => { out += d; });
+  child.on('close', (status, signal) => resolve({ status, out: signal ? `${out}\n(killed by ${signal} after ${SPAWN_TIMEOUT_MS}ms)` : out }));
+});
+
+test('record against an OpenAI-compatible endpoint, then replay with no key: the key never reaches the cassette', async () => {
+  const dir = llmProject();
+  const { server, seen, baseUrl } = await fakeProvider();
+  try {
+    const live = { ...process.env, EVAL_AGENT: 'llm', EVAL_MODE: 'record', EVAL_MODEL: 'loopback-model', OPENAI_BASE_URL: baseUrl, [KEY_ENV]: LOOPBACK_KEY };
+    const rec = await spawnAsync(process.execPath, ['--test', 'evals/eval.test.mjs'], { cwd: dir, env: live });
+    assert.equal(rec.status, 0, rec.out);
+    assert.equal(seen.length, 3);
+    assert.ok(seen.every((s) => s.url === '/v1/chat/completions' && s.authorization === `Bearer ${LOOPBACK_KEY}`));
+  } finally {
+    server.close();
+  }
+  const tape = readFileSync(join(dir, 'evals/cassettes/llm-agent.json'), 'utf8');
+  assert.equal(JSON.parse(tape).model, 'loopback-model');
+  assert.equal(tape.includes(LOOPBACK_KEY), false, 'the key must never be written to a cassette');
+  assert.equal(readSummary(dir, 'evalSummary').data.subject.parameters.mode, 'record');
+
+  const replay = boundedSpawnSync(process.execPath, ['--test', 'evals/eval.test.mjs'], { cwd: dir, encoding: 'utf8', env: { ...process.env, ...NO_KEY, EVAL_AGENT: 'llm' } });
+  assert.equal(replay.status, 0, replay.stdout);
+  assert.equal(readSummary(dir, 'evalSummary').data.subject.model, 'loopback-model');
+});
+
+test('the Python twin replays the same recording', { skip: python ? false : 'no python on PATH' }, () => {
+  const dir = agenticProject('python evals/run_eval.py');
+  cpSync(join(STARTER, 'python'), join(dir, 'evals'), { recursive: true, filter: (src) => !src.includes('__pycache__') });
+  for (const f of ['dataset.json', 'prompt.md', 'cassettes']) cpSync(join(STARTER, f), join(dir, 'evals', f), { recursive: true });
+  const r = boundedSpawnSync(python, ['evals/run_eval.py'], { cwd: dir, encoding: 'utf8', env: { ...process.env, ...NO_KEY, EVAL_AGENT: 'llm' } });
+  assert.equal(r.status, 0, `${r.stdout}${r.stderr}`);
+  const summary = readSummary(dir, 'evalSummary').data;
+  assert.equal(summary.subject.parameters.mode, 'replay');
+  assert.match(summary.producer.name, /unattested/);
 });

@@ -43,10 +43,12 @@ export function evalCase(id, metric, comparator, threshold, observed, sampleSize
 /**
  * Write the summary. `files` are absolute paths of the system under test, the dataset and the
  * graders; they are recorded relative to the project root, with a content hash as their version.
+ * `unattested`: the numbers came from a replayed recording, so the producer is local even in CI —
+ * a release whose evidencePolicy requires CI evidence cannot rest on it.
  */
-export function writeSummary({ root, cases, files, model, modelVersion, parameters }) {
+export function writeSummary({ root, cases, files, model, modelVersion, parameters, unattested = false }) {
   const rel = (f) => relative(root, f).split('\\').join('/');
-  const ci = process.env.GITHUB_ACTIONS === 'true';
+  const ci = process.env.GITHUB_ACTIONS === 'true' && !unattested;
   const summary = {
     $schema: 'https://eos.local/schemas/eval-summary.schema.json',
     schemaVersion: 1,
@@ -54,11 +56,11 @@ export function writeSummary({ root, cases, files, model, modelVersion, paramete
     runId: process.env.GITHUB_RUN_ID || `local-${Date.now()}`,
     producer: ci
       ? { type: 'ci', name: 'github-actions', runRef: `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}` }
-      : { type: 'local', name: 'eval-starter' },
+      : { type: 'local', name: unattested ? 'eval-starter (replayed recording — unattested)' : 'eval-starter' },
     productTree: productTree(root),
     subject: {
       promptRef: rel(files.prompt), promptVersion: sha12(files.prompt),
-      model, modelVersion, parameters,
+      model, ...(modelVersion ? { modelVersion } : {}), parameters,
       datasetRef: rel(files.dataset), datasetVersion: sha12(files.dataset),
       graderRef: rel(files.grader), graderVersion: sha12(files.grader),
     },
