@@ -125,3 +125,42 @@ test('an internal error fails OPEN with a warning — a broken speed bump must n
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('--format speaks each platform\'s hook dialect, and an allow never grants anything (ADR-019)', () => {
+  const denied = ['git', 'push', '--force'].join(' '); // built at runtime: this file is scanned too
+  const hook = (format, payload) => boundedSpawnSync(process.execPath, [HOOK, '--format', format], { input: JSON.stringify(payload), encoding: 'utf8' });
+  const bash = (command) => ({ tool_name: 'Bash', tool_input: { command } });
+  const hookSpecific = (o) => o.hookSpecificOutput?.permissionDecision === 'deny' && /Blocked by EOS guardrail/.test(o.hookSpecificOutput.permissionDecisionReason);
+  const expected = {
+    copilot: hookSpecific,
+    claude: hookSpecific,
+    codex: hookSpecific,
+    qwen: hookSpecific,
+    gemini: (o) => o.decision === 'deny' && /Blocked/.test(o.reason),
+    antigravity: (o) => o.decision === 'deny' && /Blocked/.test(o.reason),
+    cursor: (o) => o.permission === 'deny' && /Blocked/.test(o.agent_message) && o.user_message === o.agent_message,
+    devin: (o) => o.decision === 'block' && /Blocked/.test(o.reason),
+    cline: (o) => o.cancel === true && /Blocked/.test(o.errorMessage),
+  };
+  for (const [format, isDeny] of Object.entries(expected)) {
+    const deny = hook(format, bash(denied));
+    assert.equal(deny.status, 0, `${format}: ${deny.stderr}`);
+    assert.ok(isDeny(JSON.parse(deny.stdout)), `${format}: ${deny.stdout}`);
+    const allow = hook(format, bash('git status'));
+    assert.equal(allow.status, 0);
+    assert.equal(allow.stdout, '{}', `${format}: an allow says nothing, so the platform still asks`);
+  }
+  const kiro = hook('kiro', bash(denied));
+  assert.equal(kiro.status, 2, 'Kiro blocks on exit code 2');
+  assert.match(kiro.stderr, /Blocked by EOS guardrail/);
+  assert.equal(kiro.stdout, '');
+  assert.deepEqual([hook('kiro', bash('git status')).status, hook('kiro', bash('git status')).stdout], [0, '']);
+  // Each platform's own payload shape reaches the same rules.
+  assert.equal(JSON.parse(hook('antigravity', { toolCall: { name: 'run_command', args: { CommandLine: denied } } }).stdout).decision, 'deny');
+  assert.equal(JSON.parse(hook('cursor', { command: denied, cwd: '/work' }).stdout).permission, 'deny');
+  assert.equal(JSON.parse(hook('gemini', { tool_name: 'run_shell_command', tool_input: { command: denied } }).stdout).decision, 'deny');
+  // A format the hook does not know fails open, loudly — like any internal error of the speed bump.
+  const unknown = hook('vim', bash(denied));
+  assert.equal(unknown.stdout, '{}');
+  assert.match(unknown.stderr, /unknown --format "vim"/);
+});
