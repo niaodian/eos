@@ -8,7 +8,7 @@
 
 # Action map
 
-28 actions. `eos next` names one of them and hands it to the agent or slash command below (each slash command is an EOS skill in `.agents/skills/`). This page is a projection of `.eos/agent-map.json` — the file the router reads — so it cannot disagree with what `eos next` recommends. The curated, phase-by-phase overview is [agent-map.md](../agent-map.md).
+29 actions. `eos next` names one of them and hands it to the agent or slash command below (each slash command is an EOS skill in `.agents/skills/`). This page is a projection of `.eos/agent-map.json` — the file the router reads — so it cannot disagree with what `eos next` recommends. The curated, phase-by-phase overview is [agent-map.md](../agent-map.md).
 
 | Action | Copilot agent | Slash command | Skills | Handoff |
 |---|---|---|---|---|
@@ -21,6 +21,7 @@
 | `repair-prd` | — | `/eos-spec` | `bmad-prd` | Repair only the listed PRD defects (undefined/duplicate AC ids, uncovered requirements, unresolved blockers). Do not restructure the PRD. |
 | `design-ux` | `eos-design` | `/eos-ux-spec` | `bmad-ux` | Produce docs/DESIGN.md + docs/EXPERIENCE.md and docs/design.json, or record { "userInterface": false, "skipReason": "..." } for a non-user-facing product. |
 | `design-architecture` | `eos-architecture` | — | `bmad-architecture` | Design the architecture, lock the tech stack and the deployment topology in ADRs, and record every decision in docs/architecture.json. |
+| `document-existing-system` | `eos-discovery` | — | `bmad-document-project` | Document the existing system as it is — run bmad-document-project into docs/ (docs/index.md is its index). Record what exists and how it is built; do not re-specify it. Stories for changes come next. |
 | `plan-stories` | `eos-plan` | — | `bmad-create-epics-and-stories`, `bmad-create-story` | Slice the approved architecture into context-self-contained stories under docs/stories/. |
 | `design-acceptance-tests` | `eos-plan` | — | `bmad-testarch-atdd` | Create the missing acceptance-test intent for the listed acceptance criteria only. |
 | `design-eval-cases` | — | `/eos-eval-spec` | — | Add an eval case (EVAL-<n>) for each LLM-backed acceptance criterion listed; do not touch the others. |

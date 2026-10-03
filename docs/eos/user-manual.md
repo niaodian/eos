@@ -216,6 +216,24 @@ code .
 # then follow the guide to check off docs/eos/activation.md item by item (branch protection + CODEOWNERS + approval baseline; see Appendix D).
 ```
 
+## 3.5 An existing system (brownfield)
+
+A system that already runs does not have to be re-specified before EOS can help. Adopt it at the **delivery gates** with the `delivery-only` workflow profile (since eos-2.3.0): the running system is the baseline, and every change from now on is a story that must be ready (G5), verified (G7) and released (G8).
+
+```sh
+npx degit niaodian/eos#eos-2.3.0 /tmp/eos                      # the template, outside your repository
+# copy into your repository: .eos/ .agents/ .github/{eos,hooks,agents,instructions}/ docs/eos/
+# and merge by hand what you already have: AGENTS.md, .github/copilot-instructions.md, .github/workflows/eos-ci.yml
+node .github/hooks/validate-config.mjs                          # S7 names anything still missing
+node .github/eos/eos.mjs init <pack> --brownfield --write       # Standard track; the pack names your stack
+node .github/eos/eos.mjs next                                   # → document the existing system
+```
+
+- **First, document what exists — do not re-specify it.** `eos next` hands you to the `eos-discovery` agent with `bmad-document-project`, which writes the as-is documentation into `docs/` with `docs/index.md` as its index. Once that file exists, `next` asks for the first story.
+- **Every change is a story.** Its acceptance criteria live in the story (until a PRD exists, they stand on their own), each with a test intent; `verified` runs your tests and traces each criterion to a passing one; the release gate checks the candidate as on the Standard track, and aligns the trace matrix with the stories the release ships.
+- **Not gated:** discovery, requirements, the PRD, UX, architecture, and the post-release telemetry and write-back gates — they build on a written baseline. Write a PRD whenever you like: once `docs/prd.md` exists, every story's criteria must resolve against it.
+- **Graduating** to the full lifecycle is setting `"workflowProfile": "standard-product"` once the product is re-baselined — that only strengthens the policy. The reverse, moving a Standard project onto `delivery-only`, is a weakening: `eos policy lock` records it with a reason and a second person. The Regulated track does not offer this path; it requires the baseline.
+
 ---
 
 # Chapter 4 Core concepts (five mechanisms)

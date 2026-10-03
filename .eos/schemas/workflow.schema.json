@@ -23,6 +23,7 @@
             "description": { "type": "string", "minLength": 1 },
             "defaultChangeType": { "$ref": "#/$defs/changeType" },
             "requiresCompliance": { "type": "boolean", "description": "true = selecting this profile requires .eos/project.json to declare \"complianceProfile\": \"regulated\". A profile for regulated work must not accept evidence the compliance boundary would refuse." },
+            "baseline": { "enum": ["specified", "existing-system"], "description": "What the product baseline is. \"specified\" (the default): written stage by stage, discovery to architecture, before stories. \"existing-system\" (eos-2.3.0, brownfield): the running system is the baseline — documented as it is (bmad-document-project → docs/index.md), not re-specified — so eos next asks for that documentation instead of the baseline stages." },
             "changeTypes": {
               "type": "object",
               "minProperties": 1,

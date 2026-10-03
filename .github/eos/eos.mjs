@@ -43,12 +43,14 @@ usage: node .github/eos/eos.mjs <command> [flags]
   handoff --scope <type> --id <id> [--verify]
   ledger [--verify] [--against <ref>] [--resolve [--write]]
   focus --scope <type> --id <id>          set this machine's local focus (no authority)
-  init [<pack>] [--track standard|regulated] [--write] [--force]
+  init [<pack>] [--track standard|regulated] [--brownfield] [--write] [--force]
                                           declare the project, choose its governance track, create local files
+                                          (--brownfield: an existing system, held to the delivery gates G5/G7/G8)
   stack sync [--write]                    render the always-on workspace rule from .eos/project.json
   stage init <stage> [--write] [--interactive]
                                           a stage record's skeleton from its schema (discovery … iteration)
-  agents sync [--write|--check]           generate each agent platform's copy of the EOS skills (.agents/skills)
+  agents sync [--platform <x>] [--write|--check]
+                                          generate what each agent platform reads: skills, MCP entry, guardrail hook
   mcp                                     serve the read and verify commands as MCP tools on stdio
   new <pack> [--track …] [--write]        the pack half of init (the declaration only)
   sbom [--write] [--check]                software bill of materials, bound to the tree

@@ -230,6 +230,24 @@ code .
 # 按引导逐项勾掉 docs/eos/activation.md（分支保护 + CODEOWNERS + 审批基线；详见附录 D）。
 ```
 
+## 3.5 已有系统（存量项目）
+
+已经在运行的系统，不必先重写规范才能用上 EOS。用 `delivery-only` 工作流 profile 在**交付门禁**处接入（自 eos-2.3.0 起）：正在运行的系统就是基线，此后的每一项改动都是一个 story，必须就绪（G5）、经过验证（G7）并通过发布门禁（G8）。
+
+```sh
+npx degit niaodian/eos#eos-2.3.0 /tmp/eos                      # 模板，放在你的仓库之外
+# 复制到你的仓库：.eos/ .agents/ .github/{eos,hooks,agents,instructions}/ docs/eos/
+# 已有的文件请手工合并：AGENTS.md、.github/copilot-instructions.md、.github/workflows/eos-ci.yml
+node .github/hooks/validate-config.mjs                          # S7 会点名仍缺少的内容
+node .github/eos/eos.mjs init <pack> --brownfield --write       # Standard 轨道；pack 对应你的技术栈
+node .github/eos/eos.mjs next                                   # → 为现有系统写文档
+```
+
+- **先记录现状，不要重写规范。** `eos next` 会把你交给 `eos-discovery` agent 和 `bmad-document-project`，后者把现状文档写进 `docs/`，以 `docs/index.md` 为索引。该文件存在后，`next` 会请你写第一个 story。
+- **每项改动都是一个 story。** 它的验收标准写在 story 里（在 PRD 出现之前，它们独立成立），每条都带测试意图；`verified` 运行你的测试，并把每条标准追溯到一个通过的测试；发布门禁按 Standard 轨道检查候选版本，并把 trace matrix 与本次发布包含的 story 对齐。
+- **不设门禁的部分：** discovery、requirements、PRD、UX、架构，以及发布后的遥测与回写门禁——它们都建立在成文的基线之上。你随时可以补写 PRD：一旦 `docs/prd.md` 存在，每个 story 的标准都必须能在其中找到。
+- **毕业**到完整生命周期，只需在产品重新基线化后把 `"workflowProfile"` 设为 `"standard-product"`——这只会加强策略。反过来，把 Standard 项目改到 `delivery-only` 是一种削弱：`eos policy lock` 会连同理由和第二个人一起记录。Regulated 轨道不提供这条路径，它要求先有基线。
+
 ---
 
 # 第 4 章 核心概念（五种机制）

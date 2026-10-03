@@ -82,6 +82,9 @@ node .github/eos/eos.mjs init config-only --write   # 声明项目：还没有�
 code .                                        # 必须在项目目录*内部*执行——见下方警告
 ```
 
+**已有系统？** 那就把 EOS 引入那个仓库，在交付门禁处接入：`eos init <pack> --brownfield --write`——
+无需先做 discovery 或架构；此后每项改动都是一个 story，受 G5、G7、G8 约束（[手册 §3.5](user-manual.md)）。
+
 **`git init` 不是可选步骤。** `degit` 给你的是一个没有仓库的目录，而 EOS 会把每一次验证都绑定到它
 所运行的那棵 git 树上。缺了它，`verified` 门禁会报 BLOCKED——行为本身是正确的，但这是个令人困惑的开局。
 

@@ -8,7 +8,7 @@
 
 # 动作映射
 
-共 28 个动作。`eos next` 会给出其中一个，并把它交给下表中的 Agent 或斜杠命令（每个斜杠命令都是 `.agents/skills/` 中的一个 EOS 技能）。本页是 `.eos/agent-map.json`（路由器读取的文件）的投影，因此不会与 `eos next` 的推荐不一致。按阶段整理的人工概览见 [agent-map.md](../agent-map.md)。交接说明（Handoff）是写给 Agent 的指令，保留策略中的英文原文。
+共 29 个动作。`eos next` 会给出其中一个，并把它交给下表中的 Agent 或斜杠命令（每个斜杠命令都是 `.agents/skills/` 中的一个 EOS 技能）。本页是 `.eos/agent-map.json`（路由器读取的文件）的投影，因此不会与 `eos next` 的推荐不一致。按阶段整理的人工概览见 [agent-map.md](../agent-map.md)。交接说明（Handoff）是写给 Agent 的指令，保留策略中的英文原文。
 
 | 动作 | Copilot Agent | 斜杠命令 | 技能 | 交接说明（英文原文） |
 |---|---|---|---|---|
@@ -21,6 +21,7 @@
 | `repair-prd` | — | `/eos-spec` | `bmad-prd` | Repair only the listed PRD defects (undefined/duplicate AC ids, uncovered requirements, unresolved blockers). Do not restructure the PRD. |
 | `design-ux` | `eos-design` | `/eos-ux-spec` | `bmad-ux` | Produce docs/DESIGN.md + docs/EXPERIENCE.md and docs/design.json, or record { "userInterface": false, "skipReason": "..." } for a non-user-facing product. |
 | `design-architecture` | `eos-architecture` | — | `bmad-architecture` | Design the architecture, lock the tech stack and the deployment topology in ADRs, and record every decision in docs/architecture.json. |
+| `document-existing-system` | `eos-discovery` | — | `bmad-document-project` | Document the existing system as it is — run bmad-document-project into docs/ (docs/index.md is its index). Record what exists and how it is built; do not re-specify it. Stories for changes come next. |
 | `plan-stories` | `eos-plan` | — | `bmad-create-epics-and-stories`, `bmad-create-story` | Slice the approved architecture into context-self-contained stories under docs/stories/. |
 | `design-acceptance-tests` | `eos-plan` | — | `bmad-testarch-atdd` | Create the missing acceptance-test intent for the listed acceptance criteria only. |
 | `design-eval-cases` | — | `/eos-eval-spec` | — | Add an eval case (EVAL-<n>) for each LLM-backed acceptance criterion listed; do not touch the others. |

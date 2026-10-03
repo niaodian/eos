@@ -674,7 +674,8 @@ export const evaluators = {
       : ok(`${included.length} story/stories verified`);
   },
   releaseSpecAlignment(ctx) {
-    const r = runHook(ctx, '.github/hooks/spec-align.mjs', ['--strict']);
+    // The release scope tells spec-align which stories ship, for a profile whose stories are the spec.
+    const r = runHook(ctx, '.github/hooks/spec-align.mjs', ['--strict', ...(ctx.scopeType === 'release' ? ['--release', String(ctx.scopeId)] : [])]);
     if (r.command) ctx.commands.push(r.command);
     if (r.status === 'PASS') return ok('spec-align --strict passes');
     if (r.status === 'BLOCKED' || r.status === 'ERROR') return { status: r.status, detail: r.detail };

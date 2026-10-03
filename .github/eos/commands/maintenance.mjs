@@ -92,8 +92,12 @@ const describe = (d) => `${d.projectType} · ${(d.stacks || []).join(', ') || 'n
 
 /**
  *   eos init                                   what is declared, the tracks, the packs, the local files
- *   eos init <pack> [--track standard|regulated] [--write] [--force]
- *   eos new <pack> [--track …] [--write]       the same declaration, without the local files
+ *   eos init <pack> [--track standard|regulated] [--brownfield] [--write] [--force]
+ *   eos new <pack> [--track …] [--brownfield] [--write]   the same declaration, without the local files
+ *
+ * --brownfield adopts an existing system at the delivery gates (workflowProfile "delivery-only"):
+ * its baseline is the system that runs, documented as it is, and every change is a story held to
+ * G5, G7 and G8. Like the track, it carries over when a later init only adds a stack.
  */
 function declareProject(snapshot, flags, verb) {
   const packId = flags._[1];
@@ -120,11 +124,15 @@ function declareProject(snapshot, flags, verb) {
     if (detected.length) lines.push(`  product code detected — ${detected.join(', ')} manifest(s); packs that match: ${matching.join(', ') || 'none (see docs/eos/stack-presets.md)'}`);
     lines.push('', 'Governance tracks');
     for (const t of Object.values(TRACKS)) lines.push(`  ${t.name.padEnd(10)} ${t.title} — ${t.summary}`);
+    lines.push('', 'Adoption',
+      '  new product       the product baseline first (discovery → requirements → PRD → UX → architecture), then stories',
+      '  --brownfield      an existing system: document it as it is, then every change is a story held to the',
+      '                    delivery gates — ready (G5), verified (G7), released (G8). Standard track only.');
     lines.push('', 'Starter packs (each writes a correct .eos/project.json; none scaffolds application code)');
     for (const id of packIds()) lines.push(`  ${id.padEnd(16)} ${PACKS[id].title}`);
     if (files.length) { lines.push('', 'Local files'); for (const r of files) lines.push(`  ${r.action.padEnd(12)} ${r.path}${r.action === 'kept' ? ' (already exists — never overwritten)' : ''}`); }
     lines.push('');
-    if (state !== 'declared') lines.push(`  Declare it:  ${CLI} ${verb} <pack> --track standard|regulated --write`);
+    if (state !== 'declared') lines.push(`  Declare it:  ${CLI} ${verb} <pack> --track standard|regulated [--brownfield] --write`);
     else if (awaitingStack) lines.push(`  ${detected.length ? 'Declare the stack' : 'When code lands'}:  ${CLI} ${verb} <pack> --write   (no --force needed — the ${trackOf(existing).title} track carries over)`);
     if (verb === 'init' && !flags.write) lines.push('  Nothing was written. Re-run with --write to create the local files.');
     lines.push(`  Next:        ${CLI} next`, '');
@@ -145,6 +153,16 @@ function declareProject(snapshot, flags, verb) {
   const packTrack = trackOf(pack).name;
   const declaration = applyTrack(pack, track || (packTrack !== 'standard' ? packTrack : keptTrack));
   const chosen = trackOf(declaration);
+  // Brownfield adoption carries over like the track (--force starts over without it).
+  const keptBrownfield = state === 'declared' && existing?.workflowProfile === 'delivery-only' && !flags.force;
+  const brownfield = !!flags.brownfield || keptBrownfield;
+  if (brownfield && chosen.name === 'regulated') {
+    console.log(['EOS ' + verb + ' · refused  --brownfield adopts EOS at the delivery gates, on the Standard track.',
+      '  The Regulated track requires the product baseline (discovery → architecture) before any story ships:',
+      '  write it — bmad-document-project gives you a head start — or adopt on the Standard track first.', ''].join('\n'));
+    return EXIT.FAIL;
+  }
+  if (brownfield) declaration.workflowProfile = 'delivery-only';
   const lines = [`EOS ${verb} · ${packId} — ${PACKS[packId].title} · ${chosen.title} track`, ''];
   // A config-only declaration has no stack to lose: when code lands it takes a pack without --force,
   // as long as the track stays what the project chose. Anything else the project declared is its own.
@@ -179,13 +197,15 @@ function declareProject(snapshot, flags, verb) {
     lines.push('Next', `  1. ${CLI} next                 (start the guided loop)`,
       `  2. When code lands: ${CLI} init <pack> --write — this track carries over`, '');
     if (!flags.write) lines.push('  Nothing was written. Re-run with --write to apply.', '');
-    emit(flags, { pack: packId, track: chosen.name, written: !!flags.write, replaced: state, declaration, notes: PACKS[packId].notes, localFiles: files }, lines.join('\n'));
+    emit(flags, { pack: packId, track: chosen.name, brownfield, written: !!flags.write, replaced: state, declaration, notes: PACKS[packId].notes, localFiles: files }, lines.join('\n'));
     return EXIT.OK;
   }
   lines.push('Next',
     '  1. Replace the commands above with what CI actually runs — an unrunnable command fails closed.',
     `  2. ${CLI} stack sync --write   (put the stack in the always-on rule)`);
-  if (chosen.name === 'regulated') {
+  if (brownfield) {
+    lines.push(`  3. ${CLI} next                 (brownfield: it asks for the as-is documentation — bmad-document-project → docs/index.md — then the first story)`);
+  } else if (chosen.name === 'regulated') {
     lines.push(`  3. ${CLI} release keygen       (the key your releases will be signed with)`,
       '     node .github/hooks/eos-doctor.mjs        (release pre-flight: what a regulated release still lacks)',
       `  4. ${CLI} next`);
@@ -194,7 +214,7 @@ function declareProject(snapshot, flags, verb) {
   }
   lines.push('');
   if (!flags.write) lines.push('  Nothing was written. Re-run with --write to apply.', '');
-  emit(flags, { pack: packId, track: chosen.name, written: !!flags.write, replaced: state, declaration, notes: PACKS[packId].notes, localFiles: files }, lines.join('\n'));
+  emit(flags, { pack: packId, track: chosen.name, brownfield, written: !!flags.write, replaced: state, declaration, notes: PACKS[packId].notes, localFiles: files }, lines.join('\n'));
   return EXIT.OK;
 }
 

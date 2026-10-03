@@ -67,6 +67,7 @@
       "budgetMs": 95000,
       "files": [
         ".github/eos/agent-platforms.test.mjs",
+        ".github/eos/brownfield.test.mjs",
         ".github/eos/bypass.test.mjs",
         ".github/eos/cross-branch.test.mjs",
         ".github/eos/first-run.test.mjs",

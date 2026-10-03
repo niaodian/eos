@@ -3,10 +3,12 @@
 // It answers exactly one question: given what this repository actually contains, what is the ONE
 // thing to do next, why, how to start it, and how you will know it is done. It never asks a model
 // to guess the phase, and it never returns a menu of twelve possibilities.
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import { resolveAction, skillDiagnostics } from './registry.mjs';
 import { evaluateGate, isBlocking } from './gates.mjs';
 import { deriveProductState, classificationBlock } from './transitions.mjs';
-import { scopeState, changeTypeOf, gatePolicy } from './state.mjs';
+import { scopeState, changeTypeOf, gatePolicy, ARTIFACTS } from './state.mjs';
 import { trackSummary } from './track.mjs';
 
 const CLI = 'node .github/eos/eos.mjs';
@@ -28,6 +30,7 @@ const TITLES = {
   'repair-prd': 'Repair the PRD',
   'design-ux': 'Design the UX contract (or record SKIP)',
   'design-architecture': 'Design the architecture',
+  'document-existing-system': 'Document the existing system as it is',
   'plan-stories': 'Slice the work into stories',
   'design-acceptance-tests': 'Design the missing acceptance tests',
   'design-eval-cases': 'Design the missing eval cases',
@@ -404,9 +407,24 @@ export function route(snapshot, { now = new Date() } = {}) {
       addAlternatives(snapshot, alternatives, recommended, scope);
       return finish();
     }
+    // A brownfield product's baseline is the system that already runs (profile `baseline:
+    // "existing-system"`): documented as it is, not re-specified. That documentation comes first.
+    const existingSystem = snapshot.profile?.baseline === 'existing-system';
+    if (existingSystem && !existsSync(join(snapshot.root, ARTIFACTS.projectDocs))) {
+      take(artifactAction(snapshot, 'document-existing-system', {
+        file: ARTIFACTS.projectDocs,
+        reason: `this project adopts EOS at the delivery gates (workflowProfile "${snapshot.profileName}"): the running system is its baseline, documented as it is rather than re-specified, and ${ARTIFACTS.projectDocs} does not exist yet.`,
+        doneWhen: [`${ARTIFACTS.projectDocs} indexes the as-is documentation (bmad-document-project)`, 'the first change is written as a story under docs/stories/'],
+      }));
+      exitCode = 2;
+      addAlternatives(snapshot, alternatives, recommended, scope);
+      return finish();
+    }
     take(artifactAction(snapshot, 'plan-stories', {
       file: 'docs/stories/',
-      reason: 'the baseline is complete but there is no story to work on.',
+      reason: existingSystem
+        ? `the existing system is documented (${ARTIFACTS.projectDocs}); write the first change as a story — it is held to the delivery gates (G5 ready, G7 verified, G8 released).`
+        : 'the baseline is complete but there is no story to work on.',
       doneWhen: ['at least one story exists under docs/stories/', '`eos check --gate story-ready --scope <id>` passes for it'],
     }));
     exitCode = 2;

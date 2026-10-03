@@ -77,6 +77,10 @@ node .github/eos/eos.mjs init config-only --write   # declare it: no code yet (o
 code .                                        # from INSIDE the project — see the warning below
 ```
 
+**An existing system?** Bring EOS into that repository instead and adopt it at the delivery gates:
+`eos init <pack> --brownfield --write` — no discovery or architecture first; every change is a story
+held to G5, G7 and G8 ([manual §3.5](user-manual.md)).
+
 **`git init` is not optional.** `degit` gives you a directory with no repository, and EOS binds every
 verification to the git tree it ran against. Without it, the `verified` gate reports BLOCKED — which
 is correct behaviour, but a confusing way to start.

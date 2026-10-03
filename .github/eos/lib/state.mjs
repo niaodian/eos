@@ -31,6 +31,8 @@ export const ARTIFACTS = {
   telemetryRecord: 'docs/telemetry.json',
   iterationRecord: 'docs/iteration.json',
   activation: 'docs/eos/activation.md',
+  // A brownfield product's as-is documentation: bmad-document-project writes its index here.
+  projectDocs: 'docs/index.md',
 };
 
 function gitInfo(root) {

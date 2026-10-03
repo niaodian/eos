@@ -70,6 +70,14 @@
       ],
       "handoff": "Design the architecture, lock the tech stack and the deployment topology in ADRs, and record every decision in docs/architecture.json."
     },
+    "document-existing-system": {
+      "agent": "eos-discovery",
+      "prompt": null,
+      "skills": [
+        "bmad-document-project"
+      ],
+      "handoff": "Document the existing system as it is — run bmad-document-project into docs/ (docs/index.md is its index). Record what exists and how it is built; do not re-specify it. Stories for changes come next."
+    },
     "plan-stories": {
       "agent": "eos-plan",
       "prompt": null,
