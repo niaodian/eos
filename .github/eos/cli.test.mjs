@@ -196,6 +196,16 @@ test('init --write creates local integration files but never overwrites existing
   assert.match(r.out, /kept|exists/i);
 });
 
+test('init --write creates the approval baseline from the committed example, and keeps a developer\'s own', () => {
+  const dir = READY_REPO();
+  write(dir, '.vscode/settings.json.example', '{\n  // baseline\n  "chat.tools.global.autoApprove": false\n}\n');
+  assert.equal(run(dir, ['init', '--write']).code, 0);
+  assert.equal(readFileSync(join(dir, '.vscode/settings.json'), 'utf8'), readFileSync(join(dir, '.vscode/settings.json.example'), 'utf8'));
+  write(dir, '.vscode/settings.json', '{ "mine": true }\n');
+  run(dir, ['init', '--write']);
+  assert.equal(readFileSync(join(dir, '.vscode/settings.json'), 'utf8'), '{ "mine": true }\n', 'an existing settings.json must be preserved');
+});
+
 test('init without --write changes nothing', () => {
   const dir = READY_REPO();
   const r = run(dir, ['init']);

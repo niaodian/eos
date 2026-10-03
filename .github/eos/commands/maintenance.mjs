@@ -55,6 +55,10 @@ const VSCODE_TASKS = JSON.stringify({
 // without --force; the template's own may be replaced, because it was never this project's.
 const LOCAL_FILES = [
   { path: '.vscode/tasks.json', body: VSCODE_TASKS },
+  // The approval baseline: never auto-approve every tool, never auto-run workspace npm scripts. It is a
+  // personal, gitignored file, so it is created from the committed example and never overwritten —
+  // before 2.1.0 it existed only as the example, so a fresh copy ran on VS Code's looser defaults.
+  { path: '.vscode/settings.json', from: '.vscode/settings.json.example' },
   { path: '.eos/local/.gitkeep', body: '' },
 ];
 
@@ -63,7 +67,11 @@ function localFiles(root, write) {
   for (const f of LOCAL_FILES) {
     const full = join(root, f.path);
     if (existsSync(full)) { rows.push({ path: f.path, action: 'kept' }); continue; }
-    if (write) { mkdirSync(dirname(full), { recursive: true }); writeFileSync(full, f.body, 'utf8'); }
+    if (f.from && !existsSync(join(root, f.from))) { rows.push({ path: f.path, action: `skipped — ${f.from} is missing` }); continue; }
+    if (write) {
+      mkdirSync(dirname(full), { recursive: true });
+      writeFileSync(full, f.from ? readFileSync(join(root, f.from), 'utf8') : f.body, 'utf8');
+    }
     rows.push({ path: f.path, action: write ? 'created' : 'would create' });
   }
   return rows;
