@@ -459,6 +459,12 @@ export function bindTree(dir) {
 
 export const TEST_FILE = "import { test } from 'node:test';\ntest('valid password', () => {});\n";
 
+/**
+ * How the runtime's own JUnit report placed its cases: `file` from Node 24.11 on, where node:test
+ * records each test's file, and `name` before it, where it records none.
+ */
+export const junitMatchOf = (report) => (/<testcase\b[^>]*\sfile="/.test(readFileSync(report, 'utf8')) ? 'file' : 'name');
+
 export const TRACE_MATRIX = [
   '# Trace matrix', '',
   '| AC | Test | Result |', '| --- | --- | --- |',

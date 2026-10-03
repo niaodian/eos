@@ -6,9 +6,9 @@
 //   node --test .github/eos/test-evidence.test.mjs
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, existsSync, utimesSync } from 'node:fs';
+import { readFileSync, existsSync, utimesSync, realpathSync } from 'node:fs';
 import { join } from 'node:path';
-import { project, run, runJson, write, cleanup, storyFiles, story, APP_PROJECT, TRACE_MATRIX, commitAll } from './test-support.mjs';
+import { project, run, runJson, write, cleanup, storyFiles, story, APP_PROJECT, TRACE_MATRIX, commitAll, junitMatchOf } from './test-support.mjs';
 
 after(cleanup);
 
@@ -41,7 +41,8 @@ test('the verified gate answers the trace matrix from the JUnit report its own r
   assert.deepEqual(summary.source, { format: 'junit', reports: [REPORT] });
   assert.deepEqual(summary.producer, { type: 'local', name: 'eos verified gate' });
   assert.equal(summary.commandDigest.length, 64);
-  assert.deepEqual(summary.results.map((x) => `${x.ac} ${x.status} ${x.match}`), ['AC1.1 PASS name']);
+  // node:test records each test's file from Node 24.11 on, and only its name before.
+  assert.deepEqual(summary.results.map((x) => `${x.ac} ${x.status} ${x.match}`), [`AC1.1 PASS ${junitMatchOf(join(dir, REPORT))}`]);
   // Bound to the tree it ran on: product-tree --json reports the same digest.
   assert.equal(summary.productTree.digest, JSON.parse(run(dir, ['product-tree', '--json']).stdout).productTree.digest);
 });
@@ -160,11 +161,15 @@ test('without evidence.junit nothing changes — a summary the project writes is
 });
 
 test('a name-only match belongs to the file the matrix names: not a longer name there, not a comment, not a twin elsewhere', () => {
+  // A report that records no file, as node:test writes one before Node 24.11 — on every runtime, so
+  // the source rules stay exercised where the reporter would otherwise have placed each case.
+  const nameOnly = "import { readFileSync, writeFileSync } from 'node:fs';\nconst f = process.argv[2];\nwriteFileSync(f, readFileSync(f, 'utf8').replace(/ file=\"[^\"]*\"/g, ''));\n";
   const dir = junitProject({
-    test: NODE_TEST('tests/login.test.mjs tests/reset.test.mjs'),
+    test: [NODE_TEST('tests/login.test.mjs tests/reset.test.mjs'), `node scripts/name-only.mjs ${REPORT}`],
     files: {
       'tests/login.test.mjs': "import { test } from 'node:test';\ntest('invalid password', () => {});\n// test('valid password', () => {});\n",
       'tests/reset.test.mjs': "import { test } from 'node:test';\ntest('valid password', () => {});\n",
+      'scripts/name-only.mjs': nameOnly,
     },
   });
   // The only "valid password" that ran is reset's: login has a longer name and a comment.
@@ -186,6 +191,35 @@ test('a name-only match belongs to the file the matrix names: not a longer name 
   commitAll(dir, 'qualify it');
   const qualified = check(verify(dir), 'trace-complete');
   assert.equal(qualified.status, 'PASS', qualified.detail);
+  assert.equal(testRun(dir).results[0].match, 'name', 'the report records no file');
+});
+
+test('a report that records absolute file paths places each case in repository terms, and never records the checkout', () => {
+  // What node:test writes from Node 24.11 on, produced here on every runtime: the absolute path its
+  // process saw — on macOS a temporary checkout under /var is /private/var to it.
+  const located = [
+    "import { mkdirSync, writeFileSync } from 'node:fs';",
+    "import { join } from 'node:path';",
+    "const at = (f) => join(process.cwd(), f).replace(/&/g, '&amp;').replace(/\"/g, '&quot;').replace(/</g, '&lt;');",
+    "mkdirSync('reports/junit', { recursive: true });",
+    "writeFileSync('reports/junit/node.xml', `<testsuites><testcase name=\"valid password\" classname=\"test\" file=\"${at(process.argv[2])}\"/></testsuites>\\n`);",
+    '',
+  ].join('\n');
+  const dir = junitProject({
+    test: 'node scripts/located.mjs tests/reset.test.mjs',
+    files: { 'scripts/located.mjs': located, 'tests/reset.test.mjs': "import { test } from 'node:test';\ntest('valid password', () => {});\n" },
+  });
+  const elsewhere = check(verify(dir), 'trace-complete');
+  assert.equal(elsewhere.status, 'FAIL', elsewhere.detail);
+  assert.match(elsewhere.detail, /the report places it in tests\/reset\.test\.mjs, not tests\/login\.test\.mjs/);
+  const recorded = readFileSync(join(dir, 'docs/evidence/test-run.json'), 'utf8');
+  for (const checkout of new Set([dir, realpathSync.native(dir)])) {
+    assert.equal(recorded.includes(JSON.stringify(checkout).slice(1, -1)), false, `the evidence records the checkout ${checkout}`);
+  }
+
+  const here = junitProject({ test: 'node scripts/located.mjs tests/login.test.mjs', files: { 'scripts/located.mjs': located } });
+  assert.equal(check(verify(here), 'trace-complete').status, 'PASS');
+  assert.deepEqual(testRun(here).results.map((x) => `${x.ac} ${x.status} ${x.match}`), ['AC1.1 PASS file']);
 });
 
 test('verifying one story leaves another story\'s evidence fresh: an identical result is kept, not rewritten', () => {

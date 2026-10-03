@@ -1,8 +1,8 @@
 // Does a test file declare the test a trace-matrix row names? (ADR-016)
 //
-// Some JUnit reports record only a test's NAME: node:test writes classname="test" and no file. A
-// name-only match proves that SOME test of that name ran. Which file it ran from is settled here,
-// from the source, by two rules:
+// Some JUnit reports record only a test's NAME: node:test before Node 24.11 writes classname="test"
+// and no file. A name-only match proves that SOME test of that name ran. Which file it ran from is
+// settled here, from the source, by two rules:
 //
 //   1. the file the matrix names declares it — as a string literal or a function name, and never
 //      inside a comment (a commented-out test, or "valid password" inside "invalid password", is no

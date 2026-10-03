@@ -221,9 +221,11 @@ export function parseJUnit(text) {
 // docs/trace-matrix.md stays the authority on WHICH test proves WHICH criterion; a report only says
 // what ran. A row `tests/login.test.mjs::valid password` is answered by the testcases named
 // "valid password" — and, when the report says where a testcase lives, only by those that live in
-// tests/login.test.mjs. Reports that do not say (node:test writes classname="test" and no file) are
-// matched by name and marked `match: "name"`; the gate's static check that the selector appears in
-// the file the matrix names is what then ties the name to that file.
+// tests/login.test.mjs. Reports that do not say (node:test before Node 24.11 writes
+// classname="test" and no file) are matched by name and marked `match: "name"`; the gate's static
+// check that the selector appears in the file the matrix names is what then ties the name to that
+// file. From Node 24.11 on, node:test records each case's absolute file, which test-evidence.mjs
+// makes repository-relative.
 
 /** Extensions a report may name a test file with. Lower case on purpose: `com.example.Rs` is a class. */
 const SOURCE_EXT = /\.(?:[cm]?[jt]sx?|py|go|java|kt|kts|scala|groovy|cs|fs|vb|rb|rs|php|swift|exs?|dart|clj[cs]?)$/;
