@@ -5,7 +5,7 @@ tools: ['search', 'editFiles', 'runCommands']
 handoffs:
   - label: Open next iteration (Requirements)
     agent: agent
-    prompt: Start a new iteration. Run /requirements for the next change, fed by telemetry.
+    prompt: Start a new iteration. Run /eos-requirements for the next change, fed by telemetry.
     send: false
   - label: Back to EOS Guide (recompute the next action)
     agent: eos-guide

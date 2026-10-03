@@ -18,7 +18,7 @@ const boxes = [];
 function repo(mutate = () => {}) {
   const dir = mkdtempSync(join(tmpdir(), 'eos-cfg-'));
   boxes.push(dir);
-  for (const top of ['.github', '.eos', 'docs', 'src', 'api', 'ops', 'AGENTS.md', 'README.md', 'README.zh.md']) {
+  for (const top of ['.github', '.agents', '.claude', '.eos', 'docs', 'src', 'api', 'ops', 'AGENTS.md', 'README.md', 'README.zh.md']) {
     try { cpSync(join(ROOT, top), join(dir, top), { recursive: true }); } catch { /* optional path */ }
   }
   mutate({
@@ -304,25 +304,42 @@ test('the requirement is data, so any profile can declare it', () => {
   for (const name of ['prototype', 'standard-product', 'controlled']) assert.notEqual(wf.profiles[name].requiresCompliance, true, `${name} must not demand it`);
 });
 
-// ---------------------------------------------------------------- S15 prompts cite only the policy
-// Prompts, agents and instructions tell agents what to run. A name they cite that the policy does
-// not define sends an agent to nothing, while every other check stays green. [#10, ADR-011]
+// ---------------------------------------------------------------- S15 skills cite only the policy
+// Skills, agents and instructions tell agents what to run. A name they cite that the policy does
+// not define sends an agent to nothing, while every other check stays green. [#10, ADR-011, ADR-017]
 const S15 = (out) => out.split('\n').filter((l) => l.includes('S15'));
 
-test('S15: a prompt citing a gate that does not exist fails, and says what does', () => {
-  const { code, out } = run(repo(({ write }) => write('.github/prompts/drift.prompt.md',
-    '---\ndescription: drifted\n---\nRun `node .github/eos/eos.mjs check --gate design-ready --scope STORY-001`.\n')));
+test('S15: a skill citing a gate that does not exist fails, and says what does', () => {
+  const { code, out } = run(repo(({ write }) => write('.agents/skills/eos-drift/SKILL.md',
+    '---\nname: eos-drift\ndescription: drifted\n---\nRun `node .github/eos/eos.mjs check --gate design-ready --scope STORY-001`.\n')));
   assert.equal(code, 1, out);
-  assert.match(S15(out).join('\n'), /drift\.prompt\.md:4: cites gate "design-ready", which \.eos\/gates\.json does not define/);
+  assert.match(S15(out).join('\n'), /eos-drift\/SKILL\.md:5: cites gate "design-ready", which \.eos\/gates\.json does not define/);
 });
 
-test('S15: unknown commands, states, transitions, prompts, agents and scripts are each named', () => {
+test('S11: a skill that would not load is an error — a name that is not its directory, a non-portable field', () => {
+  const { code, out } = run(repo(({ write }) => {
+    write('.agents/skills/eos-misnamed/SKILL.md', '---\nname: eos-other\ndescription: loads nowhere\n---\n# x\n');
+    write('.agents/skills/eos-vendor/SKILL.md', '---\nname: eos-vendor\ndescription: copilot only\ntools: [search]\n---\n# x\n');
+    write('.agents/skills/eos-silent/SKILL.md', '---\nname: eos-silent\n---\n# x\n');
+  }));
+  assert.equal(code, 1, out);
+  assert.match(out, /S11 \.agents\/skills\/eos-misnamed\/SKILL\.md: name "eos-other" must equal its directory "eos-misnamed"/);
+  assert.match(out, /S11 \.agents\/skills\/eos-vendor\/SKILL\.md: tools — EOS skills carry only name and description/);
+  assert.match(out, /S11 \.agents\/skills\/eos-silent\/SKILL\.md: no "description"/);
+});
+
+test('S11: a prompt file left behind by an upgrade is pointed out — VS Code no longer loads it', () => {
+  const { out } = run(repo(({ write }) => write('.github/prompts/spec.prompt.md', '---\ndescription: old\n---\nold\n')));
+  assert.match(out, /WARN\s+S11 \.github\/prompts\/ still holds 1 prompt file\(s\) — since eos-2\.2\.0/);
+});
+
+test('S15: unknown commands, states, transitions, slash commands, agents and scripts are each named', () => {
   const { code, out } = run(repo(({ write }) => write('.github/instructions/drift.instructions.md', [
     '---', 'applyTo: "**/*.drift"', '---',
     'Then run `eos frobnicate`.',
     'Move it with `eos transition --scope story --id STORY-001 --to SHIPPED`.',
     'A story goes DRAFT → MERGED once reviewed.',
-    'Use /ghost-prompt for the rest, and hand off to the `eos-ghost` agent.',
+    'Use /ghost-skill for the rest, and hand off to the `eos-ghost` agent.',
     'The validator is `node .github/hooks/ghost.mjs`. Release at G42.',
     '',
   ].join('\n'))));
@@ -331,13 +348,13 @@ test('S15: unknown commands, states, transitions, prompts, agents and scripts ar
   assert.match(lines, /drift\.instructions\.md:4: cites `eos frobnicate`, which is not an EOS command/);
   assert.match(lines, /:5: cites --to SHIPPED for a story, which is not a state of the story machine/);
   assert.match(lines, /:6: describes DRAFT → MERGED, which is not a transition/);
-  assert.match(lines, /:7: cites \/ghost-prompt, but \.github\/prompts\/ghost-prompt\.prompt\.md does not exist/);
+  assert.match(lines, /:7: cites \/ghost-skill, but \.agents\/skills\/ghost-skill\/SKILL\.md does not exist/);
   assert.match(lines, /:7: hands off to agent "eos-ghost"/);
   assert.match(lines, /:8: cites \.github\/hooks\/ghost\.mjs, which does not exist/);
   assert.match(lines, /:8: cites G42, which is neither a gate code/);
 });
 
-test('S15: renaming a gate in the policy fails every prompt that still cites the old name', () => {
+test('S15: renaming a gate in the policy fails every skill and agent that still cites the old name', () => {
   // The drift this check exists for: the policy moves, the prose does not.
   const { code, out } = run(repo(({ read, write }) => {
     const gates = read('.eos/gates.json');

@@ -74,9 +74,9 @@ function buildProject(files, { withGovernance, withHooks, git }) {
     cpSync(TEMPLATE.gates, join(dir, '.eos/gates.json'));
     cpSync(TEMPLATE.agentMap, join(dir, '.eos/agent-map.json'));
     cpSync(TEMPLATE.schemas, join(dir, '.eos/schemas'), { recursive: true });
-    // The agent/prompt existence check reads these directories.
+    // The agent / slash-command existence check reads these directories (slash commands are skills).
     cpSync(join(REPO_ROOT, '.github/agents'), join(dir, '.github/agents'), { recursive: true });
-    cpSync(join(REPO_ROOT, '.github/prompts'), join(dir, '.github/prompts'), { recursive: true });
+    cpSync(join(REPO_ROOT, '.agents/skills'), join(dir, '.agents/skills'), { recursive: true });
     write(dir, 'docs/eos/activation.md', '# Activation\n\n- [x] Branch protection\n');
   }
   if (withHooks) {
@@ -126,12 +126,39 @@ export function write(dir, rel, body) {
   return full;
 }
 
+/**
+ * The home directory every CLI run in the suite sees.
+ *
+ * `eos next` reports a mapped BMAD skill that is not installed as a blocker, and it looks for
+ * installed skills under $HOME (and USERPROFILE). So a developer's own ~/.agents/skills — or its
+ * absence on a CI runner — decided the exit code of the router and journey tests: green on a laptop
+ * with BMAD installed, red in CI. In here every BMAD skill the agent map references is installed, on
+ * every machine; a test about a missing skill passes its own HOME. The directory goes when the
+ * process does.
+ */
+let home = null;
+export function testHome() {
+  if (home) return home;
+  home = mkdtempSync(join(tmpdir(), 'eos-home-'));
+  const agentMap = JSON.parse(readFileSync(TEMPLATE.agentMap, 'utf8'));
+  for (const name of new Set(Object.values(agentMap.actions || {}).flatMap((a) => a.skills || []))) {
+    if (name.startsWith('eos-')) continue; // EOS's own skills travel with the sandbox (.agents/skills)
+    write(home, `.agents/skills/${name}/SKILL.md`, `---\nname: ${name}\ndescription: Test stand-in for ${name}. Use never.\n---\n`);
+  }
+  const created = home;
+  process.on('exit', () => { try { rmSync(created, { recursive: true, force: true }); } catch { /* best effort */ } });
+  return home;
+}
+
+/** The environment a CLI run gets: the caller's, the test home, a fixed actor, then `extra`. */
+export const testEnv = (extra = {}) => cleanEnv({ ...process.env, HOME: testHome(), USERPROFILE: testHome(), EOS_ACTOR: 'tester', ...extra });
+
 export function run(dir, args = [], env = {}) {
   const r = timed('cli', () => spawnSync(process.execPath, [CLI, ...args], {
     cwd: dir,
     encoding: 'utf8',
     timeout: SPAWN_TIMEOUT_MS,
-    env: cleanEnv({ ...process.env, EOS_ACTOR: 'tester', ...env }),
+    env: testEnv(env),
   }));
   assertNotTimedOut(r, { what: `eos ${args.join(' ')}`, cwd: dir });
   return { code: r.status, out: (r.stdout || '') + (r.stderr || ''), stdout: r.stdout || '' };

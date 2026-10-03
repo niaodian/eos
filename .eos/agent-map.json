@@ -4,7 +4,7 @@
   "actions": {
     "fix-eos-configuration": {
       "agent": null,
-      "prompt": "validate-config",
+      "prompt": "eos-validate-config",
       "skills": [],
       "handoff": "EOS's own configuration does not load. Fix only the reported file(s); change nothing else."
     },
@@ -31,7 +31,7 @@
     },
     "expand-requirements": {
       "agent": null,
-      "prompt": "requirements",
+      "prompt": "eos-requirements",
       "skills": [
         "bmad-agent-pm",
         "eos-operational-readiness"
@@ -40,7 +40,7 @@
     },
     "write-prd": {
       "agent": null,
-      "prompt": "spec",
+      "prompt": "eos-spec",
       "skills": [
         "bmad-prd"
       ],
@@ -48,7 +48,7 @@
     },
     "repair-prd": {
       "agent": null,
-      "prompt": "spec",
+      "prompt": "eos-spec",
       "skills": [
         "bmad-prd"
       ],
@@ -56,7 +56,7 @@
     },
     "design-ux": {
       "agent": "eos-design",
-      "prompt": "ux-spec",
+      "prompt": "eos-ux-spec",
       "skills": [
         "bmad-ux"
       ],
@@ -89,7 +89,7 @@
     },
     "design-eval-cases": {
       "agent": null,
-      "prompt": "eval-spec",
+      "prompt": "eos-eval-spec",
       "skills": [],
       "handoff": "Add an eval case (EVAL-<n>) for each LLM-backed acceptance criterion listed; do not touch the others."
     },
@@ -146,7 +146,7 @@
     },
     "build-trace-matrix": {
       "agent": null,
-      "prompt": "spec-align",
+      "prompt": "eos-spec-align",
       "skills": [
         "bmad-testarch-trace"
       ],
@@ -154,31 +154,31 @@
     },
     "record-spike-outcome": {
       "agent": null,
-      "prompt": "adr",
+      "prompt": "eos-adr",
       "skills": [],
       "handoff": "Write the spike's decision record; a spike never merges product code without a follow-up story."
     },
     "prepare-release": {
       "agent": null,
-      "prompt": "release-gate",
+      "prompt": "eos-release-gate",
       "skills": [],
       "handoff": "Walk the release gate for the candidate; record evidence, do not approve anything yourself."
     },
     "repair-release": {
       "agent": null,
-      "prompt": "release-gate",
+      "prompt": "eos-release-gate",
       "skills": [],
       "handoff": "Close the listed release blockers only, then re-run the release-ready gate."
     },
     "land-telemetry": {
       "agent": null,
-      "prompt": "telemetry-plan",
+      "prompt": "eos-telemetry-plan",
       "skills": [],
       "handoff": "The change is live. Land the observability that makes it judgeable: the success metric as a real signal, dashboards, routed alerts, and a rollback trigger."
     },
     "repair-telemetry": {
       "agent": null,
-      "prompt": "telemetry-plan",
+      "prompt": "eos-telemetry-plan",
       "skills": [],
       "handoff": "Close only the listed observability gaps in docs/telemetry.json, then re-run the telemetry-ready gate."
     },
@@ -202,7 +202,7 @@
     },
     "start-next-change": {
       "agent": null,
-      "prompt": "requirements",
+      "prompt": "eos-requirements",
       "skills": [],
       "handoff": "Nothing is blocked. Start the next change from a requirement, not from code."
     }

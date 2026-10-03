@@ -70,7 +70,7 @@ GitHub Copilot 里用，或在任意终端里用，不需要服务、不需要�
 
 ```bash
 # 1. 从一个固定的发布版本开始，并把它变成你的仓库
-npx degit niaodian/eos#eos-2.1.0 my-app && cd my-app && git init
+npx degit niaodian/eos#eos-2.2.0 my-app && cd my-app && git init
 
 # 2. 声明项目 —— 还没有代码，技术栈留到架构阶段再定
 npx --offline eos init config-only --write        # 想走严格轨道就加上 --track regulated
@@ -147,8 +147,8 @@ EOS 的发布在 GitHub Actions 中构建并出具证明 —— 正是 EOS 要�
 你可以亲自核验：
 
 ```bash
-gh release download eos-2.1.0 --repo niaodian/eos --pattern 'eos-2.1.0.tar.gz'
-gh attestation verify eos-2.1.0.tar.gz --repo niaodian/eos
+gh release download eos-2.2.0 --repo niaodian/eos --pattern 'eos-2.2.0.tar.gz'
+gh attestation verify eos-2.2.0.tar.gz --repo niaodian/eos
 ```
 
 每个发布还附带它的 SBOM 和一个 `SHA256SUMS` 文件。
@@ -161,7 +161,9 @@ gh attestation verify eos-2.1.0.tar.gz --repo niaodian/eos
 .github/eos/        CLI 及其确定性引擎（零依赖），以及它的测试
 .github/hooks/      校验器与护栏：配置、文档对齐、机密扫描、产品质量门
 .github/agents/     eos-guide 以及各阶段的编排 Agent（供 Copilot Chat 使用）
-.github/prompts/    斜杠命令工作流；.github/instructions/ 存放按范围生效的编码规则
+.github/instructions/ 按文件范围生效的编码规则
+.agents/skills/     斜杠命令工作流，形式为 Agent Skills（/eos-next、/eos-spec 等）；
+                    .claude/skills/ 是为 Claude Code 生成的副本
 .github/workflows/  eos-ci.yml（Linux、macOS、Windows）与 eos-release.yml（带证明的发布）
 docs/               你的规格与 ADR；docs/eos/ 是 EOS 手册（中文版在 docs/zh/）
 ```
@@ -172,7 +174,7 @@ docs/               你的规格与 ADR；docs/eos/ 是 EOS 手册（中文版�
 - [用户手册](docs/zh/user-manual.md) —— 从想法到上线再到迭代，含分步的 SaaS 与 Agentic 路线。
 - [升级到 eos-2.0.0](docs/zh/user-manual.md#105-从-eos-122x-升级到-eos-200) —— 改变了什么、你需要做什么。
 - [升级到 eos-2.0.1](docs/zh/user-manual.md#107-从-eos-200-升级到-eos-201) —— 密钥检测安全补丁。
-- [升级到 eos-2.1.0](docs/zh/user-manual.md#108-从-eos-20x-升级到-eos-210) —— `eos upgrade`，以及用它完成的第一次升级。
+- [升级到 eos-2.2.0](docs/zh/user-manual.md#109-从-eos-21x-升级到-eos-220) —— 斜杠命令改为 Agent Skills（`/spec` → `/eos-spec`）、JUnit 证据、发布门禁预告。
 - [工作流契约](docs/zh/developer-experience.md) —— CLI、退出码、JSON 与诊断。
 - [技术栈预设与轨道](docs/zh/stack-presets.md) —— 所有受支持的技术栈，以及如何选择轨道。
 - [设计原理](docs/zh/blueprint.md) 与 [架构决策记录](docs/adr/)。
@@ -182,7 +184,7 @@ docs/               你的规格与 ADR；docs/eos/ 是 EOS 手册（中文版�
 - **Node.js 20.10+ 和 Git** —— 别无其他。CI 在 Linux、macOS 和 Windows 上运行 Node 20 与 22。
 - **永远不需要 API key。** EOS 从不调用模型。每一项附加（Copilot、BMAD、BMAD 运行时）带来什么，以及已知局限，
   见 [快速开始](docs/zh/quickstart.md#能力与依赖)。
-- **VS Code + GitHub Copilot 是可选的。** 只有当项目文件夹本身是工作区根目录时，Agent、提示词和
+- **VS Code + GitHub Copilot 是可选的。** 只有当项目文件夹本身是工作区根目录时，Agent、技能和
   hook 才会加载。hook 是 VS Code 的预览特性。
 - **一次性加固。** 真正的仓库建好后，在 Copilot Chat 中运行 `/eos-init`：分支保护、CODEOWNERS 与
   审批，进度记录在 [docs/zh/activation.md](docs/zh/activation.md)。

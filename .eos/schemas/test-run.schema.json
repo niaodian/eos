@@ -113,6 +113,30 @@
         }
       }
     },
+    "source": {
+      "description": "Where the results came from when EOS derived them itself (eos-2.2.0, ADR-016): the JUnit reports the run wrote. Absent when a runner or a script of the project wrote this file.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "format",
+        "reports"
+      ],
+      "properties": {
+        "format": {
+          "enum": [
+            "junit"
+          ]
+        },
+        "reports": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
     "results": {
       "type": "array",
       "minItems": 1,
@@ -144,6 +168,13 @@
               "FAIL",
               "SKIP",
               "ERROR"
+            ]
+          },
+          "match": {
+            "description": "How a derived result was matched to the trace-matrix reference: `file` when the report places the testcase in that file, `name` when the report records no file (node:test, for one) and the name alone matched. A name match is tied to the file by the gate's check that the selector appears in it.",
+            "enum": [
+              "file",
+              "name"
             ]
           },
           "durationMs": {

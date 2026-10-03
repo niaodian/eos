@@ -1,7 +1,7 @@
 // Documentation generated FROM the machine-readable policy.
 //
 // THE PROBLEM: the same rule lived in four places — `.eos/gates.json` (what actually runs),
-// `docs/`, `.github/prompts/` and `.github/agents/` (what people and agents read). Nothing kept
+// `docs/`, the slash-command workflows and `.github/agents/` (what people and agents read). Nothing kept
 // them in step, so the prose drifted from the engine one edit at a time and the drift was only ever
 // discovered by someone acting on documentation that had quietly stopped being true.
 //
@@ -132,19 +132,19 @@ export function renderEvidenceGraph(snapshot) {
 const ACTION_LABELS = {
   en: {
     title: 'Action map',
-    intro: (n) => `${n} actions. \`eos next\` names one of them and hands it to the agent or prompt below. This page is a projection of \`.eos/agent-map.json\` — the file the router reads — so it cannot disagree with what \`eos next\` recommends. The curated, phase-by-phase overview is [agent-map.md](../agent-map.md).`,
-    head: '| Action | Copilot agent | Prompt | Skills | Handoff |',
+    intro: (n) => `${n} actions. \`eos next\` names one of them and hands it to the agent or slash command below (each slash command is an EOS skill in \`.agents/skills/\`). This page is a projection of \`.eos/agent-map.json\` — the file the router reads — so it cannot disagree with what \`eos next\` recommends. The curated, phase-by-phase overview is [agent-map.md](../agent-map.md).`,
+    head: '| Action | Copilot agent | Slash command | Skills | Handoff |',
     builtin: '(built-in)',
   },
   zh: {
     title: '动作映射',
-    intro: (n) => `共 ${n} 个动作。\`eos next\` 会给出其中一个，并把它交给下表中的 Agent 或 Prompt。本页是 \`.eos/agent-map.json\`（路由器读取的文件）的投影，因此不会与 \`eos next\` 的推荐不一致。按阶段整理的人工概览见 [agent-map.md](../agent-map.md)。交接说明（Handoff）是写给 Agent 的指令，保留策略中的英文原文。`,
-    head: '| 动作 | Copilot Agent | Prompt | 技能 | 交接说明（英文原文） |',
+    intro: (n) => `共 ${n} 个动作。\`eos next\` 会给出其中一个，并把它交给下表中的 Agent 或斜杠命令（每个斜杠命令都是 \`.agents/skills/\` 中的一个 EOS 技能）。本页是 \`.eos/agent-map.json\`（路由器读取的文件）的投影，因此不会与 \`eos next\` 的推荐不一致。按阶段整理的人工概览见 [agent-map.md](../agent-map.md)。交接说明（Handoff）是写给 Agent 的指令，保留策略中的英文原文。`,
+    head: '| 动作 | Copilot Agent | 斜杠命令 | 技能 | 交接说明（英文原文） |',
     builtin: '（内置）',
   },
 };
 
-/** The action map: which agent, prompt and skills each routed action uses — out of .eos/agent-map.json. */
+/** The action map: which agent, slash command and skills each routed action uses — out of .eos/agent-map.json. */
 export function renderActions(agentMap, lang = 'en') {
   const L = ACTION_LABELS[lang];
   const actions = Object.entries(agentMap?.actions || {});

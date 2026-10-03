@@ -73,7 +73,7 @@ You need Node.js 20.10+ and Git. VS Code with GitHub Copilot is optional — the
 
 ```bash
 # 1. Start from a pinned release and make it your repository
-npx degit niaodian/eos#eos-2.1.0 my-app && cd my-app && git init
+npx degit niaodian/eos#eos-2.2.0 my-app && cd my-app && git init
 
 # 2. Declare the project — no code yet, so the stack is decided at architecture time
 npx --offline eos init config-only --write        # add --track regulated for the strict track
@@ -154,8 +154,8 @@ EOS releases are built and attested in GitHub Actions, the way EOS asks your rel
 yourself before you adopt it:
 
 ```bash
-gh release download eos-2.1.0 --repo niaodian/eos --pattern 'eos-2.1.0.tar.gz'
-gh attestation verify eos-2.1.0.tar.gz --repo niaodian/eos
+gh release download eos-2.2.0 --repo niaodian/eos --pattern 'eos-2.2.0.tar.gz'
+gh attestation verify eos-2.2.0.tar.gz --repo niaodian/eos
 ```
 
 Each release also ships its SBOM and a `SHA256SUMS` file.
@@ -168,7 +168,9 @@ Each release also ships its SBOM and a `SHA256SUMS` file.
 .github/eos/        the CLI and its deterministic engine (zero dependencies), with its tests
 .github/hooks/      validators and guardrails: config, doc parity, secrets, the product gate
 .github/agents/     eos-guide and the stage orchestrators for Copilot Chat
-.github/prompts/    slash-command workflows; .github/instructions/ holds the scoped coding rules
+.github/instructions/ the scoped coding rules, applied by file glob
+.agents/skills/     the slash-command workflows, as Agent Skills (/eos-next, /eos-spec …);
+                    .claude/skills/ is a generated copy for Claude Code
 .github/workflows/  eos-ci.yml (Linux, macOS, Windows) and eos-release.yml (attested releases)
 docs/               your specs and ADRs; docs/eos/ is the EOS manual set (中文 in docs/zh/)
 ```
@@ -179,7 +181,7 @@ docs/               your specs and ADRs; docs/eos/ is the EOS manual set (中文
 - [User manual](docs/eos/user-manual.md) — idea to launch to iteration, with step-by-step SaaS and Agentic tracks.
 - [Upgrading to eos-2.0.0](docs/eos/user-manual.md#105-upgrading-from-eos-122x-to-eos-200) — what changes and what to do.
 - [Upgrading to eos-2.0.1](docs/eos/user-manual.md#107-upgrading-from-eos-200-to-eos-201) — the secret-detection security patch.
-- [Upgrading to eos-2.1.0](docs/eos/user-manual.md#108-upgrading-from-eos-20x-to-eos-210) — `eos upgrade`, and the first upgrade done with it.
+- [Upgrading to eos-2.2.0](docs/eos/user-manual.md#109-upgrading-from-eos-21x-to-eos-220) — slash commands become Agent Skills (`/spec` → `/eos-spec`), JUnit evidence, the release-gate preview.
 - [Workflow contract](docs/eos/developer-experience.md) — the CLI, exit codes, JSON and diagnostics.
 - [Stack presets and tracks](docs/eos/stack-presets.md) — every supported stack, and how to choose a track.
 - [Design rationale](docs/eos/blueprint.md) and [architecture decisions](docs/adr/).
@@ -189,7 +191,7 @@ docs/               your specs and ADRs; docs/eos/ is the EOS manual set (中文
 - **Node.js 20.10+ and Git** — nothing else. CI runs Node 20 and 22 on Linux, macOS and Windows.
 - **No API key, ever.** EOS never calls a model. What each addition (Copilot, BMAD, the BMAD runtime) brings,
   and the known limitations, are in the [quickstart](docs/eos/quickstart.md#what-you-need-for-what).
-- **VS Code with GitHub Copilot is optional.** The agents, prompts and hooks load when the project folder
+- **VS Code with GitHub Copilot is optional.** The agents, skills and hooks load when the project folder
   itself is the workspace root. Hooks are a VS Code preview feature.
 - **One-time hardening.** Once your real repository exists, run `/eos-init` in Copilot Chat: branch
   protection, CODEOWNERS and approvals, tracked in [docs/eos/activation.md](docs/eos/activation.md).

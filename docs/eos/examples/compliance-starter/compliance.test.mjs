@@ -101,7 +101,7 @@ test('dsar: export gathers all sources (portable); erase runs + audits each', as
   assert.strictEqual(receipt.reason, 'user-request');
 });
 
-test('profile: parseRegimes + redactorFromProfile pick the regime from /compliance output', () => {
+test('profile: parseRegimes + redactorFromProfile pick the regime from /eos-compliance output', () => {
   // Pure parse: canonical line -> resolved profile names; rationale words are ignored.
   assert.deepStrictEqual(
     parseRegimes('# Compliance profile\n\n**Regulatory regime:** HIPAA, PCI-DSS\n'),
@@ -125,7 +125,7 @@ test('profile: parseRegimes + redactorFromProfile pick the regime from /complian
     assert.deepStrictEqual(strict.regimes, ['HIPAA', 'PCI', 'GDPR_PIPL']);
     // Opt-in softer fallbacks.
     assert.deepStrictEqual(redactorFromProfile(join(dir, 'nope.md'), { fallback: 'base' }).regimes, []);
-    assert.throws(() => redactorFromProfile(join(dir, 'nope.md'), { fallback: 'throw' }), /run \/compliance first/);
+    assert.throws(() => redactorFromProfile(join(dir, 'nope.md'), { fallback: 'throw' }), /run \/eos-compliance first/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

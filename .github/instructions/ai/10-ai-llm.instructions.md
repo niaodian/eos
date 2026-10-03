@@ -12,7 +12,7 @@ applyTo: "**/{ai,llm,rag,agents}/**"
 > `"productParadigms": ["agentic"]` declaration in `.eos/project.json`, with dir/SDK discovery only
 > as a safety net. Declare the paradigm — a self-hosted gateway or a private wrapper package leaves
 > no SDK fingerprint, so detection alone can never be complete.
-> This governs the *product's* AI code. EOS's own `.github/agents`/`.github/prompts` are config, not
+> This governs the *product's* AI code. EOS's own `.github/agents`/`.agents/skills` are config, not
 > product code; if this glob also matches them the guidance is additive and harmless. The real
 > enforcement is the eos-doctor gate (declaration-driven), not this advisory rule scope.
 

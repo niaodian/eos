@@ -226,6 +226,56 @@
           "type": "array"
         }
       }
+    },
+    "releasePreview": {
+      "type": "object",
+      "description": "Present only when the release gate (G8) will need something that does not exist yet (eos-2.2.0): a declared dependency audit, NFR measurements, a runbook, a deployment-topology ADR, and on the Regulated track a release signing key. A preview from declarations and file presence — G8 still decides.",
+      "additionalProperties": false,
+      "required": [
+        "gate",
+        "code",
+        "items"
+      ],
+      "properties": {
+        "gate": {
+          "const": "release-ready"
+        },
+        "code": {
+          "type": "string",
+          "minLength": 1
+        },
+        "items": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "check",
+              "ready",
+              "what",
+              "detail"
+            ],
+            "properties": {
+              "check": {
+                "type": "string",
+                "minLength": 1
+              },
+              "ready": {
+                "type": "boolean"
+              },
+              "what": {
+                "type": "string",
+                "minLength": 1
+              },
+              "detail": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      }
     }
   },
   "$defs": {

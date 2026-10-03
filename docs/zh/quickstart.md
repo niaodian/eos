@@ -56,7 +56,7 @@ EOS 本身从不调用任何模型，也不需要任何 API key。每一行都�
 | 你具备 | 你得到 |
 |---|---|
 | **只有 Node.js** | 完整的治理引擎：`eos next` / `status` / `check` / `verify`、全部门禁、账本、策略锁、签名发布、密钥扫描 |
-| **+ VS Code 与 GitHub Copilot** | 引导式流程：`eos-*` agent、`/eos-*` prompt、常驻规则与 PreToolUse 护栏。所用模型就是你在 Copilot 里选的那个——无需任何配置 |
+| **+ VS Code 与 GitHub Copilot** | 引导式流程：`eos-*` agent、`/eos-*` 斜杠命令（技能）、常驻规则与 PreToolUse 护栏。所用模型就是你在 Copilot 里选的那个——无需任何配置 |
 | **+ BMAD 技能**（`bmad-*`） | 各阶段编排的撰写工作流（PRD、架构、story、测试设计）。没有它们，`eos next` 仍会点名每一步，由你手工完成 |
 | **+ BMAD 项目运行时**（`_bmad/`，需要 python3 与 uv） | BMAD 的项目级定制与会话记忆。可选：没有它，技能按自带默认值运行 |
 | **一个 agentic / LLM 产品** | 你产品自己的模型调用，由评估工具链来检验（[eval-starter](../eos/examples/eval-starter/README.md)）。那是你本来就要写的产品代码，不是 EOS 的配置 |
@@ -68,12 +68,13 @@ EOS 本身从不调用任何模型，也不需要任何 API key。每一行都�
 - **在分支保护与 CODEOWNERS 就位之前，治理是契约式的。** EOS 无法在本机验证服务端保护，因此"放宽需要第二个人"只有在完成 `/eos-init` 加固后才成立；在此之前 `eos-doctor` 会报告 `CONTRACTUAL`（[ADR-014](../adr/014-trust-chain.md)）。
 - **本地证据诚实，但未经证明。** 在笔记本上记录的证据是 `UNATTESTED_LOCAL`；Regulated 发布需要 CI 产出的证据（`evidencePolicy`）。
 - **"任意技术栈"的验证深度不同。** EOS 自身的 CI 覆盖 Node 路径与 Python 评估起步包；Python、Go、Java、Rust 与 .NET 起步包声明的是 EOS 会运行的命令，对应的工具链需要你自行安装。
+- **JUnit 结果可能只按名称匹配。** 有些运行器（包括 node:test）在 JUnit XML 中不记录文件。此时 EOS 按测试名称匹配 trace matrix 的行，标记为 `"match": "name"`，并从源码确定文件：该行所指文件必须声明这个测试（不能在注释里），且不能有其他测试文件声明同名测试——请让测试名称唯一，或在行中写明所属 suite（`tests/login.test.mjs::login > valid password`）（[ADR-016](../adr/016-junit-test-evidence.md)）。
 - **Windows 上的符号链接。** 不支持符号链接的检出会把链接变成普通文件，于是产品树指纹与 Linux 不同，在一边记录的证据在另一边读作 `STALE`。
 
 ## Day-1（可直接复制——与用户手册 §3.4 完全一致的序列）
 
 ```sh
-npx degit niaodian/eos#eos-2.1.0 my-new-app && cd my-new-app
+npx degit niaodian/eos#eos-2.2.0 my-new-app && cd my-new-app
 git init && git add -A && git commit -q -m "chore: scaffold from eos"
 node .github/hooks/validate-config.mjs        # 期望 PASS
 node .github/eos/eos.mjs init config-only --write   # 声明项目：还没有代码（或 init <pack>；--track regulated）
@@ -151,7 +152,7 @@ node .github/eos/eos.mjs next
 这条规则为啥： node .github/eos/eos.mjs explain <gate> (activation|prd-ready|story-ready|verified|release-ready)
 晋级工作：     node .github/eos/eos.mjs transition --scope story --id <id> --to <STATE>
 一次性硬化：   /eos-init   (branch protection + CODEOWNERS + 审批基线 → docs/eos/activation.md)
-发布前：       node .github/eos/eos.mjs release-status   然后 /release-gate
+发布前：       node .github/eos/eos.mjs release-status   然后 /eos-release-gate
 声明项目：     node .github/eos/eos.mjs init [<pack>] [--track regulated] --write
 更短的写法：   npx --offline eos <command>   (npm 10.9+) · npm run -s eos -- <command>
 自检：         node .github/hooks/validate-config.mjs · node .github/eos/eos.mjs doctor

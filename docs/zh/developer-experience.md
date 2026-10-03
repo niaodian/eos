@@ -64,7 +64,7 @@ Next Best Action 引擎   纯函数：状态 → 恰好一个推荐动作
   project.json          # 这个项目"是什么"（纳入版本管理，权威）
   workflow.json         # Change Type 门禁策略 + 状态机（纳入版本管理，受 CODEOWNERS 保护）
   gates.json            # Gate 定义与版本（纳入版本管理，受 CODEOWNERS 保护）
-  agent-map.json        # 动作 → Agent / Prompt / 最小 BMAD Skill 链（纳入版本管理）
+  agent-map.json        # 动作 → Agent / 斜杠命令 / 最小 BMAD Skill 链（纳入版本管理）
   schemas/              # 上述每个文件的 JSON Schema
   evidence/             # 机器生成的 Gate 证据（纳入版本管理 —— 发布证据必须可共享）
   waivers/              # 受控例外
@@ -313,7 +313,7 @@ Waiver 是 `.eos/waivers/` 下的一个文件，包含 `gate`、`scope`、`reaso
 
 ## 8. Agent 与 Skill 映射契约
 
-`.eos/agent-map.json` 把一个**动作 id** 映射到至多一个主 Copilot Agent（或一个 Prompt）以及一条最小
+`.eos/agent-map.json` 把一个**动作 id** 映射到至多一个主 Copilot Agent（或一个斜杠命令，即一个 EOS 技能）以及一条最小
 BMAD Skill 链。开发者永远不需要从 73 个已安装 Skill 中挑选。
 
 ```json
@@ -330,11 +330,11 @@ BMAD Skill 链。开发者永远不需要从 73 个已安装 Skill 中挑选。
 }
 ```
 
-规则：一个动作 → 一个主 Agent；Skill 列表保持最小；被引用的 Agent 文件或 Prompt 文件不存在时，该动作
+规则：一个动作 → 一个主 Agent；Skill 列表保持最小；被引用的 Agent 文件或技能（`.agents/skills/<name>/SKILL.md`）不存在时，该动作
 变为 `BLOCKED` 并给出安装/替代路径（由 `eos doctor` 报告），而不是静默推荐一个用不了的东西。Router 读取的
 是 JSON；[generated/actions.md](generated/actions.md) 是它的投影，由 `eos docs` 以中英文生成并在 CI
-中校验；[agent-map.md](agent-map.md) 是按阶段人工整理的概览。Prompt、Agent 文件、Instructions 与交接
-说明中引用的每个门禁、命令、状态、迁移、Prompt、Agent 和脚本都必须在策略中存在，否则
+中校验；[agent-map.md](agent-map.md) 是按阶段人工整理的概览。技能、Agent 文件、Instructions 与交接
+说明中引用的每个门禁、命令、状态、迁移、斜杠命令、Agent 和脚本都必须在策略中存在，否则
 `validate-config` S15 会让构建失败（[ADR-011](../adr/011-prompts-cite-only-the-policy.md)）。
 
 ## 9. 交接上下文包

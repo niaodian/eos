@@ -1,0 +1,5 @@
+# Test reports are written by the run they describe: inside the product tree they would change the
+# very digest they are bound to. (Already in the EOS template's .gitignore.)
+/reports/junit/
+__pycache__/
+.pytest_cache/

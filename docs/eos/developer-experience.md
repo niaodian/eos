@@ -66,7 +66,7 @@ Layout on disk:
   project.json          # what this project IS (tracked, authoritative)
   workflow.json         # change-type gate policy + state machines (tracked, CODEOWNERS-protected)
   gates.json            # gate definitions + versions (tracked, CODEOWNERS-protected)
-  agent-map.json        # action → agent / prompt / minimal BMAD skill chain (tracked)
+  agent-map.json        # action → agent / slash command / minimal BMAD skill chain (tracked)
   schemas/              # JSON Schemas for every file above
   evidence/             # machine-generated gate evidence (tracked — release evidence must be shared)
   waivers/              # controlled exceptions (tracked)
@@ -343,7 +343,7 @@ always produces the same action, and an LLM is never asked to guess the phase.
 
 ## 8. Agent & skill mapping contract
 
-`.eos/agent-map.json` maps an **action id** to at most one primary Copilot agent (or one prompt) and
+`.eos/agent-map.json` maps an **action id** to at most one primary Copilot agent (or one slash command — an EOS skill) and
 a minimal BMAD skill chain. Developers never choose from the 73 installed skills.
 
 ```json
@@ -361,11 +361,11 @@ a minimal BMAD skill chain. Developers never choose from the 73 installed skills
 ```
 
 Rules: one action → one primary agent; the skill list stays minimal; a referenced agent file or
-prompt file that does not exist makes the action `BLOCKED` with an install/alternative path
+skill (`.agents/skills/<name>/SKILL.md`) that does not exist makes the action `BLOCKED` with an install/alternative path
 (`eos doctor` reports it) instead of silently recommending something unusable. The JSON is what the
 router reads; [generated/actions.md](generated/actions.md) is its projection, generated in English and
 Chinese by `eos docs` and checked in CI, and [agent-map.md](agent-map.md) is the curated overview by
-phase. Every gate, command, state, transition, prompt, agent and script a prompt, agent file,
+phase. Every gate, command, state, transition, slash command, agent and script a skill, agent file,
 instruction or handoff cites must exist in the policy: `validate-config` S15 fails the build otherwise
 ([ADR-011](../adr/011-prompts-cite-only-the-policy.md)).
 

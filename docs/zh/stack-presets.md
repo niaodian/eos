@@ -55,7 +55,8 @@ EOS 的 CI 曾经只有一句 `if [ -f package.json ]`，于是 **Python/Go/Java
 |---|---|
 | `projectType` | `application` \| `library` \| `config-only`。前两者**必须**有 `commands.test`；`config-only` 只有在仓库里**找不到任何栈清单文件**时才允许，且**不得**声明 `commands`（不会被执行） |
 | `stacks` | `node` \| `python` \| `go` \| `java` \| `rust` \| `dotnet` \| `other`（数组，可多栈）。栈没有清单文件（shell / Terraform / 裸脚本）就用 `other` |
-| `commands` | `install` / `lint` / `typecheck` / `test` / `eval`。缺省=N/A；声明了就**必须真的能跑通** |
+| `commands` | `install` / `lint` / `typecheck` / `test` / `eval` / `audit`。缺省=N/A；声明了就**必须真的能跑通**。`audit`（npm audit、pip-audit、govulncheck 等）不属于每次推送的门禁：由发布门禁（G8）运行，缺失即 FAIL——每个带代码的起步包都声明了它 |
+| `evidence` | `{ "junit": ["reports/junit/*.xml"] }`——`commands.test` 写出 JUnit XML 的位置。`verified` 门禁只读取本次运行写出的报告，并据此生成 `docs/evidence/test-run.json`（eos-2.2.0，ADR-016；见 `docs/eos/examples/trace-evidence/`） |
 | `productParadigms` | `deterministic` \| `agentic`（数组）。含 `agentic` => G-EVAL 门打开 |
 | `evalRequired` | 可选 `boolean`，显式覆盖上面的推断 |
 | `evalWaiver` | `{ reason, approvedBy }`——自动检测到 LLM 依赖但你坚持声明为 deterministic 时必须给，且要有真实理由 |
@@ -84,32 +85,36 @@ EOS 的 CI 曾经只有一句 `if [ -f package.json ]`，于是 **Python/Go/Java
 // Node.js / TypeScript
 { "projectType": "application", "stacks": ["node"],
   "commands": { "install": "npm ci", "lint": "npm run --silent lint",
-                "typecheck": "npm run --silent typecheck", "test": "npm test --silent" } }
+                "typecheck": "npm run --silent typecheck", "test": "npm test --silent",
+                "audit": "npm audit --audit-level=high" } }
 
 // Python
 { "projectType": "application", "stacks": ["python"],
   "commands": { "install": "pip install -r requirements.txt", "lint": "ruff check .",
-                "typecheck": "mypy .", "test": "pytest -q" } }
+                "typecheck": "mypy .", "test": "pytest -q --junitxml=reports/junit/python.xml",
+                "audit": "pip-audit -r requirements.txt" },
+  "evidence": { "junit": ["reports/junit/*.xml"] } }
 
 // Go
 { "projectType": "application", "stacks": ["go"],
   "commands": { "install": "go mod download", "lint": "golangci-lint run",
-                "typecheck": "go vet ./...", "test": "go test ./..." } }
+                "typecheck": "go vet ./...", "test": "go test ./...", "audit": "govulncheck ./..." } }
 
 // Java (Maven)
 { "projectType": "application", "stacks": ["java"],
   "commands": { "install": "mvn -q dependency:go-offline", "lint": "mvn -q spotless:check",
-                "test": "mvn -q test" } }
+                "test": "mvn -q test", "audit": "mvn -q org.owasp:dependency-check-maven:check -DfailBuildOnCVSS=7" },
+  "evidence": { "junit": ["target/surefire-reports/TEST-*.xml"] } }
 
 // Rust
 { "projectType": "application", "stacks": ["rust"],
   "commands": { "install": "cargo fetch", "lint": ["cargo clippy -- -D warnings"],
-                "typecheck": "cargo check", "test": "cargo test" } }
+                "typecheck": "cargo check", "test": "cargo test", "audit": "cargo audit" } }
 
 // .NET / C#
 { "projectType": "application", "stacks": ["dotnet"],
   "commands": { "install": "dotnet restore", "lint": "dotnet format --verify-no-changes",
-                "test": "dotnet test" } }
+                "test": "dotnet test", "audit": "dotnet restore -warnaserror:NU1903,NU1904" } }
 
 // Agentic / LLM 产品（在后端栈基础上加 eval——声明了 agentic 就必须有 eval 命令）
 { "projectType": "application", "stacks": ["python"], "productParadigms": ["deterministic", "agentic"],
@@ -211,7 +216,7 @@ EOS 的 CI 曾经只有一句 `if [ -f package.json ]`，于是 **Python/Go/Java
 - **R3**：`ai/10-ai-llm.instructions.md`（已发布，`**/{ai,llm,rag}/**`）——prompt 即制品、tool/agent 架构、非确定性评估、可复现、LLM 安全、tracing/成本
 - **Layout**：`ai/`（agents/tools/chains）· `ai/prompts/`（版本化 prompt）· `evals/`（评估集+grader）
 - **常见依赖治理**（按需，pin 版本）：编排 LangChain / LlamaIndex；向量库 Chroma(本地)/ Pinecone·Qdrant·Weaviate(托管)；provider SDK OpenAI/Anthropic。**同步阻塞的 LLM 调用不得在 Web 请求线程内**——走异步队列(Celery/BullMQ)，见 `ai/10-ai-llm` 的 Execution model。
-- **配套门**：`/eval-spec` 产 `docs/eval-plan.md`（条件门 **G-EVAL**，非 LLM 功能 SKIP+理由）；C-nfr 加成本/token/延迟/质量阈值
+- **配套门**：`/eos-eval-spec` 产 `docs/eval-plan.md`（条件门 **G-EVAL**，非 LLM 功能 SKIP+理由）；C-nfr 加成本/token/延迟/质量阈值
 - **起步骨架**：拷 `docs/eos/examples/eval-starter/`（零依赖可跑的 dataset+graders+runner+stub），换掉 stub 即用
 - **quality.json 内层命令**：`ruff check . && pytest -q && pytest evals/ -q`
   （Node 项目改用 `node --test evals/*.test.mjs`——须给显式 glob,裸 `evals/` 目录在 Node 23 会报错）
@@ -230,4 +235,4 @@ node .github/hooks/validate-config.mjs   # 期望 PASS：S3 glob 互斥、S4 类
 node .github/hooks/project-gate.mjs      # 期望 PASS：你声明的 lint/typecheck/test/eval 真的跑了
 ```
 
-> 新增/删除栈不动 EOS 骨架（agents / prompts / hooks / 治理流程都不变）——只换 `applyTo` 和正文。详见 user-manual 第 11 章。
+> 新增/删除栈不动 EOS 骨架（agents / skills / hooks / 治理流程都不变）——只换 `applyTo` 和正文。详见 user-manual 第 11 章。

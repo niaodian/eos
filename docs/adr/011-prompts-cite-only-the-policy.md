@@ -1,6 +1,8 @@
 # ADR-011 — Prompts may cite only what the policy defines; projections are generated in both languages
 
-- Status: Accepted
+- Status: Accepted — amended by [ADR-017](017-workflows-are-agent-skills.md) (eos-2.2.0): the slash commands
+  are Agent Skills in `.agents/skills/`, which S15 scans in place of `.github/prompts` and `.github/skills`;
+  a cited `/name` must be a skill there.
 - Date: 2026-10-01
 - Depends on: ADR-007 (generated docs), ADR-010 (one diagnostic contract)
 - Governs: `validate-config` S13 (`enforces`) and S15, `.github/eos/lib/alignment.mjs`, the `enforces` property of a gate, `docs/{eos,zh}/generated/actions.md`
@@ -15,7 +17,7 @@ Two gaps remained.
 
 1. **Hand-written prompts were unchecked.** Prompts, agents and instructions tell agents what to
    run (`eos check --gate story-ready`, `--to READY_FOR_DEV`, "hand off to `eos-plan`",
-   `/release-gate`, "G6"). Renaming a gate, a state or a prompt left every file that cited the old
+   `/eos-release-gate`, "G6"). Renaming a gate, a state or a prompt left every file that cited the old
    name sending agents to nothing, with every check green. A rename test proved it: a gate renamed
    in `.eos/gates.json` passed validation while `eos-plan.agent.md` still cited the old id on two lines.
 2. **The agent map had no generated projection.** `docs/eos/agent-map.md` called itself "the

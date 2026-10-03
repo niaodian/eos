@@ -13,10 +13,10 @@ import { validate, loadSchema } from './schema.mjs';
 
 export const STAGE_RECORDS = {
   discovery: { path: 'docs/discovery.json', schema: 'discovery.schema.json', doc: 'docs/discovery.md', prompt: 'the eos-discovery agent' },
-  requirements: { path: 'docs/requirements.json', schema: 'requirements.schema.json', doc: 'docs/requirements.md', prompt: '/requirements' },
-  design: { path: 'docs/design.json', schema: 'design.schema.json', doc: 'docs/DESIGN.md', prompt: '/ux-spec' },
+  requirements: { path: 'docs/requirements.json', schema: 'requirements.schema.json', doc: 'docs/requirements.md', prompt: '/eos-requirements' },
+  design: { path: 'docs/design.json', schema: 'design.schema.json', doc: 'docs/DESIGN.md', prompt: '/eos-ux-spec' },
   architecture: { path: 'docs/architecture.json', schema: 'architecture.schema.json', doc: 'docs/architecture.md', prompt: 'the eos-architecture agent' },
-  telemetry: { path: 'docs/telemetry.json', schema: 'telemetry.schema.json', doc: 'docs/telemetry-plan.md', prompt: '/telemetry-plan' },
+  telemetry: { path: 'docs/telemetry.json', schema: 'telemetry.schema.json', doc: 'docs/telemetry-plan.md', prompt: '/eos-telemetry-plan' },
   iteration: { path: 'docs/iteration.json', schema: 'iteration.schema.json', doc: 'docs/retrospective.md', prompt: 'the eos-review agent' },
 };
 

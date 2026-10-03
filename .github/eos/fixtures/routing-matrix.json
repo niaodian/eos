@@ -97,7 +97,7 @@
         "@project": "@APP"
       },
       "expectedAction": "expand-requirements",
-      "expectedPrompt": "requirements",
+      "expectedPrompt": "eos-requirements",
       "expectedExitCode": 2
     },
     {
@@ -124,7 +124,7 @@
         "@project": "@APP"
       },
       "expectedAction": "write-prd",
-      "expectedPrompt": "spec",
+      "expectedPrompt": "eos-spec",
       "expectedExitCode": 2
     },
     {
@@ -336,7 +336,7 @@
         }
       },
       "expectedAction": "design-eval-cases",
-      "expectedPrompt": "eval-spec",
+      "expectedPrompt": "eos-eval-spec",
       "expectedExitCode": 2,
       "expectBlocker": "agentic-eval-case"
     },
@@ -637,7 +637,7 @@
         }
       },
       "expectedAction": "record-spike-outcome",
-      "expectedPrompt": "adr",
+      "expectedPrompt": "eos-adr",
       "expectedExitCode": 0
     },
     {
@@ -759,7 +759,7 @@
         }
       },
       "expectedAction": "repair-release",
-      "expectedPrompt": "release-gate",
+      "expectedPrompt": "eos-release-gate",
       "expectedExitCode": 2,
       "expectBlocker": "release-manifest"
     },

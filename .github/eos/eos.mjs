@@ -37,6 +37,8 @@ usage: node .github/eos/eos.mjs <command> [flags]
   release-status                          aggregate release readiness
   verify-release --release <id>           candidate-bound release verification
   product-tree                            the identity of the tree a verification applies to
+  evidence junit [<report.xml>…] [--write]
+                                          answer the trace matrix from JUnit reports → docs/evidence/test-run.json
   waive --gate <id> --scope <id> --reason <text> --risk-owner <who> --expires <YYYY-MM-DD> --control <text>
   handoff --scope <type> --id <id> [--verify]
   ledger [--verify] [--against <ref>] [--resolve [--write]]
@@ -44,6 +46,7 @@ usage: node .github/eos/eos.mjs <command> [flags]
   init [<pack>] [--track standard|regulated] [--write] [--force]
                                           declare the project, choose its governance track, create local files
   stack sync [--write]                    render the always-on workspace rule from .eos/project.json
+  agents sync [--write|--check]           generate each agent platform's copy of the EOS skills (.agents/skills)
   new <pack> [--track …] [--write]        the pack half of init (the declaration only)
   sbom [--write] [--check]                software bill of materials, bound to the tree
   policy [diff|lock|check] [--against <ref>] [--write] [--reason <text>]

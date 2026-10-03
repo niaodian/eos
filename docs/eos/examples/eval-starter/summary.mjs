@@ -7,9 +7,9 @@
 // The gate recomputes every verdict from `observed` and `threshold`; a case reported PASS whose
 // numbers say otherwise still fails.
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { dirname, join, relative } from 'node:path';
+import { dirname, join, relative, resolve } from 'node:path';
 
 export const SUMMARY_PATH = 'docs/evidence/eval-summary.json';
 
@@ -43,10 +43,16 @@ export function evalCase(id, metric, comparator, threshold, observed, sampleSize
 /**
  * Write the summary. `files` are absolute paths of the system under test, the dataset and the
  * graders; they are recorded relative to the project root, with a content hash as their version.
+ * `unattested`: the numbers came from a replayed recording, so the producer is local even in CI —
+ * a release whose evidencePolicy requires CI evidence cannot rest on it.
  */
-export function writeSummary({ root, cases, files, model, modelVersion, parameters }) {
-  const rel = (f) => relative(root, f).split('\\').join('/');
-  const ci = process.env.GITHUB_ACTIONS === 'true';
+export function writeSummary({ root, cases, files, model, modelVersion, parameters, unattested = false }) {
+  // Both sides resolved first: Windows hands out a short (8.3) temp path in one place and the long
+  // one in another (C:\Users\RUNNER~1 vs C:\Users\runneradmin), and macOS links /var to
+  // /private/var, so a plain relative() walked up and back down the same directory.
+  const real = (p) => { try { return realpathSync.native(p); } catch { return resolve(p); } };
+  const rel = (f) => relative(real(root), real(f)).split('\\').join('/');
+  const ci = process.env.GITHUB_ACTIONS === 'true' && !unattested;
   const summary = {
     $schema: 'https://eos.local/schemas/eval-summary.schema.json',
     schemaVersion: 1,
@@ -54,11 +60,11 @@ export function writeSummary({ root, cases, files, model, modelVersion, paramete
     runId: process.env.GITHUB_RUN_ID || `local-${Date.now()}`,
     producer: ci
       ? { type: 'ci', name: 'github-actions', runRef: `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}` }
-      : { type: 'local', name: 'eval-starter' },
+      : { type: 'local', name: unattested ? 'eval-starter (replayed recording — unattested)' : 'eval-starter' },
     productTree: productTree(root),
     subject: {
       promptRef: rel(files.prompt), promptVersion: sha12(files.prompt),
-      model, modelVersion, parameters,
+      model, ...(modelVersion ? { modelVersion } : {}), parameters,
       datasetRef: rel(files.dataset), datasetVersion: sha12(files.dataset),
       graderRef: rel(files.grader), graderVersion: sha12(files.grader),
     },

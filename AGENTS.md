@@ -9,7 +9,7 @@ In Copilot Chat use the `eos-guide` agent, or `/eos-next` · `/eos-resume` · `/
 - Guided-workflow contract: [docs/eos/developer-experience.md](docs/eos/developer-experience.md)
 - Always-on rules: [.github/copilot-instructions.md](.github/copilot-instructions.md)
 - Scoped rules: `.github/instructions/**` (auto-applied by `applyTo` globs)
-- Workflow commands (slash): `.github/prompts/**`
+- Workflow commands (slash): Agent Skills in `.agents/skills/eos-*/` (`.claude/skills/` is a generated copy for Claude Code — edit the source, then `node .github/eos/eos.mjs agents sync --write`)
 - Orchestrator agents (handoffs): `.github/agents/**`
 - BMAD reuse map: [docs/eos/agent-map.md](docs/eos/agent-map.md)
 - Quickstart: [docs/eos/quickstart.md](docs/eos/quickstart.md)

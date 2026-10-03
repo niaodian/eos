@@ -125,3 +125,19 @@ test('advisory + real gaps: still exit 0 (every-push CI stays non-blocking)', ()
   assert.equal(code, 0);
   assert.match(out, /ADVISORY/);
 });
+
+test('the machine test-run summary decides whether a traced row passed — a hand-written PASS is a claim', () => {
+  const FROM_THE_RUN = '| AC | Test | Result |\n| --- | --- | --- |\n| AC1.1 | a.test.ts | from the run |\n| AC1.2 | b.test.ts | from the run |\n';
+  const summary = (statuses) => JSON.stringify({ schemaVersion: 1, results: Object.entries(statuses).flatMap(([ac, list]) => list.map((status) => ({ ac, testPath: 'a.test.ts', status }))) });
+  // The 2.2.0 example: no result written in the matrix, every row answered by the run.
+  const green = run(project({ 'docs/prd.md': PRD_2AC, 'docs/trace-matrix.md': FROM_THE_RUN, 'docs/evidence/test-run.json': summary({ 'AC1.1': ['PASS'], 'AC1.2': ['PASS', 'PASS'] }) }), ['--strict']);
+  assert.equal(green.code, 0, green.out);
+  assert.match(green.out, /2\/2 .*from docs\/evidence\/test-run\.json/);
+  // A matrix that claims PASS where the run recorded a failure, or no result at all, does not pass.
+  const claimed = run(project({ 'docs/prd.md': PRD_2AC, 'docs/trace-matrix.md': TRACE_2PASS, 'docs/evidence/test-run.json': summary({ 'AC1.1': ['PASS', 'FAIL'] }) }), ['--strict']);
+  assert.equal(claimed.code, 1);
+  assert.match(claimed.out, /2 traced row\(s\) not passing in docs\/evidence\/test-run\.json/);
+  const unreadable = run(project({ 'docs/prd.md': PRD_2AC, 'docs/trace-matrix.md': TRACE_2PASS, 'docs/evidence/test-run.json': '{"results": 3}' }), ['--strict']);
+  assert.equal(unreadable.code, 1);
+  assert.match(unreadable.out, /not a readable test-run summary/);
+});

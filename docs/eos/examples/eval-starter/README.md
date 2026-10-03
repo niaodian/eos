@@ -19,8 +19,13 @@ don't cold-start the G-EVAL gate from a blank page. Copy this folder into your p
 - `summary.mjs` — writes `docs/evidence/eval-summary.json` (schema `.eos/schemas/eval-summary.schema.json`):
   which prompt, model, dataset and grader produced which number against which threshold, bound to
   the product tree via `eos product-tree --json`.
+- `llm-agent.mjs` + `prompt.md` + `model.mjs` — the **same agent backed by a real model**
+  (any OpenAI-compatible endpoint, Node's built-in `fetch`, no dependency), with record / replay.
+  See *Connect a real model* below.
+- `cassettes/llm-agent.json` — a recording the LLM agent replays without a key. The shipped one is
+  **hand-written to show the format**; record your own.
 - `python/` — the same harness for Python stacks (stdlib only): `run_eval.py`, `agent.py`,
-  `graders.py`, and `test_eval.py` for `pytest`.
+  `graders.py`, `test_eval.py` for `pytest`, and `model.py` + `llm_agent.py` for the real-model path.
 
 ## Run
 ```sh
@@ -37,6 +42,43 @@ the starter is a demo: it grades and prints, but writes no summary.
 
 > ⚠️ Pass an explicit file or glob (e.g. `evals/*.test.mjs`), **not a bare directory** —
 > under Node 23 `node --test evals/` treats the path as a module and errors.
+
+## Connect a real model
+
+`decide(req)` keeps one contract — `{ state, toolsCalled, mutated, trace:{ tokens, latencyMs } }` — so
+switching from the stub to a model changes nothing the graders, the dataset or the thresholds see:
+
+```sh
+EVAL_AGENT=llm node --test evals/eval.test.mjs          # Python: EVAL_AGENT=llm pytest evals/ -q
+```
+
+`model.mjs` (`python/model.py`) talks to any **OpenAI-compatible** chat-completions endpoint —
+OpenAI, Azure OpenAI's v1 surface, OpenRouter, DeepSeek, DashScope compatible mode, or a local
+Ollama / vLLM / LM Studio — and nothing else depends on the vendor. `EVAL_MODE` decides where the
+answers come from:
+
+| `EVAL_MODE` | Calls the provider | Notes |
+|---|---|---|
+| `auto` (default) | with a key: yes · without: no | live when the key is set, replay otherwise |
+| `live` | yes | needs `EVAL_MODEL` and the key |
+| `record` | yes | also writes `cassettes/llm-agent.json` — commit it |
+| `replay` | no | answers from the cassette; a request it has not seen **fails** |
+
+Configuration is environment only: `EVAL_MODEL` (the model or deployment name — it is recorded in the
+summary), `OPENAI_BASE_URL` (default `https://api.openai.com/v1`), and the key in `OPENAI_API_KEY` —
+a repository **secret** in CI, never a file. The key goes only into the `Authorization` header: it is
+never logged and never written to a cassette.
+
+**Replay is honest about what it proves.** It re-grades recorded answers, not today's model: the
+summary records `"mode": "replay"` and the cassette version, and its producer is **local even in CI**,
+so it reads `UNATTESTED_LOCAL` — a release whose `evidencePolicy` requires CI evidence cannot rest on
+it. Record in CI with the secret when that matters. Changing the prompt, the model or the parameters
+makes replay fail until you record again — by design, the same way the product tree makes the summary
+stale. A cassette stores prompts and answers: record with the dataset, **never with production data**.
+
+The model's output is untrusted: `llm-agent.mjs` parses and validates it, and anything outside the
+allowed shape is graded as a failure (`invalid-output`), never passed through. The Node and Python
+twins compute the same request key, so one recording replays in both.
 
 ## The summary contract
 The runner writes three cases. Their ids are what your stories cite in an AC's eval case
@@ -66,4 +108,4 @@ Editing the prompt, the dataset or a grader changes the product tree, so the rec
 LLM output is non-deterministic, so you do **not** unit-test it by exact equality — you score it
 with graders against thresholds and guard a **regression baseline** (a prompt/model/tool change that
 drops below baseline does not ship). See `.github/instructions/ai/10-ai-llm.instructions.md` and the
-`/eval-spec` prompt.
+`/eos-eval-spec` prompt.

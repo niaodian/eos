@@ -1,0 +1,12 @@
+{
+  "projectType": "application",
+  "stacks": ["node", "python"],
+  "productParadigms": ["deterministic"],
+  "commands": {
+    "test": [
+      "node --test --test-reporter=spec --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=reports/junit/node.xml tests/login.test.mjs",
+      "python3 -m pytest -q tests/test_logout.py --junitxml=reports/junit/python.xml"
+    ]
+  },
+  "evidence": { "junit": ["reports/junit/*.xml"] }
+}

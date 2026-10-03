@@ -11,7 +11,7 @@
 >   and prints the exact steps for what it can't).
 > - Want the full rationale and steps → see **Appendix D** of `docs/eos/user-manual.md`.
 > - This file is a **checkable progress ledger**: every run of `eos-doctor` reads it and advisory-reminds you
->   how many items remain; **`/release-gate` (G8)** re-checks it before you ship — **this is the defense against
+>   how many items remain; **`/eos-release-gate` (G8)** re-checks it before you ship — **this is the defense against
 >   "systematic forgetting".**
 >
 > **Checkbox syntax** (`eos-doctor` parses this — do not change the line-start format):
@@ -48,7 +48,7 @@
 
 - [ ] CODEOWNERS: replace every `@niaodian` in `.github/CODEOWNERS` with your team handle
   - **Why**: combined with "Require review from Code Owners" above, this stops anyone (including an agent) from
-    **changing governance files without review** (instructions / agents / hooks / workflows / prompts and
+    **changing governance files without review** (instructions / agents / hooks / workflows / skills and
     `docs/eos/`). (Audit E1/H5)
   - **Steps**: edit `.github/CODEOWNERS`, `@niaodian` → e.g. `@your-org/platform-team` (prefer a team over an
     individual, to avoid a single person's leave blocking review). (See Appendix D.2)
@@ -97,7 +97,7 @@
 
 ## 2. Open the "org-compliance" axis (~+2 points) — only **regulated** projects need this
 
-- [ ] (If regulated) Compliance boundary: run `/compliance` to produce `docs/compliance-profile.md` **+ `docs/compliance-profile.json`**, and confirm org standards
+- [ ] (If regulated) Compliance boundary: run `/eos-compliance` to produce `docs/compliance-profile.md` **+ `docs/compliance-profile.json`**, and confirm org standards
   - **Why**: a profile-neutral template can't certify HIPAA/PCI-DSS etc. for you; once you declare a regulated
     regime AND an LLM/agent is present, `eos-doctor`'s **D5 (BLOCKER, deny-by-default)** requires you to first
     record the data boundary (BAA/DPA · self-host · redaction · excluding regulated data).

@@ -342,6 +342,7 @@ export const maintenanceCommands = {
         ? [...(conflicts.length ? ['  Merge each parked file into its original by hand, then delete .eos/local/upgrade/.'] : []),
           '  Next: node .github/eos/eos.mjs policy lock   (see what the upgrade changed in the policy; re-lock with --write)',
           '        node .github/eos/eos.mjs docs --write',
+          '        node .github/eos/eos.mjs agents sync --write   (regenerate the agent platforms\' copies of the skills)',
           '        node .github/eos/eos.mjs verify --full',
           `  Read the upgrade notes for ${nextVersion} in docs/eos/user-manual.md §10.`]
         : ['  Nothing was changed. Re-run with --write to apply.']),

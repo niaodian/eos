@@ -18,10 +18,10 @@ Input: `docs/prd.md`. Honor the UX contracts `docs/EXPERIENCE.md` + `docs/DESIGN
 (flows, screen states, accessibility) when they exist — the API/data design must serve them.
 
 Use skill `bmad-architecture` (Winston) to produce architecture + data model + API contract.
-Then run `/adr` for each irreversible decision. Enforce NFR mapping against docs/checklists/C-nfr.md.
+Then run `/eos-adr` for each irreversible decision. Enforce NFR mapping against docs/checklists/C-nfr.md.
 
 Decide the **deployment topology** here too (it is NFR-driven and irreversible-ish): run
-`/deploy-topology` to walk `docs/checklists/G-deployment.md`, pick the **simplest topology that
+`/eos-deploy-topology` to walk `docs/checklists/G-deployment.md`, pick the **simplest topology that
 meets the NFRs** (bare process / Docker / K8s / serverless / PaaS — never default to K8s), and
 record `docs/adr/NNN-deployment-topology.md` + a Deployment section in `docs/architecture.md`.
 

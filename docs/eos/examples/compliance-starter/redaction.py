@@ -5,7 +5,7 @@ This is the *code form* of the Agentic data-boundary (docs/checklists/F-complian
 eos-doctor D5, enforcing the rule "Never place secrets or PII in prompts or logs. Redact
 before sending to the provider." (.github/instructions/ai/10-ai-llm.instructions.md).
 
-Regime presets (compose only what your /compliance profile selected)::
+Regime presets (compose only what your /eos-compliance profile selected)::
 
     create_redactor(["PCI-DSS"])         # base + cardholder data only
     create_redactor(["HIPAA"])           # base + PHI (personal identifiers + health fields)
@@ -93,7 +93,7 @@ PROFILES: dict[str, Profile] = {
     ),
 }
 
-# Map the regime names /compliance uses onto profile keys.
+# Map the regime names /eos-compliance uses onto profile keys.
 REGIME_ALIASES = {
     "hipaa": "HIPAA",
     "pci": "PCI", "pci-dss": "PCI", "pcidss": "PCI",
@@ -218,8 +218,8 @@ def create_redactor(regimes: Iterable[str] | None = None) -> Redactor:
     return Redactor(regimes)
 
 
-# ── Auto-select the regime(s) from the /compliance output ──────────────────────────────
-# ``/compliance`` writes docs/compliance-profile.md with a canonical machine-readable line::
+# ── Auto-select the regime(s) from the /eos-compliance output ──────────────────────────────
+# ``/eos-compliance`` writes docs/compliance-profile.md with a canonical machine-readable line::
 #
 #     **Regulatory regime:** HIPAA, PCI-DSS      (or ``none`` for generic PII handling)
 #
@@ -231,7 +231,7 @@ _REGIME_SPLIT = re.compile(r"[\s,/+&]+")
 
 
 def parse_regimes(profile_text: str) -> list[str]:
-    """Extract resolved regime names from a /compliance profile's regime line."""
+    """Extract resolved regime names from a /eos-compliance profile's regime line."""
     m = _REGIME_LINE.search(profile_text or "")
     if not m:
         return []
@@ -252,7 +252,7 @@ def parse_regimes(profile_text: str) -> list[str]:
 def redactor_from_profile(
     path: str | Path = "docs/compliance-profile.md", *, fallback: str = "all"
 ) -> Redactor:
-    """Build a redactor straight from the /compliance profile doc.
+    """Build a redactor straight from the /eos-compliance profile doc.
 
     * file lists regimes -> scope to them
     * file says ``none``  -> base credentials only (honours the human decision)
@@ -264,7 +264,7 @@ def redactor_from_profile(
     except FileNotFoundError:
         if fallback == "throw":
             raise FileNotFoundError(
-                f"redactor_from_profile: {path} not found — run /compliance first"
+                f"redactor_from_profile: {path} not found — run /eos-compliance first"
             ) from None
         return create_redactor([] if fallback == "base" else None)
     return create_redactor(parse_regimes(text))

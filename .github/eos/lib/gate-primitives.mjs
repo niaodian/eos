@@ -125,24 +125,48 @@ export function runProjectGate(ctx) {
  */
 export const TEST_REF = /(?:^|[\s(`"'])((?:[A-Za-z0-9_.@-]+\/)*[A-Za-z0-9_.@-]+\.[A-Za-z0-9]{1,10})(?:::([^|`"')]+))?/g;
 
+/** A header cell that names the column holding the tests. */
+const TEST_HEADER = /\b(?:tests?|tested|specs?)\b|测试|用例/i;
+
+const refsIn = (cellList) => {
+  const refs = [];
+  for (const cell of cellList) {
+    for (const m of cell.matchAll(TEST_REF)) refs.push(m[2] ? `${m[1]}::${m[2].trim()}` : m[1]);
+  }
+  return [...new Set(refs)];
+};
+
 /**
- * Parse docs/trace-matrix.md into `AC id → { testRefs, resultCell }`.
+ * Parse docs/trace-matrix.md into `AC id → { testRefs, testColumnRefs?, resultCell }`.
  * Only the human MAPPING is taken from here. Whether the test passed is read from the machine
  * summary, because this file is prose and prose is what a gate must not be talked past.
+ * `testRefs` reads every cell; `testColumnRefs` only the columns whose header names the test
+ * ("Test", "Tests", "Spec" …), present when the table has such a header.
  */
 export function parseTraceMatrix(text) {
   const rows = new Map();
   let inFence = false;
+  let previous = null;
+  let testColumns = null;
   for (const line of text.split(/\r?\n/)) {
     if (/^\s*(```|~~~)/.test(line)) { inFence = !inFence; continue; }
-    if (inFence || !/^\s*\|/.test(line)) continue;
+    if (inFence || !/^\s*\|/.test(line)) { previous = null; testColumns = null; continue; }
+    const positional = line.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map((s) => s.trim());
+    if (positional.every((c) => /^:?-{3,}:?$/.test(c))) {
+      // The row above a separator is the header.
+      const cols = (previous || []).map((h, i) => (i > 0 && TEST_HEADER.test(h) ? i : -1)).filter((i) => i >= 0);
+      testColumns = cols.length ? cols : null;
+      previous = null;
+      continue;
+    }
+    previous = positional;
     const cells = line.split('|').map((s) => s.trim()).filter(Boolean);
     if (cells.length < 2 || !AC_ID.test(cells[0])) continue;
-    const testRefs = [];
-    for (const cell of cells.slice(1)) {
-      for (const m of cell.matchAll(TEST_REF)) testRefs.push(m[2] ? `${m[1]}::${m[2].trim()}` : m[1]);
-    }
-    rows.set(cells[0], { testRefs: [...new Set(testRefs)], resultCell: cells.at(-1) });
+    rows.set(cells[0], {
+      testRefs: refsIn(cells.slice(1)),
+      ...(testColumns ? { testColumnRefs: refsIn(testColumns.map((i) => positional[i] || '')) } : {}),
+      resultCell: cells.at(-1),
+    });
   }
   return rows;
 }
@@ -155,7 +179,11 @@ export function refMatches(ref, result) {
   if (!result.selector) return false;
   return result.selector.includes(refSelector) || refSelector.includes(result.selector);
 }
-/** Best-effort selector verification: only decisive when the test file is readable text. */
+/**
+ * Best-effort selector verification for a summary a project wrote itself: only decisive when the
+ * test file is readable text, and a substring is enough. A name-only JUnit match is held to the
+ * stricter rule in test-source.mjs instead.
+ */
 export function selectorPresent(root, testPath, selector) {
   let text;
   try { text = readFileSync(join(root, testPath), 'utf8'); } catch { return true; }
@@ -222,6 +250,13 @@ export function listAdrs(root) {
   }
   return out;
 }
+
+/** Where the release gate looks for the runbook. The preview `eos status` shows reads the same list. */
+export const RUNBOOKS = ['ops/runbook.md', 'docs/runbook.md', 'ops/RUNBOOK.md'];
+
+/** The ADR that records the deployment topology, if any. */
+export const findTopologyAdr = (root) => listAdrs(root)
+  .find((a) => /deployment|topology|hosting|infrastructure/i.test(a.name) || /deployment topology/i.test(a.text)) || null;
 
 /** An ADR that still says TBD / <fill in> has not decided anything. */
 export const decisionIsPlaceholder = (text) => {

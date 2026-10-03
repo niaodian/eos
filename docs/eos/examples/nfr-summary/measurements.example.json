@@ -1,0 +1,30 @@
+{
+  "targets": [
+    {
+      "id": "NFR1",
+      "category": "performance",
+      "decision": "ADOPT",
+      "metric": "p95 latency of GET /todos at 50 rps",
+      "comparator": "<=",
+      "threshold": 300,
+      "observed": 212,
+      "unit": "ms",
+      "evidenceRef": "reports/k6/todos-summary.json"
+    },
+    {
+      "id": "NFR2",
+      "category": "availability",
+      "decision": "DEFER",
+      "metric": "monthly availability",
+      "owner": "@platform",
+      "trigger": "before the first paying tenant is onboarded",
+      "dueBy": "2026-12-31"
+    },
+    {
+      "id": "NFR3",
+      "category": "accessibility",
+      "decision": "SKIP",
+      "reason": "the API has no user interface; WCAG applies to the separate web client, which has its own NFRs"
+    }
+  ]
+}

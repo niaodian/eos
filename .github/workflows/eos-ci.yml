@@ -91,6 +91,12 @@ jobs:
         # describes rules the engine no longer applies — and people act on prose. [audit #10]
         run: node .github/eos/eos.mjs docs --check
 
+      - name: EOS agent-platform drift (one skill source, generated copies)
+        # .agents/skills/eos-* is the only source of EOS's slash commands; .claude/skills/eos-* is a
+        # byte-identical copy because Claude Code reads nothing else. A copy edited by hand, or a
+        # source changed without regenerating, would give two agents two different workflows. (ADR-017)
+        run: node .github/eos/eos.mjs agents sync --check
+
       - name: EOS SDLC gate doctor (G-EVAL / G-UX wiring + BMAD runtime + secret hygiene)
         # --deep also verifies that every MAPPED BMAD skill can actually activate here (project
         # runtime + executables). Without it a directory-name check reports PASS for skills that

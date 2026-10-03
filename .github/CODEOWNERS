@@ -27,7 +27,8 @@
 /.github/copilot-instructions.md    @niaodian
 /.github/instructions/              @niaodian
 /.github/agents/                    @niaodian
-/.github/prompts/                   @niaodian
+/.agents/skills/                    @niaodian
+/.claude/skills/                    @niaodian
 /.github/hooks/                     @niaodian
 /.github/eos/                       @niaodian
 /.github/workflows/                 @niaodian

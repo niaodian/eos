@@ -25,7 +25,7 @@ body:
       label: Affected area
       options:
         - "hooks / validators (.github/hooks/*)"
-        - "prompts (slash commands, .github/prompts/*)"
+        - "skills (slash commands, .agents/skills/eos-*)"
         - "agents (orchestrators, .github/agents/*)"
         - "instructions / rules (.github/instructions/*)"
         - "docs (docs/eos/*, README)"

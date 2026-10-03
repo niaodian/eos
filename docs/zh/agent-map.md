@@ -12,18 +12,18 @@
 
 | 阶段 | 使用（skills / agents） |
 |---|---|
-| 导航（任意阶段） | EOS agent `eos-guide`；prompts `/eos-next`、`/eos-resume`、`/eos-status`；CLI `node .github/eos/eos.mjs next` |
+| 导航（任意阶段） | EOS agent `eos-guide`；斜杠命令（技能）`/eos-next`、`/eos-resume`、`/eos-status`；CLI `node .github/eos/eos.mjs next` |
 | 发现 Discovery | bmad-brainstorming, bmad-agent-analyst, bmad-forge-idea |
 | 需求 Requirements | bmad-agent-pm, bmad-prd, bmad-product-brief, eos-operational-readiness |
 | 规格 Spec | bmad-prd |
 | UX/设计 UX/Design | bmad-ux, bmad-agent-ux-designer (Sally), bmad-cis-design-thinking (Maya) |
-| 架构 Architecture | bmad-architecture (Winston)；EOS `/adr`、`/deploy-topology`（拓扑决策 → docs/checklists/G-deployment.md + deployment-topology ADR） |
+| 架构 Architecture | bmad-architecture (Winston)；EOS `/eos-adr`、`/eos-deploy-topology`（拓扑决策 → docs/checklists/G-deployment.md + deployment-topology ADR） |
 | 规划 Planning | bmad-create-epics-and-stories, bmad-create-story, bmad-sprint-planning, bmad-testarch-atdd, bmad-check-implementation-readiness |
 | 开发 Development | bmad-dev-story, bmad-agent-dev (Amelia), bmad-quick-dev, bmad-code-review；EOS skill `eos-compliance-skeletons`（隐私脚手架） |
-| 测试 Testing | bmad-tea (Murat), bmad-testarch-*, bmad-qa-generate-e2e-tests；EOS `/e2e`（Playwright 框架+生成+trace；开发期用沙箱化 **Playwright MCP** 驱动浏览器自查——阶段 7 经 `cp .vscode/mcp.json.example .vscode/mcp.json` opt-in，随仓 inert），`/spec-align`（AC 覆盖 / first-pass 率） |
-| LLM Eval（若 agentic） | EOS `/eval-spec` → docs/eval-plan.md；bmad-eval-runner（仅作模式参考） |
-| 发布/运维 Release/Ops | EOS prompts：/release-gate（遵循阶段 4 的部署拓扑）、/runbook |
-| 可观测性 Observability | EOS prompt：/telemetry-plan |
+| 测试 Testing | bmad-tea (Murat), bmad-testarch-*, bmad-qa-generate-e2e-tests；EOS `/eos-e2e`（Playwright 框架+生成+trace；开发期用沙箱化 **Playwright MCP** 驱动浏览器自查——阶段 7 经 `cp .vscode/mcp.json.example .vscode/mcp.json` opt-in，随仓 inert），`/eos-spec-align`（AC 覆盖 / first-pass 率） |
+| LLM Eval（若 agentic） | EOS `/eos-eval-spec` → docs/eval-plan.md；bmad-eval-runner（仅作模式参考） |
+| 发布/运维 Release/Ops | EOS 技能：/eos-release-gate（遵循阶段 4 的部署拓扑）、/eos-runbook |
+| 可观测性 Observability | EOS 技能：/eos-telemetry-plan |
 | 迭代 Iteration | bmad-correct-course, bmad-retrospective, bmad-document-project, bmad-sprint-status |
 | CI（本地，用 act） | bmad-testarch-ci（脚手架）；`.github/workflows/eos-ci.yml` 跑 validate-config + eos-doctor + secret-scan + tests + evals |
 | 安全评审 Security review | bmad-review-adversarial-general, bmad-code-review；EOS secret-scan.mjs + E-security 清单 + guardrail |
