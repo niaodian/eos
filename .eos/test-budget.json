@@ -76,6 +76,7 @@
         ".github/eos/policy.test.mjs",
         ".github/eos/router.test.mjs",
         ".github/eos/skills.test.mjs",
+        ".github/eos/stage-init.test.mjs",
         ".github/eos/test-evidence.test.mjs",
         ".github/eos/transaction.test.mjs",
         ".github/eos/upgrade.test.mjs",

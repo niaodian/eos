@@ -768,6 +768,7 @@ rejected transition · `2` blocked/pending/stale · `3` EOS itself cannot be eva
 | `ledger [--verify] [--against <ref>]` | Verify the append-only hash chain |
 | `focus --scope <type> --id <id>` | Set this machine's local focus (carries no authority) |
 | `init [--write]` | Report or create local, non-destructive integration files |
+| `stage init <stage> [--write] [--interactive]` | The skeleton of a stage's machine record (`docs/<stage>.json`) and its document, generated from the schema: every required field with a `TODO(eos)` placeholder — every gate rejects the record until each is answered, so a skeleton never advances a stage. Samples: [examples/stage-records](examples/stage-records/README.md) (since eos-2.3.0) |
 | `stack sync [--write]` | Render the always-on workspace rule's `Local commands` from `.eos/project.json`, so the prose cannot disagree with what CI runs. Blocks rather than guessing when no stack is declared |
 | `doctor` | Is EOS itself wired correctly? |
 

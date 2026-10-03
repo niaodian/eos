@@ -1,0 +1,13 @@
+{
+  "$schema": "../../../../.eos/schemas/design.schema.json",
+  "schemaVersion": 1,
+  "userInterface": true,
+  "surfaces": ["web"],
+  "coverage": {
+    "flows": { "status": "COVERED", "ref": "docs/EXPERIENCE.md#flows" },
+    "states": { "status": "COVERED", "ref": "docs/EXPERIENCE.md#empty-loading-and-error-states" },
+    "accessibility": { "status": "COVERED", "ref": "docs/DESIGN.md#accessibility (WCAG 2.2 AA)" },
+    "designTokens": { "status": "COVERED", "ref": "docs/DESIGN.md#tokens" },
+    "responsive": { "status": "NOT_APPLICABLE", "reason": "the first release targets desktop browsers only; mobile web is a scoped-out item in discovery" }
+  }
+}

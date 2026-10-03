@@ -1,0 +1,20 @@
+{
+  "$schema": "../../../../.eos/schemas/discovery.schema.json",
+  "schemaVersion": 1,
+  "problem": {
+    "statement": "People who share a household lose track of chores and errands because their to-do lists live in separate apps and are never in sync.",
+    "falsifiableBy": "Households that already share one list complete no more items per week than households that do not.",
+    "affectedUsers": "two-to-five-person households planning weekly chores"
+  },
+  "successMetric": {
+    "name": "weekly shared items completed per household",
+    "baseline": 6,
+    "target": 9,
+    "unit": "items/week",
+    "dataSource": "todo.item.completed events in the analytics warehouse, grouped by household"
+  },
+  "scope": {
+    "in": ["shared lists per household", "item assignment to a member", "completion events"],
+    "out": ["recurring schedules", "calendar sync", "a mobile app (web only in this release)"]
+  }
+}

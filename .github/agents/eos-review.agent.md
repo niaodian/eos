@@ -20,7 +20,7 @@ Use `bmad-correct-course` (change management), `bmad-retrospective` (retro),
 `bmad-document-project` (brownfield docs), `bmad-sprint-status`.
 
 Gate G10 (`iteration-ready`, machine-verified): every change is impact-analyzed AND written back to
-the spec source of truth. Record it in `docs/iteration.json`
+the spec source of truth. Start from the skeleton — `node .github/eos/eos.mjs stage init iteration --write` — and replace every `TODO(eos)`: the gate rejects the record while one remains. Record it in `docs/iteration.json`
 (schema `.eos/schemas/iteration.schema.json`): the learnings, WHERE each one landed, the eval-dataset
 update and baseline decision for an agentic product, and a named owner recording
 CONTINUE / CORRECT_COURSE / STOP. Verify with

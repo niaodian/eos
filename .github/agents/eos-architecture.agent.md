@@ -63,6 +63,8 @@ enabled + tech-stack ADR written), the **deployment topology is chosen** (NFR-ju
 `docs/adr/*-deployment-topology.md`), and — if both paradigms are present — the isolation
 points above are designed (async boundary, separated fault models, layered state).
 
+Start from the skeleton — `node .github/eos/eos.mjs stage init architecture --write` — and replace every `TODO(eos)`: the gate rejects the record while one remains.
+
 Output: docs/architecture.md (incl. a Deployment section), **docs/architecture.json**
 (schema `.eos/schemas/architecture.schema.json` — the decision record G4 actually reads:
 stack / topology / authz / security / audit / rollback / DR / data / API / event, each DECIDED with a

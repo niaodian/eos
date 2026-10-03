@@ -26,7 +26,7 @@ boundary, and no unresolved blocking question.
 
 Output: `docs/discovery.md` (the narrative) **and** `docs/discovery.json`
 (schema `.eos/schemas/discovery.schema.json`) — the gate reads the record, because prose is exactly
-what a gate must not be able to be talked past. Verify with
+what a gate must not be able to be talked past. Start from the skeleton — `node .github/eos/eos.mjs stage init discovery --write` — and replace every `TODO(eos)`: the gate rejects the record while one remains. Verify with
 `node .github/eos/eos.mjs check --gate discovery-ready`.
 
 ## Stage close-out (do not skip)

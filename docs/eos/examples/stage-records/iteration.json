@@ -1,0 +1,12 @@
+{
+  "$schema": "../../../../.eos/schemas/iteration.schema.json",
+  "schemaVersion": 1,
+  "release": "v1.0.0",
+  "learnings": [
+    { "observation": "Households complete more shared items, but unassigned items are completed far less often than assigned ones.", "source": "telemetry", "metric": "weekly shared items completed per household" }
+  ],
+  "specWriteBack": [
+    { "target": "docs/requirements.json", "change": "added FR4: a new item is assigned to its creator unless reassigned", "targetDigest": "0000000000000000000000000000000000000000000000000000000000000000" }
+  ],
+  "decision": { "outcome": "CONTINUE", "owner": "@product" }
+}

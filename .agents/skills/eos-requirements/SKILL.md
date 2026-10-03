@@ -32,6 +32,7 @@ i18n/l10n, multi-tenancy, capacity/SLO, DR (RTO/RPO) — plus `compliance` when 
 | `docs/requirements.json` | the machine: schema `.eos/schemas/requirements.schema.json` |
 
 The gate reads the JSON, because prose is exactly what a gate must not be able to be talked past.
+Start from the skeleton — `node .github/eos/eos.mjs stage init requirements --write` — and replace every `TODO(eos)`: the gate rejects the record while one remains.
 Every NFR needs a `target` — an unquantified NFR cannot be verified at G8. Check with:
 
 ```sh

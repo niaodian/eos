@@ -1,0 +1,16 @@
+{
+  "$schema": "../../../../.eos/schemas/telemetry.schema.json",
+  "schemaVersion": 1,
+  "owner": "@platform",
+  "signals": [
+    { "metric": "weekly shared items completed per household", "emittedAs": "todo.item.completed", "source": "todo-api completion handler" }
+  ],
+  "dashboards": [
+    { "name": "Household lists", "ref": "dashboards/household-lists.json" }
+  ],
+  "alerts": [
+    { "name": "completion write failures", "condition": "5xx on POST /items/{id}/complete > 1% over 10m", "routesTo": "@platform on-call" }
+  ],
+  "sensitiveOperationAudit": { "status": "COVERED", "operations": ["member removed from a household"], "sink": "audit-log" },
+  "rolloutMetrics": { "canaryMetric": "completion write failures", "rollbackTrigger": "completion write failures above 1% for 10 minutes on the canary", "observationWindow": "24h" }
+}

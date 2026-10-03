@@ -1,0 +1,26 @@
+{
+  "$schema": "../../../../.eos/schemas/requirements.schema.json",
+  "schemaVersion": 1,
+  "functional": [
+    { "id": "FR1", "statement": "A household member can create, edit and delete items on the household's shared list", "priority": "MUST" },
+    { "id": "FR2", "statement": "An item can be assigned to one member of the household", "priority": "MUST" },
+    { "id": "FR3", "statement": "Completing an item records who completed it and when", "priority": "MUST" }
+  ],
+  "nfr": [
+    { "id": "NFR1", "category": "performance", "statement": "List reads are fast for a household", "target": "p95 < 300ms at 50 rps" },
+    { "id": "NFR2", "category": "security", "statement": "A member can never read another household's list", "target": "0 cross-household reads in the authz test suite" }
+  ],
+  "operationalPreFlight": {
+    "telemetry": { "decision": "ADOPT", "note": "emit todo.item.completed with household and assignee" },
+    "authz": { "decision": "ADOPT", "note": "every query is scoped by the household of the authenticated member" },
+    "audit": { "decision": "ADOPT", "note": "membership changes are written to the audit sink" },
+    "rollback": { "decision": "ADOPT", "note": "feature flag shared_lists plus image rollback" },
+    "monitoring": { "decision": "ADOPT", "note": "5xx rate and p95 latency alert to @platform" },
+    "canary": { "decision": "ADOPT", "note": "5% of households for 24 hours before full rollout" },
+    "quota": { "decision": "SKIP", "reason": "list sizes are bounded by household size; the gateway rate limit already applies" },
+    "i18n": { "decision": "DEFER", "owner": "@product", "trigger": "when the first non-English market is planned" },
+    "multiTenancy": { "decision": "ADOPT", "note": "the household is the tenant; cross-household access is denied by default" },
+    "capacitySlo": { "decision": "ADOPT", "note": "99.9% monthly availability for list reads and writes" },
+    "dr": { "decision": "ADOPT", "note": "managed PostgreSQL with point-in-time recovery, RPO 5 minutes" }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "$schema": "../../../../.eos/schemas/design.schema.json",
+  "schemaVersion": 1,
+  "userInterface": false,
+  "skipReason": "todo-api is a machine API consumed by the household web client, which has its own design and experience contracts."
+}

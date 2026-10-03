@@ -799,6 +799,7 @@ LLM tracing（token/成本/context/tool-span）。
 | `ledger [--verify] [--against <ref>]` | 校验只追加的哈希链 |
 | `focus --scope <type> --id <id>` | 设置本机的本地关注点（不携带任何权威） |
 | `init [--write]` | 报告或创建本地的、非破坏性的集成文件 |
+| `stage init <stage> [--write] [--interactive]` | 根据 schema 生成某阶段机器记录（`docs/<stage>.json`）及其文档的骨架：每个必填字段都放一个 `TODO(eos)` 占位符——在逐一回答之前，所有门禁都会拒绝这份记录，因此骨架永远不会推进阶段。样例见 [examples/stage-records](../eos/examples/stage-records/README.md)（自 eos-2.3.0 起） |
 | `stack sync [--write]` | 依据 `.eos/project.json` 渲染常驻工作区规则的 `Local commands`，使散文不可能与 CI 实际执行的命令不一致。未声明技术栈时阻断而非猜测 |
 | `doctor` | EOS 自身接线是否正确 |
 
