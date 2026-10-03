@@ -138,7 +138,7 @@ Also enforces — codes the method names that have no gate of their own:
 |---|---|---|
 | `product-tree-bound` | the evidence records the product tree it was produced from | Run this gate inside a git repository — EOS binds a verification to the source, tests, prompts and eval data it actually ran against. |
 | `tests-executed` | the declared test command ran and passed | Run `node .github/hooks/project-gate.mjs` and fix failures; a missing toolchain is BLOCKED, never a pass. |
-| `trace-complete` | every story AC has a trace row bound to a real, executed test | Produce docs/trace-matrix.md at G7 (bmad-testarch-trace): each row needs the AC id, an existing test path, the command/run that executed it, and its machine result. |
+| `trace-complete` | every story AC has a trace row bound to a real, executed test | Produce docs/trace-matrix.md at G7 (bmad-testarch-trace): each row names the AC id and the test that proves it (path::test name). Declare where your runner writes JUnit XML ("evidence": {"junit": ["reports/junit/*.xml"]}) and this gate derives docs/evidence/test-run.json from the run itself — see docs/eos/examples/trace-evidence/. |
 | `eval-threshold` | eval baseline met (agentic products only) | Run the declared commands.eval so it writes a schema-valid summary to docs/evidence/eval-summary.json; see docs/eval-plan.md. |
 | `evidence-current` | the evidence matches the current inputs | An input moved after the prerequisite gate ran: re-run `eos check --gate story-ready --scope <STORY-ID>` first, then `eos check --gate verified --scope <STORY-ID>`. |
 

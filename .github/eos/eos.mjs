@@ -37,6 +37,8 @@ usage: node .github/eos/eos.mjs <command> [flags]
   release-status                          aggregate release readiness
   verify-release --release <id>           candidate-bound release verification
   product-tree                            the identity of the tree a verification applies to
+  evidence junit [<report.xml>…] [--write]
+                                          answer the trace matrix from JUnit reports → docs/evidence/test-run.json
   waive --gate <id> --scope <id> --reason <text> --risk-owner <who> --expires <YYYY-MM-DD> --control <text>
   handoff --scope <type> --id <id> [--verify]
   ledger [--verify] [--against <ref>] [--resolve [--write]]

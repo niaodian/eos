@@ -90,6 +90,9 @@ export function policySnapshot({ gates, workflow, project }) {
       commands: Object.fromEntries(Object.entries(project.commands || {}).map(([k, v]) => [k, canonical(v)])),
       // Which organization baseline the project answers to (ADR-013): leaving it must be visible.
       upstream: project.policyUpstream?.source || null,
+      // Where the verified gate reads test results from (ADR-016). Present only when declared, so
+      // every project that never declared it keeps the digest it was locked with.
+      ...(project.evidence !== undefined ? { evidence: canonical(project.evidence) } : {}),
     };
   }
   return { gates: gateMap, workflow: { defaultProfile: workflow?.defaultProfile ?? null, profiles, stateMachines }, project: proj };
@@ -243,6 +246,13 @@ export function diffPolicy(a, b) {
       else if (pb.commands[step] !== cmd) add('REVIEW', `project:command-changed:${step}`, `the ${step} command changed — EOS cannot tell whether the new one checks as much`);
     }
     for (const step of Object.keys(pb.commands)) if (!(step in pa.commands)) add('STRENGTHENING', `project:command-added:${step}`, `the ${step} command now runs`);
+    // Which reports the verified gate trusts as the run's results. Pointing it elsewhere, or back at a
+    // hand-maintained test-run.json, changes what "the tests passed" rests on — EOS cannot rank that.
+    if ((pa.evidence ?? null) !== (pb.evidence ?? null)) {
+      add('REVIEW', 'project:evidence-changed', pb.evidence === undefined
+        ? 'the verified gate no longer derives test-run.json from JUnit reports (evidence removed)'
+        : `the verified gate now reads its test results from ${pb.evidence}${pa.evidence === undefined ? '' : ` instead of ${pa.evidence}`}`);
+    }
   }
   return changes;
 }

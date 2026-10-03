@@ -63,6 +63,7 @@ EOS itself never calls a model and needs no API key. Each row adds to the one ab
 - **Until branch protection and CODEOWNERS exist, governance is contractual.** EOS cannot verify server-side protection from a laptop, so "a weakening needs a second person" holds only after the `/eos-init` hardening; `eos-doctor` reports `CONTRACTUAL` until then ([ADR-014](../adr/014-trust-chain.md)).
 - **Local evidence is honest but unattested.** Evidence recorded on a laptop is `UNATTESTED_LOCAL`; a Regulated release needs evidence produced in CI (`evidencePolicy`).
 - **"Any stack" is verified to different depths.** EOS's own CI exercises the Node path and the Python eval starter; the Python, Go, Java, Rust and .NET packs declare the commands EOS runs, and their toolchains are yours to install.
+- **A JUnit result may be matched by name only.** Some runners — node:test among them — record no file in their JUnit XML. EOS then matches a trace-matrix row by test name and marks it `"match": "name"`; what ties it to the file is the gate's check that the name appears in the file the row names ([ADR-016](../adr/016-junit-test-evidence.md)).
 - **Symlinks on Windows.** A checkout without symlink support turns a link into a plain file, so the product-tree digest differs from Linux and evidence recorded on one reads `STALE` on the other.
 
 ## Day-1 (copy-ready — the same sequence as the manual, §3.4)

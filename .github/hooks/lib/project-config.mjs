@@ -47,11 +47,34 @@ function upstreamOf(raw, errors) {
   return raw;
 }
 
+/**
+ * `evidence`: where the project's runners write the results EOS turns into gate evidence (ADR-016).
+ * Only JUnit XML, only inside the repository, and never into EOS's own directories: a pattern that
+ * reached `.eos/` or `docs/evidence/` would let a report be confused with the evidence derived from it.
+ */
+function evidenceOf(raw, errors) {
+  if (raw === undefined) return undefined;
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) { errors.push(`${PROJECT_CONFIG_PATH}: "evidence" must be an object, e.g. { "junit": ["reports/junit/*.xml"] }`); return undefined; }
+  for (const k of Object.keys(raw)) if (k !== 'junit') errors.push(`${PROJECT_CONFIG_PATH}: unknown key "evidence.${k}" (allowed: junit)`);
+  const junit = raw.junit;
+  if (!Array.isArray(junit) || !junit.length) {
+    errors.push(`${PROJECT_CONFIG_PATH}: "evidence.junit" must be a non-empty array of report paths or globs, e.g. ["reports/junit/*.xml"]`);
+    return undefined;
+  }
+  const bad = junit.filter((p) => typeof p !== 'string' || !p.endsWith('.xml') || p.includes('\\') || /^\//.test(p) || /^[A-Za-z]:/.test(p)
+    || p.split('/').includes('..') || /^(\.eos|\.git|docs\/evidence)(\/|$)/.test(p.replace(/^\.\//, '')));
+  if (bad.length) {
+    errors.push(`${PROJECT_CONFIG_PATH}: "evidence.junit" entries must be repository-relative paths or globs ending in .xml, with "/" separators, no "..", outside .eos/, .git/ and docs/evidence/ (got ${bad.map((b) => JSON.stringify(b)).join(', ')})`);
+    return undefined;
+  }
+  return { junit: junit.map((p) => p.replace(/^\.\//, '')) };
+}
+
 // The schema (.eos/schemas/project.schema.json) lists the same keys; a test keeps the two equal.
 export const TOP_LEVEL_KEYS = new Set([
   '$schema', 'projectType', 'language', 'stacks', 'commands', 'productParadigms', 'evalRequired',
   'evalWaiver', 'rationale', 'workflowProfile', 'complianceProfile',
-  'evidencePolicy', 'evidencePolicyReason', 'templateDefault', 'release', 'policyUpstream',
+  'evidencePolicy', 'evidencePolicyReason', 'templateDefault', 'release', 'policyUpstream', 'evidence',
 ]);
 // Prose language only (BCP-47). Deliberately not an enum: EOS must not ship a closed list of
 // languages a team is allowed to think in.
@@ -372,6 +395,9 @@ export function loadProjectConfig(root) {
     // recognizable manifest (shell, Terraform, …) declares `application` + stacks:["other"].
     errors.push(`${PROJECT_CONFIG_PATH}: projectType "config-only" must not declare commands — they would never run. Use "application" (or "library") with stacks (use "other" if your stack has no manifest file) so commands.test is actually executed.`);
   }
+  if (projectType === 'config-only' && parsed.evidence !== undefined) {
+    errors.push(`${PROJECT_CONFIG_PATH}: projectType "config-only" must not declare "evidence" — no test runs, so no report would ever be read.`);
+  }
 
   const config = {
     projectType,
@@ -389,6 +415,7 @@ export function loadProjectConfig(root) {
     templateDefault: parsed.templateDefault === true,
     release: releaseOf(parsed.release, errors),
     policyUpstream: upstreamOf(parsed.policyUpstream, errors),
+    evidence: evidenceOf(parsed.evidence, errors),
   };
   if (parsed.templateDefault !== undefined && typeof parsed.templateDefault !== 'boolean') {
     errors.push(`${PROJECT_CONFIG_PATH}: "templateDefault" must be true or false`);

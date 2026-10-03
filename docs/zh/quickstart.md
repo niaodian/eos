@@ -68,6 +68,7 @@ EOS 本身从不调用任何模型，也不需要任何 API key。每一行都�
 - **在分支保护与 CODEOWNERS 就位之前，治理是契约式的。** EOS 无法在本机验证服务端保护，因此"放宽需要第二个人"只有在完成 `/eos-init` 加固后才成立；在此之前 `eos-doctor` 会报告 `CONTRACTUAL`（[ADR-014](../adr/014-trust-chain.md)）。
 - **本地证据诚实，但未经证明。** 在笔记本上记录的证据是 `UNATTESTED_LOCAL`；Regulated 发布需要 CI 产出的证据（`evidencePolicy`）。
 - **"任意技术栈"的验证深度不同。** EOS 自身的 CI 覆盖 Node 路径与 Python 评估起步包；Python、Go、Java、Rust 与 .NET 起步包声明的是 EOS 会运行的命令，对应的工具链需要你自行安装。
+- **JUnit 结果可能只按名称匹配。** 有些运行器（包括 node:test）在 JUnit XML 中不记录文件。此时 EOS 按测试名称匹配 trace matrix 的行，并标记为 `"match": "name"`；把它与文件绑定在一起的，是门禁对"该名称出现在该行所指文件中"的检查（[ADR-016](../adr/016-junit-test-evidence.md)）。
 - **Windows 上的符号链接。** 不支持符号链接的检出会把链接变成普通文件，于是产品树指纹与 Linux 不同，在一边记录的证据在另一边读作 `STALE`。
 
 ## Day-1（可直接复制——与用户手册 §3.4 完全一致的序列）

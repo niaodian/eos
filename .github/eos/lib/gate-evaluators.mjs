@@ -25,6 +25,7 @@ import { lastGateEvent } from './ledger.mjs';
 import { findWaiver, expiredWaivers } from './waivers.mjs';
 import { AC_ID, opsDecisionProblem } from './story.mjs';
 import { verifyRelease } from './release-integrity.mjs';
+import { beginCapture, finishCapture } from './test-evidence.mjs';
 import {
   STATUSES, SEVERITY, EXPENSIVE, isBlocking, insideRepo, parseTraceMatrix,
   ok, fail, blocked, na, awaiting, runHook, runProjectGate, refMatches, selectorPresent,
@@ -382,8 +383,12 @@ export const evaluators = {
     if (p.projectType === 'config-only') {
       return blocked('this repository declares projectType "config-only" — a story cannot be verified where no product code is declared');
     }
+    // With `evidence.junit` declared, the reports must be bracketed by THIS run: what the report
+    // locations hold before it is the baseline every report is compared against afterwards.
+    const capture = beginCapture(ctx.root, p);
     const r = runProjectGate(ctx);
     if (r.command) ctx.commands.push(r.command);
+    if (capture) ctx.junit = finishCapture(ctx.root, capture, { project: p, gateRun: r });
     if (r.status === 'PASS') return ok('the declared quality commands ran and passed');
     if (r.status === 'ERROR') return { status: 'ERROR', detail: r.detail };
     if (r.status === 'BLOCKED') return blocked(`the product-quality gate is BLOCKED: ${r.detail}`);
@@ -402,6 +407,12 @@ export const evaluators = {
 
     // (2) The machine result. A row ending in "PASS" is a claim; this file is the run. Without it
     //     the gate certifies prose, which is the whole of EOS-AUD-006.
+    //     When the project declares its JUnit reports, this gate run just derived the file from
+    //     them (testsExecuted). If that could not happen, the summary on disk is from another run,
+    //     and reading it anyway would be exactly the freshness gap the declaration closes.
+    if (ctx.junit && ctx.junit.status !== 'WRITTEN') {
+      return { status: ctx.junit.status === 'SKIPPED' ? 'FAIL' : ctx.junit.status, detail: `test results from JUnit (evidence.junit): ${ctx.junit.detail}` };
+    }
     const run = readSummary(ctx.root, 'testRun');
     if (run.errors.length) return { status: 'ERROR', detail: `${run.path}: ${run.errors.join('; ')}` };
     if (!run.present) {
@@ -430,7 +441,7 @@ export const evaluators = {
       const executed = byAc.get(ac.id) || [];
       if (!executed.length) { problems.push(`${ac.id}: no executed test result in ${run.path}`); continue; }
       const failed = executed.filter((r) => r.status !== 'PASS');
-      if (failed.length) { problems.push(`${ac.id}: ${failed.map((f) => `${f.testPath} ${f.status}`).join(', ')}`); continue; }
+      if (failed.length) { problems.push(`${ac.id}: ${failed.map((f) => `${f.testPath}${f.selector ? `::${f.selector}` : ''} ${f.status}${f.detail ? ` (${f.detail})` : ''}`).join(', ')}`); continue; }
       // (3) The test file must EXIST. A trace row pointing at a path that was never written is the
       //     cheapest possible fake, and a summary can name it just as cheaply.
       for (const r of executed) {
@@ -454,7 +465,7 @@ export const evaluators = {
     }
     return problems.length
       ? fail(`trace evidence incomplete: ${problems.slice(0, 4).join(' · ')}${problems.length > 4 ? ` · +${problems.length - 4} more` : ''}`)
-      : ok(`${ctx.story.acs.length} criteria traced to executed, passing tests (run ${run.data.runId || run.data.generatedAt})`);
+      : ok(`${ctx.story.acs.length} criteria traced to executed, passing tests (run ${run.data.runId || run.data.generatedAt}${run.data.source?.format === 'junit' ? `, derived from ${run.data.source.reports.length} JUnit report(s)` : ''})`);
   },
   evalThreshold(ctx) {
     if (!ctx.snapshot.agentic) return na('this product is not declared agentic');

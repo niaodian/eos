@@ -8,30 +8,28 @@ import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { project, write, run, runJson, cleanup, story, commitAll, treeDigest,
-  baselineFiles, storyFiles, testRun, TEST_FILE, TRACE_MATRIX } from './test-support.mjs';
+import { project, write, run, runJson, cleanup, story, baselineFiles, TEST_FILE } from './test-support.mjs';
 
 after(cleanup);
 
 const PRD = '# PRD\n\n## Login (FR1)\n\n- AC1.1 the user can log in with a valid password\n- AC1.2 the user can log out and the session is destroyed\n';
+// The Result column is prose: the gate reads the run, never this cell.
 const TRACE = ['| AC | Test | Result |', '| --- | --- | --- |',
-  '| AC1.1 | tests/login.test.mjs::valid password | PASS |',
-  '| AC1.2 | tests/logout.test.mjs::clears the session | PASS |', ''].join('\n');
-const RUN = testRun({
-  acs: [], testPath: 'tests/login.test.mjs',
-});
-const TWO_AC_RUN = {
-  ...RUN,
-  results: [
-    { ac: 'AC1.1', testPath: 'tests/login.test.mjs', selector: 'valid password', status: 'PASS' },
-    { ac: 'AC1.2', testPath: 'tests/logout.test.mjs', selector: 'clears the session', status: 'PASS' },
-  ],
-};
+  '| AC1.1 | tests/login.test.mjs::valid password | from the run |',
+  '| AC1.2 | tests/logout.test.mjs::clears the session | from the run |', ''].join('\n');
 const LOGOUT_TEST = "import { test } from 'node:test';\ntest('clears the session', () => {});\n";
 const APP = {
   projectType: 'application', stacks: ['node'], productParadigms: ['deterministic'],
   workflowProfile: 'standard-product', commands: { test: 'node --version' },
 };
+// The full loop runs the real path (ADR-016): a real node:test run writes JUnit XML, and the
+// verified gate derives docs/evidence/test-run.json from it. Nothing in the loop is hand-written.
+const LOOP_APP = {
+  ...APP,
+  commands: { test: 'node --test --test-reporter=junit --test-reporter-destination=reports/junit/node.xml tests/login.test.mjs tests/logout.test.mjs' },
+  evidence: { junit: ['reports/junit/*.xml'] },
+};
+const LOCAL = { GITHUB_ACTIONS: '', GITLAB_CI: '', CI: '' };
 const halfDone = () => story({
   id: 'STORY-012',
   rows: [['AC1.1', 'the user can log in', 'tests/login.test.mjs::valid password', '—'], ['AC1.2', 'the user can log out', '—', '—']],
@@ -56,7 +54,8 @@ test('journey: an untouched template with product code is routed to activation, 
 
 test('journey: the full loop from a blocked story to a merged story and a release verdict', () => {
   const dir = project(baselineFiles({
-    '.eos/project.json': APP,
+    '.eos/project.json': LOOP_APP,
+    '.gitignore': '/reports/junit/\n',
     'docs/prd.md': PRD,
     'docs/stories/STORY-012.md': halfDone(),
     'tests/login.test.mjs': TEST_FILE,
@@ -104,10 +103,14 @@ test('journey: the full loop from a blocked story to a merged story and a releas
   assert.equal(r.json.recommendedAction.id, 'build-trace-matrix');
   assert.match(JSON.stringify(r.json.blockers), /trace-matrix\.md does not exist/);
 
+  // The trace matrix is the only thing written by hand. The gate runs the tests and derives the
+  // machine result from the JUnit report that run wrote.
   write(dir, 'docs/trace-matrix.md', TRACE);
-  write(dir, 'docs/evidence/test-run.json', { ...TWO_AC_RUN, productTree: { digest: treeDigest(dir) } });
-  const verified = runJson(dir, ['check', '--gate', 'verified', '--scope', 'STORY-012']);
+  const verified = runJson(dir, ['check', '--gate', 'verified', '--scope', 'STORY-012'], LOCAL);
   assert.equal(verified.code, 0, verified.out);
+  const derived = JSON.parse(readFileSync(join(dir, 'docs/evidence/test-run.json'), 'utf8'));
+  assert.deepEqual(derived.source.reports, ['reports/junit/node.xml']);
+  assert.deepEqual(derived.results.map((r) => `${r.ac}:${r.status}`), ['AC1.1:PASS', 'AC1.2:PASS']);
   assert.equal(run(dir, ['transition', '--scope', 'story', '--id', 'STORY-012', '--to', 'VERIFIED']).code, 0);
 
   // 7. an input moves: the recorded PASS becomes STALE and the merge is refused
@@ -127,15 +130,13 @@ test('journey: the full loop from a blocked story to a merged story and a releas
   assert.equal(stale.json.recommendedAction.id, 'refresh-stale-evidence');
   assert.match(stale.json.recommendedAction.command, /check --gate verified --scope STORY-012/);
 
-  // Re-running the GATE is not enough on its own: the recorded test results still describe
-  // the tree as it was, and EOS says so rather than re-blessing them.
-  const notYet = runJson(dir, ['check', '--gate', 'verified', '--scope', 'STORY-012']);
-  assert.notEqual(notYet.code, 0, notYet.out);
-  assert.match(JSON.stringify(notYet.json.checks.find((c) => c.id === 'trace-complete')), /does not describe this code/);
-
-  // The tests have to run again — which is what a real runner does when it rewrites the summary.
-  write(dir, 'docs/evidence/test-run.json', { ...TWO_AC_RUN, productTree: { digest: treeDigest(dir) } });
-  assert.equal(run(dir, ['check', '--gate', 'verified', '--scope', 'STORY-012']).code, 0);
+  // The recorded results describe the tree as it was. Re-running the gate re-runs the tests, so the
+  // summary is derived again for THIS tree — the recovery is the one command `eos next` printed.
+  const before = JSON.parse(readFileSync(join(dir, 'docs/evidence/test-run.json'), 'utf8'));
+  const again = runJson(dir, ['check', '--gate', 'verified', '--scope', 'STORY-012'], LOCAL);
+  assert.equal(again.code, 0, again.out);
+  const after = JSON.parse(readFileSync(join(dir, 'docs/evidence/test-run.json'), 'utf8'));
+  assert.notEqual(after.productTree.digest, before.productTree.digest, 'the summary now describes the edited tree');
   assert.equal(run(dir, ['transition', '--scope', 'story', '--id', 'STORY-012', '--to', 'MERGED']).code, 0);
 
   // 9. with the story merged, the router hands the focus to the next change

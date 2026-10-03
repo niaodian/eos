@@ -100,7 +100,7 @@ const EXAMPLES = {
     acknowledged: [{ change: 'profile:standard-product:FEATURE:verified:required→waivable', kind: 'WEAKENING', detail: 'verified becomes waivable', reason: 'Pilot team, reviewed weekly by the platform group.', requestedBy: 'dev-a', approver: 'lead-b' }],
     upstream: { source: 'https://policy.example.com/acme.json', name: 'acme-engineering', version: '2026.10', digest: DIGEST, syncedAt: NOW, keyId: DIGEST },
   }],
-  project: () => [repoFile('.eos/project.json'), { ...APP_PROJECT, workflowProfile: 'regulated', complianceProfile: 'regulated', evidencePolicy: 'ci', language: 'en', release: { artifacts: ['dist/*.tgz'], signing: { publicKey: '.eos/keys/release.pub' } }, policyUpstream: { source: 'https://policy.example.com/acme.json', publicKey: '.eos/keys/org-policy.pub' } }],
+  project: () => [repoFile('.eos/project.json'), { ...APP_PROJECT, workflowProfile: 'regulated', complianceProfile: 'regulated', evidencePolicy: 'ci', language: 'en', release: { artifacts: ['dist/*.tgz'], signing: { publicKey: '.eos/keys/release.pub' } }, policyUpstream: { source: 'https://policy.example.com/acme.json', publicKey: '.eos/keys/org-policy.pub' }, evidence: { junit: ['reports/junit/*.xml'] } }],
   providers: () => [{ schemaVersion: 1, providers: [{ adapter: 'mock', subjects: ['enforcement-authority'], options: {} }] }],
   'release-manifest': () => [produced().manifest, {
     ...produced().manifest,
@@ -113,7 +113,12 @@ const EXAMPLES = {
   requirements: () => [REQUIREMENTS_RECORD],
   telemetry: () => [TELEMETRY_RECORD],
   'test-budget': () => [repoFile('.eos/test-budget.json')],
-  'test-run': () => [produced().testRun],
+  'test-run': () => [produced().testRun, {
+    schemaVersion: 1, generatedAt: NOW, runId: 'github-7-1', producer: { type: 'ci', name: 'github-actions', runRef: 'https://github.com/acme/app/actions/runs/7' },
+    commandDigest: DIGEST, framework: 'junit', command: 'node --test', productTree: { digest: DIGEST },
+    source: { format: 'junit', reports: ['reports/junit/node.xml'] },
+    results: [{ ac: 'AC1.1', testPath: 'tests/login.test.mjs', selector: 'valid password', status: 'PASS', match: 'name', durationMs: 1, detail: '1 testcase(s) named "valid password"' }],
+  }],
   'transition-event': () => [produced().event],
   waiver: () => [{
     schemaVersion: 1, gate: 'story-ready', scope: { type: 'story', id: 'STORY-001' },

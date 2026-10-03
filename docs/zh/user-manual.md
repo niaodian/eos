@@ -504,7 +504,7 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 | **何时进入** | G6 通过 |
 | **怎么启动** | Chat 输入 **`bmad-tea`**（Murat）/ `bmad-testarch-test-design` / `bmad-testarch-automate` / `bmad-testarch-trace` / **`bmad-testarch-nfr`** / `bmad-qa-generate-e2e-tests`；**面向用户流程用 `/e2e`**（编排 Playwright 框架+E2E 生成+trace，开发期可用 Playwright MCP 驱动浏览器自查，见 7.7）；**LLM 功能:按 `docs/eval-plan.md` 跑 eval 集 + 回归基线** |
 | **输入** | `docs/prd.md`（AC 清单）、**`docs/checklists/C-nfr.md`（NFR 目标值）**、**`docs/eval-plan.md`（LLM 功能）**、`src/` 代码 |
-| **产出** | 测试套件 + `docs/trace-matrix.md`（AC ↔ 测试映射，是*人*的判断）**+ `docs/evidence/test-run.json`**（*机器*的结果：哪个测试跑了、跑在哪棵产品树上、返回了什么）+ **`docs/evidence/nfr-summary.json`** + **`docs/evidence/eval-summary.json`**（LLM 功能）。见 [examples/trace-evidence](../eos/examples/trace-evidence/README.md)——那是你自己测试运行器里约 30 行的映射步骤，不是 EOS 插件 |
+| **产出** | 测试套件 + `docs/trace-matrix.md`（AC ↔ 测试映射，是*人*的判断）**+ `docs/evidence/test-run.json`**（*机器*的结果：哪个测试跑了、跑在哪棵产品树上、返回了什么）+ **`docs/evidence/nfr-summary.json`** + **`docs/evidence/eval-summary.json`**（LLM 功能）。自 eos-2.2.0 起，`verified` 门禁会根据你的测试运行器本就会输出的 JUnit XML 自行写出 `test-run.json`——只需声明 `"evidence": {"junit": ["reports/junit/*.xml"]}`；见 [examples/trace-evidence](../eos/examples/trace-evidence/README.md) |
 | **生效规则 R6** | 金字塔结构；**每条 AC ≥1 测试**；`describe(<criterion id>)` 命名；无真实计时器/无顺序依赖；改动行覆盖率 ≥80%；**NFR 目标用 `bmad-testarch-nfr` 验证**；**LLM 输出用 eval 集+grader 验(非 exact-match),见 `ai/10-ai-llm` 规则** |
 | **决策门 G7** | `node .github/eos/eos.mjs check --gate verified --scope <STORY-ID>` —— ☑ 每条 AC 追溯到一个**存在且真正跑过**的测试 ☑ 该次运行描述的是**这棵**产品树 ☑ **NFR 目标已验证，或延后且带负责人+触发条件** ☑ **LLM 功能：实测分数达阈值，且由 EOS 依据摘要自身的数字重算** ☑ **spec-alignment 量化（`/spec-align`）**。1.13.0 之前，矩阵里手写一个 `PASS` 就够了 |
 | **必查项** | 有没有"没被任何测试覆盖的 AC"？**C-nfr 里定的 P95/吞吐/SLO 有没有被验证**（而不是定了就忘）？延后的有没有显式标 trigger？**LLM 的 eval 分达阈值了吗?prompt/模型改动有没有跑回归?** |
@@ -656,7 +656,7 @@ bmad-tea / bmad-testarch-*         → 单元 + 集成测试
 ```
 SaaS 的 **G7** 要求：每条 AC ≥1 测试、**API 契约测试**（对 openapi.yaml）、**DB 状态集成测试**
 （事务 commit/rollback、约束、幂等）、NFR 目标已验证。
-门禁读取的是*机器*结果，而不是手写的 PASS：你的测试命令还必须写出 `docs/evidence/test-run.json`（AC → 测试文件 → selector → PASS，并绑定 `eos product-tree --json`）。这是你自己测试运行器里约 30 行的映射步骤——见 [examples/trace-evidence](../eos/examples/trace-evidence/README.md)。
+门禁读取的是*机器*结果，而不是手写的 PASS——自 eos-2.2.0 起，这一步不需要你写任何代码。让测试运行器输出 JUnit XML（node:test 用 `--test-reporter=junit --test-reporter-destination=reports/junit/node.xml`，pytest 用 `--junitxml=reports/junit/python.xml`，vitest、Playwright、Maven/Gradle、gotestsum 等同理），并在 `.eos/project.json` 中声明报告位置：`"evidence": {"junit": ["reports/junit/*.xml"]}`。`verified` 门禁会运行 `commands.test`，只读取本次运行写出的报告，据此回答 `docs/trace-matrix.md` 的每一行，并写出绑定产品树的 `docs/evidence/test-run.json`。请把 `/reports/junit/` 保留在 `.gitignore` 中（模板已经加好）。如果测试在 CI 的另一个步骤里运行：`node .github/eos/eos.mjs evidence junit --write`。可运行的 Node + Python 双栈示例见 [examples/trace-evidence](../eos/examples/trace-evidence/README.md)，决策见 ADR-016。
 
 ### 第 8–10 步：发布 + 观测 + 迭代
 ```
@@ -789,7 +789,8 @@ LLM tracing（token/成本/context/tool-span）。
 | `transition --scope <type> --id <id> --to <STATE>` | 迁移一个 scope，由已记录的证据把守 |
 | `approve --scope <type> --id <id>` | 记录一次批准——必须是与申请人**不同**的人 |
 | `release-status` / `verify-release --release <id>` | 汇总就绪度 / 候选绑定的发布验证（G8） |
-| **`product-tree`** | 一次验证所对应的产品树身份。`--json` 打印摘要，供你的测试运行器写进 `docs/evidence/test-run.json` |
+| **`product-tree`** | 一次验证所对应的产品树身份。`--json` 打印摘要；如果由你自己的运行器写摘要，必须把它写进去 |
+| **`evidence junit [<report.xml>…] [--write]`** | 用 JUnit XML 报告回答 `docs/trace-matrix.md` 的每条引用，并写出 `docs/evidence/test-run.json`——用于测试在 CI 另一个步骤中运行的情形。比任何产品文件更旧的报告一律拒绝（退出码 2）。不带文件时读取 `evidence.junit`；`verified` 门禁每次运行都会做同样的转换 |
 | **`providers`** | 本项目咨询哪些外部权威，以及它们此刻怎么说。默认不存在——一个都没配置时，每道门禁依然离线得出结论 |
 | `waive --gate … --reason … --risk-owner … --expires …` | 记录一份有期限、有归属的豁免（不可豁免的门禁永远拿不到） |
 | `handoff --scope <type> --id <id>` | 把当前步骤交接给另一个 agent/会话 |
@@ -1105,7 +1106,7 @@ node .github/eos/eos.mjs init config-only --write   # 还没有代码——或 <
 | **Product 状态改名** | `PRD_APPROVED` → `PRD_BASELINED`，`ARCHITECTURE_APPROVED` → `ARCHITECTURE_BASELINED`，并新增 `UX_BASELINED` | 无需操作。Product 状态是*推导*出来的，Ledger 不必改写。改名的原因是：机器判定文档完整 ≠ 人批准了它。 |
 | **验收标准必须被定义，而不只是被提及**（EOS-AUD-004） | `prd-ready` 报告 "referenced but never defined: AC…" | 把每条标准写成以其 id 开头并带正文的列表项、表格行或标题。 |
 | **运营任务必须是决策**（EOS-AUD-005） | `story-ready` 报告 `Telemetry: "SKIP" with no reason` | 使用 `ADOPT — <任务>; owner: <谁>; verify: <如何验证>`、`SKIP — <理由>`，或 `DEFER — owner: <谁>; trigger: <什么条件结束它>`。 |
-| **Trace 行需要机器结果**（EOS-AUD-006） | `verified` 报告 "a hand-written PASS … is a claim, not a result" | 从你的测试运行器输出 `docs/evidence/test-run.json`——见 [examples/trace-evidence](../eos/examples/trace-evidence/README.md)。这是一个约 30 行的映射步骤，用你自己的语言写。 |
+| **Trace 行需要机器结果**（EOS-AUD-006） | `verified` 报告 "a hand-written PASS … is a claim, not a result" | 从你的测试运行器输出 `docs/evidence/test-run.json`——见 [examples/trace-evidence](../eos/examples/trace-evidence/README.md)。自 eos-2.2.0 起，声明 `evidence.junit` 即可取代这个映射步骤。 |
 | **发布门禁检查提示词所要求的一切**（EOS-AUD-007） | `release-ready` 新增候选质量、依赖审计、NFR 证据、灰度、健康/就绪、拓扑与执行权威 | 声明 `commands.audit`，记录 `docs/evidence/nfr-summary.json`，并扩展 `ops/runbook.md`。离线的审计是 `DEFERRED`，绝不是绿。 |
 | **RELEASED 继续走向 G9 与 G10**（EOS-AUD-010） | `RELEASED` 之后，`eos next` 要求遥测而不是再发一次版 | 产出 `docs/telemetry.json`（`/telemetry-plan`），再产出 `docs/iteration.json`（`eos-review` Agent）。 |
 | **BMAD 运行时会被验证**（EOS-AUD-002） | `eos-doctor --deep` 可能报告 BLOCKED：技能已安装，但 `_bmad/` 运行时缺失 | 用 BMAD 自己的安装器安装项目运行时，或取消这些技能的映射。EOS 本身没有 BMAD 也能工作——见 [ADR-003](../adr/003-bmad-runtime-boundary.md)。 |

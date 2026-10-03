@@ -248,6 +248,39 @@ export function compareProductTree(root, recorded, { recordedCommit = null } = {
   return { status: 'CHANGED', reasons };
 }
 
+/**
+ * Which of these paths count toward the product tree: tracked, or untracked and not ignored.
+ *
+ * A file EOS reads as EVIDENCE must not be one of them. A JUnit report that git does not ignore is
+ * written by the very run it describes, so it would change the digest it is bound to on every run.
+ * @returns {string[]|null} null = git could not answer
+ */
+export function productTreeMembers(root, paths) {
+  if (!paths.length) return [];
+  // Literal pathspecs: a report name containing `*` or `[` must not be read as a pattern.
+  const tracked = zsplit(git(root, ['--literal-pathspecs', 'ls-files', '-z', '--', ...paths]));
+  const untracked = zsplit(git(root, ['--literal-pathspecs', 'ls-files', '--others', '--exclude-standard', '-z', '--', ...paths]));
+  if (tracked === null || untracked === null) return null;
+  return [...new Set([...tracked, ...untracked])].filter((p) => !isSelfReference(p)).sort();
+}
+
+/**
+ * The most recently modified product file. A test report older than it cannot describe the tree as
+ * it is now: something changed after the tests ran.
+ * @returns {{path: string|null, mtimeMs: number}|null} null = git could not enumerate the tree
+ */
+export function newestProductFile(root) {
+  const files = productFiles(root);
+  if (files === null) return null;
+  let newest = { path: null, mtimeMs: 0 };
+  for (const f of files) {
+    let st;
+    try { st = lstatSync(join(root, f.path)); } catch { continue; } // deleted: newer than nothing
+    if (st.mtimeMs > newest.mtimeMs) newest = { path: f.path, mtimeMs: st.mtimeMs };
+  }
+  return newest;
+}
+
 /** Uncommitted product-tree changes — a release candidate must be a committed thing. */
 export function uncommittedProductChanges(root) {
   const paths = porcelainPaths(root);

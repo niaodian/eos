@@ -24,6 +24,11 @@ __pycache__/
 *.pyc
 .pytest_cache/
 
+# Test reports the runners write and the verified gate reads ("evidence.junit", ADR-016). They are
+# written by the run they describe, so inside the product tree they would change the very digest they
+# are bound to. Root-anchored on purpose: a bare `reports/` would also hide a source module of that name.
+/reports/junit/
+
 # generated docs (rebuild via docs/eos/tools/build-pdf.sh)
 docs/eos/*.pdf
 docs/zh/*.pdf
