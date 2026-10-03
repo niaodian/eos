@@ -93,6 +93,10 @@ export function policySnapshot({ gates, workflow, project }) {
       // Where the verified gate reads test results from (ADR-016). Present only when declared, so
       // every project that never declared it keeps the digest it was locked with.
       ...(project.evidence !== undefined ? { evidence: canonical(project.evidence) } : {}),
+      // The EOS template's own declaration (ADR-022): the next change that replaces it is this
+      // project's first declaration, compared with no earlier project policy. Present only when
+      // true, so a project's own declaration keeps the digest it was locked with.
+      ...(project.templateDefault === true ? { templateDefault: true } : {}),
     };
   }
   return { gates: gateMap, workflow: { defaultProfile: workflow?.defaultProfile ?? null, profiles, stateMachines }, project: proj };
@@ -204,7 +208,21 @@ export function diffPolicy(a, b) {
 
   const pa = a.project;
   const pb = b.project;
-  if (pa && pb) {
+  if (pa?.templateDefault && pb && !pb.templateDefault) {
+    // THE FIRST DECLARATION (ADR-022). The template ships EOS's own declaration, marked as such. A
+    // change that replaces it with this project's first declaration has no earlier project policy to
+    // be weaker than — the declaration it replaces describes EOS, not this project — just as when the
+    // base has no declaration at all. Gates, profiles and state machines are still compared above:
+    // what the template shipped is the floor the project starts from. While a declaration stays the
+    // template's own (in EOS's repository), it is compared like any other.
+    add('INFO', `project:first-declaration:${pb.projectType}`, `this project's first declaration (${pb.projectType}, ${pb.workflowProfile}) replaces the EOS template's own — there was no earlier project policy to weaken`);
+  } else if (pa && pb) {
+    // Marking a project's declaration as the template's own again would make the NEXT change to it a
+    // first declaration, compared with nothing — the two-step way around this check. It needs the
+    // same reason and second person as switching a gate off.
+    if (!pa.templateDefault && pb.templateDefault) {
+      add('WEAKENING', 'project:templateDefault:declared->template', 'the declaration is marked as the EOS template\'s own again — the next change to it would be compared with no earlier project policy');
+    }
     if (['application', 'library'].includes(pa.projectType) && pb.projectType === 'config-only') {
       add('WEAKENING', `project:projectType:${pa.projectType}->config-only`, 'the product-quality gate stops running the project\'s tests at all');
     } else if (pa.projectType !== pb.projectType) {
@@ -435,6 +453,30 @@ export function planLock(root, { against = null, reason = null, actor = null, wr
     : null;
   if (write && !refused && !errors.length) writeFileAtomic(join(root, POLICY_LOCK_PATH), `${JSON.stringify(lock, null, 2)}\n`);
   return { base, changes, errors, lock, drafted, refused, written: write && !refused && !errors.length };
+}
+
+/**
+ * The lock of a project's first declaration (ADR-022): its policy as it now stands, nothing
+ * acknowledged. `eos init` writes it only when the declaration it replaces is the EOS template's
+ * own — the template's lock described EOS's policy, and any acknowledgement in it was EOS's. It
+ * pins a digest and approves nothing: `policy check` still compares the change with its base, and a
+ * gate or profile weakened against the template still needs a second person there.
+ *
+ * @param {string} root
+ * @param {{project?: object, write?: boolean}} [opts] project: the declaration being written, when
+ *   it is not on disk yet (a dry run)
+ */
+export function baselineLock(root, { project = undefined, write = false } = {}) {
+  const { files, errors } = readPolicy(root);
+  if (errors.length) return { lock: null, errors, written: false };
+  const lock = {
+    $schema: './schemas/policy-lock.schema.json',
+    schemaVersion: 1,
+    policyDigest: policyDigest(policySnapshot({ ...files, ...(project !== undefined ? { project } : {}) })),
+    acknowledged: [],
+  };
+  if (write) writeFileAtomic(join(root, POLICY_LOCK_PATH), `${JSON.stringify(lock, null, 2)}\n`);
+  return { lock, errors: [], written: write };
 }
 
 // --------------------------------------------------------------------------------- organization baseline

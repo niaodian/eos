@@ -79,6 +79,7 @@ npx degit niaodian/eos#eos-2.4.0 my-new-app && cd my-new-app
 git init && git add -A && git commit -q -m "chore: scaffold from eos"
 node .github/hooks/validate-config.mjs        # 期望 PASS
 node .github/eos/eos.mjs init config-only --write   # 声明项目：还没有代码（或 init <pack>；--track regulated）
+git add -A && git commit -q -m "chore: declare the project"   # 连同本项目的策略锁与 SBOM
 code .                                        # 必须在项目目录*内部*执行——见下方警告
 ```
 
@@ -115,6 +116,10 @@ gh repo create my-new-app --private --source=. --remote=origin --push
 > 把它推迟到 **Phase 4（架构阶段）**，由 ADR 正式锁定。只有当真实的技术栈清单（`pyproject.toml`、
 > `go.mod`、带依赖的 `package.json` 等）已经存在、而声明仍说"没有代码"时，它才会变成错误。此时
 > `eos next` 会把你引回 `eos init`，它会点名相匹配的包，而 `eos init <pack> --write` 会保留你的轨道。
+>
+> 第一次 `init --write` 还会为本项目建立自己的策略锁（`.eos/policy.lock.json`）与 SBOM
+> （`.eos/sbom.json`），模板自带的那两份描述的是 EOS。请把它们和声明一起提交。无论脚手架是否已先提交，
+> 首次推送与首个 PR 都能通过 CI（[ADR-022](../adr/022-first-declaration-starts-the-policy.md)）。
 
 > **两个名字很像、但做的事完全不同。**
 > `/eos-init`（Copilot Chat）是上面那个**硬化引导**——这才是你 Day-1 需要的那个。

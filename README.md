@@ -83,6 +83,7 @@ npx degit niaodian/eos#eos-2.4.0 my-app && cd my-app && git init
 
 # 2. Declare the project — no code yet, so the stack is decided at architecture time
 npx --offline eos init config-only --write        # add --track regulated for the strict track
+git add -A && git commit -m "chore: start from eos"   # the declaration, with its own policy lock and SBOM
 
 # 3. Ask for the one next step: what to do, why, and how to start it
 npx --offline eos next
@@ -100,6 +101,10 @@ npx --offline eos verify                          # re-run every gate your chang
 - **Already have code?** `npx --offline eos init` lists the starter packs (`node-service`,
   `python-service`, `go-service`, `java-service`, `rag-app`, `agentic-app`, `data-pipeline`, `library`,
   `regulated-app`) and names the ones that match the code it finds.
+- **Green from the first push.** `eos init --write` replaces the template's declaration with yours and
+  starts your own policy lock and SBOM — the template's described EOS
+  ([ADR-022](docs/adr/022-first-declaration-starts-the-policy.md)). CI then runs the governance gate on your
+  project, not EOS's own test suite ([ADR-021](docs/adr/021-eos-tests-run-only-in-eos.md)).
 - **In your agent** the same loop is one slash command away. The one-time setup for each agent is in the
   [user manual, Chapter 6.6](docs/eos/user-manual.md#chapter-66-using-eos-with-claude-code-codex-and-antigravity):
   - **GitHub Copilot (VS Code):** the **eos-guide** agent, or `/eos-next` · `/eos-resume` · `/eos-status`.

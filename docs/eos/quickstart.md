@@ -74,6 +74,7 @@ npx degit niaodian/eos#eos-2.4.0 my-new-app && cd my-new-app
 git init && git add -A && git commit -q -m "chore: scaffold from eos"
 node .github/hooks/validate-config.mjs        # expect PASS
 node .github/eos/eos.mjs init config-only --write   # declare it: no code yet (or init <pack>; --track regulated)
+git add -A && git commit -q -m "chore: declare the project"   # with this project's policy lock and SBOM
 code .                                        # from INSIDE the project — see the warning below
 ```
 
@@ -117,6 +118,11 @@ Then, in **Copilot Chat**:
 > `go.mod`, a `package.json` with dependencies, …) exist while the declaration still claims there is
 > no code. `eos next` then routes you back to `eos init`, which names the matching packs, and
 > `eos init <pack> --write` keeps your track.
+>
+> The first `init --write` also starts this project's own policy lock (`.eos/policy.lock.json`) and
+> SBOM (`.eos/sbom.json`) — the template's described EOS — so commit them with the declaration. Scaffold
+> committed first or not, the first push and the first pull request then pass CI
+> ([ADR-022](../adr/022-first-declaration-starts-the-policy.md)).
 
 > **Two similarly-named things, doing different jobs.**
 > `/eos-init` (Copilot Chat) is the **hardening walkthrough** above — the one you want on day one.

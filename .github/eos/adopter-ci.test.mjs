@@ -99,7 +99,7 @@ test('a project that declared itself skips EOS\'s own tests, and its governance 
   assert.deepEqual(runPath(dir, { base: scaffold, only: (c) => !c.declaration }), []);
 });
 
-test('the first declaration passes the policy, SBOM and doctor checks — scaffold first or declare first, first push or first pull request', { todo: 'the first declaration starts the project\'s policy (next change)' }, () => {
+test('the first declaration passes the policy, SBOM and doctor checks — scaffold first or declare first, first push or first pull request', () => {
   // 1. The documented order. Its first pull request compares with the scaffold, whose declaration is
   //    still the template's own; its first push has nothing to compare with.
   const { dir, scaffold } = documentedDay1();

@@ -267,3 +267,120 @@ test('a regulated profile with the boundary declared works normally', () => {
   const dir = project({ '.eos/project.json': { ...APP_PROJECT, workflowProfile: 'regulated', complianceProfile: 'regulated', evidencePolicy: 'ci' } });
   assert.notEqual(run(dir, ['status']).code, 3);
 });
+
+// ---------------------------------------------------------- the first declaration (ADR-022)
+// The template ships EOS's own declaration and a lock that describes EOS's policy. A project's first
+// declaration has no earlier project policy to be weaker than; a project's later ones always do.
+const TEMPLATE_DECLARATION = JSON.parse(readFileSync(join(REPO_ROOT, '.eos/project.json'), 'utf8'));
+const CONFIG_ONLY = { projectType: 'config-only', stacks: [], productParadigms: ['deterministic'], workflowProfile: 'standard-product' };
+const changesBetween = (before, after) => diffPolicy(policySnapshot({ ...shipped(), project: before }), policySnapshot({ ...shipped(), project: after }));
+
+test('replacing the template\'s declaration is the first declaration: nothing in it weakens a project policy', () => {
+  assert.equal(TEMPLATE_DECLARATION.templateDefault, true);
+  const changes = changesBetween(TEMPLATE_DECLARATION, CONFIG_ONLY);
+  assert.deepEqual(changes.filter((c) => c.requiresAck), [], 'application → config-only and the removed test command are not weakenings of THIS project');
+  assert.deepEqual(changes.map((c) => `${c.kind} ${c.id}`), ['INFO project:first-declaration:config-only']);
+});
+
+test('the first declaration still compares the gates and the workflow with the template\'s', () => {
+  const before = { ...shipped(), project: TEMPLATE_DECLARATION };
+  const after = clone({ ...shipped(), project: CONFIG_ONLY });
+  after.workflow.profiles['standard-product'].changeTypes.FEATURE.gates.verified = 'not_applicable';
+  const ids = diffPolicy(policySnapshot(before), policySnapshot(after)).filter((c) => c.requiresAck).map((c) => c.id);
+  assert.deepEqual(ids, ['profile:standard-product:FEATURE/verified:required->not_applicable']);
+});
+
+test('a declaration that stays the template\'s own is compared like any other — EOS keeps its own floor', () => {
+  const { test: _dropped, ...commands } = TEMPLATE_DECLARATION.commands;
+  const ids = changesBetween(TEMPLATE_DECLARATION, { ...TEMPLATE_DECLARATION, commands }).filter((c) => c.requiresAck).map((c) => c.id);
+  assert.deepEqual(ids, ['project:command-removed:test']);
+});
+
+test('marking a project\'s declaration as the template\'s own again is a weakening', () => {
+  const ids = changesBetween(APP_PROJECT, { ...APP_PROJECT, templateDefault: true }).filter((c) => c.requiresAck).map((c) => `${c.kind} ${c.id}`);
+  assert.deepEqual(ids, ['WEAKENING project:templateDefault:declared->template']);
+});
+
+test('the template marker is part of the digest only where it is set', () => {
+  const digest = (project) => policyDigest(policySnapshot({ ...shipped(), project }));
+  assert.equal(digest(APP_PROJECT), digest({ ...APP_PROJECT, templateDefault: false }), 'every declared project keeps the digest it was locked with');
+  assert.notEqual(digest(APP_PROJECT), digest({ ...APP_PROJECT, templateDefault: true }));
+});
+
+/** A template copy: the template's declaration and a lock of the template's policy, committed on main. */
+function templateRepo() {
+  const dir = project({ '.eos/project.json': TEMPLATE_DECLARATION });
+  assert.equal(run(dir, ['policy', 'lock', '--write']).code, 0);
+  commitAll(dir, 'chore: scaffold from eos');
+  git(dir, ['checkout', '-q', '-b', 'declare']);
+  return dir;
+}
+const lockOf = (dir) => readFileSync(join(dir, '.eos/policy.lock.json'), 'utf8');
+
+test('eos init on a template copy starts this project\'s lock — the first pull request and the first push pass', () => {
+  const dir = templateRepo();
+  const template = lockOf(dir);
+  const r = runJson(dir, ['init', 'config-only', '--write']);
+  assert.equal(r.code, 0, r.out);
+  assert.deepEqual(r.json.derivedFiles.map((f) => `${f.action} ${f.path}`), ['written .eos/policy.lock.json', 'written .eos/sbom.json']);
+  assert.deepEqual(r.json.policyNotes, []);
+  const lock = JSON.parse(lockOf(dir));
+  assert.notEqual(lockOf(dir), template);
+  assert.deepEqual(lock.acknowledged, [], 'the baseline approves nothing');
+  commitAll(dir, 'chore: declare the project');
+  for (const args of [['policy', 'check', '--against', 'main'], ['policy', 'check'], ['sbom', '--check'], ['doctor']]) {
+    const c = run(dir, args);
+    assert.equal(c.code, 0, `${args.join(' ')}\n${c.out}`);
+  }
+});
+
+test('the first declaration\'s lock approves nothing: a gate weakened before init still needs a second person', () => {
+  const dir = templateRepo();
+  weaken(dir);
+  const r = runJson(dir, ['init', 'config-only', '--write']);
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.json.policyNotes.join(), /1 policy change\(s\) against merge-base with main still need a reason and a second person/);
+  const c = run(dir, ['policy', 'check', '--against', 'main']);
+  assert.equal(c.code, 1, c.out);
+  assert.match(c.out, /WEAKENING profile:standard-product:FEATURE\/verified:required->not_applicable .*not acknowledged/);
+  assert.doesNotMatch(c.out, /project:projectType|command-removed/, 'the declaration itself is not what is held');
+});
+
+test('without --write, init on a template copy only says what it would record', () => {
+  const dir = templateRepo();
+  const before = lockOf(dir);
+  const r = run(dir, ['init', 'config-only']);
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /would write {2}\.eos\/policy\.lock\.json/);
+  assert.equal(lockOf(dir), before);
+  assert.equal(git(dir, ['status', '--porcelain']).out.trim(), '');
+});
+
+test('a declared project cannot reset its lock through init — --force keeps it, and the weakening needs a second person', () => {
+  const dir = lockedRepo();
+  const before = lockOf(dir);
+  const r = run(dir, ['init', 'config-only', '--write', '--force']);
+  assert.equal(r.code, 0, r.out);
+  assert.equal(lockOf(dir), before, 'a declared project\'s lock is never rewritten by init');
+  assert.doesNotMatch(r.out, /policy\.lock\.json {2}\(/);
+  assert.match(r.out, /re-declaring never resets the lock/);
+  const c = run(dir, ['policy', 'check', '--against', 'main']);
+  assert.equal(c.code, 1, c.out);
+  assert.match(c.out, /WEAKENING project:projectType:application->config-only/);
+  // Recording it drafts the acknowledgement; only a second person makes it pass.
+  run(dir, ['policy', 'lock', '--write', '--reason', 'the product moved to another repository for good']);
+  assert.match(run(dir, ['policy', 'check', '--against', 'main']).out, /awaiting an approver/);
+});
+
+test('the two-step route is closed: marking the declaration as the template\'s needs a second person first', () => {
+  const dir = lockedRepo();
+  write(dir, '.eos/project.json', { ...APP_PROJECT, templateDefault: true });
+  const step1 = run(dir, ['policy', 'check', '--against', 'main']);
+  assert.equal(step1.code, 1, step1.out);
+  assert.match(step1.out, /WEAKENING project:templateDefault:declared->template/);
+  // In the same change, init now sees a "template" and starts a fresh lock — and the base still holds.
+  assert.equal(run(dir, ['init', 'config-only', '--write']).code, 0);
+  const step2 = run(dir, ['policy', 'check', '--against', 'main']);
+  assert.equal(step2.code, 1, step2.out);
+  assert.match(step2.out, /WEAKENING project:projectType:application->config-only/);
+});

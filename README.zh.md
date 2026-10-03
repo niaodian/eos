@@ -79,6 +79,7 @@ npx degit niaodian/eos#eos-2.4.0 my-app && cd my-app && git init
 
 # 2. 声明项目 —— 还没有代码，技术栈留到架构阶段再定
 npx --offline eos init config-only --write        # 想走严格轨道就加上 --track regulated
+git add -A && git commit -m "chore: start from eos"   # 声明，连同它自己的策略锁与 SBOM
 
 # 3. 询问唯一的下一步：做什么、为什么、怎么开始
 npx --offline eos next
@@ -95,6 +96,9 @@ npx --offline eos verify                          # 重跑你的改动可能影�
 - **已经有代码了？** `npx --offline eos init` 会列出所有起步包（`node-service`、`python-service`、
   `go-service`、`java-service`、`rag-app`、`agentic-app`、`data-pipeline`、`library`、
   `regulated-app`），并指出与它所发现的代码相匹配的那些。
+- **首次推送即为绿。** `eos init --write` 用你的声明替换模板自身的声明，并建立你自己的策略锁与 SBOM，
+  模板自带的那两份描述的是 EOS（[ADR-022](docs/adr/022-first-declaration-starts-the-policy.md)）。
+  之后 CI 在你的项目上运行治理门禁，而不是 EOS 自己的测试套件（[ADR-021](docs/adr/021-eos-tests-run-only-in-eos.md)）。
 - **在你的 agent 里**，同样的循环只需一条斜杠命令。各 agent 的一次性配置见
   [用户手册第 6.6 章](docs/zh/user-manual.md#第-66-章-在-claude-code、codex-和-antigravity-中使用-eos)：
   - **GitHub Copilot（VS Code）：** 使用 **eos-guide** Agent，或 `/eos-next` · `/eos-resume` · `/eos-status`。

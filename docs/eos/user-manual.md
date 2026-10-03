@@ -214,6 +214,13 @@ Seeing `PASS` means the rule layers, prompts, agents, and hooks are healthy, and
 starter packs. Stack not decided yet (most 0-1 projects)? `init config-only --write`. Stack known?
 `init <pack> --write`, then `stack sync --write` renders its commands into the workspace rule below.
 
+`init --write` also starts this project's own policy lock (`.eos/policy.lock.json`) and SBOM
+(`.eos/sbom.json`) — the template's described EOS. Commit them with the declaration: whether the scaffold
+was committed first or not, the first push and the first pull request pass CI
+([ADR-022](../adr/022-first-declaration-starts-the-policy.md)). Chose a pack? Edit its commands before you
+commit the declaration, then `eos policy lock --write`: until it is committed it is the first declaration,
+and nothing in it needs approving.
+
 Open `.github/instructions/00-workspace.instructions.md` and change it to the real facts of **your project**:
 - `Local commands`: if the stack is **already decided**, replace this with the install/lint/test/typecheck commands for your stack--**copy the finished line directly** from `docs/eos/stack-presets.md` (a recipe book for Node/Python/Go/Java/Rust/.NET full stacks; copy the matching block). If the stack is **not decided yet** (most 0-1 projects are not before architecture), **keep the Node placeholder**--this is a ⛳ PROVISIONAL value, and the authoritative lock happens in **Phase 4 (Architecture)** together with `docs/adr/00X-tech-stack.md`, avoiding conflict between always-on rules and the future real stack.
 - `Layout`: update it if the directory structure differs.
@@ -226,6 +233,7 @@ npx degit niaodian/eos#eos-2.4.0 my-new-app && cd my-new-app
 git init && git add -A && git commit -q -m "chore: scaffold from eos"
 node .github/hooks/validate-config.mjs
 node .github/eos/eos.mjs init config-only --write   # declare it: no code yet (or init <pack> [--track regulated])
+git add -A && git commit -q -m "chore: declare the project"   # with this project's policy lock and SBOM
 node .github/eos/eos.mjs next                       # the one next action
 # Key: run `code .` from inside the project directory so my-new-app becomes the workspace root (including .github/).
 # Do not open its parent directory, or custom agents / instructions / hooks will not be discovered.
@@ -630,8 +638,10 @@ So EOS **never depends on "Rule A overriding Rule B"**. The only reliable contro
 ### Step 0: Create project + choose stack (5 minutes)
 ```sh
 npx degit niaodian/eos#eos-2.4.0 todo-api && cd todo-api
+git init && git add -A && git commit -q -m "chore: scaffold from eos"
 node .github/hooks/validate-config.mjs          # expect PASS
 node .github/eos/eos.mjs init node-service --write   # declare the stack (or python-service, go-service… — `eos init` lists them)
+git add -A && git commit -q -m "chore: declare the project"   # with its policy lock and SBOM — edit the commands first (§3.3)
 ```
 **Stack already decided?** `eos init <pack> --write` declares it; `node .github/eos/eos.mjs stack sync --write` then renders its `Local commands` into `.github/instructions/00-workspace.instructions.md`.
 **Not decided yet?** Declare `eos init config-only --write` instead--the **authoritative stack lock happens in Step 4 Architecture** (together with ADR), and `eos init <pack> --write` then keeps your track. SaaS projects usually know the stack at Step 0.
@@ -691,9 +701,11 @@ The gate reads the *machine* result, not a hand-written PASS — and since eos-2
 ### Step 0: Create project + create AI directories
 ```sh
 npx degit niaodian/eos#eos-2.4.0 cs-agent && cd cs-agent
+git init && git add -A && git commit -q -m "chore: scaffold from eos"
 mkdir -p ai/prompts evals                       # AI code goes here; Agentic rules overlay automatically
 node .github/hooks/validate-config.mjs          # expect PASS
 node .github/eos/eos.mjs init rag-app --write    # the Python LLM pack: agentic paradigm + an eval command
+git add -A && git commit -q -m "chore: declare the project"   # with its policy lock and SBOM — edit the commands first (§3.3)
 ```
 Choose Python as the stack (most common for LLM products): `rag-app` is the Python LLM pack--adjust its commands to your project, and add the **AI/LLM additional layer** from stack-presets.
 

@@ -227,6 +227,11 @@ node .github/hooks/validate-config.mjs      # 期望：PASS
 0-1 项目如此）？`init config-only --write`。已定栈？`init <pack> --write`，再用 `stack sync --write`
 把它的命令渲染进下面的工作区规则。
 
+`init --write` 同时为本项目建立自己的策略锁（`.eos/policy.lock.json`）与 SBOM（`.eos/sbom.json`），
+模板自带的那两份描述的是 EOS。把它们和声明一起提交：无论脚手架是否已先提交，首次推送与首个 PR 都能通过 CI
+（[ADR-022](../adr/022-first-declaration-starts-the-policy.md)）。选了起步包？在提交声明之前修改它的命令，
+再运行 `eos policy lock --write`：提交之前它仍是首次声明，其中没有任何内容需要审批。
+
 打开 `.github/instructions/00-workspace.instructions.md`，把它改成**你这个项目**的真实情况：
 - `Local commands`：**已定栈**就换成你的栈的 install/lint/test/typecheck 命令——**成品行直接抄** `docs/eos/stack-presets.md`（Node/Python/Go/Java/Rust/.NET 全栈配方册，复制对应一块即可）。**还没定栈**（多数 0-1 项目在架构前都没定）就**保留 Node 占位**——这是 ⛳ PROVISIONAL 值，**权威锁定在阶段 4（架构）** 连同 `docs/adr/00X-tech-stack.md`，避免 always-on 规则与将来真实栈打架
 - `Layout`：若目录结构不同，更新
@@ -239,6 +244,7 @@ npx degit niaodian/eos#eos-2.4.0 my-new-app && cd my-new-app
 git init && git add -A && git commit -q -m "chore: scaffold from eos"
 node .github/hooks/validate-config.mjs
 node .github/eos/eos.mjs init config-only --write   # 声明项目：还没有代码（或 init <pack> [--track regulated]）
+git add -A && git commit -q -m "chore: declare the project"   # 连同本项目的策略锁与 SBOM
 node .github/eos/eos.mjs next                       # 唯一的下一步
 # 关键：从项目目录内执行 `code .`，让 my-new-app 成为工作区根（含 .github/）。
 # 不要打开它的父目录，否则自定义 agent / instructions / hooks 都不会被发现。
@@ -650,8 +656,10 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 ### 第 0 步：建项目 + 选栈（5 分钟）
 ```sh
 npx degit niaodian/eos#eos-2.4.0 todo-api && cd todo-api
+git init && git add -A && git commit -q -m "chore: scaffold from eos"
 node .github/hooks/validate-config.mjs          # 期望 PASS
 node .github/eos/eos.mjs init node-service --write   # 声明技术栈（或 python-service、go-service…——`eos init` 会列出全部）
+git add -A && git commit -q -m "chore: declare the project"   # 连同策略锁与 SBOM；先按 §3.3 修改命令
 ```
 **已定栈**？`eos init <pack> --write` 声明它；再用 `node .github/eos/eos.mjs stack sync --write` 把它的 `Local commands` 渲染进 `.github/instructions/00-workspace.instructions.md`。
 **还没定**？改为声明 `eos init config-only --write`——栈的**权威锁定在第 4 步架构**（连同 ADR），届时 `eos init <pack> --write` 会保留你的轨道。SaaS 项目通常第 0 步就知道栈。
@@ -715,9 +723,11 @@ SaaS 的 **G7** 要求：每条 AC ≥1 测试、**API 契约测试**（对 open
 ### 第 0 步：建项目 + 建 AI 目录
 ```sh
 npx degit niaodian/eos#eos-2.4.0 cs-agent && cd cs-agent
+git init && git add -A && git commit -q -m "chore: scaffold from eos"
 mkdir -p ai/prompts evals                       # AI 代码放这里，自动叠加 Agentic 规则
 node .github/hooks/validate-config.mjs          # 期望 PASS
 node .github/eos/eos.mjs init rag-app --write    # Python 的 LLM 包：agentic 范式 + eval 命令
+git add -A && git commit -q -m "chore: declare the project"   # 连同策略锁与 SBOM；先按 §3.3 修改命令
 ```
 栈选 Python（LLM 产品最常见）：`rag-app` 就是 Python 的 LLM 包——按你的项目调整它的命令，再从 stack-presets 加上 **AI/LLM 附加层**。
 
