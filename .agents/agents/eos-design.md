@@ -50,7 +50,8 @@ announce**. For this stage that means:
    ```
 
 4. **Announce.** Run `next` and name the following stage and the agent that owns it
-   (architecture is a different agent — say so, and offer the handoff button).
+   (architecture belongs to the `eos-architecture` agent — say so, and say how to reach it: the
+   handoff button in Copilot, the agent list in Antigravity, a spawn request in Codex).
 
    ```
    node .github/eos/eos.mjs next

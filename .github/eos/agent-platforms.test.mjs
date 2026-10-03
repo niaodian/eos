@@ -276,3 +276,19 @@ test('the upgrade dry run previews what --write will do to the agent-platform fi
   assert.ok(!preview.files.some((f) => f.path.startsWith('.clinerules/')), 'the team\'s Cline hook is not in the plan');
   assert.match(run(dir, ['upgrade', '--from', REPO_ROOT, '--base', REPO_ROOT]).out, /Not compared \(generated\)[^\n]*\n(?: {4}would [^\n]*\n)*? {4}would update {2}\.mcp\.json/);
 });
+
+test('the orchestrators read correctly where they are rendered: Copilot\'s handoff UI is only ever named as Copilot\'s', () => {
+  // Antigravity and Codex get each .github/agents body as it is, without the handoffs frontmatter
+  // that draws Copilot's buttons. An instruction to "offer the handoff button above" means nothing
+  // there, so every sentence that names Copilot's UI must say it is Copilot's.
+  const dir = sandbox();
+  assert.equal(run(dir, ['agents', 'sync', '--platform', 'codex', '--write']).code, 0);
+  const COPILOT_UI = /handoff button|agent picker|mode selector/i;
+  for (const name of ['eos-architecture', 'eos-design', 'eos-discovery', 'eos-guide', 'eos-plan', 'eos-review']) {
+    for (const rel of [`.agents/agents/${name}.md`, `.codex/agents/${name}.toml`]) {
+      const sentences = read(dir, rel).replace(/\s+/g, ' ').split(/(?<=[.;:!?])\s+/);
+      const unqualified = sentences.filter((s) => COPILOT_UI.test(s) && !/Copilot/.test(s));
+      assert.deepEqual(unqualified, [], `${rel} names Copilot's UI as if every platform had it`);
+    }
+  }
+});
