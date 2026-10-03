@@ -11,8 +11,7 @@ import { spawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { PassThrough } from 'node:stream';
-import { project, runJson, cleanup, REPO_ROOT, APP_PROJECT, CLI, SPAWN_TIMEOUT_MS } from './test-support.mjs';
-import { cleanEnv } from './test-spawn.mjs';
+import { project, runJson, cleanup, testEnv, REPO_ROOT, APP_PROJECT, CLI, SPAWN_TIMEOUT_MS } from './test-support.mjs';
 import { TOOLS, NOT_TOOLS, MODERN_VERSIONS, LEGACY_VERSIONS, argumentProblem, serve } from './lib/mcp.mjs';
 import { commands } from './commands/index.mjs';
 
@@ -23,7 +22,7 @@ const modern = (params = {}) => ({ ...params, _meta: { [META]: MODERN_VERSIONS[0
 
 /** A real `eos mcp` process: send requests, read answers by id, close stdin and wait for it to exit. */
 function server(cwd) {
-  const child = spawn(process.execPath, [CLI, 'mcp'], { cwd, stdio: ['pipe', 'pipe', 'pipe'], timeout: SPAWN_TIMEOUT_MS, env: cleanEnv({ ...process.env, EOS_ACTOR: 'tester' }) });
+  const child = spawn(process.execPath, [CLI, 'mcp'], { cwd, stdio: ['pipe', 'pipe', 'pipe'], timeout: SPAWN_TIMEOUT_MS, env: testEnv() });
   const messages = [];
   const waiting = [];
   let buffer = '';

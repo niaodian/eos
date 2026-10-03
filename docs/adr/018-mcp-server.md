@@ -46,8 +46,10 @@ Options considered:
    (so no argument becomes a flag such as `--write`), and no inherited property names.
 4. **Calls run one at a time**, in arrival order, so two gates never append to the ledger at once.
    Closing stdin means "no more questions": what was asked is answered, then the server exits.
-   SIGTERM, SIGINT or a broken stdout means "stop now": the running CLI process is killed, not
-   orphaned.
+   SIGTERM, SIGINT or a broken stdout means "stop now". A cancelled call, a stopped server and a call
+   past its time limit all stop the run *with everything it started* — `eos_check` runs the
+   project's tests through project-gate — as a process group on POSIX and with `taskkill /T` on
+   Windows, so nothing is orphaned; the server returns only once that tree is gone.
 5. **Both protocol eras.** A client that opens with `initialize` (revisions up to 2025-11-25) gets
    that handshake; a request carrying `_meta["io.modelcontextprotocol/protocolVersion"]` (2026-07-28)
    is served statelessly; `server/discover` answers both, and an unsupported version is refused with

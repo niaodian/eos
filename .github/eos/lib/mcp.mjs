@@ -132,15 +132,49 @@ export const INSTRUCTIONS = 'EOS is the governance engine of this repository. Ca
   + 'eos_check and eos_verify run gates and record machine evidence. Changing a state, approving, waiving or weakening the policy needs a person: '
   + 'those are CLI commands the developer runs, deliberately not tools here — name the command instead of working around it.';
 
+const WINDOWS = process.platform === 'win32';
+const duration = (ms) => (ms >= 60000 ? `${Math.round(ms / 60000)} min` : `${Math.max(1, Math.round(ms / 1000))} s`);
+
+/**
+ * Stop a CLI run and everything it started. `eos_check` on `verified` runs project-gate, which runs
+ * the project's tests: killing only the CLI left those running, reparented, for as long as they
+ * liked. On POSIX a run leads its own process group (it is spawned detached), so the whole group is
+ * signalled — TERM, then KILL for whatever is still there after `graceMs`. On Windows `taskkill /T`
+ * walks the process tree.
+ * @returns {Promise<void>} once the tree is gone, or the grace period is over
+ */
+export function stopTree(child, { graceMs = 2000 } = {}) {
+  if (!child?.pid) return Promise.resolve();
+  if (WINDOWS) {
+    return new Promise((done) => {
+      const killer = spawn('taskkill', ['/pid', String(child.pid), '/T', '/F'], { stdio: 'ignore', windowsHide: true });
+      killer.on('error', () => { try { child.kill(); } catch { /* already gone */ } done(); });
+      killer.on('close', () => done());
+    });
+  }
+  const group = (sig) => { try { process.kill(-child.pid, sig); return true; } catch { return false; } };
+  if (!group('SIGTERM')) return Promise.resolve();
+  return new Promise((done) => {
+    const deadline = Date.now() + graceMs;
+    const poll = () => {
+      if (!group(0)) { done(); return; }
+      if (Date.now() >= deadline) { group('SIGKILL'); done(); return; }
+      setTimeout(poll, 25);
+    };
+    poll();
+  });
+}
+
 /** The answer to one tool call, from the CLI run it made. */
-export function toolResult(argv, { code, signal, out, err, timeoutMs }) {
+export function toolResult(argv, { code, signal, out, err, timeoutMs, timedOut = false }) {
   let result = null;
-  try { result = JSON.parse(out); } catch { /* not JSON: an early refusal, returned as text */ }
+  if (!timedOut) try { result = JSON.parse(out); } catch { /* not JSON: an early refusal, returned as text */ }
   const exitCode = code ?? null;
-  const verdict = signal ? 'ERROR' : EXIT_NAMES[exitCode] ?? 'ERROR';
+  const verdict = signal || timedOut ? 'ERROR' : EXIT_NAMES[exitCode] ?? 'ERROR';
   const command = `eos ${argv.join(' ')}`;
-  const output = result ? undefined : (`${out}${err}`.trim()
-    || (signal ? `${command} was stopped (${signal}) — a run longer than ${Math.round(timeoutMs / 60000)} min is ended` : `${command} ended with exit ${exitCode}`));
+  const output = result ? undefined : timedOut
+    ? `${command} was stopped after ${duration(timeoutMs)}, its time limit, with everything it started — run it from the CLI to see it through`
+    : (`${out}${err}`.trim() || (signal ? `${command} was stopped (${signal})` : `${command} ended with exit ${exitCode}`));
   const structured = { command, exitCode, verdict, ...(result ? { result } : { output }) };
   return {
     content: [{ type: 'text', text: JSON.stringify(structured, null, 2) }],
@@ -158,7 +192,7 @@ export function toolResult(argv, { code, signal, out, err, timeoutMs }) {
  *
  * The input ending means "no more questions": what was already asked is answered, then the server
  * returns. `signal` aborting (SIGTERM, SIGINT) or the output breaking means "stop now": the running
- * CLI process is killed rather than left behind, and nothing queued starts.
+ * CLI run is stopped with every process it started (stopTree), and nothing queued starts.
  * @returns {Promise<void>}
  */
 export function serve({ input = process.stdin, output = process.stdout, cwd = process.cwd(), timeoutMs = 15 * 60 * 1000, signal } = {}) {
@@ -167,10 +201,13 @@ export function serve({ input = process.stdin, output = process.stdout, cwd = pr
   let stopped = false;
   let stopServe = () => {};
   const stop = () => {
+    if (stopped) return;
     stopped = true;
-    for (const job of pending.values()) { job.cancelled = true; job.child?.kill(); }
+    const trees = [];
+    for (const job of pending.values()) { job.cancelled = true; if (job.child) trees.push(stopTree(job.child)); }
     pending.clear();
-    stopServe();
+    // The server returns once what it started is gone, so nothing it ran outlives it.
+    Promise.all(trees).then(() => stopServe());
   };
   const send = (msg) => { if (!stopped) output.write(`${JSON.stringify({ jsonrpc: '2.0', ...msg })}\n`); };
   const error = (id, code, message, data) => send({ id, error: { code, message, ...(data ? { data } : {}) } });
@@ -187,15 +224,23 @@ export function serve({ input = process.stdin, output = process.stdout, cwd = pr
       pending.delete(id);
       answer();
     };
-    const child = spawn(process.execPath, [CLI, ...argv], { cwd, stdio: ['ignore', 'pipe', 'pipe'], timeout: timeoutMs, windowsHide: true });
+    // Its own process group (POSIX), so stopping it can stop everything it starts (stopTree).
+    const child = spawn(process.execPath, [CLI, ...argv], { cwd, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true, detached: !WINDOWS });
     job.child = child;
+    let timedOut = false;
+    const timer = setTimeout(() => { timedOut = true; stopTree(child); }, timeoutMs);
+    child.stdout.setEncoding('utf8');
+    child.stderr.setEncoding('utf8');
     child.stdout.on('data', (d) => { out += d; });
     child.stderr.on('data', (d) => { err += d; });
-    child.on('error', (e) => finish(() => error(id, -32603, `eos ${argv[0]} could not start: ${e.message}`)));
-    child.on('close', (code, signal) => finish(() => {
-      const result = toolResult(argv, { code, signal, out, err, timeoutMs });
-      send({ id, result: modern ? { resultType: 'complete', ...result } : result });
-    }));
+    child.on('error', (e) => { clearTimeout(timer); finish(() => error(id, -32603, `eos ${argv[0]} could not start: ${e.message}`)); });
+    child.on('close', (code, signal) => {
+      clearTimeout(timer);
+      finish(() => {
+        const result = toolResult(argv, { code, signal, out, err, timeoutMs, timedOut });
+        send({ id, result: modern ? { resultType: 'complete', ...result } : result });
+      });
+    });
   });
 
   const callTool = (id, params, modern) => {
@@ -220,7 +265,7 @@ export function serve({ input = process.stdin, output = process.stdout, cwd = pr
     if (id === undefined) {
       if (method === 'notifications/cancelled') {
         const job = pending.get(params?.requestId);
-        if (job) { job.cancelled = true; pending.delete(params.requestId); job.child?.kill(); }
+        if (job) { job.cancelled = true; pending.delete(params.requestId); if (job.child) stopTree(job.child); }
       }
       return undefined; // notifications/initialized and the rest need no answer
     }
