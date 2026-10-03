@@ -69,7 +69,7 @@ EOS itself never calls a model and needs no API key. Each row adds to the one ab
 ## Day-1 (copy-ready — the same sequence as the manual, §3.4)
 
 ```sh
-npx degit niaodian/eos#eos-2.1.0 my-new-app && cd my-new-app
+npx degit niaodian/eos#eos-2.2.0 my-new-app && cd my-new-app
 git init && git add -A && git commit -q -m "chore: scaffold from eos"
 node .github/hooks/validate-config.mjs        # expect PASS
 node .github/eos/eos.mjs init config-only --write   # declare it: no code yet (or init <pack>; --track regulated)
