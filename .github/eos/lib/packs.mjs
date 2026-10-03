@@ -82,7 +82,7 @@ export const PACKS = {
     },
     notes: [
       'The agentic paradigm turns G-EVAL on: `commands.eval` must produce real numbers, not just exit 0.',
-      'See docs/eos/examples/eval-starter/ for a runnable eval harness and docs/evidence/eval-summary.json for the shape the gate reads.',
+      'Start evals/ from docs/eos/examples/eval-starter/python/ (run by `pytest evals/`): it writes docs/evidence/eval-summary.json, the summary the gate reads.',
     ],
   },
   'agentic-app': {
@@ -97,6 +97,7 @@ export const PACKS = {
     notes: [
       'Prompts, datasets and model configuration are PRODUCT: editing one makes a verified story stale, by design.',
       'Tool allow-lists and prompt-injection handling belong in the architecture record, not in a code comment.',
+      'Start evals/ from docs/eos/examples/eval-starter/ (make `npm run eval` run `node --test evals/eval.test.mjs`): it writes docs/evidence/eval-summary.json, the summary the gate reads.',
     ],
   },
   'data-pipeline': {

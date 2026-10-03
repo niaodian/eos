@@ -656,6 +656,7 @@ bmad-tea / bmad-testarch-*         → 单元 + 集成测试
 ```
 SaaS 的 **G7** 要求：每条 AC ≥1 测试、**API 契约测试**（对 openapi.yaml）、**DB 状态集成测试**
 （事务 commit/rollback、约束、幂等）、NFR 目标已验证。
+门禁读取的是*机器*结果，而不是手写的 PASS：你的测试命令还必须写出 `docs/evidence/test-run.json`（AC → 测试文件 → selector → PASS，并绑定 `eos product-tree --json`）。这是你自己测试运行器里约 30 行的映射步骤——见 [examples/trace-evidence](../eos/examples/trace-evidence/README.md)。
 
 ### 第 8–10 步：发布 + 观测 + 迭代
 ```
@@ -716,8 +717,9 @@ node .github/eos/eos.mjs init rag-app --write    # Python 的 LLM 包：agentic 
 ```
 bmad-dev-story                     → ai/ 下的 agent/tools/chains + ai/prompts/ 版本化 prompt
 bmad-code-review
-node --test evals/*.test.mjs       → 跑评估基线（G-EVAL 机器强制：达标才能过）
+node --test evals/eval.test.mjs    → 跑评估基线（G-EVAL 机器强制：达标才能过）
 ```
+`evals/` 从 [examples/eval-starter](../eos/examples/eval-starter/README.md) 起步（Node；Python 栈用其中的 `python/`），并把同一条命令声明为 `commands.eval`。starter 会写出 `docs/evidence/eval-summary.json`——数值、阈值、模型、数据集与评分器，并绑定产品树——G-EVAL 读的正是它；仅仅退出码为 0 的评估命令不会通过。
 写 AI 代码时**自动生效**的 Agentic 规则：prompt 存成文件（不内联字符串）、工具 typed schema、
 temperature=0 可复现、把模型输出当**不可信**（防注入、输出审核、不放密钥/PII 进 prompt）、
 LLM tracing（token/成本/context/tool-span）。

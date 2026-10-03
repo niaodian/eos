@@ -631,6 +631,7 @@ bmad-tea / bmad-testarch-*         → unit + integration tests
 /spec-align                        → quantify: AC coverage / first-pass rate / drift
 ```
 SaaS **G7** requires: every AC has ≥1 test, **API contract tests** (against openapi.yaml), **DB state integration tests** (transaction commit/rollback, constraints, idempotency), and NFR targets verified.
+The gate reads the *machine* result, not a hand-written PASS: your test command must also write `docs/evidence/test-run.json` (AC → test file → selector → PASS, bound to `eos product-tree --json`). It is a ~30-line mapping step in your own runner — see [examples/trace-evidence](examples/trace-evidence/README.md).
 
 ### Step 8–10: Release + observability + iteration
 ```
@@ -688,8 +689,9 @@ At **G4**, the architecture agent forces Agentic design to include:
 ```
 bmad-dev-story                     → agent/tools/chains under ai/ + versioned prompts under ai/prompts/
 bmad-code-review
-node --test evals/*.test.mjs       → run eval baseline (G-EVAL machine-enforced: must meet threshold)
+node --test evals/eval.test.mjs    → run eval baseline (G-EVAL machine-enforced: must meet threshold)
 ```
+Start `evals/` from [examples/eval-starter](examples/eval-starter/README.md) (Node, or `python/` for Python stacks) and declare the same command as `commands.eval`. The starter writes `docs/evidence/eval-summary.json` — the numbers, thresholds, model, dataset and grader, bound to the product tree — which is what G-EVAL reads; an eval command that merely exits 0 does not pass.
 When writing AI code, Agentic rules take effect **automatically**: prompts saved as files (not inline strings), tool typed schema, temperature=0 for reproducibility, treat model output as **untrusted** (anti-injection, output review, do not put secrets/PII into prompts), LLM tracing (token/cost/context/tool-span).
 
 > **Key**: LLM output **cannot be tested with exact-match unit tests** (it is probabilistic)--you must use **evaluation set + grader + regression baseline**.
