@@ -6,6 +6,14 @@
 > [GitHub Releases](https://github.com/niaodian/eos/releases). How often EOS releases, and what a
 > patch may contain: [CONTRIBUTING.md](../../CONTRIBUTING.md#release-cadence).
 
+## eos-2.5.0 — 2026-10-04
+
+- **Your CI runs your project, not EOS's test suite** (ADR-021): once `.eos/project.json` is your own declaration, `eos-ci.yml` skips EOS's five test layers, its coverage job and its Linux/macOS/Windows matrix — no Windows or macOS runner starts. The governance checks and your declared commands run as before; EOS's suites still run in EOS itself and in a copy that has not run `eos init`. Require only `verify` in branch protection.
+- **Your first declaration starts your own policy lock and SBOM** (ADR-022): on a template copy, `eos init <pack> --write` records this project's policy in `.eos/policy.lock.json` (nothing acknowledged) and regenerates `.eos/sbom.json`, so the first push and the first pull request pass `policy check`, `sbom --check` and the doctors — scaffold committed first or not. A declared project keeps its lock: re-declaring is a policy change, a weakening still needs a second person, and marking a declaration as the template's own again is itself a weakening.
+- **When your CI runs changes**: a push builds only `main`, `master` and tags, and a pull request is built once per commit — a new commit cancels its older run. A branch without a pull request is no longer built when you push it: open a pull request, or add the branch to `on.push.branches`. A weekly scheduled run starts one short `plan` job in your repository; delete the `schedule:` block if you do not want it.
+- **EOS's own CI is cheaper**: a pull request runs EOS's matrix once per platform on Node 24, a documentation-only pull request skips it, and merges, tags, the weekly run and manual runs take the full matrix (Windows and macOS on Node 20, 22 and 24, Linux on 24, plus `verify` on 20 and `coverage` on 22).
+- **`eos init` keeps the SBOM current** whenever a declaration changes the stacks it describes — including when code lands in a `config-only` project — and a failing `sbom --check` names `eos sbom --write`.
+
 ## eos-2.4.0 — 2026-10-04
 
 - **Node 24 is tested on every platform**: CI runs Node 20, 22 and 24 on Linux, macOS and Windows. Node 20 reached end of life on 2026-04-30 and stays only as the declared minimum (`engines` is unchanged): use 22 or 24.

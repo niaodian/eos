@@ -7,6 +7,14 @@
 > [GitHub Releases](https://github.com/niaodian/eos/releases)。EOS 多久发一次版、补丁版可以包含什么：
 > [CONTRIBUTING.md](../../CONTRIBUTING.md#release-cadence)。
 
+## eos-2.5.0 — 2026-10-04
+
+- **你的 CI 运行你的项目，而不是 EOS 的测试套件**（ADR-021）：一旦 `.eos/project.json` 是你自己的声明，`eos-ci.yml` 就会跳过 EOS 的五个测试层、覆盖率作业以及 Linux/macOS/Windows 矩阵，不会启动任何 Windows 或 macOS runner。治理检查和你声明的命令照常运行；EOS 自己的测试套件仍在 EOS 本身以及尚未运行 `eos init` 的副本中运行。分支保护中只需把 `verify` 设为必需检查。
+- **首次声明会建立你自己的策略锁与 SBOM**（ADR-022）：在模板副本上，`eos init <pack> --write` 会把本项目的策略记录到 `.eos/policy.lock.json`（不确认任何变更），并重新生成 `.eos/sbom.json`。因此无论脚手架是否先提交，首次推送与首个 PR 都能通过 `policy check`、`sbom --check` 与两个 doctor。已声明的项目保留自己的锁：重新声明属于策略变更，削弱仍需第二个人审批；把声明重新标记为模板自身本身就是一项削弱。
+- **CI 的触发时机有变**：推送只构建 `main`、`master` 与 tag；PR 的每个提交构建一次，新提交会取消它之前的运行。没有 PR 的分支推送后不再构建：请为它开 PR，或把它加入 `on.push.branches`。每周一次的定时运行在你的仓库里只启动一个很短的 `plan` 作业；不需要的话，删除 `schedule:` 一节即可。
+- **EOS 自己的 CI 更省**：PR 只在每个平台上用 Node 24 各跑一次 EOS 的矩阵，只改文档的 PR 跳过矩阵；合并、tag、每周运行与手动运行使用完整矩阵（Windows 与 macOS 上的 Node 20、22、24，Linux 上的 24，外加 Node 20 的 `verify` 与 Node 22 的 `coverage`）。
+- **`eos init` 会让 SBOM 保持最新**：只要声明改变了 SBOM 所描述的技术栈（包括 `config-only` 项目有了代码之后），就会重新生成；`sbom --check` 失败时会给出 `eos sbom --write`。
+
 ## eos-2.4.0 — 2026-10-04
 
 - **每个平台都测试 Node 24**：CI 在 Linux、macOS 和 Windows 上运行 Node 20、22 和 24。Node 20 已于 2026-04-30 停止维护，只作为声明的最低版本保留（`engines` 不变）：请使用 22 或 24。

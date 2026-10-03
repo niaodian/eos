@@ -75,7 +75,7 @@ AI agent 是可选的 —— CLI 在任何终端里都能用。
 
 ```bash
 # 1. 从一个固定的发布版本开始，并把它变成你的仓库
-npx degit niaodian/eos#eos-2.4.0 my-app && cd my-app && git init
+npx degit niaodian/eos#eos-2.5.0 my-app && cd my-app && git init
 
 # 2. 声明项目 —— 还没有代码，技术栈留到架构阶段再定
 npx --offline eos init config-only --write        # 想走严格轨道就加上 --track regulated
@@ -166,8 +166,8 @@ EOS 的发布在 GitHub Actions 中构建并出具证明 —— 正是 EOS 要�
 你可以亲自核验：
 
 ```bash
-gh release download eos-2.4.0 --repo niaodian/eos --pattern 'eos-2.4.0.tar.gz'
-gh attestation verify eos-2.4.0.tar.gz --repo niaodian/eos
+gh release download eos-2.5.0 --repo niaodian/eos --pattern 'eos-2.5.0.tar.gz'
+gh attestation verify eos-2.5.0.tar.gz --repo niaodian/eos
 ```
 
 每个发布还附带它的 SBOM 和一个 `SHA256SUMS` 文件。
@@ -197,7 +197,7 @@ docs/               你的规格与 ADR；docs/eos/ 是 EOS 手册（中文版�
 - [在 Claude Code、Codex 和 Antigravity 中使用 EOS](docs/zh/user-manual.md#第-66-章-在-claude-code、codex-和-antigravity-中使用-eos) —— 各 agent 的一次性配置与日常开发流程。
 - [升级到 eos-2.0.0](docs/zh/user-manual.md#105-从-eos-122x-升级到-eos-200) —— 改变了什么、你需要做什么。
 - [升级到 eos-2.0.1](docs/zh/user-manual.md#107-从-eos-200-升级到-eos-201) —— 密钥检测安全补丁。
-- [升级到 eos-2.4.0](docs/zh/user-manual.md#1011-从-eos-23x-升级到-eos-240) —— 各平台都测试 Node 24、为 Antigravity 安装的 BMAD 能被识别、`eos next --exit-zero`、runbook 写在发布门禁读取的位置。
+- [升级到 eos-2.5.0](docs/zh/user-manual.md#1012-从-eos-24x-升级到-eos-250) —— 你的 CI 运行你的项目而不是 EOS 的测试套件，首次声明会建立你自己的策略锁与 SBOM，每次变更只运行一次 CI。
 - [工作流契约](docs/zh/developer-experience.md) —— CLI、退出码、JSON 与诊断。
 - [技术栈预设与轨道](docs/zh/stack-presets.md) —— 所有受支持的技术栈，以及如何选择轨道。
 - [设计原理](docs/zh/blueprint.md) 与 [架构决策记录](docs/adr/)。
