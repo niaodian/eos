@@ -1252,6 +1252,11 @@ declaration marked `"templateDefault": true`, and `eos init` replaces it with yo
 Until you declare your project, a push still runs EOS's suites — and they pass, because the tree is still
 the template's. Mark only `verify` as a required check ([Appendix D.1](#appendix-d-post-instantiation-hardening-make-gates-authoritative)).
 
+**When it runs.** On a push to `main` or `master` and on a tag; on every pull request, where a new commit
+cancels the pull request's earlier run; and once a week on the default branch, where a project runs only
+the short `plan` job. A branch without a pull request is not built when you push it: open a pull request,
+or add the branch to `on.push.branches` (a release branch, say).
+
 ---
 
 # Chapter 9 Failure localization and troubleshooting

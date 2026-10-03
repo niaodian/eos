@@ -214,7 +214,8 @@ docs/               your specs and ADRs; docs/eos/ is the EOS manual set (中文
 ## Requirements and notes
 
 - **Node.js 20.10+ and Git** — nothing else. Use Node 22 or 24: Node 20 reached end of life on 2026-04-30
-  and stays supported only as the declared minimum. EOS's own CI tests Node 20, 22 and 24 on Linux, macOS and Windows.
+  and stays supported only as the declared minimum. EOS's own CI tests Node 20, 22 and 24 on Linux, macOS and
+  Windows on every merge, tag and week; a pull request runs each platform once, on Node 24.
 - **Your CI.** [eos-ci.yml](.github/workflows/eos-ci.yml) comes with the template. In your repository it runs the
   governance gate and the commands your declaration names. EOS's own test suites, coverage and cross-platform
   matrix test EOS, so they run only while `.eos/project.json` is still the template's own, and are skipped once

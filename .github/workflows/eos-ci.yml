@@ -36,8 +36,19 @@ name: EOS CI
 # onto node24 anyway and warned on every run, so the pin no longer described what actually ran.
 
 on:
+  # The default branch and tags. A branch with a pull request is built by `pull_request`; building it on
+  # `push` as well ran every job twice for one change. A branch without a pull request is not built
+  # until it has one — add it to `branches` if you need it built (a release branch, say). `master` is
+  # here for a repository whose default branch still carries that name (`git init` without `-b`).
   push:
+    branches: [main, master]
+    tags: ['**']
   pull_request:
+  # Weekly, on the default branch: runner images and Node patch releases change under an unchanged
+  # tree, and only this run takes EOS's full matrix when nothing is merged. In a project it is one
+  # short `plan` job — EOS's own tests are skipped there, and so is `verify`.
+  schedule:
+    - cron: '17 3 * * 1'
   workflow_dispatch:
 
 # Least privilege by default; a job that needs more asks for it in its own `permissions:` block.
@@ -46,14 +57,18 @@ on:
 permissions:
   contents: read
 
-# One run per ref: an older run for the same branch is superseded rather than left racing the new
-# one — except on the default branch, where every commit keeps its own verdict.
+# One run per pull request: a new commit supersedes the run of the previous one. Everything else —
+# the default branch, a tag, the schedule, a manual run — keeps its own verdict, in its own group, so
+# the weekly run never cancels or queues behind a merge.
 concurrency:
-  group: eos-ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  group: eos-ci-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   verify:
+    # Not on the weekly schedule: that run exists for EOS's full matrix, and a project's governance
+    # gate has already run on every change that reached its default branch.
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -280,14 +295,21 @@ jobs:
       contents: read
     outputs:
       self: ${{ steps.plan.outputs.self }}
+      cross_platform: ${{ steps.plan.outputs.cross_platform }}
+      matrix: ${{ steps.plan.outputs.matrix }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          # A pull request is checked out as its merge commit, whose first parent is the base: two
+          # commits are enough to list what the pull request changes.
+          fetch-depth: 2
           persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '20'
       - id: plan
+        env:
+          EOS_EVENT: ${{ github.event_name }}
         run: node .github/eos/ci-plan.mjs >> "$GITHUB_OUTPUT"
 
   # ---------------------------------------------------------------------------------------------
@@ -301,19 +323,13 @@ jobs:
   # likely to break.
   cross-platform:
     needs: plan
-    if: needs.plan.outputs.self == 'true'
+    if: needs.plan.outputs.self == 'true' && needs.plan.outputs.cross_platform == 'true'
     strategy:
       fail-fast: false
-      matrix:
-        os: [windows-latest, macos-latest]
-        # Every runtime the README claims, on every platform. Node 20 reached end of life on
-        # 2026-04-30 but stays: it is still the declared minimum (`engines`), and raising that is a
-        # breaking change of its own. 22 and 24 are the LTS lines the README recommends. Linux
-        # already runs 20 (verify) and 22 (coverage), so it joins the matrix for 24 only.
-        node: ['20', '22', '24']
-        include:
-          - os: ubuntu-latest
-            node: '24'
+      # From the plan (ci-plan.mjs, where the reasons live): a pull request runs Node 24 once on each
+      # platform; the default branch, tags, the weekly schedule and a manual run take every runtime the
+      # README claims on every platform. A pull request that changes documentation only skips this job.
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
     runs-on: ${{ matrix.os }}
     # Measured (2.0): all five layers take 8 to 20 min on Windows, depending on the runner, and ~3 min
     # on macOS. 45 min is room for the slowest Windows runner seen, not for a hang.

@@ -205,7 +205,8 @@ docs/               你的规格与 ADR；docs/eos/ 是 EOS 手册（中文版�
 ## 环境要求与说明
 
 - **Node.js 20.10+ 和 Git** —— 别无其他。请使用 Node 22 或 24：Node 20 已于 2026-04-30 停止维护，
-  只作为声明的最低版本继续受支持。EOS 自己的 CI 在 Linux、macOS 和 Windows 上测试 Node 20、22 与 24。
+  只作为声明的最低版本继续受支持。EOS 自己的 CI 在每次合并、每个 tag 和每周一次的运行中，于 Linux、macOS 和
+  Windows 上测试 Node 20、22 与 24；PR 只在每个平台上用 Node 24 各跑一次。
 - **你的 CI。** [eos-ci.yml](.github/workflows/eos-ci.yml) 随模板一起提供。在你的仓库里，它运行治理门禁和你在声明中
   写明的命令。EOS 自己的测试套件、覆盖率与跨平台矩阵测试的是 EOS，所以只在 `.eos/project.json` 仍是模板自身的
   声明时运行，执行 `eos init` 之后即被跳过（见[手册 §8.4](docs/zh/user-manual.md#84-你的仓库里-ci-运行什么)、
