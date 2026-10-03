@@ -1,9 +1,9 @@
 // Gate & transition engine — what runs the rules and records what happened.
 //
-// The rules themselves live in gate-evaluators.mjs and the vocabulary they are written in lives in
-// gate-primitives.mjs. This file is the part that decides WHICH rules apply (the change-type
-// policy), runs them, aggregates a verdict, resolves waivers and providers, and writes the evidence
-// that makes the verdict checkable later.
+// The rules themselves live in evaluators/<gate id>.mjs, collected by gate-evaluators.mjs, and the
+// vocabulary they are written in lives in gate-primitives.mjs. This file is the part that decides
+// WHICH rules apply (the change-type policy), runs them, aggregates a verdict, resolves waivers and
+// providers, and writes the evidence that makes the verdict checkable later.
 //
 // Two rules govern everything here:
 //   1. A missing tool, an unreadable file, a crashed validator or "there are no tests" is BLOCKED
