@@ -107,6 +107,7 @@ test('every generated hook runs the guardrail in its platform\'s dialect', { ski
   const payload = JSON.stringify({ tool_name: 'Bash', tool_input: { command: denied } });
   const sh = (command) => boundedSpawnSync('sh', ['-c', command], { cwd: dir, input: payload, encoding: 'utf8', env: cleanEnv({ ...process.env, CLAUDE_PROJECT_DIR: '' }) });
   const commandOf = {
+    claude: json(dir, '.claude/settings.json').hooks.PreToolUse.at(-1).hooks[0].command,
     codex: json(dir, '.codex/hooks.json').hooks.PreToolUse[0].hooks[0].command,
     cursor: json(dir, '.cursor/hooks.json').hooks.beforeShellExecution[0].command,
     antigravity: json(dir, '.agents/hooks.json')['eos-guardrail'].PreToolUse[0].hooks[0].command,
@@ -117,6 +118,7 @@ test('every generated hook runs the guardrail in its platform\'s dialect', { ski
     cline: './.clinerules/hooks/PreToolUse',
   };
   const denies = {
+    claude: (o) => o.hookSpecificOutput.permissionDecision === 'deny',
     codex: (o) => o.hookSpecificOutput.permissionDecision === 'deny',
     qwen: (o) => o.hookSpecificOutput.permissionDecision === 'deny',
     cursor: (o) => o.permission === 'deny',
@@ -135,17 +137,21 @@ test('every generated hook runs the guardrail in its platform\'s dialect', { ski
   assert.match(read(dir, '.opencode/plugins/eos-guardrail.js'), /from '\.\.\/\.\.\/\.github\/hooks\/lib\/secret-rules\.mjs'/);
 });
 
-test('the Claude Code hook is exec form — no shell, so it runs on native Windows too — and covers the PowerShell tool', () => {
+test('the Claude Code hook is one plain command line that every reader runs — sh, PowerShell, VS Code — and covers the PowerShell tool', () => {
   const group = json(REPO_ROOT, '.claude/settings.json').hooks.PreToolUse.find((g) => JSON.stringify(g).includes('deny-dangerous.js'));
   assert.ok(group.matcher.split('|').includes('PowerShell'), group.matcher);
   const [handler] = group.hooks;
-  assert.equal(handler.command, 'node');
-  assert.ok(Array.isArray(handler.args), 'args present = exec form');
+  // VS Code reads this file too and ignores `args`: an exec-form hook ran a bare `node` there and
+  // blocked every tool call of the session. No args, and no placeholder a shell would have to expand.
+  assert.equal(handler.args, undefined);
+  assert.equal(handler.command, 'node .github/hooks/deny-dangerous.js --format claude');
+  assert.doesNotMatch(handler.command, /[$%`'"]/);
   const denied = ['git', 'push', '--force'].join(' ');
   for (const tool of ['Bash', 'PowerShell']) {
-    // What Claude Code does: substitute the placeholder into each argument and spawn, no shell.
-    const args = handler.args.map((a) => a.replace('${CLAUDE_PROJECT_DIR}', REPO_ROOT));
-    const r = boundedSpawnSync(process.execPath, args, { cwd: REPO_ROOT, input: JSON.stringify({ tool_name: tool, tool_input: { command: denied } }), encoding: 'utf8' });
+    // The command line split on spaces is exactly what any shell runs, sh or PowerShell.
+    const [cmd, ...rest] = handler.command.split(' ');
+    assert.equal(cmd, 'node');
+    const r = boundedSpawnSync(process.execPath, rest, { cwd: REPO_ROOT, input: JSON.stringify({ tool_name: tool, tool_input: { command: denied } }), encoding: 'utf8' });
     assert.equal(r.status, 0, r.stderr);
     assert.equal(JSON.parse(r.stdout).hookSpecificOutput.permissionDecision, 'deny', `${tool}: ${r.stdout}`);
   }

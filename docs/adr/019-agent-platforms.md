@@ -52,9 +52,14 @@ their other servers.
    touched — accepted as it is when it already runs the guardrail, reported otherwise.
 4. **One guardrail, many dialects.** `deny-dangerous.js --format <platform>` reads any platform's payload
    with the same rules and answers in that platform's dialect. It only ever denies: on allow it prints
-   no decision, because an explicit "allow" would skip the platform's own approval prompt. Where a
-   platform supports it (Claude Code), the hook is exec form — `node` with an argument list, no shell —
-   so the same entry runs on native Windows.
+   no decision, because an explicit "allow" would skip the platform's own approval prompt. Every
+   generated hook is one plain command line (`node .github/hooks/deny-dangerous.js --format …`), never
+   Claude Code's exec form (`command` + `args`) or a path placeholder: VS Code reads
+   `.claude/settings.json` too and ignores `args` — an exec-form hook ran a bare `node` there and
+   blocked every tool call of the session. A plain line runs under sh, Git Bash and PowerShell, so it
+   also works on native Windows (the Claude matcher includes the `PowerShell` tool). Hooks start in
+   the project root; from anywhere else the hook errors and the call proceeds, and CI stays the
+   authority.
 5. **Agents where they do not collide.** Antigravity and Codex get the orchestrators rendered from
    `.github/agents/`. Claude Code does not: VS Code also reads `.claude/agents/`, so every orchestrator
    would be listed twice in Copilot, and Claude Code runs the same workflows as skills.

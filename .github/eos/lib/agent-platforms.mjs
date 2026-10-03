@@ -205,10 +205,13 @@ export const CONFIG_FILES = [
   {
     path: '.claude/settings.json',
     pieces: [{ platforms: ['claude'], ...hookEntry(['hooks', 'PreToolUse'], {
-      // Exec form (command + args): no shell, so it runs the same on native Windows, and the path
-      // placeholder is substituted as one argument. PowerShell is the shell tool there.
+      // One plain command line, no `args` and no path placeholder. VS Code loads this same file (its
+      // Claude hook compatibility) and ignores `args`: an exec-form hook ran a bare `node` there and
+      // blocked every tool call. The command line runs under sh, Git Bash and PowerShell alike, so it
+      // also works on native Windows, where PowerShell is the shell tool. Hooks start in the project
+      // root; from anywhere else the hook errors and the call proceeds — CI stays the authority.
       matcher: 'Bash|PowerShell|Write|Edit|MultiEdit|NotebookEdit',
-      hooks: [{ type: 'command', command: 'node', args: ['${CLAUDE_PROJECT_DIR}/.github/hooks/deny-dangerous.js', '--format', 'claude'], timeout: 30 }],
+      hooks: [{ type: 'command', command: hook('claude'), timeout: 30 }],
     }) }],
   },
   {
