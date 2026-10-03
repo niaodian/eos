@@ -176,8 +176,8 @@ mkdir -p ~/.git-templates/eos && cp -R <golden>/.github ~/.git-templates/eos/
 git config --global init.templateDir ~/.git-templates/eos
 ```
 
-Versioning: `docs/eos/VERSION` (current `eos-2.0.1`). For upgrades, use `degit` to pull the new version to /tmp, merge with `diff -ru`,
-then run `validate-config.mjs` + `bmad-code-review`.
+Versioning: `docs/eos/VERSION` (current `eos-2.0.1`). For upgrades, fetch the new template and the one you started from,
+then run `eos upgrade --from <new> --base <old>` (a three-way comparison per file; ADR-015).
 
 ---
 

@@ -51,6 +51,8 @@ usage: node .github/eos/eos.mjs <command> [flags]
   policy export --name <org> --version <v> [--sign --key <file>] [--out <file>] | policy sync [--check]
                                           publish an organisation baseline / vendor it (the only networked command)
   migrate [--apply]                       governance file versions; plan first, then apply
+  upgrade --from <dir> --base <dir> [--write]
+                                          move to a new EOS version: three-way per file, never overwrites your edits
   docs [--write] [--check]                regenerate the docs that restate the policy
   health                                  blockers, stale evidence, waivers, trend — one screen
   report [--format json|markdown] [--out <file>] [--org <report.json>…]
@@ -100,7 +102,7 @@ async function main() {
       '  Upgrade EOS, or run `node .github/eos/eos.mjs migrate` to see the version gap.', ''].join('\n'));
     return EXIT.ERROR;
   }
-  if (snapshot.errors.length && !['doctor', 'init', 'next', 'resume', 'status', 'ledger', 'migrate'].includes(command)) {
+  if (snapshot.errors.length && !['doctor', 'init', 'next', 'resume', 'status', 'ledger', 'migrate', 'upgrade'].includes(command)) {
     console.log(['EOS ERROR — the configuration could not be evaluated:', '', ...snapshot.errors.map((e) => `  ERROR ${e}`), '',
       '  Fix the file(s) above, or run `node .github/eos/eos.mjs doctor`.', ''].join('\n'));
     return EXIT.ERROR;

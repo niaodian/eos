@@ -143,6 +143,7 @@ flowchart LR
 | `eos policy check` · `lock` · `sync` | detect, approve and distribute governance changes |
 | `eos report --format markdown` | a governance report: gates, waivers, evidence, SBOM and signatures |
 | `eos health` · `eos doctor` | one-screen project health; whether EOS itself is wired correctly |
+| `eos upgrade --from <new> --base <old>` | move to a new EOS version — three-way per file, never overwrites your edits |
 
 Add `--json` for machine-readable output; exit codes and diagnostics follow one documented contract:
 [docs/eos/developer-experience.md](docs/eos/developer-experience.md).
@@ -178,6 +179,7 @@ docs/               your specs and ADRs; docs/eos/ is the EOS manual set (中文
 - [User manual](docs/eos/user-manual.md) — idea to launch to iteration, with step-by-step SaaS and Agentic tracks.
 - [Upgrading to eos-2.0.0](docs/eos/user-manual.md#105-upgrading-from-eos-122x-to-eos-200) — what changes and what to do.
 - [Upgrading to eos-2.0.1](docs/eos/user-manual.md#107-upgrading-from-eos-200-to-eos-201) — the secret-detection security patch.
+- [Upgrading to eos-2.1.0](docs/eos/user-manual.md#108-upgrading-from-eos-20x-to-eos-210) — `eos upgrade`, and the first upgrade done with it.
 - [Workflow contract](docs/eos/developer-experience.md) — the CLI, exit codes, JSON and diagnostics.
 - [Stack presets and tracks](docs/eos/stack-presets.md) — every supported stack, and how to choose a track.
 - [Design rationale](docs/eos/blueprint.md) and [architecture decisions](docs/adr/).

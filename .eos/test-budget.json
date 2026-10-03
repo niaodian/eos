@@ -75,6 +75,7 @@
         ".github/eos/policy.test.mjs",
         ".github/eos/router.test.mjs",
         ".github/eos/transaction.test.mjs",
+        ".github/eos/upgrade.test.mjs",
         ".github/hooks/eos-doctor.test.mjs",
         ".github/hooks/project-gate.test.mjs"
       ]

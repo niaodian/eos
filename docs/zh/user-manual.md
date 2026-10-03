@@ -24,7 +24,7 @@
 | 想查某个斜杠命令 / agent / 规则 | [第 7 章 完整参考](#第-7-章-完整参考（速查）) |
 | 配置坏了 / Agent 不按预期工作 | [第 9 章 故障定位](#第-9-章-故障定位与排错) |
 | 想把这套搬到别的项目/团队 | [第 10 章 跨项目复用与分发](#第-10-章-跨项目复用与分发) |
-| 升级到 `eos-2.0.0`、选择治理轨道或为发布签名 | [§10.5 升级](#105-从-eos-122x-升级到-eos-200) · [§10.6 轨道与签名发布](#106-治理轨道、签名发布与中心策略) · [§10.7 2.0.1 安全补丁](#107-从-eos-200-升级到-eos-201) |
+| 升级到 `eos-2.0.0`、选择治理轨道或为发布签名 | [§10.5 升级](#105-从-eos-122x-升级到-eos-200) · [§10.6 轨道与签名发布](#106-治理轨道、签名发布与中心策略) · [§10.7 2.0.1 安全补丁](#107-从-eos-200-升级到-eos-201) · [§10.8 `eos upgrade` 与 2.1.0](#108-从-eos-20x-升级到-eos-210) |
 
 ---
 
@@ -1091,7 +1091,7 @@ node .github/eos/eos.mjs init config-only --write   # 还没有代码——或 <
 ## 10.4 版本化与升级
 
 - 每次改 EOS 配置：改 `docs/eos/VERSION`（如 `eos-1.4.1`→`eos-1.6.0`），跑 `validate-config.mjs`，Conventional Commits 提交。
-- 升级既有项目：从新版模板 diff `.github/`，挑选合并；用户级 `bmad-*` 独立升级。
+- 升级既有项目（2.1.0 起）：`eos upgrade --from <新版模板> --base <你当初起步的模板>`——默认只预览，加 `--write` 才执行。它逐个文件比较两份模板与你的副本：只有 EOS 改过的会更新，只有你改过的会保留，双方都改过的绝不覆盖——新版本放进 `.eos/local/upgrade/` 供手工合并。你的声明、证据、账本、豁免、story 与 README 永远不会被触碰。两份模板由你自己获取（degit 或带证明的发布 tarball），并用**新版本**的 CLI 运行；你自己的 ADR 从 100 起编号（[ADR-015](../adr/015-three-way-upgrades.md)）。用户级 `bmad-*` 独立升级。
 
 ### 10.4.1 从 `eos-1.12.0` 升级到 `eos-1.13.0`
 
@@ -1478,6 +1478,28 @@ node .github/eos/eos.mjs report --org team-a.json team-b.json --format markdown
 # 1. 采用新模板的 .github/hooks/（deny-dangerous.js、secret-scan.mjs 与 lib/secret-rules.mjs）
 # 2. 扫描，并把每个被报告的值移出代码
 node .github/hooks/secret-scan.mjs
+```
+
+## 10.8 从 `eos-2.0.x` 升级到 `eos-2.1.0`
+
+这是第一个可以用 `eos upgrade` 本身完成的升级——用 2.1.0 的 CLI 对你的项目运行它。门禁、策略与证据格式
+都没有变化；变化的是 EOS 为满足它们提供给你的东西。
+
+| 变化 | 你会看到什么 | 你需要做什么 |
+|---|---|---|
+| **`eos upgrade`**（[ADR-015](../adr/015-three-way-upgrades.md)） | 升级是逐文件的三方比较：更新、保留，或放进 `.eos/local/upgrade/` 等待手工合并——绝不覆盖 | 这次升级（见下）以及以后每次升级都用它。你自己的 ADR 从 100 起编号 |
+| **eval-starter 会写出 G-EVAL 读取的摘要** | `docs/evidence/eval-summary.json`，绑定产品树；`python/` 中附带仅用标准库的 Python 版 | Agentic 产品：重新复制 starter（或把 `summary.mjs` 及其 `writeSummary` 调用加入你的运行器），并在 story 中引用它的 `EVAL-n` 编号 |
+| **`init --write` 生成审批基线** | 从已提交的示例生成 `.vscode/settings.json`；缺失或被放宽时 `eos-doctor` 的 D8 会警告 | 每台机器运行一次 `node .github/eos/eos.mjs init --write` |
+| **文档** | 快速开始新增*能力与依赖*与*已知局限*；ADR-014（信任链）；SaaS 第 7 步与 Agentic 第 6–7 步写明门禁读取的机器摘要 | 读一遍已知局限 |
+
+**升级步骤**
+
+```sh
+npx degit niaodian/eos#eos-2.0.1 /tmp/eos-base    # 你当前的版本——见 docs/eos/VERSION
+npx degit niaodian/eos#eos-2.1.0 /tmp/eos-next
+node /tmp/eos-next/.github/eos/eos.mjs upgrade --from /tmp/eos-next --base /tmp/eos-base          # 先看计划
+node /tmp/eos-next/.github/eos/eos.mjs upgrade --from /tmp/eos-next --base /tmp/eos-base --write  # 再执行
+node .github/eos/eos.mjs policy lock && node .github/eos/eos.mjs verify --full
 ```
 
 ---

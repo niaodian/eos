@@ -19,7 +19,7 @@
 | Want to look up a slash command / agent / rule | [Chapter 7 Complete reference](#chapter-7-complete-reference-quick-reference) |
 | Configuration is broken / Agent is not working as expected | [Chapter 9 Failure localization](#chapter-9-failure-localization-and-troubleshooting) |
 | Want to move this system to another project/team | [Chapter 10 Cross-project reuse and distribution](#chapter-10-cross-project-reuse-and-distribution) |
-| Upgrading to `eos-2.0.0`, choosing a governance track, or signing releases | [§10.5 Upgrading](#105-upgrading-from-eos-122x-to-eos-200) · [§10.6 Tracks and signed releases](#106-governance-tracks-signed-releases-and-central-policy) · [§10.7 The 2.0.1 security patch](#107-upgrading-from-eos-200-to-eos-201) |
+| Upgrading to `eos-2.0.0`, choosing a governance track, or signing releases | [§10.5 Upgrading](#105-upgrading-from-eos-122x-to-eos-200) · [§10.6 Tracks and signed releases](#106-governance-tracks-signed-releases-and-central-policy) · [§10.7 The 2.0.1 security patch](#107-upgrading-from-eos-200-to-eos-201) · [§10.8 `eos upgrade` and 2.1.0](#108-upgrading-from-eos-20x-to-eos-210) |
 
 ---
 
@@ -1045,7 +1045,7 @@ node .github/eos/eos.mjs init config-only --write   # no code yet — or <pack>,
 ## 10.4 Versioning and upgrades
 
 - Every EOS configuration change: update `docs/eos/VERSION` (e.g., `eos-1.4.1`→`eos-1.6.0`), run `validate-config.mjs`, commit with Conventional Commits.
-- Upgrading existing projects: diff `.github/` from the new template version, selectively merge; user-level `bmad-*` upgrades independently.
+- Upgrading existing projects (2.1.0+): `eos upgrade --from <new template> --base <the template you started from>` — a dry run by default, `--write` to apply. Per file it compares the two templates with your copy: what only EOS changed is updated, what only you changed is kept, and a file both changed is never overwritten — the new version is parked under `.eos/local/upgrade/` for a hand merge. Your declaration, evidence, ledger, waivers, stories and README are never touched. Fetch both templates yourself (degit or the attested release tarball) and run the NEW version's CLI; number your own ADRs from 100 ([ADR-015](../adr/015-three-way-upgrades.md)). User-level `bmad-*` upgrades independently.
 
 ### 10.4.1 Upgrading from `eos-1.12.0` to `eos-1.13.0`
 
@@ -1465,6 +1465,29 @@ does, a hardcoded value was hiding there.
 # 1. Take the new template's .github/hooks/ (deny-dangerous.js, secret-scan.mjs and lib/secret-rules.mjs)
 # 2. Scan, and move every reported value out of the code
 node .github/hooks/secret-scan.mjs
+```
+
+## 10.8 Upgrading from `eos-2.0.x` to `eos-2.1.0`
+
+The first upgrade you can do with `eos upgrade` itself — run the 2.1.0 CLI against your project. The
+gates, the policy and the evidence formats do not change; what changes is what EOS gives you to
+satisfy them.
+
+| What changed | What you will see | What to do |
+|---|---|---|
+| **`eos upgrade`** ([ADR-015](../adr/015-three-way-upgrades.md)) | An upgrade is a three-way comparison per file: updated, kept, or parked under `.eos/local/upgrade/` for a hand merge — never overwritten | Use it for this upgrade (below) and every later one. Number your own ADRs from 100 |
+| **The eval-starter writes the summary G-EVAL reads** | `docs/evidence/eval-summary.json`, bound to the product tree; a stdlib-only Python twin in `python/` | Agentic products: re-copy the starter (or add `summary.mjs` and its `writeSummary` call to your runner) and cite its `EVAL-n` ids in your stories |
+| **`init --write` creates the approval baseline** | `.vscode/settings.json` from the committed example; `eos-doctor` D8 warns when it is missing or loosened | Run `node .github/eos/eos.mjs init --write` once on each machine |
+| **Docs** | The quickstart's *What you need for what* and *Known limitations*; ADR-014 (the trust chain); SaaS step 7 and Agentic steps 6–7 now name the machine summaries the gates read | Read the known limitations once |
+
+**Upgrade steps**
+
+```sh
+npx degit niaodian/eos#eos-2.0.1 /tmp/eos-base    # the version you are on — see docs/eos/VERSION
+npx degit niaodian/eos#eos-2.1.0 /tmp/eos-next
+node /tmp/eos-next/.github/eos/eos.mjs upgrade --from /tmp/eos-next --base /tmp/eos-base          # review the plan
+node /tmp/eos-next/.github/eos/eos.mjs upgrade --from /tmp/eos-next --base /tmp/eos-base --write  # apply it
+node .github/eos/eos.mjs policy lock && node .github/eos/eos.mjs verify --full
 ```
 
 ---

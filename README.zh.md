@@ -136,6 +136,7 @@ flowchart LR
 | `eos policy check` · `lock` · `sync` | 发现、批准并分发治理变更 |
 | `eos report --format markdown` | 治理报告：门、豁免、证据、SBOM 与签名 |
 | `eos health` · `eos doctor` | 一屏看清项目健康度；检查 EOS 自身是否接线正确 |
+| `eos upgrade --from <新版> --base <旧版>` | 升级到新的 EOS 版本——逐文件三方比较，绝不覆盖你的修改 |
 
 加上 `--json` 即可得到机器可读的输出；退出码与诊断遵循同一份成文契约：
 [docs/zh/developer-experience.md](docs/zh/developer-experience.md)。
@@ -171,6 +172,7 @@ docs/               你的规格与 ADR；docs/eos/ 是 EOS 手册（中文版�
 - [用户手册](docs/zh/user-manual.md) —— 从想法到上线再到迭代，含分步的 SaaS 与 Agentic 路线。
 - [升级到 eos-2.0.0](docs/zh/user-manual.md#105-从-eos-122x-升级到-eos-200) —— 改变了什么、你需要做什么。
 - [升级到 eos-2.0.1](docs/zh/user-manual.md#107-从-eos-200-升级到-eos-201) —— 密钥检测安全补丁。
+- [升级到 eos-2.1.0](docs/zh/user-manual.md#108-从-eos-20x-升级到-eos-210) —— `eos upgrade`，以及用它完成的第一次升级。
 - [工作流契约](docs/zh/developer-experience.md) —— CLI、退出码、JSON 与诊断。
 - [技术栈预设与轨道](docs/zh/stack-presets.md) —— 所有受支持的技术栈，以及如何选择轨道。
 - [设计原理](docs/zh/blueprint.md) 与 [架构决策记录](docs/adr/)。

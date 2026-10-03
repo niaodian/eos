@@ -179,8 +179,8 @@ mkdir -p ~/.git-templates/eos && cp -R <golden>/.github ~/.git-templates/eos/
 git config --global init.templateDir ~/.git-templates/eos
 ```
 
-版本化：`docs/eos/VERSION`（当前 `eos-2.0.1`）。升级用 `degit` 拉新版到 /tmp 后 `diff -ru` 合并，
-再跑 `validate-config.mjs` + `bmad-code-review`。
+版本化：`docs/eos/VERSION`（当前 `eos-2.0.1`）。升级时取得新版模板与你当初起步的模板，
+再运行 `eos upgrade --from <新版> --base <旧版>`（逐文件三方比较；ADR-015）。
 
 ---
 
