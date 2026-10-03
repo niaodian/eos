@@ -30,7 +30,7 @@ import {
   STATUSES, SEVERITY, EXPENSIVE, isBlocking, insideRepo, parseTraceMatrix,
   ok, fail, blocked, na, awaiting, runHook, runProjectGate, refMatches, selectorPresent,
   stageDocCheck, manifestStories, thresholdMet, listAdrs, runCommandList, aggregate,
-  WORKSPACE_RULE, PROVISIONAL_STACK, TEST_REF,
+  WORKSPACE_RULE, PROVISIONAL_STACK, TEST_REF, RUNBOOKS, findTopologyAdr,
   repoFileExists, duplicates, decisionIsPlaceholder, isRegulated, evidenceIntegrity,
 } from './gate-primitives.mjs';
 
@@ -696,9 +696,8 @@ export const evaluators = {
       : ok('no waiver has expired');
   },
   releaseOpsArtifacts(ctx) {
-    const runbooks = ['ops/runbook.md', 'docs/runbook.md', 'ops/RUNBOOK.md'];
-    const runbook = runbooks.find((p) => existsSync(join(ctx.root, p)));
-    if (!runbook) return fail(`no runbook found (looked for ${runbooks.join(', ')}) — run /runbook`);
+    const runbook = RUNBOOKS.find((p) => existsSync(join(ctx.root, p)));
+    if (!runbook) return fail(`no runbook found (looked for ${RUNBOOKS.join(', ')}) — run /runbook`);
     const text = readFileSync(join(ctx.root, runbook), 'utf8');
     // The release prompt asks a human for rollback, gradual rollout and health/readiness. If the
     // machine gate only looks for "rollback", the other two are advisory theatre. (EOS-AUD-007)
@@ -717,8 +716,7 @@ export const evaluators = {
    * product claiming a blue/green cluster rollback is documentation, not a plan.
    */
   releaseDeploymentTopology(ctx) {
-    const adrs = listAdrs(ctx.root);
-    const topology = adrs.find((a) => /deployment|topology|hosting|infrastructure/i.test(a.name) || /deployment topology/i.test(a.text));
+    const topology = findTopologyAdr(ctx.root);
     if (!topology) {
       return fail('no deployment-topology decision record under docs/adr/ — run /deploy-topology so rollback, canary and health/readiness are the mechanisms this topology actually has');
     }

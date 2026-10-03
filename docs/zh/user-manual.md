@@ -520,7 +520,7 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 | **目标** | 过质量/安全/回滚/灰度/NFR 门后才发布 |
 | **何时进入** | G7 通过 |
 | **怎么启动** | Chat 输入 **`/release-gate`**；缺 runbook 就先 **`/runbook <service>`** |
-| **输入** | 测试结果、NFR 验证结果、`ops/runbook-*.md` |
+| **输入** | 测试结果、NFR 验证结果（`docs/evidence/nfr-summary.json`——逐项测量目标，再用 [examples/nfr-summary](../eos/examples/nfr-summary/README.md) 写出）、`ops/runbook-*.md`。自项目声明之日起，`eos status` 就一直列着 G8 需要什么 |
 | **产出** | 发布门禁报告（逐项 PASS/FAIL）、`ops/runbook-<service>.md` |
 | **决策门 G8（硬门）** | `node .github/eos/eos.mjs verify-release --release <id>` 会跑完提示词列出的全部 13 项：① 候选已提交 ② **质量命令在这个候选上重跑** ③ story 已 VERIFIED ④ **每个 story 的验证描述的就是这棵树** ⑤ 规格对齐 ⑥ 密钥扫描 ⑦ 依赖审计 ⑧ NFR 证据 ⑨ 合规边界 ⑩ Waiver ⑪ Runbook：回滚**+灰度+健康/就绪** ⑫ 部署拓扑 ADR ⑬ 执行权威。**任一 FAIL 阻断发布**；`DEFERRED`（离线审计、带负责人+触发条件的 NFR）可见且绝不算绿 |
 | **必查项** | 回滚步骤是"可执行的精确步骤"还是空话？灰度延后的有没有写 trigger？审计 0 漏洞吗？**NFR 目标验了没**？另外 `VERIFIED → APPROVED` 需要一位**不是候选准备者本人**记录的批准——任何模型、任何自动化都无法代劳 |
@@ -783,7 +783,7 @@ LLM tracing（token/成本/context/tool-span）。
 |---|---|
 | `next` | 唯一推荐的下一步动作、为什么、以及怎么开始（`--why`、`--all`） |
 | `resume` | 在新会话里恢复本机的关注点 |
-| `status` | 产品与当前 scope 处在哪里（`--changed`） |
+| `status` | 产品与当前 scope 处在哪里（`--changed`）；自 eos-2.2.0 起还会列出发布门禁（G8）将需要、但目前还不存在的东西：依赖审计、NFR 测量结果、runbook、部署拓扑 ADR（有了产品代码之后，`next` 也会点名其中缺失的项） |
 | `check --gate <id> [--scope <id>]` | 真正跑一道门禁并记录证据 |
 | `explain <gate>` | 按需打印某一道门禁的完整规则 |
 | `transition --scope <type> --id <id> --to <STATE>` | 迁移一个 scope，由已记录的证据把守 |

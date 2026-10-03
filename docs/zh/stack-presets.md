@@ -55,7 +55,8 @@ EOS 的 CI 曾经只有一句 `if [ -f package.json ]`，于是 **Python/Go/Java
 |---|---|
 | `projectType` | `application` \| `library` \| `config-only`。前两者**必须**有 `commands.test`；`config-only` 只有在仓库里**找不到任何栈清单文件**时才允许，且**不得**声明 `commands`（不会被执行） |
 | `stacks` | `node` \| `python` \| `go` \| `java` \| `rust` \| `dotnet` \| `other`（数组，可多栈）。栈没有清单文件（shell / Terraform / 裸脚本）就用 `other` |
-| `commands` | `install` / `lint` / `typecheck` / `test` / `eval`。缺省=N/A；声明了就**必须真的能跑通** |
+| `commands` | `install` / `lint` / `typecheck` / `test` / `eval` / `audit`。缺省=N/A；声明了就**必须真的能跑通**。`audit`（npm audit、pip-audit、govulncheck 等）不属于每次推送的门禁：由发布门禁（G8）运行，缺失即 FAIL——每个带代码的起步包都声明了它 |
+| `evidence` | `{ "junit": ["reports/junit/*.xml"] }`——`commands.test` 写出 JUnit XML 的位置。`verified` 门禁只读取本次运行写出的报告，并据此生成 `docs/evidence/test-run.json`（eos-2.2.0，ADR-016；见 `docs/eos/examples/trace-evidence/`） |
 | `productParadigms` | `deterministic` \| `agentic`（数组）。含 `agentic` => G-EVAL 门打开 |
 | `evalRequired` | 可选 `boolean`，显式覆盖上面的推断 |
 | `evalWaiver` | `{ reason, approvedBy }`——自动检测到 LLM 依赖但你坚持声明为 deterministic 时必须给，且要有真实理由 |
@@ -84,32 +85,36 @@ EOS 的 CI 曾经只有一句 `if [ -f package.json ]`，于是 **Python/Go/Java
 // Node.js / TypeScript
 { "projectType": "application", "stacks": ["node"],
   "commands": { "install": "npm ci", "lint": "npm run --silent lint",
-                "typecheck": "npm run --silent typecheck", "test": "npm test --silent" } }
+                "typecheck": "npm run --silent typecheck", "test": "npm test --silent",
+                "audit": "npm audit --audit-level=high" } }
 
 // Python
 { "projectType": "application", "stacks": ["python"],
   "commands": { "install": "pip install -r requirements.txt", "lint": "ruff check .",
-                "typecheck": "mypy .", "test": "pytest -q" } }
+                "typecheck": "mypy .", "test": "pytest -q --junitxml=reports/junit/python.xml",
+                "audit": "pip-audit -r requirements.txt" },
+  "evidence": { "junit": ["reports/junit/*.xml"] } }
 
 // Go
 { "projectType": "application", "stacks": ["go"],
   "commands": { "install": "go mod download", "lint": "golangci-lint run",
-                "typecheck": "go vet ./...", "test": "go test ./..." } }
+                "typecheck": "go vet ./...", "test": "go test ./...", "audit": "govulncheck ./..." } }
 
 // Java (Maven)
 { "projectType": "application", "stacks": ["java"],
   "commands": { "install": "mvn -q dependency:go-offline", "lint": "mvn -q spotless:check",
-                "test": "mvn -q test" } }
+                "test": "mvn -q test", "audit": "mvn -q org.owasp:dependency-check-maven:check -DfailBuildOnCVSS=7" },
+  "evidence": { "junit": ["target/surefire-reports/TEST-*.xml"] } }
 
 // Rust
 { "projectType": "application", "stacks": ["rust"],
   "commands": { "install": "cargo fetch", "lint": ["cargo clippy -- -D warnings"],
-                "typecheck": "cargo check", "test": "cargo test" } }
+                "typecheck": "cargo check", "test": "cargo test", "audit": "cargo audit" } }
 
 // .NET / C#
 { "projectType": "application", "stacks": ["dotnet"],
   "commands": { "install": "dotnet restore", "lint": "dotnet format --verify-no-changes",
-                "test": "dotnet test" } }
+                "test": "dotnet test", "audit": "dotnet restore -warnaserror:NU1903,NU1904" } }
 
 // Agentic / LLM 产品（在后端栈基础上加 eval——声明了 agentic 就必须有 eval 命令）
 { "projectType": "application", "stacks": ["python"], "productParadigms": ["deterministic", "agentic"],

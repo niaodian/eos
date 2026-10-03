@@ -502,7 +502,7 @@ So EOS **never depends on "Rule A overriding Rule B"**. The only reliable contro
 | **Goal** | Release only after passing quality/security/rollback/canary/NFR gates |
 | **When to enter** | G7 passed |
 | **How to start** | Enter **`/release-gate`** in Chat; if runbook is missing, run **`/runbook <service>`** first |
-| **Input** | Test results, NFR verification results, `ops/runbook-*.md` |
+| **Input** | Test results, NFR verification results (`docs/evidence/nfr-summary.json` — measure each target and write it with [examples/nfr-summary](examples/nfr-summary/README.md)), `ops/runbook-*.md`. `eos status` has listed what G8 needs since the project was declared |
 | **Output** | Release-gate report (PASS/FAIL item by item), `ops/runbook-<service>.md` |
 | **Decision gate G8 (hard gate)** | `node .github/eos/eos.mjs verify-release --release <id>` runs all 13 checks the prompt lists: ① the candidate is committed ② **the quality commands re-run ON THIS candidate** ③ stories VERIFIED ④ **each story's verification describes THIS tree** ⑤ spec alignment ⑥ secret scan ⑦ dependency audit ⑧ NFR evidence ⑨ compliance boundary ⑩ waivers ⑪ runbook: rollback **+ canary + health/readiness** ⑫ deployment-topology ADR ⑬ enforcement authority. **Any FAIL blocks release**; `DEFERRED` (an offline audit, an NFR with owner+trigger) is visible and never green |
 | **Must-check items** | Are rollback steps "exact executable steps" or empty words? Do deferred canary items have triggers? Does audit show 0 vulnerabilities? **Were NFR targets verified**? Note that `VERIFIED → APPROVED` needs an approval recorded by **someone other than whoever prepared the candidate** — no model, and no automation, can supply it |
@@ -752,7 +752,7 @@ rejected transition · `2` blocked/pending/stale · `3` EOS itself cannot be eva
 |---|---|
 | `next` | The ONE recommended next action, why, and how to start it (`--why`, `--all`) |
 | `resume` | Restore this machine's focus in a new session |
-| `status` | Where the product and the active scope are (`--changed`) |
+| `status` | Where the product and the active scope are (`--changed`), and — since eos-2.2.0 — what the release gate (G8) will need that does not exist yet: a dependency audit, NFR measurements, a runbook, a deployment-topology ADR (`next` names the missing ones once there is product code) |
 | `check --gate <id> [--scope <id>]` | Run one gate for real and record the evidence |
 | `explain <gate>` | The full rule set for one gate, on demand |
 | `transition --scope <type> --id <id> --to <STATE>` | Move a scope, guarded by recorded evidence |

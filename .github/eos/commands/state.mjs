@@ -18,6 +18,7 @@ import { loadWaivers, expiredWaivers, waiverStatus } from '../lib/waivers.mjs';
 import { activeWorkPath } from '../lib/registry.mjs';
 import { trackSummary } from '../lib/track.mjs';
 import { policyDrift } from '../lib/policy.mjs';
+import { releasePreview, previewLines } from '../lib/release-preview.mjs';
 import { EXIT, emit } from './shared.mjs';
 
 const CLI = 'node .github/eos/eos.mjs';
@@ -96,6 +97,9 @@ export const stateCommands = {
     }
     lines.push('Product', `  ${product.state}${product.blockedBy ? ` — next guard: ${product.blockedBy.reason}` : ''}`, '');
     if (json.track) lines.push(...trackLines(json.track));
+    // What the release gate will need, said from the first status on — not discovered at the release.
+    const preview = releasePreview(snapshot);
+    if (preview) { json.releasePreview = preview; lines.push(...previewLines(preview)); }
     if (!productCodeVerified) {
       lines.push('Scope of this verdict',
         snapshot.projectPresent
@@ -141,7 +145,13 @@ export const stateCommands = {
     if (cross.overlaps.length) decision.crossBranch = { base: cross.base.ref, overlaps: cross.overlaps };
     const drift = policyDrift(snapshot.root);
     if (drift) decision.policyDrift = drift;
-    const extra = [...crossBranchLines(cross), ...policyDriftLines(drift)];
+    // Only when something is missing, once there is product code to prepare a release of, and not
+    // while a release is the focus (its real G8 blockers are already the card): the common case's
+    // JSON is unchanged. `eos status` shows the full list from day one.
+    const preview = decision.current?.scopeType === 'release' || snapshot.project?.projectType === 'config-only' ? null : releasePreview(snapshot);
+    const ahead = preview && preview.items.some((i) => !i.ready) ? preview : null;
+    if (ahead) decision.releasePreview = ahead;
+    const extra = [...previewLines(ahead, { compact: true }), ...crossBranchLines(cross), ...policyDriftLines(drift)];
     emit(flags, decision, renderCard(decision, { why: !!flags.why, all: !!flags.all }) + (extra.length ? `\n${extra.join('\n')}` : ''));
     return decision.exitCode;
   },

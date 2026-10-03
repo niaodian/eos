@@ -223,6 +223,13 @@ export function listAdrs(root) {
   return out;
 }
 
+/** Where the release gate looks for the runbook. The preview `eos status` shows reads the same list. */
+export const RUNBOOKS = ['ops/runbook.md', 'docs/runbook.md', 'ops/RUNBOOK.md'];
+
+/** The ADR that records the deployment topology, if any. */
+export const findTopologyAdr = (root) => listAdrs(root)
+  .find((a) => /deployment|topology|hosting|infrastructure/i.test(a.name) || /deployment topology/i.test(a.text)) || null;
+
 /** An ADR that still says TBD / <fill in> has not decided anything. */
 export const decisionIsPlaceholder = (text) => {
   const body = text.replace(/^---[\s\S]*?---/, '').trim();

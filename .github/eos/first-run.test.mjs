@@ -229,3 +229,56 @@ test('no lock, or a lock that matches, says nothing', () => {
   assert.equal(run(dir, ['policy', 'lock', '--write']).code, 0);
   assert.doesNotMatch(run(dir, ['status']).out, /Policy changed/);
 });
+
+// ---------------------------------------------------------------- the release gate, previewed (2.2)
+// G8 used to be where a missing dependency audit, unmeasured NFRs, the runbook and the topology ADR
+// first surfaced. A declared project now sees them from its first `status`, and `next` names the
+// ones still missing once there is product code to release.
+test('every starter pack with product code declares the dependency audit the release gate runs', () => {
+  const r = runJson(project({ 'README.md': '# fresh\n' }), ['new']);
+  for (const { id } of r.json.packs) {
+    const d = runJson(project({ 'README.md': '# fresh\n' }), ['new', id]).json.declaration;
+    if (d.projectType === 'config-only') continue;
+    assert.ok(d.commands.audit, `${id} declares no commands.audit — G8 would be the first to say so`);
+  }
+});
+
+test('status previews what the release gate will need, from the first day', () => {
+  const dir = project({ '.eos/project.json': { ...APP_PROJECT, commands: { test: 'node --version' } } });
+  const r = runJson(dir, ['status']);
+  const items = Object.fromEntries(r.json.releasePreview.items.map((i) => [i.check, i.ready]));
+  assert.deepEqual(items, { 'dependency-audit': false, 'nfr-evidence': false, 'ops-artifacts': false, 'deployment-topology': false });
+  const text = run(dir, ['status']).out;
+  assert.match(text, /Release gate ahead \(G8\)/);
+  assert.match(text, /· a dependency audit \(commands\.audit\)\n\s+not declared — the release gate FAILs without it/);
+
+  write(dir, '.eos/project.json', { ...APP_PROJECT, commands: { test: 'node --version', audit: 'npm audit --audit-level=high' } });
+  write(dir, 'docs/evidence/nfr-summary.json', { schemaVersion: 1 });
+  write(dir, 'ops/runbook.md', '# Runbook\n');
+  write(dir, 'docs/adr/002-deployment-topology.md', '# 2. Deployment topology\n');
+  const ready = runJson(dir, ['status']).json.releasePreview.items;
+  assert.ok(ready.every((i) => i.ready), JSON.stringify(ready));
+});
+
+test('next names what the release gate will still need — within the published schema', () => {
+  const dir = project({ '.eos/project.json': { ...APP_PROJECT, commands: { test: 'node --version' } } });
+  const r = runJson(dir, ['next']);
+  assert.ok(validate(NEXT_SCHEMA, r.json).valid, JSON.stringify(validate(NEXT_SCHEMA, r.json).errors));
+  assert.deepEqual(r.json.releasePreview.items.filter((i) => !i.ready).map((i) => i.check),
+    ['dependency-audit', 'nfr-evidence', 'ops-artifacts', 'deployment-topology']);
+  assert.match(run(dir, ['next']).out, /Ahead at release \(G8\)\n\s+not ready yet: a dependency audit \(commands\.audit\) · NFR measurements/);
+});
+
+test('next stays quiet about the release while there is no product code, and on a template copy', () => {
+  const configOnly = project({ '.eos/project.json': { projectType: 'config-only', stacks: [], productParadigms: ['deterministic'] } });
+  assert.equal(runJson(configOnly, ['next']).json.releasePreview, undefined);
+  assert.ok(runJson(configOnly, ['status']).json.releasePreview, 'status still lists it');
+  assert.equal(runJson(project({ '.eos/project.json': SHIPPED }), ['status']).json.releasePreview, undefined);
+});
+
+test('the Regulated track previews the release signing key too', () => {
+  const dir = project({ '.eos/project.json': { ...APP_PROJECT, workflowProfile: 'regulated', complianceProfile: 'regulated', evidencePolicy: 'ci' } });
+  const key = runJson(dir, ['status']).json.releasePreview.items.find((i) => i.check === 'manifest-signature');
+  assert.equal(key.ready, false);
+  assert.match(key.detail, /release keygen --write/);
+});

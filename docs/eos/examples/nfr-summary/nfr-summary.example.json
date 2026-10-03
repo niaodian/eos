@@ -1,0 +1,13 @@
+{
+  "$schema": "https://eos.local/schemas/nfr-summary.schema.json",
+  "schemaVersion": 1,
+  "generatedAt": "2026-10-03T08:00:00.000Z",
+  "runId": "github-8821-1",
+  "producer": { "type": "ci", "name": "github-actions", "runRef": "https://github.com/acme/todo-api/actions/runs/8821" },
+  "productTree": { "digest": "<written by nfr-summary.mjs from `eos product-tree --json`>" },
+  "targets": [
+    { "id": "NFR1", "category": "performance", "decision": "ADOPT", "metric": "p95 latency of GET /todos at 50 rps", "comparator": "<=", "threshold": 300, "observed": 212, "unit": "ms", "status": "PASS", "evidenceRef": "reports/k6/todos-summary.json" },
+    { "id": "NFR2", "category": "availability", "decision": "DEFER", "metric": "monthly availability", "owner": "@platform", "trigger": "before the first paying tenant is onboarded", "dueBy": "2026-12-31" },
+    { "id": "NFR3", "category": "accessibility", "decision": "SKIP", "reason": "the API has no user interface; WCAG applies to the separate web client, which has its own NFRs" }
+  ]
+}

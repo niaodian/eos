@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 import { cpSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { boundedSpawnSync } from './test-spawn.mjs';
-import { project, run, runJson, cleanup, storyFiles, story, commitAll, APP_PROJECT, REPO_ROOT, treeDigest } from './audit-support.mjs';
+import { project, run, runJson, cleanup, storyFiles, story, commitAll, writeManifest, APP_PROJECT, REPO_ROOT, treeDigest } from './audit-support.mjs';
 import { readSummary, summaryTreeMismatch } from './lib/machine-summary.mjs';
 
 after(cleanup);
@@ -111,4 +111,40 @@ test('the trace-evidence example passes G7 as a dual-stack project — node:test
   const summary = readSummary(dir, 'testRun').data;
   assert.deepEqual(summary.source.reports, ['reports/junit/node.xml', 'reports/junit/python.xml']);
   assert.deepEqual(summary.results.map((x) => `${x.ac} ${x.status} ${x.match}`), ['AC1.1 PASS name', 'AC1.2 PASS file']);
+});
+
+// ---------------------------------------------------------------- NFR evidence (P1-2)
+// G8 required docs/evidence/nfr-summary.json while the template showed nothing that writes one. The
+// helper, copied into a project, must produce a summary the release gate's nfr-evidence check accepts.
+const NFR_EXAMPLE = join(REPO_ROOT, 'docs/eos/examples/nfr-summary');
+/** A project with the helper copied in and the EOS engine in place, as a copy of the template has it. */
+function nfrProject(measurements) {
+  const dir = project(storyFiles({ 'perf/measurements.json': measurements }), { withHooks: true });
+  cpSync(join(REPO_ROOT, '.github/eos'), join(dir, '.github/eos'), { recursive: true, filter: (src) => !/\.test\.mjs$/.test(src) });
+  cpSync(join(NFR_EXAMPLE, 'nfr-summary.mjs'), join(dir, 'scripts/nfr-summary.mjs'));
+  commitAll(dir, 'measure');
+  return dir;
+}
+
+test('the NFR helper, copied into a project, writes a summary the release gate accepts', () => {
+  const dir = nfrProject({ targets: [{ id: 'NFR1', category: 'performance', decision: 'ADOPT', metric: 'p95 reset latency', comparator: '<=', threshold: 800, observed: 410, unit: 'ms' }] });
+  const r = boundedSpawnSync(process.execPath, ['scripts/nfr-summary.mjs', 'perf/measurements.json'], { cwd: dir, encoding: 'utf8', env: { ...process.env, ...LOCAL } });
+  assert.equal(r.status, 0, `${r.stdout}${r.stderr}`);
+  const summary = readSummary(dir, 'nfrSummary');
+  assert.deepEqual(summary.errors, []);
+  assert.equal(summaryTreeMismatch(summary.data, treeDigest(dir)), null);
+  assert.equal(summary.data.targets[0].status, 'PASS');
+
+  writeManifest(dir, { releaseId: 'R-1' });
+  const gate = runJson(dir, ['check', '--gate', 'release-ready', '--scope', 'R-1']);
+  const nfr = gate.json.checks.find((c) => c.id === 'nfr-evidence');
+  assert.equal(nfr?.status, 'PASS', JSON.stringify(nfr));
+});
+
+test('a measurement that misses its threshold fails where it was measured, not first at the release', () => {
+  const dir = nfrProject({ targets: [{ id: 'NFR1', decision: 'ADOPT', comparator: '<=', threshold: 800, observed: 950, unit: 'ms' }] });
+  const r = boundedSpawnSync(process.execPath, ['scripts/nfr-summary.mjs', 'perf/measurements.json'], { cwd: dir, encoding: 'utf8', env: { ...process.env, ...LOCAL } });
+  assert.equal(r.status, 1, r.stdout);
+  assert.match(r.stdout, /FAIL\s+NFR1 950ms <= 800ms/);
+  assert.equal(readSummary(dir, 'nfrSummary').data.targets[0].status, 'FAIL');
 });

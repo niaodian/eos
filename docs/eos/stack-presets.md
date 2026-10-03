@@ -52,7 +52,8 @@ declaration**, executed by the zero-dependency, cross-platform `node .github/hoo
 |---|---|
 | `projectType` | `application` \| `library` \| `config-only`. The first two **must** have `commands.test`; `config-only` is allowed only when **no stack manifest exists** in the repo, and must **not** declare `commands` (they would never run) |
 | `stacks` | `node` \| `python` \| `go` \| `java` \| `rust` \| `dotnet` \| `other` (array, multi-stack ok). Use `other` for a stack with no manifest file (shell / Terraform / plain scripts) |
-| `commands` | `install` / `lint` / `typecheck` / `test` / `eval`. Absent = N/A; declared = **must actually run and pass** |
+| `commands` | `install` / `lint` / `typecheck` / `test` / `eval` / `audit`. Absent = N/A; declared = **must actually run and pass**. `audit` (npm audit, pip-audit, govulncheck …) is not part of the per-push gate: the release gate (G8) runs it, and fails without it — every starter pack with code declares one |
+| `evidence` | `{ "junit": ["reports/junit/*.xml"] }` — where `commands.test` writes JUnit XML. The `verified` gate reads only the reports that run wrote and derives `docs/evidence/test-run.json` from them (eos-2.2.0, ADR-016; see `docs/eos/examples/trace-evidence/`) |
 | `productParadigms` | `deterministic` \| `agentic` (array). Contains `agentic` => the G-EVAL gate turns on |
 | `evalRequired` | Optional `boolean`, explicitly overriding the inference above |
 | `evalWaiver` | `{ reason, approvedBy }` — required when an LLM dependency is discovered but you still declare `deterministic`; the reason must be real |
@@ -82,32 +83,36 @@ declaration**, executed by the zero-dependency, cross-platform `node .github/hoo
 // Node.js / TypeScript
 { "projectType": "application", "stacks": ["node"],
   "commands": { "install": "npm ci", "lint": "npm run --silent lint",
-                "typecheck": "npm run --silent typecheck", "test": "npm test --silent" } }
+                "typecheck": "npm run --silent typecheck", "test": "npm test --silent",
+                "audit": "npm audit --audit-level=high" } }
 
 // Python
 { "projectType": "application", "stacks": ["python"],
   "commands": { "install": "pip install -r requirements.txt", "lint": "ruff check .",
-                "typecheck": "mypy .", "test": "pytest -q" } }
+                "typecheck": "mypy .", "test": "pytest -q --junitxml=reports/junit/python.xml",
+                "audit": "pip-audit -r requirements.txt" },
+  "evidence": { "junit": ["reports/junit/*.xml"] } }
 
 // Go
 { "projectType": "application", "stacks": ["go"],
   "commands": { "install": "go mod download", "lint": "golangci-lint run",
-                "typecheck": "go vet ./...", "test": "go test ./..." } }
+                "typecheck": "go vet ./...", "test": "go test ./...", "audit": "govulncheck ./..." } }
 
 // Java (Maven)
 { "projectType": "application", "stacks": ["java"],
   "commands": { "install": "mvn -q dependency:go-offline", "lint": "mvn -q spotless:check",
-                "test": "mvn -q test" } }
+                "test": "mvn -q test", "audit": "mvn -q org.owasp:dependency-check-maven:check -DfailBuildOnCVSS=7" },
+  "evidence": { "junit": ["target/surefire-reports/TEST-*.xml"] } }
 
 // Rust
 { "projectType": "application", "stacks": ["rust"],
   "commands": { "install": "cargo fetch", "lint": ["cargo clippy -- -D warnings"],
-                "typecheck": "cargo check", "test": "cargo test" } }
+                "typecheck": "cargo check", "test": "cargo test", "audit": "cargo audit" } }
 
 // .NET / C#
 { "projectType": "application", "stacks": ["dotnet"],
   "commands": { "install": "dotnet restore", "lint": "dotnet format --verify-no-changes",
-                "test": "dotnet test" } }
+                "test": "dotnet test", "audit": "dotnet restore -warnaserror:NU1903,NU1904" } }
 
 // Agentic / LLM product (adds eval on top of the backend stack — declaring agentic REQUIRES an eval command)
 { "projectType": "application", "stacks": ["python"], "productParadigms": ["deterministic", "agentic"],

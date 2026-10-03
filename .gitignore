@@ -28,6 +28,8 @@ __pycache__/
 # written by the run they describe, so inside the product tree they would change the very digest they
 # are bound to. Root-anchored on purpose: a bare `reports/` would also hide a source module of that name.
 /reports/junit/
+# Maven / Cargo build output (the java-service pack reads Surefire's reports from /target/).
+/target/
 
 # generated docs (rebuild via docs/eos/tools/build-pdf.sh)
 docs/eos/*.pdf
