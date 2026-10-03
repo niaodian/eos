@@ -1222,6 +1222,24 @@ Run one minimal dry-run feature (such as "user login") end to end through 10 pha
 
 > See **Appendix C** for the complete real example (`my-app` 12/12 passed, report in `my-app/docs/eos/walkthrough.md`).
 
+## 8.4 What CI runs in your repository
+
+`.github/workflows/eos-ci.yml` came with the template, and it is two things at once: the governance gate
+every project runs, and EOS's own test suite ([ADR-021](../adr/021-eos-tests-run-only-in-eos.md)).
+`.github/eos/ci-plan.mjs` tells them apart from `.eos/project.json`: the template ships its own
+declaration marked `"templateDefault": true`, and `eos init` replaces it with yours.
+
+| Job / step | In your project | In EOS itself |
+|---|---|---|
+| `verify` — validate-config, doc parity, SBOM, governance versions, generated docs, agent platforms, doctor `--deep`, gitleaks and the secret scan, spec-align, ledger, policy lock, `eos doctor` | runs | runs |
+| `verify` — the product-quality gate (`project-gate.mjs`) | runs **your** declared install / lint / typecheck / test / eval | runs EOS's declared suite |
+| `verify` — the five `EOS tests ·` layers | skipped | runs |
+| `coverage` and `cross-platform` | skipped — no runner starts | runs |
+| `release-candidate` (tags only) | runs | runs |
+
+Until you declare your project, a push still runs EOS's suites — and they pass, because the tree is still
+the template's. Mark only `verify` as a required check ([Appendix D.1](#appendix-d-post-instantiation-hardening-make-gates-authoritative)).
+
 ---
 
 # Chapter 9 Failure localization and troubleshooting
@@ -2010,6 +2028,7 @@ GitHub repository → **Settings → Rules → Rulesets → New branch ruleset**
 2. Check **Require a pull request before merging** (forbid direct push to the default branch).
 3. Check **Require status checks to pass before merging** → search and select **`verify`** (the job in `eos-ci.yml`).
    -- This step turns validate-config / eos-doctor / secret-scan from "green-light advice" into "red-light block".
+   Select `verify` only: `coverage` and `cross-platform` test EOS itself and are skipped in your repository ([§8.4](#84-what-ci-runs-in-your-repository)).
 4. Check **Require review from Code Owners** (paired with CODEOWNERS in D.2).
 5. (Recommended) Check **Do not allow bypassing the above settings**, to avoid casual administrator bypass.
 

@@ -524,3 +524,55 @@ export const storyFiles = (extra = {}) => baselineFiles({
 });
 
 export const hasHooks = (dir) => existsSync(join(dir, '.github/hooks'));
+
+// ------------------------------------------------------------------------ the CI workflow, as text
+// Enough structure to assert what runs where, without a YAML parser (EOS has no dependencies).
+export const CI_WORKFLOW = '.github/workflows/eos-ci.yml';
+
+/** Each job's block of text, by name. */
+export function ciJobs(text) {
+  const body = text.slice(text.indexOf('\njobs:'));
+  const out = {};
+  const starts = [...body.matchAll(/^ {2}([a-z][a-z0-9-]*):\n/gm)];
+  starts.forEach((m, i) => { out[m[1]] = body.slice(m.index, i + 1 < starts.length ? starts[i + 1].index : undefined); });
+  return out;
+}
+
+/** A job's steps: name, id, if and run — a `run: |` block is de-indented and joined. */
+export function ciSteps(job) {
+  const at = job.indexOf('\n    steps:\n');
+  if (at < 0) return [];
+  return job.slice(at + '\n    steps:\n'.length).split(/\n(?= {6}- )/).map((text) => {
+    const field = (key) => (text.match(new RegExp(`^ {6}- ${key}: (.+)$`, 'm')) || text.match(new RegExp(`^ {8}${key}: (.+)$`, 'm')) || [])[1]?.trim() ?? null;
+    let run = field('run');
+    if (run === '|') {
+      const lines = text.split('\n');
+      const block = [];
+      for (const line of lines.slice(lines.findIndex((l) => /^ {8}run: \|$/.test(l)) + 1)) {
+        if (line.trim() && !line.startsWith(' '.repeat(10))) break;
+        block.push(line.slice(10));
+      }
+      run = block.join('\n').trim();
+    }
+    return { text, name: field('name'), id: field('id'), if: field('if'), run };
+  });
+}
+
+/** Does this step run only in EOS itself (the plan's `self`)? */
+export const gatedOnSelf = (step) => /steps\.scope\.outputs\.self == 'true'/.test(step.if || '');
+
+/**
+ * The commands `verify` runs in a project — every step the plan does not gate — one per line, as
+ * written. A summary line ending in `|| true` is left out: its failure is ignored by design.
+ */
+export function projectPathCommands(text) {
+  const out = [];
+  for (const step of ciSteps(ciJobs(text).verify)) {
+    if (gatedOnSelf(step) || !step.run) continue;
+    for (const line of step.run.split('\n')) {
+      const m = line.trim().match(/^(node \.github\/[^\s|>&;]+(?: [^|>&;]+)?)/);
+      if (m && !/\|\| true\s*$/.test(line)) out.push(m[1].trim());
+    }
+  }
+  return out;
+}

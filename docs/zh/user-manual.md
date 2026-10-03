@@ -1255,6 +1255,24 @@ Chat 输入 **`/eos-validate-config`**：让 Agent 读 `.github/` 全量，检�
 
 > 完整真实样例见**附录 C**（`my-app` 12/12 通过，报告在 `my-app/docs/eos/walkthrough.md`）。
 
+## 8.4 你的仓库里 CI 运行什么
+
+`.github/workflows/eos-ci.yml` 随模板一起复制过来，它同时承担两件事：每个项目都要运行的治理门禁，以及
+EOS 自己的测试套件（[ADR-021](../adr/021-eos-tests-run-only-in-eos.md)）。`.github/eos/ci-plan.mjs`
+根据 `.eos/project.json` 区分二者：模板自带的声明标记为 `"templateDefault": true`，`eos init` 会把它
+换成你的声明。
+
+| 作业 / 步骤 | 在你的项目中 | 在 EOS 自身中 |
+|---|---|---|
+| `verify` —— validate-config、文档对齐、SBOM、治理版本、生成文档、agent 平台、doctor `--deep`、gitleaks 与密钥扫描、spec-align、账本、策略锁、`eos doctor` | 运行 | 运行 |
+| `verify` —— 产品质量门（`project-gate.mjs`） | 运行**你**声明的 install / lint / typecheck / test / eval | 运行 EOS 声明的测试套件 |
+| `verify` —— 五个 `EOS tests ·` 测试层 | 跳过 | 运行 |
+| `coverage` 与 `cross-platform` | 跳过，不会启动任何 runner | 运行 |
+| `release-candidate`（仅 tag） | 运行 | 运行 |
+
+在你声明项目之前推送，CI 仍会运行 EOS 的测试套件；它们会通过，因为这时的代码树仍是模板本身。必需检查只勾选
+`verify`（见[附录 D.1](#附录-d-实例化后硬化（让门禁具备权威）)）。
+
 ---
 
 # 第 9 章 故障定位与排错
@@ -2009,6 +2027,7 @@ GitHub 仓库 → **Settings → Rules → Rulesets → New branch ruleset**，�
 2. 勾选 **Require a pull request before merging**（禁止直接 push 到默认分支）。
 3. 勾选 **Require status checks to pass before merging** → 搜索并选中 **`verify`**（`eos-ci.yml` 的 job）。
    —— 这一步把 validate-config / eos-doctor / secret-scan 从"绿灯建议"变成"红灯阻断"。
+   只选 `verify`：`coverage` 与 `cross-platform` 测试的是 EOS 自身，在你的仓库里会被跳过（见 [§8.4](#84-你的仓库里-ci-运行什么)）。
 4. 勾选 **Require review from Code Owners**（配合 D.2 的 CODEOWNERS）。
 5. （推荐）勾选 **Do not allow bypassing the above settings**，避免管理员随手绕过。
 

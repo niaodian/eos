@@ -97,6 +97,12 @@ the CI gates actually block a merge) needs that remote to exist, so create it be
 gh repo create my-new-app --private --source=. --remote=origin --push
 ```
 
+**What your CI runs.** `eos-ci.yml` came with the template. Once the project is declared, it runs the
+governance gate — configuration, secrets, SBOM, ledger, policy lock, doctor — and the commands your
+declaration names. EOS's own test suites, coverage job and cross-platform matrix test EOS, so they are
+skipped ([manual §8.4](user-manual.md#84-what-ci-runs-in-your-repository)). In branch protection,
+require `verify` only.
+
 Then, in **Copilot Chat**:
 
 1. **`/eos-init`** — the one-time hardening walkthrough: your answer language, branch protection,

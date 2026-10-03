@@ -99,6 +99,10 @@ code .                                        # 必须在项目目录*内部*执
 gh repo create my-new-app --private --source=. --remote=origin --push
 ```
 
+**你的 CI 运行什么。** `eos-ci.yml` 随模板一起复制过来。项目声明之后，它运行治理门禁（配置、密钥、SBOM、
+账本、策略锁、doctor）以及你在声明中写明的命令。EOS 自己的测试套件、覆盖率作业与跨平台矩阵测试的是 EOS，
+因此会被跳过（见[手册 §8.4](user-manual.md#84-你的仓库里-ci-运行什么)）。分支保护中只把 `verify` 设为必需检查。
+
 然后，在 **Copilot Chat** 里：
 
 1. **`/eos-init`**——一次性硬化引导：回答语言、分支保护、CODEOWNERS、审批基线，

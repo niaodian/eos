@@ -181,7 +181,8 @@ gh attestation verify eos-2.4.0.tar.gz --repo niaodian/eos
                     .claude/skills/ 是为 Claude Code 生成的副本
 .mcp.json、.claude/settings.json、.agents/hooks.json、.agents/mcp_config.json、.agents/agents/
                     由 `eos agents sync` 为每个已声明的 agent 平台生成——不要手工编辑
-.github/workflows/  eos-ci.yml（Linux、macOS、Windows）与 eos-release.yml（带证明的发布）
+.github/workflows/  eos-ci.yml（治理门禁；EOS 自己的测试矩阵只在 EOS 自身运行）与
+                    eos-release.yml（带证明的发布）
 docs/               你的规格与 ADR；docs/eos/ 是 EOS 手册（中文版在 docs/zh/）
 ```
 
@@ -200,7 +201,11 @@ docs/               你的规格与 ADR；docs/eos/ 是 EOS 手册（中文版�
 ## 环境要求与说明
 
 - **Node.js 20.10+ 和 Git** —— 别无其他。请使用 Node 22 或 24：Node 20 已于 2026-04-30 停止维护，
-  只作为声明的最低版本继续受支持。CI 在 Linux、macOS 和 Windows 上运行 Node 20、22 与 24。
+  只作为声明的最低版本继续受支持。EOS 自己的 CI 在 Linux、macOS 和 Windows 上测试 Node 20、22 与 24。
+- **你的 CI。** [eos-ci.yml](.github/workflows/eos-ci.yml) 随模板一起提供。在你的仓库里，它运行治理门禁和你在声明中
+  写明的命令。EOS 自己的测试套件、覆盖率与跨平台矩阵测试的是 EOS，所以只在 `.eos/project.json` 仍是模板自身的
+  声明时运行，执行 `eos init` 之后即被跳过（见[手册 §8.4](docs/zh/user-manual.md#84-你的仓库里-ci-运行什么)、
+  [ADR-021](docs/adr/021-eos-tests-run-only-in-eos.md)）。
 - **永远不需要 API key。** EOS 从不调用模型。每一项附加（Copilot、BMAD、BMAD 运行时）带来什么，以及已知局限，
   见 [快速开始](docs/zh/quickstart.md#能力与依赖)。
 - **AI agent 是可选的。** GitHub Copilot（VS Code）、Claude Code、OpenAI Codex 和 Google Antigravity 都有分步指导；

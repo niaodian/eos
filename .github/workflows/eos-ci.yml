@@ -13,6 +13,16 @@ name: EOS CI
 #     && node .github/hooks/eos-doctor.mjs && node .github/hooks/project-gate.mjs
 # This is the batch, whole-repo gate (complements per-edit hooks + validate-config.mjs).
 #
+# WHAT RUNS WHERE (ADR-021). This file is copied into every project that starts from the template, and
+# it is two things at once. The governance checks in `verify` — configuration, docs drift, SBOM,
+# secrets, ledger, policy, doctor and the project's own declared commands — run in every repository.
+# EOS's own test suites (the five "EOS tests ·" steps), the `coverage` job and the `cross-platform`
+# matrix test EOS itself, so they run only while .eos/project.json is still the template's own
+# declaration ("templateDefault": true): in EOS's repository, and in a copy that has not run
+# `eos init` yet. Once a project declares itself, they are skipped — without starting a single
+# Windows or macOS runner. `.github/eos/ci-plan.mjs` reads the declaration; this file holds no
+# second copy of the rule.
+#
 # NON-NODE STACKS: the product-quality step below runs whatever `.eos/project.json` declares, so a
 # Python/Go/Java/Rust/.NET project's tests DO run and DO fail CI. Add your toolchain's setup step
 # (actions/setup-python, setup-go, setup-java, dtolnay/rust-toolchain, setup-dotnet…) before it —
@@ -66,6 +76,13 @@ jobs:
           # The declared minimum (`engines`), end of life since 2026-04-30: the gate proves the floor
           # still works, and the ci-linux timing baseline is recorded on it. 22 and 24 run below.
           node-version: '20'
+
+      - name: EOS itself, or a project that copied it? (decides whether EOS's own tests run)
+        id: scope
+        # Computed here rather than taken from the `plan` job: `verify` is the required check, and
+        # GitHub reports a job skipped because a job it needs failed as a PASSING required check. A
+        # broken plan must turn this job red, never skip it green.
+        run: node .github/eos/ci-plan.mjs >> "$GITHUB_OUTPUT"
 
       - name: EOS config validation (S1–S13)
         run: node .github/hooks/validate-config.mjs
@@ -136,7 +153,11 @@ jobs:
         run: node .github/hooks/spec-align.mjs
 
       # ---------------------------------------------------------------------------------------
-      # TEST LAYERS. Each step runs one layer in a SINGLE `node --test` invocation, so Node
+      # TEST LAYERS — EOS's OWN suites. They run only while the declaration is the template's own
+      # (steps.scope above, ADR-021); in a project they are skipped, and the product-quality step
+      # below runs the project's own declared tests instead.
+      #
+      # Each step runs one layer in a SINGLE `node --test` invocation, so Node
       # parallelises the files across cores, and each step reports its own duration plus a budget
       # check. This replaced ~15 one-file-per-step invocations that ran strictly sequentially and
       # were gated by a single 1,246-line file (38.3s of a 38.7s run). Layers + the split brought
@@ -146,21 +167,26 @@ jobs:
       # plausible second at a time, and the commit that caused it is the only affordable moment to
       # fix it. On a slow runner scale the budget (EOS_TEST_BUDGET_SCALE) rather than raising it.
       - name: EOS tests · unit (pure logic, atomic writes, single-module behaviour)
+        if: steps.scope.outputs.self == 'true'
         run: node .github/eos/run-tests.mjs unit
 
       - name: EOS tests · contract (CLI JSON + exit codes, adapter contract, offline boundary)
+        if: steps.scope.outputs.self == 'true'
         run: node .github/eos/run-tests.mjs contract
 
       - name: EOS tests · integration (routing, gate bypasses, cross-stack quality, doctor)
+        if: steps.scope.outputs.self == 'true'
         run: node .github/eos/run-tests.mjs integration
 
       - name: EOS tests · journey (the whole developer loop, end to end, offline)
+        if: steps.scope.outputs.self == 'true'
         run: node .github/eos/run-tests.mjs journey
 
       - name: EOS tests · audit regressions (one executable case per audit finding)
         # Each test performs the reported bypass — relabelling, an outlived waiver, a tampered or
         # truncated ledger, hand-written evidence, a story added after a release gate, a forked
         # ledger from concurrent writers — and asserts it no longer works.
+        if: steps.scope.outputs.self == 'true'
         run: node .github/eos/run-tests.mjs audit-regression
 
       - name: EOS ledger append-only verification
@@ -217,11 +243,11 @@ jobs:
         # declares. Replaces the old `if [ -f package.json ]` branch, which silently skipped
         # Python/Go/Java/Rust/.NET projects so their failing tests could never fail CI. [audit EOS-002]
         #
-        # This DELIBERATELY re-executes the test layers above. The steps above exist for fast,
-        # granular feedback (a red step names the layer); this step proves the DECLARED command in
-        # .eos/project.json actually runs and passes. EOS requires that of every other project, so
-        # it has to hold itself to it — a declaration nobody executes is exactly the vacuous green
-        # this gate exists to refuse. The overlap costs ~30s of a 20-minute budget.
+        # In EOS's own repository this DELIBERATELY re-executes the test layers above. The steps
+        # above exist for fast, granular feedback (a red step names the layer); this step proves the
+        # DECLARED command in .eos/project.json actually runs and passes. EOS requires that of every
+        # other project, so it has to hold itself to it — a declaration nobody executes is exactly the
+        # vacuous green this gate exists to refuse. In a project, this is the step that runs its tests.
         run: node .github/hooks/project-gate.mjs
 
       - name: EOS gate summary (published to the PR / run summary)
@@ -243,10 +269,27 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
   # ---------------------------------------------------------------------------------------------
-  # Candidate-bound release verification. `verify` proves THE CHANGE is sound; this proves THE THING
-  # BEING SHIPPED is. It re-runs the declared quality commands on the tag's own tree and requires
-  # every included story's verification to describe THAT tree — story state is not evidence about
-  # code. [EOS-AUD-001 / EOS-AUD-007]
+  # EOS's OWN TESTS — the plan. Reads .eos/project.json once for the jobs below, which test EOS
+  # itself and are skipped as a whole (no runner starts) in a project that has declared itself.
+  # `verify` does not depend on this job: it asks the same script in its own step (see there).
+  # ---------------------------------------------------------------------------------------------
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      self: ${{ steps.plan.outputs.self }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '20'
+      - id: plan
+        run: node .github/eos/ci-plan.mjs >> "$GITHUB_OUTPUT"
+
   # ---------------------------------------------------------------------------------------------
   # CROSS-PLATFORM. EOS is a path-handling program — product-tree digests, porcelain parsing, the
   # posix() normaliser, evidence file names — and all of it was only ever tested on Linux. A
@@ -257,6 +300,8 @@ jobs:
   # so leaving them Linux-only tested the platform-independent half and skipped the half most
   # likely to break.
   cross-platform:
+    needs: plan
+    if: needs.plan.outputs.self == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -351,6 +396,8 @@ jobs:
   # measured figure so a real regression fails the build and normal variance does not. Needs Node
   # 22+, which is where --test-coverage-* became enforceable. [audit #8]
   coverage:
+    needs: plan
+    if: needs.plan.outputs.self == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -365,6 +412,12 @@ jobs:
       - name: EOS branch + line coverage (thresholds enforced)
         run: node .github/eos/run-tests.mjs --coverage
 
+  # ---------------------------------------------------------------------------------------------
+  # Candidate-bound release verification. `verify` proves THE CHANGE is sound; this proves THE THING
+  # BEING SHIPPED is. It re-runs the declared quality commands on the tag's own tree and requires
+  # every included story's verification to describe THAT tree — story state is not evidence about
+  # code. [EOS-AUD-001 / EOS-AUD-007]
+  # ---------------------------------------------------------------------------------------------
   release-candidate:
     if: startsWith(github.ref, 'refs/tags/')
     needs: verify
