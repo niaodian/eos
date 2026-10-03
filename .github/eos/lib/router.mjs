@@ -13,7 +13,7 @@ const CLI = 'node .github/eos/eos.mjs';
 
 /** Bootstrap pointers used before .eos/agent-map.json can be read (a brand-new repository). */
 const BOOTSTRAP_MAP = {
-  'fix-eos-configuration': { agent: null, prompt: 'validate-config', skills: [] },
+  'fix-eos-configuration': { agent: null, prompt: 'eos-validate-config', skills: [] },
   'complete-local-activation': { agent: null, prompt: 'eos-init', skills: [] },
   'declare-project': { agent: null, prompt: null, skills: [] },
 };

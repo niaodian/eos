@@ -273,7 +273,7 @@ test('validate-config S12 mirrors project-gate: node-only WARNs, other stacks ER
   const base = {
     '.github/copilot-instructions.md': '# rules\n',
     '.github/instructions/00-workspace.instructions.md': '---\napplyTo: "**"\n---\n# x\n',
-    '.github/prompts/.gitkeep': '',
+    '.agents/skills/.gitkeep': '',
     '.github/agents/.gitkeep': '',
     '.github/hooks/.gitkeep': '',
     'docs/eos/agent-map.md': '# map\n',

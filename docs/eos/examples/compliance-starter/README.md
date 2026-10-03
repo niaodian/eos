@@ -78,9 +78,9 @@ identical. Java `.class` files are build artifacts (git-ignored); compile to an 
 > `IllegalStateException`) with overloads for the optional args. Storage backing differs by idiom
 > (JS `Map`, Python `dict`, Go `map`, Java `HashMap`) — same shapes otherwise.
 
-## Auto-select the regime from `/compliance`
+## Auto-select the regime from `/eos-compliance`
 Instead of hardcoding `createRedactor(['HIPAA'])`, let the redactor read the regime the
-`/compliance` workflow already decided. That workflow writes `docs/compliance-profile.md` whose
+`/eos-compliance` workflow already decided. That workflow writes `docs/compliance-profile.md` whose
 first content line is a canonical, machine-readable anchor:
 
 ```
@@ -100,7 +100,7 @@ resolve to a known regime are honoured, so free-text rationale on the line is ig
 | Java | `redactorFromProfile("docs/compliance-profile.md", "all")` | fail-safe: all regimes (also `"base"` / `"throw"`) |
 
 The policy is deliberate: a **present** profile scopes to exactly what the human selected (or `none`
-→ base only), while a **missing** profile fails safe to *all* regimes so a forgotten `/compliance`
+→ base only), while a **missing** profile fails safe to *all* regimes so a forgotten `/eos-compliance`
 run can never silently under-redact. Pass `''`/`""` (or omit in Node/Python) for the default path.
 
 ## Why this shape
@@ -108,7 +108,7 @@ These are the three items that, left as prose in a checklist, get rebuilt ad-hoc
 usually **retrofitted late** (the most expensive time). `redaction.mjs` in particular is the
 `eos-doctor` **D5** landmine made concrete: if regulated data reaches a third-party LLM without a
 boundary, you are forced into a model/architecture swap. See `docs/checklists/F-compliance.md`
-(*Agentic data-boundary*), `docs/checklists/F-compliance-gdpr-pipl.md`, and the `/compliance` prompt.
+(*Agentic data-boundary*), `docs/checklists/F-compliance-gdpr-pipl.md`, and the `/eos-compliance` prompt.
 
 > `【New-build】` — no BMAD skill ships compliance code skeletons; this fills that gap and composes
 > with `eos-operational-readiness` (decides *what*) by giving the *starting scaffold*, in all four

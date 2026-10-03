@@ -91,7 +91,7 @@
           "id": "requirements-written",
           "title": "docs/requirements.md is written and docs/requirements.json validates",
           "evaluator": "requirementsWritten",
-          "fix": "Run /requirements (bmad-agent-pm + eos-operational-readiness)."
+          "fix": "Run /eos-requirements (bmad-agent-pm + eos-operational-readiness)."
         },
         {
           "id": "functional-requirements",
@@ -132,7 +132,7 @@
           "id": "prd-present",
           "title": "docs/prd.md exists",
           "evaluator": "prdPresent",
-          "fix": "Run /spec to produce docs/prd.md (bmad-prd — it detects create / update / validate intent)."
+          "fix": "Run /eos-spec to produce docs/prd.md (bmad-prd — it detects create / update / validate intent)."
         },
         {
           "id": "ac-parseable",
@@ -173,7 +173,7 @@
           "id": "ux-applicability",
           "title": "the product states whether it has a user-facing surface",
           "evaluator": "uxApplicabilityDecided",
-          "fix": "Create docs/design.json: { \"userInterface\": true } or { \"userInterface\": false, \"skipReason\": \"…\" }. Run /ux-spec."
+          "fix": "Create docs/design.json: { \"userInterface\": true } or { \"userInterface\": false, \"skipReason\": \"…\" }. Run /eos-ux-spec."
         },
         {
           "id": "ux-documents",
@@ -403,7 +403,7 @@
           "id": "compliance-boundary",
           "title": "the compliance data boundary holds",
           "evaluator": "releaseComplianceBoundary",
-          "fix": "Run /compliance to record docs/compliance-profile.json; eos-doctor D5 explains what is missing."
+          "fix": "Run /eos-compliance to record docs/compliance-profile.json; eos-doctor D5 explains what is missing."
         },
         {
           "id": "no-expired-waivers",
@@ -415,7 +415,7 @@
           "id": "ops-artifacts",
           "title": "runbook, rollback, canary and health/readiness are documented",
           "evaluator": "releaseOpsArtifacts",
-          "fix": "Run /runbook and /deploy-topology so rollback, gradual rollout and health/readiness are written down before shipping."
+          "fix": "Run /eos-runbook and /eos-deploy-topology so rollback, gradual rollout and health/readiness are written down before shipping."
         },
         {
           "id": "deployment-topology",
@@ -444,7 +444,7 @@
           "id": "telemetry-plan",
           "title": "docs/telemetry-plan.md is written and docs/telemetry.json validates",
           "evaluator": "telemetryPlanWritten",
-          "fix": "Run /telemetry-plan; it produces the plan and the record."
+          "fix": "Run /eos-telemetry-plan; it produces the plan and the record."
         },
         {
           "id": "signals-land",

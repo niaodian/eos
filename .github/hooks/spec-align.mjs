@@ -29,8 +29,8 @@ if (missing.length) {
     console.log(`  ERROR missing spec evidence: ${missing.join(', ')}`);
     console.log('');
     console.log('FAIL (--strict): no spec evidence to score. A release gate cannot pass on absent proof —');
-    console.log('  run /spec (docs/prd.md) and produce docs/trace-matrix.md at G7, or, if this project tracks');
-    console.log('  specs elsewhere, record that N/A in the /release-gate report instead of running --strict.');
+    console.log('  run /eos-spec (docs/prd.md) and produce docs/trace-matrix.md at G7, or, if this project tracks');
+    console.log('  specs elsewhere, record that N/A in the /eos-release-gate report instead of running --strict.');
     process.exit(1);
   }
   console.log(`ADVISORY / SKIP — ${missing.join(' + ')} not found; nothing to score yet (produced at G7).`);

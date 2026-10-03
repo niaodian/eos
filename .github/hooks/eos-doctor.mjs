@@ -225,7 +225,7 @@ const hasEvalCommand = !!declared?.commands?.eval;
 
 if (llmPresent) {
   if (!hasEvalPlan) {
-    errors.push(`D1 G-EVAL: found ${evalReason} but no docs/eval-plan.md. Design evals before shipping (run /eval-spec).`);
+    errors.push(`D1 G-EVAL: found ${evalReason} but no docs/eval-plan.md. Design evals before shipping (run /eos-eval-spec).`);
   }
   const evalsDir = join(root, 'evals');
   const hasRunner = existsSync(evalsDir)
@@ -241,7 +241,7 @@ if (llmPresent) {
 // --- D3: G-UX (conditional) — real frontend components should have a UX contract ---
 const hasComponents = anyFile((n) => /\.(tsx|jsx)$/.test(n));
 if (hasComponents && !existsSync(join(root, 'docs/EXPERIENCE.md'))) {
-  warns.push('D3 G-UX: found React component files but no docs/EXPERIENCE.md. User-facing work needs the UX contract (run /ux-spec) or an explicit SKIP.');
+  warns.push('D3 G-UX: found React component files but no docs/EXPERIENCE.md. User-facing work needs the UX contract (run /eos-ux-spec) or an explicit SKIP.');
 }
 
 // --- D4: secret hygiene — delegate to secret-scan.mjs if present (error on leak) ---
@@ -286,7 +286,7 @@ if (regulated && (llmPresent || autoLlm)) {
   // that is its purpose — but it must never switch off the compliance boundary: "we decided not to
   // evaluate model output" says nothing about whether regulated data reaches a model. [review]
   if (!compliance.present) {
-    errors.push(`D5 Compliance (BLOCKER): a regulated regime applies and LLM/agent code exists, but there is no ${COMPLIANCE_PROFILE_PATH}. Prose cannot authorize this — record the structured data-boundary decision (regimes · data categories · thirdPartyModelPolicy · control status · owner · approval) via /compliance. Deny-by-default per security rules.`);
+    errors.push(`D5 Compliance (BLOCKER): a regulated regime applies and LLM/agent code exists, but there is no ${COMPLIANCE_PROFILE_PATH}. Prose cannot authorize this — record the structured data-boundary decision (regimes · data categories · thirdPartyModelPolicy · control status · owner · approval) via /eos-compliance. Deny-by-default per security rules.`);
   } else {
     for (const problem of evaluateDataBoundary(compliance.profile)) {
       errors.push(`D5 Compliance (BLOCKER): regulated data + LLM/agent path — ${problem}. Resolve F-compliance.md "Agentic data-boundary" before shipping.`);

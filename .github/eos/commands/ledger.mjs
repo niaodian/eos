@@ -145,7 +145,7 @@ export const ledgerCommands = {
     emit(flags, { file: rel, package: pkg }, [
       `EOS handoff · ${rel}`, '',
       `  goal: ${pkg.goal}`,
-      `  agent: ${pkg.recommended.agent || '—'}${pkg.recommended.prompt ? ` · prompt: /${pkg.recommended.prompt}` : ''}${pkg.recommended.skills.length ? ` · skills: ${pkg.recommended.skills.join(', ')}` : ''}`,
+      `  agent: ${pkg.recommended.agent || '—'}${pkg.recommended.prompt ? ` · slash command: /${pkg.recommended.prompt}` : ''}${pkg.recommended.skills.length ? ` · skills: ${pkg.recommended.skills.join(', ')}` : ''}`,
       `  files: ${pkg.files.length} (hash-bound)`,
       `  return: ${pkg.returnCommand}`, '',
     ].join('\n'));

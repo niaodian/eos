@@ -11,12 +11,12 @@ applyTo: "**/*.{test,spec}.*"
   (transactions commit/rollback, constraints, idempotency) in integration tests — determinism gets the
   same rigor the eval set gives the probabilistic side.
 - Dual-track: deterministic code → exact-assert unit/integration tests; LLM/agent code → the eval set
-  (graders + baseline, see `ai/10-ai-llm` + `/eval-spec`). Never exact-assert probabilistic output.
+  (graders + baseline, see `ai/10-ai-llm` + `/eos-eval-spec`). Never exact-assert probabilistic output.
 - No flaky patterns: no real timers (use fakes), no order-dependent tests.
 - Coverage gate: changed lines >= 80% (enforced locally; see hooks/quality.json).
 - For test design/automation, invoke `bmad-testarch-test-design` / `bmad-testarch-automate`.
 - E2E/browser: Playwright is the engine (init via `bmad-testarch-framework`); author flows with
-  `/e2e`. Deterministic Playwright specs are the only thing CI runs. Dev-time only and **opt-in at
+  `/eos-e2e`. Deterministic Playwright specs are the only thing CI runs. Dev-time only and **opt-in at
   Phase 7**, the agent may drive the local dev server through the sandboxed **Playwright MCP**
   (activate via `cp .vscode/mcp.json.example .vscode/mcp.json`, localhost) for exploration/triage —
   never as a substitute for a spec, never in CI. It ships **inert** (`.example`) because MCP servers

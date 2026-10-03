@@ -28,5 +28,5 @@
 
 > Output lands in: `docs/architecture.md` (Deployment section) + `docs/adr/NNN-deployment-topology.md`;
 > the topology's manifest (`Dockerfile` / `compose.yml` / `k8s/*.yaml` / `serverless.yml`) automatically picks up the R8
-> `release-ops` rule (`applyTo: **/{Dockerfile,*.yml,*.yaml}`). At Phase 8, `/release-gate` (G8) verifies that
+> `release-ops` rule (`applyTo: **/{Dockerfile,*.yml,*.yaml}`). At Phase 8, `/eos-release-gate` (G8) verifies that
 > rollback/canary/health match the topology chosen here.

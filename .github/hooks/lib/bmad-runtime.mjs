@@ -15,6 +15,7 @@ import { existsSync, readFileSync, statSync, accessSync, constants } from 'node:
 import { join, delimiter } from 'node:path';
 import { validate } from '../../eos/lib/schema.mjs';
 import { foreignProjectReferences } from '../../eos/lib/project-context.mjs';
+import { PROJECT_SKILL_DIRS } from '../../eos/lib/skills.mjs';
 
 export const BMAD_LOCK_PATH = '.eos/bmad.lock.json';
 
@@ -23,8 +24,9 @@ export function skillRoots(root = null) {
   const dirs = [];
   // PROJECT FIRST. A skill that travels with the repository is this project's answer, and a
   // user-level skill of the same name must not shadow it — that is how one project's work silently
-  // runs another project's version of a step.
-  if (root && existsSync(join(root, '.github/skills'))) dirs.push(join(root, '.github/skills'));
+  // runs another project's version of a step. Every project directory an agent reads skills from
+  // counts, the source (.agents/skills, ADR-017) first.
+  for (const rel of PROJECT_SKILL_DIRS) if (root && existsSync(join(root, rel))) dirs.push(join(root, rel));
   const homes = [process.env.HOME, process.env.USERPROFILE].filter(Boolean);
   for (const home of homes) {
     for (const rel of ['.agents/skills', '.claude/skills', '.copilot/skills']) {

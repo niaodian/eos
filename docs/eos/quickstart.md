@@ -8,7 +8,7 @@
 | Tool | Needed for | If absent |
 |---|---|---|
 | **Node.js** (20.10+) | the `eos` CLI, validators, hooks, JS/TS tests & evals | required — the only hard dependency (npm 10.9+, bundled with Node 22, for the `npx --offline eos` shortcut) |
-| **VS Code + GitHub Copilot** | the `eos-*` agents, `/eos-*` prompts and always-on rules | required for the guided flow; the `eos.mjs` CLI itself works without it |
+| **VS Code + GitHub Copilot** | the `eos-*` agents, `/eos-*` slash commands (skills) and always-on rules | required for the guided flow; the `eos.mjs` CLI itself works without it |
 | **BMAD skills** (`bmad-*`) | every stage workflow (`bmad-prd`, `bmad-architecture`, `bmad-create-story`, …) | required for the guided flow — EOS orchestrates them, it does not reimplement them. Verify with `node .github/hooks/eos-doctor.mjs --deep` |
 | **`gh` CLI**, authenticated | creating the remote, and verifying branch protection during `/eos-init` | **optional**: do it in the GitHub web UI instead. Set up with `gh auth login` |
 | **Docker** + `act` | local CI (`act push`) — runs GitHub Actions locally | **optional**: skip CI and run the same checks directly (below) |
@@ -51,7 +51,7 @@ EOS itself never calls a model and needs no API key. Each row adds to the one ab
 | You have | You get |
 |---|---|
 | **Node.js only** | the whole governance engine: `eos next` / `status` / `check` / `verify`, every gate, the ledger, policy locks, signed releases, the secret scan |
-| **+ VS Code with GitHub Copilot** | the guided flow: the `eos-*` agents, the `/eos-*` prompts, the always-on rules and the PreToolUse guardrail. The model is the one you pick in Copilot — nothing to configure |
+| **+ VS Code with GitHub Copilot** | the guided flow: the `eos-*` agents, the `/eos-*` slash commands (skills), the always-on rules and the PreToolUse guardrail. The model is the one you pick in Copilot — nothing to configure |
 | **+ BMAD skills** (`bmad-*`) | the authoring workflow each stage orchestrates (PRD, architecture, stories, test design). Without them `eos next` still names every step and you do it by hand |
 | **+ the BMAD project runtime** (`_bmad/`, needs python3 and uv) | BMAD's project-level customization and session memory. Optional: the skills run on their shipped defaults without it |
 | **an agentic / LLM product** | your product's own model calls, which the eval harness exercises ([eval-starter](examples/eval-starter/README.md)). That is product code you write anyway, not EOS configuration |
@@ -153,7 +153,7 @@ Where am I:     node .github/eos/eos.mjs status         (add --changed for what 
 Why this rule:  node .github/eos/eos.mjs explain <gate> (activation|prd-ready|story-ready|verified|release-ready)
 Promote work:   node .github/eos/eos.mjs transition --scope story --id <id> --to <STATE>
 One-time harden: /eos-init   (branch protection + CODEOWNERS + approval baseline → docs/eos/activation.md)
-Before release: node .github/eos/eos.mjs release-status   then /release-gate
+Before release: node .github/eos/eos.mjs release-status   then /eos-release-gate
 Declare:        node .github/eos/eos.mjs init [<pack>] [--track regulated] --write
 Shorter:        npx --offline eos <command>   (npm 10.9+) · npm run -s eos -- <command>
 Self-check:     node .github/hooks/validate-config.mjs · node .github/eos/eos.mjs doctor

@@ -1,7 +1,7 @@
 # Contributing to EOS
 
 Thanks for your interest in improving the **Engineering Operating System (EOS)** template — a portable,
-**local-first** setup of rules, prompts, agents, hooks, and docs for VS Code + GitHub Copilot that
+**local-first** setup of rules, skills, agents, hooks, and docs for VS Code + GitHub Copilot that
 orchestrates the installed **BMAD** skills across the SDLC.
 
 By participating you agree to abide by our [Code of Conduct](CODE_OF_CONDUCT.md).
@@ -53,8 +53,9 @@ discovery → requirements → PRD → UX → architecture → stories → code
 ```
 
 - Specs in `docs/` are the single source of truth; never implement beyond the approved spec.
-- For most template contributions you'll touch one layer: a rule (`.github/instructions/`), a prompt
-  (`.github/prompts/`), an agent (`.github/agents/`), a hook (`.github/hooks/`), or docs (`docs/`).
+- For most template contributions you'll touch one layer: a rule (`.github/instructions/`), a skill
+  (`.agents/skills/eos-*/` — then `node .github/eos/eos.mjs agents sync --write` regenerates `.claude/skills/`),
+  an agent (`.github/agents/`), a hook (`.github/hooks/`), or docs (`docs/`).
 - Start from an issue (bug report or proposal) so the change has a clear, agreed scope.
 
 ### Naming & style

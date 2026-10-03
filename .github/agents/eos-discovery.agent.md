@@ -5,7 +5,7 @@ tools: ['search', 'editFiles', 'runCommands']
 handoffs:
   - label: Go to Requirement Analysis
     agent: agent
-    prompt: /requirements docs/discovery.md
+    prompt: /eos-requirements docs/discovery.md
     send: false
   - label: Back to EOS Guide (recompute the next action)
     agent: eos-guide

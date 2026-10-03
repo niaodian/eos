@@ -15,7 +15,7 @@
 ## Scope first (narrow the ePHI scope first; this saves the most effort)
 | ✔ | Control | Requirement | Landing point |
 |---|---|---|---|
-| ☐ | ePHI inventory | Identify which fields are PHI, where they are stored, and which services/third parties they pass through | 🟢 record in `docs/compliance-profile.md` (via `/compliance`); data class in `data-api` rule |
+| ☐ | ePHI inventory | Identify which fields are PHI, where they are stored, and which services/third parties they pass through | 🟢 record in `docs/compliance-profile.md` (via `/eos-compliance`); data class in `data-api` rule |
 | ☐ | Minimize PHI surface | Do not collect it if avoidable; de-identify it if possible; PHI must not enter logs/telemetry/frontend | 🟢 `backend/*` "No PII in logs" · `frontend` "secrets/PII not in client bundle" · `secret-scan.mjs` |
 
 ## Technical Safeguards (§164.312) — most relevant to engineering; EOS has the most landing points here
@@ -35,8 +35,8 @@
 |---|---|---|---|
 | ☐ | Risk analysis & management (a)(1) | Periodic risk assessment + mitigation | ⚪ process (security officer) — conclusions backfilled into `docs/compliance-profile.md` |
 | ☐ | Information access management · minimum necessary (a)(4) | Roles receive only the minimum PHI needed to perform their duties | 🟡 project RBAC + 🟢 `security` multi-tenant/authz deny-by-default · `D-ops` permission matrix |
-| ☐ | Security incident procedures (a)(6) | Detect/respond/report security incidents | 🟢 `/runbook <service>` incident+rollback steps · `release-ops` runbook conventions |
-| ☐ | Contingency plan (a)(7) | Data backup + disaster recovery + emergency operations | 🟢 `C-nfr` SLO/RTO/RPO · `data-api` "backups: cadence + restore test, encrypted" · `/release-gate` rollback |
+| ☐ | Security incident procedures (a)(6) | Detect/respond/report security incidents | 🟢 `/eos-runbook <service>` incident+rollback steps · `release-ops` runbook conventions |
+| ☐ | Contingency plan (a)(7) | Data backup + disaster recovery + emergency operations | 🟢 `C-nfr` SLO/RTO/RPO · `data-api` "backups: cadence + restore test, encrypted" · `/eos-release-gate` rollback |
 | ☐ | Workforce training / sanction (a)(5)/(a)(1)(ii)(C) | Workforce training + sanction handling for violations | ⚪ process (HR/security) — non-code |
 | ☐ | Business Associate Agreement (b)(1) | Any third party that touches PHI (cloud/analytics/**LLM**) **signs a BAA first** | ⚪ process/legal + 🟢 enforced early by `eos-doctor` **D5** data-boundary + `F-compliance` Agentic section |
 
@@ -55,7 +55,7 @@
 ## Breach Notification & documentation
 | ✔ | Control (§) | Requirement | Landing point |
 |---|---|---|---|
-| ☐ | Breach notification (§164.404/408) | Notify individuals + HHS without unreasonable delay, **≤60 days** | ⚪ process — trigger conditions/channels written into `/runbook` incident section |
+| ☐ | Breach notification (§164.404/408) | Notify individuals + HHS without unreasonable delay, **≤60 days** | ⚪ process — trigger conditions/channels written into `/eos-runbook` incident section |
 | ☐ | Documentation retention (§164.316(b)(2)) | Policies and records (including audit logs) **retained ≥ 6 years** | 🟡 project log-retention job (≥6y) + 🟢 `data-api` retention-per-class convention |
 
 ---

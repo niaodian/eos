@@ -108,4 +108,4 @@ Editing the prompt, the dataset or a grader changes the product tree, so the rec
 LLM output is non-deterministic, so you do **not** unit-test it by exact equality — you score it
 with graders against thresholds and guard a **regression baseline** (a prompt/model/tool change that
 drops below baseline does not ship). See `.github/instructions/ai/10-ai-llm.instructions.md` and the
-`/eval-spec` prompt.
+`/eos-eval-spec` prompt.

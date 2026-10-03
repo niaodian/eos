@@ -161,7 +161,9 @@ gh attestation verify eos-2.1.0.tar.gz --repo niaodian/eos
 .github/eos/        CLI 及其确定性引擎（零依赖），以及它的测试
 .github/hooks/      校验器与护栏：配置、文档对齐、机密扫描、产品质量门
 .github/agents/     eos-guide 以及各阶段的编排 Agent（供 Copilot Chat 使用）
-.github/prompts/    斜杠命令工作流；.github/instructions/ 存放按范围生效的编码规则
+.github/instructions/ 按文件范围生效的编码规则
+.agents/skills/     斜杠命令工作流，形式为 Agent Skills（/eos-next、/eos-spec 等）；
+                    .claude/skills/ 是为 Claude Code 生成的副本
 .github/workflows/  eos-ci.yml（Linux、macOS、Windows）与 eos-release.yml（带证明的发布）
 docs/               你的规格与 ADR；docs/eos/ 是 EOS 手册（中文版在 docs/zh/）
 ```
@@ -182,7 +184,7 @@ docs/               你的规格与 ADR；docs/eos/ 是 EOS 手册（中文版�
 - **Node.js 20.10+ 和 Git** —— 别无其他。CI 在 Linux、macOS 和 Windows 上运行 Node 20 与 22。
 - **永远不需要 API key。** EOS 从不调用模型。每一项附加（Copilot、BMAD、BMAD 运行时）带来什么，以及已知局限，
   见 [快速开始](docs/zh/quickstart.md#能力与依赖)。
-- **VS Code + GitHub Copilot 是可选的。** 只有当项目文件夹本身是工作区根目录时，Agent、提示词和
+- **VS Code + GitHub Copilot 是可选的。** 只有当项目文件夹本身是工作区根目录时，Agent、技能和
   hook 才会加载。hook 是 VS Code 的预览特性。
 - **一次性加固。** 真正的仓库建好后，在 Copilot Chat 中运行 `/eos-init`：分支保护、CODEOWNERS 与
   审批，进度记录在 [docs/zh/activation.md](docs/zh/activation.md)。

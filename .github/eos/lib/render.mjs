@@ -30,7 +30,7 @@ export function renderCard(result, { why = false, all = false } = {}) {
   if (a?.copilotAgent || a?.copilotPrompt || a?.skills?.length) {
     const bits = [];
     if (a.copilotAgent) bits.push(a.copilotAgent === 'agent' ? 'Copilot agent: the built-in agent' : `Copilot agent: ${a.copilotAgent}`);
-    if (a.copilotPrompt) bits.push(`prompt: /${a.copilotPrompt}`);
+    if (a.copilotPrompt) bits.push(`slash command: /${a.copilotPrompt}`);
     if (a.skills?.length) bits.push(`skills: ${a.skills.join(', ')}`);
     out.push(line(2, bits.join(' · ')));
   }

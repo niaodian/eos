@@ -72,7 +72,8 @@ test('EOS-AUD-002: DEGRADED warns but does not fail; only a skill that cannot ac
   };
 
   // Installed + no runtime  -> warning, exit 0.
-  const ok = project({ ...base, '.github/skills/bmad-prd/SKILL.md': '---\nname: bmad-prd\n---\n# BMad PRD\n' });
+  // .agents/skills is the project's skill source since 2.2 (ADR-017); .github/skills is still read.
+  const ok = project({ ...base, '.agents/skills/bmad-prd/SKILL.md': '---\nname: bmad-prd\n---\n# BMad PRD\n' });
   const okRun = doctor(ok);
   assert.equal(okRun.status, 0, okRun.stdout);
   assert.match(okRun.stdout, /DEGRADED, not a failure/);

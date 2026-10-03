@@ -4,7 +4,7 @@
 // "Never place secrets or PII in prompts or logs. Redact before sending to the provider."
 // (.github/instructions/ai/10-ai-llm.instructions.md).
 //
-// Regime presets (compose only what your /compliance profile selected):
+// Regime presets (compose only what your /eos-compliance profile selected):
 //   createRedactor(['PCI-DSS'])          -> base + cardholder data only
 //   createRedactor(['HIPAA'])            -> base + PHI (personal identifiers + health fields)
 //   createRedactor(['GDPR','PIPL'])      -> base + personal data
@@ -71,7 +71,7 @@ export const PROFILES = {
   },
 };
 
-// Map the regime names /compliance uses onto profile keys.
+// Map the regime names /eos-compliance uses onto profile keys.
 export const REGIME_ALIASES = {
   hipaa: 'HIPAA',
   pci: 'PCI', 'pci-dss': 'PCI', pcidss: 'PCI',
@@ -177,8 +177,8 @@ export function createRedactor(regimes = DEFAULT_REGIMES) {
   };
 }
 
-// ── Auto-select the regime(s) from the /compliance output ──────────────────────────────
-// `/compliance` writes docs/compliance-profile.md with a canonical machine-readable line:
+// ── Auto-select the regime(s) from the /eos-compliance output ──────────────────────────────
+// `/eos-compliance` writes docs/compliance-profile.md with a canonical machine-readable line:
 //   **Regulatory regime:** HIPAA, PCI-DSS      (or `none` for generic PII handling)
 // parseRegimes reads that line and resolves it to profile names. Only tokens that resolve
 // to a *known* regime are kept, so free-text rationale on the line is ignored; an explicit
@@ -198,7 +198,7 @@ export function parseRegimes(profileText) {
   return out;
 }
 
-// Build a redactor straight from the /compliance profile doc.
+// Build a redactor straight from the /eos-compliance profile doc.
 //   file lists regimes  -> scope to them
 //   file says `none`     -> base credentials only (honours the human decision)
 //   file missing         -> fallback: 'all' (default, fail-safe — never silently under-redact),
@@ -209,7 +209,7 @@ export function redactorFromProfile(path = 'docs/compliance-profile.md', { fallb
     text = readFileSync(path, 'utf8');
   } catch {
     if (fallback === 'throw') {
-      throw new Error(`redactorFromProfile: ${path} not found — run /compliance first`);
+      throw new Error(`redactorFromProfile: ${path} not found — run /eos-compliance first`);
     }
     return createRedactor(fallback === 'base' ? [] : undefined); // 'all' -> default regimes
   }

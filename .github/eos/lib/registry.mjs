@@ -6,6 +6,7 @@ import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { validate } from './schema.mjs';
 import { currentBranch } from './git-base.mjs';
+import { skillExists, SKILLS_DIR, PROJECT_SKILL_DIRS } from './skills.mjs';
 
 export const EOS_DIR = '.eos';
 export const WORKFLOW_PATH = '.eos/workflow.json';
@@ -85,8 +86,9 @@ export function loadAgentMap(root) {
 }
 
 /**
- * Resolve an action to its agent / prompt / skills, reporting BLOCKED when the referenced Copilot
- * asset does not exist. `agent: "agent"` is VS Code's built-in agent and has no file.
+ * Resolve an action to its agent / slash command / skills, reporting BLOCKED when the referenced
+ * asset does not exist. `agent: "agent"` is VS Code's built-in agent and has no file. `prompt` names
+ * the slash command, which since 2.2 is an EOS Agent Skill in .agents/skills/<name>/ (ADR-017).
  */
 export function resolveAction(root, agentMap, actionId) {
   const entry = agentMap?.actions?.[actionId];
@@ -97,8 +99,8 @@ export function resolveAction(root, agentMap, actionId) {
   if (entry.agent && entry.agent !== 'agent' && !existsSync(join(root, `.github/agents/${entry.agent}.agent.md`))) {
     problems.push(`agent "${entry.agent}" is mapped to action "${actionId}" but .github/agents/${entry.agent}.agent.md does not exist`);
   }
-  if (entry.prompt && !existsSync(join(root, `.github/prompts/${entry.prompt}.prompt.md`))) {
-    problems.push(`prompt "/${entry.prompt}" is mapped to action "${actionId}" but .github/prompts/${entry.prompt}.prompt.md does not exist`);
+  if (entry.prompt && !skillExists(root, entry.prompt)) {
+    problems.push(`slash command "/${entry.prompt}" is mapped to action "${actionId}" but ${SKILLS_DIR}/${entry.prompt}/SKILL.md does not exist`);
   }
   return {
     agent: entry.agent ?? null,
@@ -120,7 +122,7 @@ export function skillDiagnostics(skills, root = null) {
     }
   }
   // Project-level skills travel with the repository and are always available.
-  if (root && existsSync(join(root, '.github/skills'))) dirs.push(join(root, '.github/skills'));
+  for (const rel of PROJECT_SKILL_DIRS) if (root && existsSync(join(root, rel))) dirs.push(join(root, rel));
   if (!dirs.length) return { checked: false, missing: [], note: 'no skill directory found — skill availability was not checked' };
   const installed = new Set();
   for (const d of dirs) {

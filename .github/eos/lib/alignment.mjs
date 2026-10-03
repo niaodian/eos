@@ -1,22 +1,27 @@
 // Prompt ↔ policy alignment (ADR-011).
 //
-// Prompts, agents and instructions are hand-written and tell agents what to run: `eos check --gate
-// story-ready`, `--to READY_FOR_DEV`, "hand off to `eos-plan`", "/release-gate", "G6". Nothing
+// Skills, agents and instructions are hand-written and tell agents what to run: `eos check --gate
+// story-ready`, `--to READY_FOR_DEV`, "hand off to `eos-plan`", "/eos-release-gate", "G6". Nothing
 // checked that those names exist. Renaming a gate, a state or a prompt left every file that cited
 // the old name sending agents to something that is not there, with every check still green.
 //
 // This reads every name a prompt may cite from the machine-readable policy — gates and their
 // codes, the codes a gate declares it `enforces`, state machines and their transitions, the command
-// registry, prompt/agent/skill files — and reports each citation that names nothing. The vocabulary
+// registry, skill/agent files — and reports each citation that names nothing. The vocabulary
 // is never restated here, so the check cannot drift from the policy it checks. It is a static
 // check of REFERENCES; it does not judge whether prose is good advice.
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { listSkills, SKILLS_DIR } from './skills.mjs';
 
-/** What is scanned: everything hand-written that agents are told to read. */
+/**
+ * What is scanned: everything hand-written that agents are told to read. Since 2.2 the slash commands
+ * are Agent Skills in .agents/skills (ADR-017); the .claude/skills mirror is generated from them and
+ * kept byte-identical by `eos agents sync --check`, so checking the source checks both.
+ */
 export const ALIGNMENT_SOURCES = [
   '.github/copilot-instructions.md', 'AGENTS.md',
-  '.github/prompts', '.github/agents', '.github/instructions', '.github/skills',
+  SKILLS_DIR, '.github/agents', '.github/instructions',
 ];
 
 // VS Code's built-in chat modes: a handoff may target them without an agent file.
@@ -57,9 +62,10 @@ export function alignmentVocabulary(root, { gates, workflow, commands }) {
     machines,
     states: new Set(machines.flatMap((m) => [...m.states])),
     commands: new Set(commands || []),
-    prompts: listNames(root, '.github/prompts', '.prompt.md'),
+    // A slash command is a skill: `/eos-next` resolves to .agents/skills/eos-next/SKILL.md.
+    prompts: new Set(listSkills(root)),
     agents: listNames(root, '.github/agents', '.agent.md'),
-    skills: listDirs(root, '.github/skills'),
+    skills: listDirs(root, SKILLS_DIR),
     root,
   };
 }
@@ -158,14 +164,14 @@ function checkText(text, add, vocab) {
   }
 }
 
-/** Slash commands, outside fenced code (where `/tmp` is a path, not a prompt). */
+/** Slash commands, outside fenced code (where `/tmp` is a path, not a command). */
 function checkSlash(text, add, vocab) {
   // A slash command starts a word: after whitespace, a bracket or a quote. `rem/%/clamp`, `and/or`
   // and URLs are paths, not prompts.
   for (const m of text.matchAll(/(?<=^|[\s(\["'])\/([a-z][a-z0-9]*(?:-[a-z0-9]+)*)(?![\w/-]|\.\w)/g)) {
     const name = m[1];
     if (!vocab.prompts.has(name)) {
-      add('prompt', `/${name}`, `cites /${name}, but .github/prompts/${name}.prompt.md does not exist${closest(name, vocab.prompts)}`);
+      add('prompt', `/${name}`, `cites /${name}, but ${SKILLS_DIR}/${name}/SKILL.md does not exist${closest(name, vocab.prompts)}`);
     }
   }
 }

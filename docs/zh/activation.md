@@ -13,7 +13,7 @@
 > - 想要引导式逐步执行 → 在 Copilot Chat 里跑 **`/eos-init`**（它会尽量替你改、改不了的打印确切步骤）。
 > - 想要完整原理与步骤 → 见 `docs/eos/user-manual.md` **附录 D**。
 > - 本文件是**可勾选的进度台账**：`eos-doctor` 每次运行都会读它并 advisory 提示还剩几项；
->   `/release-gate`（G8）发布前会再核一次——**这就是"系统性遗忘"的防线**。
+>   `/eos-release-gate`（G8）发布前会再核一次——**这就是"系统性遗忘"的防线**。
 >
 > **勾选语法**（`eos-doctor` 按此解析，请勿改变行首格式）：
 > - `- [ ]` 未做（pending，会被持续提示）
@@ -45,7 +45,7 @@
 
 - [ ] CODEOWNERS: 把 `.github/CODEOWNERS` 里的 `@niaodian` 全部换成你的团队 handle
   - **为什么**：配合上面的 "Require review from Code Owners"，阻止任何人（含 agent）**免评审改动治理文件**
-    （instructions / agents / hooks / workflows / prompts 与 `docs/eos/`）。（审计 E1/H5）
+    （instructions / agents / hooks / workflows / skills 与 `docs/eos/`）。（审计 E1/H5）
   - **步骤**：编辑 `.github/CODEOWNERS`，`@niaodian` → 例如 `@your-org/platform-team`（推荐团队而非个人，
     避免单人休假阻塞评审）。（详见附录 D.2）
   - **验证**：`grep -n '@niaodian' .github/CODEOWNERS` 应无输出。
@@ -88,7 +88,7 @@
 
 ## 二、打开"组织合规"轴（约 +2 分）——仅**受监管**项目需要
 
-- [ ] （若受监管）合规边界: 跑 `/compliance` 产出 `docs/compliance-profile.md` **+ `docs/compliance-profile.json`**，并确认组织标准
+- [ ] （若受监管）合规边界: 跑 `/eos-compliance` 产出 `docs/compliance-profile.md` **+ `docs/compliance-profile.json`**，并确认组织标准
   - **为什么**：profile-neutral 模板无法替你认证 HIPAA/PCI-DSS 等；一旦声明受监管 regime 且存在 LLM/agent，
     `eos-doctor` 的 **D5（BLOCKER，deny-by-default）** 会要求先记录数据边界（BAA/DPA · 自托管 · 脱敏 · 排除受监管数据）。
     **边界必须写成结构化 JSON**：D5 校验枚举值 + 控制项状态 + owner + 未过期审批，不再靠散文关键词

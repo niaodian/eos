@@ -24,7 +24,7 @@
 |---|---|---|
 | ☐ | Use hosted fields / iframe / redirect (PAN never enters your system) | 🟡 project payment integration + 🟢 `frontend` "no secrets/sensitive in client bundle" |
 | ☐ | Tokenization (use a token instead of the PAN for downstream business) | 🟡 project + 🟢 `data-api` "never store raw sensitive; surrogate keys" |
-| ☐ | Record chosen SAQ type + CDE boundary | 🟢 `docs/compliance-profile.md` (via `/compliance`) |
+| ☐ | Record chosen SAQ type + CDE boundary | 🟢 `docs/compliance-profile.md` (via `/eos-compliance`) |
 
 ## The 12 requirements (v4.0)
 | ✔ | Req | Requirement | Landing point |
@@ -38,9 +38,9 @@
 | ☐ | 7 | Restrict access by business need-to-know | 🟢 `security` deny-by-default authz · `data-api` tenant-scoping/RLS · `D-ops` permission matrix |
 | ☐ | 8 | Identify & authenticate (unique ID + **MFA**) | 🟡 project authN (MFA) + 🟢 `security` least-privilege creds, key rotation |
 | ☐ | 9 | Restrict physical access | ⚪ cloud provider / facility — non-code |
-| ☐ | 10 | Log & monitor all access (audit logs, **retain ≥12 months**, ≥3 months instantly queryable) | 🟢 `backend/*` structured logs + request id, "No PII/card data" · 🟡 project log-retention (≥12m) · `/telemetry-plan` |
+| ☐ | 10 | Log & monitor all access (audit logs, **retain ≥12 months**, ≥3 months instantly queryable) | 🟢 `backend/*` structured logs + request id, "No PII/card data" · 🟡 project log-retention (≥12m) · `/eos-telemetry-plan` |
 | ☐ | 11 | Test security regularly (**quarterly ASV external scan**, penetration testing, change detection) | ⚪ external ASV/pentest `【Optional · needs external body】` + 🟢 `secret-scan.mjs`/`gitleaks` as a partial local aid |
-| ☐ | 12 | Organizational security policy (risk assessment, awareness training, incident response) | ⚪ process + 🟢 incident/rollback in `/runbook` |
+| ☐ | 12 | Organizational security policy (risk assessment, awareness training, incident response) | ⚪ process + 🟢 incident/rollback in `/eos-runbook` |
 
 ## Requirement 3 — Protect stored account data (**easiest to trip on, broken out**)
 | ✔ | Control | Requirement | Landing point |
@@ -56,4 +56,4 @@
 *Agentic data-boundary* in `F-compliance.md` (self-hosted · redaction/tokenization gateway · exclude card
 data; a BAA/DPA does not change PCI's hard "never store SAD" line). `eos-doctor` **D5** WARNs when
 "PCI-DSS declared + LLM code present + no boundary decision". Any unresolved 🟢/🟡 item is a
-**G2 = BLOCKER**, re-verified at G8 by `/release-gate`.
+**G2 = BLOCKER**, re-verified at G8 by `/eos-release-gate`.

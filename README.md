@@ -168,7 +168,9 @@ Each release also ships its SBOM and a `SHA256SUMS` file.
 .github/eos/        the CLI and its deterministic engine (zero dependencies), with its tests
 .github/hooks/      validators and guardrails: config, doc parity, secrets, the product gate
 .github/agents/     eos-guide and the stage orchestrators for Copilot Chat
-.github/prompts/    slash-command workflows; .github/instructions/ holds the scoped coding rules
+.github/instructions/ the scoped coding rules, applied by file glob
+.agents/skills/     the slash-command workflows, as Agent Skills (/eos-next, /eos-spec …);
+                    .claude/skills/ is a generated copy for Claude Code
 .github/workflows/  eos-ci.yml (Linux, macOS, Windows) and eos-release.yml (attested releases)
 docs/               your specs and ADRs; docs/eos/ is the EOS manual set (中文 in docs/zh/)
 ```
@@ -189,7 +191,7 @@ docs/               your specs and ADRs; docs/eos/ is the EOS manual set (中文
 - **Node.js 20.10+ and Git** — nothing else. CI runs Node 20 and 22 on Linux, macOS and Windows.
 - **No API key, ever.** EOS never calls a model. What each addition (Copilot, BMAD, the BMAD runtime) brings,
   and the known limitations, are in the [quickstart](docs/eos/quickstart.md#what-you-need-for-what).
-- **VS Code with GitHub Copilot is optional.** The agents, prompts and hooks load when the project folder
+- **VS Code with GitHub Copilot is optional.** The agents, skills and hooks load when the project folder
   itself is the workspace root. Hooks are a VS Code preview feature.
 - **One-time hardening.** Once your real repository exists, run `/eos-init` in Copilot Chat: branch
   protection, CODEOWNERS and approvals, tracked in [docs/eos/activation.md](docs/eos/activation.md).

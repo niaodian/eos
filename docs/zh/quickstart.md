@@ -56,7 +56,7 @@ EOS 本身从不调用任何模型，也不需要任何 API key。每一行都�
 | 你具备 | 你得到 |
 |---|---|
 | **只有 Node.js** | 完整的治理引擎：`eos next` / `status` / `check` / `verify`、全部门禁、账本、策略锁、签名发布、密钥扫描 |
-| **+ VS Code 与 GitHub Copilot** | 引导式流程：`eos-*` agent、`/eos-*` prompt、常驻规则与 PreToolUse 护栏。所用模型就是你在 Copilot 里选的那个——无需任何配置 |
+| **+ VS Code 与 GitHub Copilot** | 引导式流程：`eos-*` agent、`/eos-*` 斜杠命令（技能）、常驻规则与 PreToolUse 护栏。所用模型就是你在 Copilot 里选的那个——无需任何配置 |
 | **+ BMAD 技能**（`bmad-*`） | 各阶段编排的撰写工作流（PRD、架构、story、测试设计）。没有它们，`eos next` 仍会点名每一步，由你手工完成 |
 | **+ BMAD 项目运行时**（`_bmad/`，需要 python3 与 uv） | BMAD 的项目级定制与会话记忆。可选：没有它，技能按自带默认值运行 |
 | **一个 agentic / LLM 产品** | 你产品自己的模型调用，由评估工具链来检验（[eval-starter](../eos/examples/eval-starter/README.md)）。那是你本来就要写的产品代码，不是 EOS 的配置 |
@@ -152,7 +152,7 @@ node .github/eos/eos.mjs next
 这条规则为啥： node .github/eos/eos.mjs explain <gate> (activation|prd-ready|story-ready|verified|release-ready)
 晋级工作：     node .github/eos/eos.mjs transition --scope story --id <id> --to <STATE>
 一次性硬化：   /eos-init   (branch protection + CODEOWNERS + 审批基线 → docs/eos/activation.md)
-发布前：       node .github/eos/eos.mjs release-status   然后 /release-gate
+发布前：       node .github/eos/eos.mjs release-status   然后 /eos-release-gate
 声明项目：     node .github/eos/eos.mjs init [<pack>] [--track regulated] --write
 更短的写法：   npx --offline eos <command>   (npm 10.9+) · npm run -s eos -- <command>
 自检：         node .github/hooks/validate-config.mjs · node .github/eos/eos.mjs doctor

@@ -8,7 +8,7 @@ handoffs:
     prompt: >-
       Implement the next ready story with bmad-dev-story, then bmad-code-review and resolve blocking
       findings before the story is done (G6). Then Testing (G7): bmad-tea / bmad-testarch-* to build
-      AC-traced tests + trace-matrix and verify NFR targets & LLM evals. Then run /release-gate (G8).
+      AC-traced tests + trace-matrix and verify NFR targets & LLM evals. Then run /eos-release-gate (G8).
     send: false
   - label: Back to EOS Guide (recompute the next action)
     agent: eos-guide
@@ -48,7 +48,7 @@ drafts sitting in `docs/stories/` block nothing. Therefore:
    real reason to promote serially — not an excuse to also *write* serially.
 
 If drafting a story would require new acceptance criteria that the PRD does not have, that is a PRD
-gap: say so and fix it in `/spec` **once, for the whole backlog**, rather than amending `docs/prd.md`
+gap: say so and fix it in `/eos-spec` **once, for the whole backlog**, rather than amending `docs/prd.md`
 19 more times and invalidating `prd-ready` evidence on every single story.
 
 ## Stage close-out (do not skip)

@@ -46,6 +46,7 @@ usage: node .github/eos/eos.mjs <command> [flags]
   init [<pack>] [--track standard|regulated] [--write] [--force]
                                           declare the project, choose its governance track, create local files
   stack sync [--write]                    render the always-on workspace rule from .eos/project.json
+  agents sync [--write|--check]           generate each agent platform's copy of the EOS skills (.agents/skills)
   new <pack> [--track …] [--write]        the pack half of init (the declaration only)
   sbom [--write] [--check]                software bill of materials, bound to the tree
   policy [diff|lock|check] [--against <ref>] [--write] [--reason <text>]

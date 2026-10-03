@@ -215,7 +215,7 @@ declaration**, executed by the zero-dependency, cross-platform `node .github/hoo
 - **R3**: `ai/10-ai-llm.instructions.md` (shipped, `**/{ai,llm,rag}/**`) — prompt-as-artifact, tool/agent architecture, non-deterministic evaluation, reproducibility, LLM safety, tracing/cost
 - **Layout**: `ai/` (agents/tools/chains) · `ai/prompts/` (versioned prompts) · `evals/` (eval sets + graders)
 - **Common dependency governance** (as needed, pin versions): orchestration LangChain / LlamaIndex; vector stores Chroma (local) / Pinecone·Qdrant·Weaviate (hosted); provider SDKs OpenAI/Anthropic. **A synchronous, blocking LLM call must never run inside a web request thread** — use an async queue (Celery/BullMQ); see the Execution model in `ai/10-ai-llm`.
-- **Companion gate**: `/eval-spec` produces `docs/eval-plan.md` (conditional gate **G-EVAL**; non-LLM features SKIP with a reason); C-nfr adds cost/token/latency/quality thresholds
+- **Companion gate**: `/eos-eval-spec` produces `docs/eval-plan.md` (conditional gate **G-EVAL**; non-LLM features SKIP with a reason); C-nfr adds cost/token/latency/quality thresholds
 - **Starter skeleton**: copy `docs/eos/examples/eval-starter/` (a zero-dependency runnable dataset + graders + runner + stub) and swap the stub
 - **quality.json inner command**: `ruff check . && pytest -q && pytest evals/ -q`
   (Node projects use `node --test evals/*.test.mjs` instead — pass an explicit glob; a bare `evals/` directory errors on Node 23)
@@ -234,4 +234,4 @@ node .github/hooks/validate-config.mjs   # expect PASS: S3 glob exclusivity, S4 
 node .github/hooks/project-gate.mjs      # expect PASS: your declared lint/typecheck/test/eval actually ran
 ```
 
-> Adding or removing a stack doesn't touch the EOS skeleton (agents / prompts / hooks / governance flow are all unchanged) — you only swap `applyTo` and the body text. See user-manual Chapter 11 for details.
+> Adding or removing a stack doesn't touch the EOS skeleton (agents / skills / hooks / governance flow are all unchanged) — you only swap `applyTo` and the body text. See user-manual Chapter 11 for details.

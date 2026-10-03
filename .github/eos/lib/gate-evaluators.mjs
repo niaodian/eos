@@ -469,7 +469,7 @@ export const evaluators = {
   },
   evalThreshold(ctx) {
     if (!ctx.snapshot.agentic) return na('this product is not declared agentic');
-    if (!ctx.snapshot.artifacts.evalPlan) return fail('docs/eval-plan.md is missing — an agentic product cannot be verified without an eval design (/eval-spec)');
+    if (!ctx.snapshot.artifacts.evalPlan) return fail('docs/eval-plan.md is missing — an agentic product cannot be verified without an eval design (/eos-eval-spec)');
     if (!ctx.snapshot.project?.commands?.eval) return fail('.eos/project.json declares an agentic product but has no commands.eval — G-EVAL cannot be proven');
     const testsRan = ctx.results.find((c) => c.id === 'tests-executed');
     if (!testsRan || testsRan.status === 'PENDING') return { status: 'PENDING', detail: 'the eval command runs as part of the product-quality gate; run this gate to execute it' };
@@ -685,7 +685,7 @@ export const evaluators = {
     if (profile.errors.length) return fail(`docs/compliance-profile.json: ${profile.errors.join(' · ')}`);
     const regulated = profile.profile ? profile.profile.regulated || declaredRegulated : declaredRegulated;
     if (!regulated) return na('no regulated regime is declared for this product');
-    if (!profile.present) return fail('a regulated regime is declared but docs/compliance-profile.json does not exist — record the structured data-boundary decision via /compliance');
+    if (!profile.present) return fail('a regulated regime is declared but docs/compliance-profile.json does not exist — record the structured data-boundary decision via /eos-compliance');
     const problems = evaluateDataBoundary(profile.profile);
     return problems.length ? fail(problems.join(' · ')) : ok('the structured data-boundary decision is approved and implemented');
   },
@@ -697,7 +697,7 @@ export const evaluators = {
   },
   releaseOpsArtifacts(ctx) {
     const runbook = RUNBOOKS.find((p) => existsSync(join(ctx.root, p)));
-    if (!runbook) return fail(`no runbook found (looked for ${RUNBOOKS.join(', ')}) — run /runbook`);
+    if (!runbook) return fail(`no runbook found (looked for ${RUNBOOKS.join(', ')}) — run /eos-runbook`);
     const text = readFileSync(join(ctx.root, runbook), 'utf8');
     // The release prompt asks a human for rollback, gradual rollout and health/readiness. If the
     // machine gate only looks for "rollback", the other two are advisory theatre. (EOS-AUD-007)
@@ -708,7 +708,7 @@ export const evaluators = {
     ];
     const absent = required.filter((r) => !r.re.test(text));
     return absent.length
-      ? fail(`${runbook} does not document ${absent.map((a) => `${a.key} (${a.fix})`).join('; ')} — run /runbook and /deploy-topology`)
+      ? fail(`${runbook} does not document ${absent.map((a) => `${a.key} (${a.fix})`).join('; ')} — run /eos-runbook and /eos-deploy-topology`)
       : ok(`${runbook} documents rollback, gradual rollout and health/readiness`);
   },
   /**
@@ -718,7 +718,7 @@ export const evaluators = {
   releaseDeploymentTopology(ctx) {
     const topology = findTopologyAdr(ctx.root);
     if (!topology) {
-      return fail('no deployment-topology decision record under docs/adr/ — run /deploy-topology so rollback, canary and health/readiness are the mechanisms this topology actually has');
+      return fail('no deployment-topology decision record under docs/adr/ — run /eos-deploy-topology so rollback, canary and health/readiness are the mechanisms this topology actually has');
     }
     if (decisionIsPlaceholder(topology.text)) {
       return fail(`${topology.path} records no decided topology (it is still a template / TBD) — decide it before shipping`);

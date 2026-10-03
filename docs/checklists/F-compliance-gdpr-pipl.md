@@ -27,7 +27,7 @@
 ## Lawful basis & consent
 | ✔ | Control | Requirement | Landing point |
 |---|---|---|---|
-| ☐ | Lawful basis recorded | record a lawful basis for each processing activity (one of GDPR's 6; PIPL prefers consent) | 🟢 record in `docs/compliance-profile.md` (via `/compliance`) + ROPA below |
+| ☐ | Lawful basis recorded | record a lawful basis for each processing activity (one of GDPR's 6; PIPL prefers consent) | 🟢 record in `docs/compliance-profile.md` (via `/eos-compliance`) + ROPA below |
 | ☐ | Consent captured & revocable | consent is obtainable and revocable, **withdrawal as easy as giving**; consent state is queryable | 🟡 project consent store (versioned, timestamped, queryable) + 🟢 `data-api` audited state changes |
 | ☐ | **Separate consent (PIPL)** | sensitive personal info / cross-border provision / external provision / disclosure need **separate consent** (no bundled checkbox) | 🟡 project granular consent UI + per-purpose flags |
 | ☐ | Minor's consent | GDPR ≤16 needs a guardian; PIPL **≤14 is sensitive info** needing guardian's separate consent | 🟡 project age-gating + guardian consent path |
@@ -50,7 +50,7 @@
 ## Cross-border transfer (the easiest rework, especially under PIPL)
 | ✔ | Control | Requirement | Landing point |
 |---|---|---|---|
-| ☐ | Transfer mechanism named | GDPR: SCCs / adequacy / BCR · PIPL: one of security assessment / standard contract / certification | 🟢 record in `docs/compliance-profile.md`; irreversible → `/adr` |
+| ☐ | Transfer mechanism named | GDPR: SCCs / adequacy / BCR · PIPL: one of security assessment / standard contract / certification | 🟢 record in `docs/compliance-profile.md`; irreversible → `/eos-adr` |
 | ☐ | **Data residency / in-country storage** | under PIPL, data is stored **in-country** by default; state which data may leave and where to | 🟡 project region routing / DB placement + 🟢 `C-nfr` "compliance domain" + data class |
 | ☐ | Transfer impact & minimization | assess necessity, minimize fields, redact before export | 🟡 project + 🟢 `ai/llm` "redact before sending to provider" |
 | ☐ | **Third-party / LLM boundary** | before any cross-border third party (cloud/analytics/**LLM**) processes personal data, the mechanism is in place (DPA + transfer mechanism) | ⚪ legal (DPA) + 🟢 `eos-doctor` **D5** + `F-compliance` Agentic section |
@@ -60,14 +60,14 @@
 |---|---|---|---|
 | ☐ | Retention per purpose | set a retention period per purpose; archive/delete on expiry, don't default to keeping forever | 🟢 `data-api` "retention per data class; archive or purge" |
 | ☐ | **ROPA** (GDPR Art.30) | record of processing activities: purpose/category/recipients/transfers/retention | 🟡 project register (can start from `compliance-profile.md`) |
-| ☐ | **DPIA / PIA** | run an impact assessment before high-risk processing | ⚪ process (DPO) — backfill the conclusion into the profile + `/adr` |
+| ☐ | **DPIA / PIA** | run an impact assessment before high-risk processing | ⚪ process (DPO) — backfill the conclusion into the profile + `/eos-adr` |
 | ☐ | Security of processing (GDPR Art.32) | encryption, access control, availability/recovery | 🟢 `security` encrypt at rest/in transit · `C-nfr` RTO/RPO · `data-api` backups |
 | ☐ | **DPO / representative** | appoint a DPO when required; overseas controllers set an EU rep (GDPR) / domestic representative (PIPL) | ⚪ org/legal — non-code |
 
 ## Breach notification
 | ✔ | Control | Requirement | Landing point |
 |---|---|---|---|
-| ☐ | Breach notification | GDPR **≤72h** to the regulator (plus individuals if high-risk); PIPL prompt remediation + notification | ⚪ process — trigger/deadline/channel written into the incident section of `/runbook` |
+| ☐ | Breach notification | GDPR **≤72h** to the regulator (plus individuals if high-risk); PIPL prompt remediation + notification | ⚪ process — trigger/deadline/channel written into the incident section of `/eos-runbook` |
 
 ---
 **Agentic note**: sending personal data to a third-party LLM = cross-border transfer + third-party processing,

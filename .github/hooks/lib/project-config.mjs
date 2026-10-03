@@ -18,6 +18,12 @@ export const PROJECT_TYPES = ['application', 'library', 'config-only'];
 export const PARADIGMS = ['deterministic', 'agentic'];
 export const STACKS = ['node', 'python', 'go', 'java', 'rust', 'dotnet', 'other'];
 export const STEPS = ['install', 'lint', 'typecheck', 'test', 'eval', 'audit'];
+/**
+ * The agent platforms EOS generates files for (ADR-017). `agentPlatforms` in the declaration narrows
+ * it; absent, every one is served. Today only "claude" changes what is written — Claude Code reads
+ * skills from .claude/skills alone, so it gets a mirror; the others read .agents/skills natively.
+ */
+export const AGENT_PLATFORMS = ['copilot', 'claude', 'codex', 'cursor', 'antigravity', 'gemini'];
 /** `release`: what ships and the key it is signed with. Paths stay inside the repository. */
 function releaseOf(raw, errors) {
   if (raw === undefined) return undefined;
@@ -45,6 +51,18 @@ function upstreamOf(raw, errors) {
     errors.push(`${PROJECT_CONFIG_PATH}: "policyUpstream.publicKey" must be a repository-relative path`);
   }
   return raw;
+}
+
+/** `agentPlatforms`: which agent platforms the team uses, so EOS generates only what they read. */
+function platformsOf(raw, errors) {
+  if (raw === undefined) return undefined;
+  if (!Array.isArray(raw) || !raw.length || raw.some((p) => typeof p !== 'string')) {
+    errors.push(`${PROJECT_CONFIG_PATH}: "agentPlatforms" must be a non-empty array of ${AGENT_PLATFORMS.join(' | ')}`);
+    return undefined;
+  }
+  const unknown = raw.filter((p) => !AGENT_PLATFORMS.includes(p));
+  if (unknown.length) errors.push(`${PROJECT_CONFIG_PATH}: unknown agent platform(s) ${unknown.map((u) => JSON.stringify(u)).join(', ')} in "agentPlatforms" (expected ${AGENT_PLATFORMS.join(' | ')})`);
+  return [...new Set(raw)];
 }
 
 /**
@@ -75,6 +93,7 @@ export const TOP_LEVEL_KEYS = new Set([
   '$schema', 'projectType', 'language', 'stacks', 'commands', 'productParadigms', 'evalRequired',
   'evalWaiver', 'rationale', 'workflowProfile', 'complianceProfile',
   'evidencePolicy', 'evidencePolicyReason', 'templateDefault', 'release', 'policyUpstream', 'evidence',
+  'agentPlatforms',
 ]);
 // Prose language only (BCP-47). Deliberately not an enum: EOS must not ship a closed list of
 // languages a team is allowed to think in.
@@ -416,6 +435,7 @@ export function loadProjectConfig(root) {
     release: releaseOf(parsed.release, errors),
     policyUpstream: upstreamOf(parsed.policyUpstream, errors),
     evidence: evidenceOf(parsed.evidence, errors),
+    agentPlatforms: platformsOf(parsed.agentPlatforms, errors),
   };
   if (parsed.templateDefault !== undefined && typeof parsed.templateDefault !== 'boolean') {
     errors.push(`${PROJECT_CONFIG_PATH}: "templateDefault" must be true or false`);

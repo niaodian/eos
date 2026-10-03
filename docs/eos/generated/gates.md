@@ -61,7 +61,7 @@ Functional requirements, quantified NFRs, and a decision for every operational c
 
 | Check | What it verifies | How to satisfy it |
 |---|---|---|
-| `requirements-written` | docs/requirements.md is written and docs/requirements.json validates | Run /requirements (bmad-agent-pm + eos-operational-readiness). |
+| `requirements-written` | docs/requirements.md is written and docs/requirements.json validates | Run /eos-requirements (bmad-agent-pm + eos-operational-readiness). |
 | `functional-requirements` | functional requirements exist and are uniquely identified | Give every functional requirement a unique FR<n> id and a statement. |
 | `nfr-quantified` | every NFR carries a target | Quantify each NFR — an unquantified NFR cannot be verified at the release gate. |
 | `operational-preflight` | every operational concern is decided, not skipped | For each concern record ADOPT + note, SKIP + reason, or DEFER + owner + trigger. A bare "SKIP" is not a decision. |
@@ -75,7 +75,7 @@ The PRD exists, its acceptance criteria are DEFINED (not merely mentioned), each
 
 | Check | What it verifies | How to satisfy it |
 |---|---|---|
-| `prd-present` | docs/prd.md exists | Run /spec to produce docs/prd.md (bmad-prd — it detects create / update / validate intent). |
+| `prd-present` | docs/prd.md exists | Run /eos-spec to produce docs/prd.md (bmad-prd — it detects create / update / validate intent). |
 | `ac-parseable` | the PRD DEFINES its AC<n>.<n> ids, it does not merely mention them | State every criterion as a list item, table row or heading that opens with its id and carries the criterion text. |
 | `ac-unique` | no acceptance-criterion id is defined twice | Renumber the duplicated AC ids so each one addresses exactly one statement. |
 | `ac-covers-requirements` | every requirement has at least one acceptance criterion | Cite the FR id beside its acceptance criteria (or in the heading section that defines them) so no requirement ships unspecified. |
@@ -89,7 +89,7 @@ A user-facing product has BOTH docs/DESIGN.md and docs/EXPERIENCE.md with real c
 
 | Check | What it verifies | How to satisfy it |
 |---|---|---|
-| `ux-applicability` | the product states whether it has a user-facing surface | Create docs/design.json: { "userInterface": true } or { "userInterface": false, "skipReason": "…" }. Run /ux-spec. |
+| `ux-applicability` | the product states whether it has a user-facing surface | Create docs/design.json: { "userInterface": true } or { "userInterface": false, "skipReason": "…" }. Run /eos-ux-spec. |
 | `ux-documents` | a user-facing product has both a design and an experience contract | Produce docs/DESIGN.md AND docs/EXPERIENCE.md (eos-design agent / bmad-ux). |
 | `ux-coverage` | flows, states, a11y, tokens and responsive behaviour are covered | Record each coverage dimension as COVERED + ref, or NOT_APPLICABLE + reason. |
 
@@ -162,9 +162,9 @@ The manifest states exactly which stories this release ships, and the candidate 
 | `dependency-audit` | the dependency / supply-chain audit is clean | Run the declared commands.audit (npm audit / pip-audit / cargo audit …) and resolve findings; offline it is DEFERRED, never PASS — and for a regulated product it BLOCKS. |
 | `evidence-trust` | the release states how trustworthy its evidence is | Evidence produced locally is honest but indistinguishable from a hand-written file. Produce it from CI (producer.type = ci), or record an attestation, or accept DEFERRED for a non-regulated release. |
 | `nfr-evidence` | NFR targets have recorded evidence | Record measured NFR results in docs/evidence/nfr-summary.json (bmad-testarch-nfr); a deferral needs an owner and a trigger. |
-| `compliance-boundary` | the compliance data boundary holds | Run /compliance to record docs/compliance-profile.json; eos-doctor D5 explains what is missing. |
+| `compliance-boundary` | the compliance data boundary holds | Run /eos-compliance to record docs/compliance-profile.json; eos-doctor D5 explains what is missing. |
 | `no-expired-waivers` | no waiver in this release has expired | Renew the waiver with a new expiry and approver, or close the gap it was covering. |
-| `ops-artifacts` | runbook, rollback, canary and health/readiness are documented | Run /runbook and /deploy-topology so rollback, gradual rollout and health/readiness are written down before shipping. |
+| `ops-artifacts` | runbook, rollback, canary and health/readiness are documented | Run /eos-runbook and /eos-deploy-topology so rollback, gradual rollout and health/readiness are written down before shipping. |
 | `deployment-topology` | the operational mechanisms match the recorded topology decision | Record the deployment topology in an ADR (docs/adr/*-deployment-topology.md) so rollback/canary/health are the ones that topology actually uses. |
 | `activation-authority` | enforcement authority is recorded, not assumed | Close or explicitly waive every item in docs/eos/activation.md; EOS cannot verify server-side branch protection, so an unresolved item is UNVERIFIED, never PASS. |
 
@@ -176,7 +176,7 @@ RELEASED is not the end of the loop. The discovery success metric is emitted as 
 
 | Check | What it verifies | How to satisfy it |
 |---|---|---|
-| `telemetry-plan` | docs/telemetry-plan.md is written and docs/telemetry.json validates | Run /telemetry-plan; it produces the plan and the record. |
+| `telemetry-plan` | docs/telemetry-plan.md is written and docs/telemetry.json validates | Run /eos-telemetry-plan; it produces the plan and the record. |
 | `signals-land` | the success metric is actually emitted | Add a signals entry mapping the discovery success metric to the event/metric that carries it. |
 | `observability` | dashboards, routed alerts, audit and a rollback trigger exist | Record dashboards, alerts with routesTo, the sensitive-operation audit decision, and rolloutMetrics.rollbackTrigger. |
 

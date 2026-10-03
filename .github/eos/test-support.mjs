@@ -74,9 +74,9 @@ function buildProject(files, { withGovernance, withHooks, git }) {
     cpSync(TEMPLATE.gates, join(dir, '.eos/gates.json'));
     cpSync(TEMPLATE.agentMap, join(dir, '.eos/agent-map.json'));
     cpSync(TEMPLATE.schemas, join(dir, '.eos/schemas'), { recursive: true });
-    // The agent/prompt existence check reads these directories.
+    // The agent / slash-command existence check reads these directories (slash commands are skills).
     cpSync(join(REPO_ROOT, '.github/agents'), join(dir, '.github/agents'), { recursive: true });
-    cpSync(join(REPO_ROOT, '.github/prompts'), join(dir, '.github/prompts'), { recursive: true });
+    cpSync(join(REPO_ROOT, '.agents/skills'), join(dir, '.agents/skills'), { recursive: true });
     write(dir, 'docs/eos/activation.md', '# Activation\n\n- [x] Branch protection\n');
   }
   if (withHooks) {

@@ -41,12 +41,12 @@ export function releasePreview(snapshot) {
   const runbook = RUNBOOKS.find((f) => existsSync(join(root, f)));
   add('ops-artifacts', !!runbook, 'a runbook with rollback, gradual rollout and health/readiness', runbook
     ? `${runbook} exists — the release gate checks it names rollback, gradual rollout and health/readiness`
-    : `none yet (looked for ${RUNBOOKS.join(', ')}) — write it with /runbook`);
+    : `none yet (looked for ${RUNBOOKS.join(', ')}) — write it with /eos-runbook`);
 
   const topology = findTopologyAdr(root);
   add('deployment-topology', !!topology, 'a deployment-topology decision (docs/adr/)', topology
     ? `${topology.path} records it`
-    : 'not decided yet — record it with /deploy-topology');
+    : 'not decided yet — record it with /eos-deploy-topology');
 
   if (p.complianceProfile === 'regulated') {
     const key = p.release?.signing?.publicKey;

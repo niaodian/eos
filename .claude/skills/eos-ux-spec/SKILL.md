@@ -1,0 +1,71 @@
+---
+name: eos-ux-spec
+description: Design the UX/UI contracts, docs/DESIGN.md and docs/EXPERIENCE.md, before architecture (reuses bmad-ux; gate G-UX). Use after the PRD when the product has a user interface.
+---
+# UX & Design Spec (EOS) — Gate G-UX
+
+Usage: `/eos-ux-spec <path to docs/prd.md>`
+
+Input: `docs/prd.md` (must have passed G3).
+
+Produce the two peer design contracts using skill `bmad-ux`
+(or talk to `bmad-agent-ux-designer` / Sally for an opinionated pass;
+use `bmad-cis-design-thinking` / Maya when the problem is still fuzzy):
+
+**First decide whether this gate applies at all**, and record the decision in `docs/design.json`
+(schema `.eos/schemas/design.schema.json`):
+
+```json
+{ "schemaVersion": 1, "userInterface": false,
+  "skipReason": "Machine API consumed only by other services; no human interacts with it." }
+```
+
+A non-user-facing product stops here — but it must SAY so. Silence is not a skip, and neither is the
+word "SKIP" on its own. For a user-facing product set `"userInterface": true`, record `coverage` for
+flows / states / accessibility / designTokens / responsive (each `COVERED` + a `ref`, or
+`NOT_APPLICABLE` + a reason), and produce **both** contracts below — G-UX requires both files, not
+either one:
+
+- `docs/DESIGN.md` — visual identity (owns *how it looks*: design tokens, type, color, spacing).
+- `docs/EXPERIENCE.md` — information architecture, user flows, screen states, interactions,
+  accessibility, journeys, **target device matrix (phone/tablet/desktop + breakpoints)** (owns
+  *how it works*). Cross-reference DESIGN.md tokens by name.
+
+## Scope decision (conditional gate)
+This stage is **conditional**. For a pure backend / API / CLI project with no user-facing
+surface, write one line in `docs/EXPERIENCE.md`: `SKIP — no user-facing surface (reason: …)`
+and proceed. Otherwise, do not skip.
+
+## Gate G-UX (for user-facing work)
+For EACH user-facing requirement in the PRD, verify:
+- [ ] A screen/flow exists in `EXPERIENCE.md`.
+- [ ] All states are defined: loading / empty / error / success.
+- [ ] Accessibility baseline is stated (keyboard path, focus, labels, contrast).
+- [ ] Visual tokens it needs exist in `DESIGN.md` (referenced by name, not hardcoded).
+- [ ] Responsive/multi-device behavior is stated: target devices + breakpoints, and how the
+      layout adapts (or `single-target` with a reason for a fixed-surface app).
+
+Any unmet item => BLOCKER. These contracts win over any later mock or import,
+and they are the source of truth for the frontend rules (a11y + loading/empty/error states)
+and for `/eos-telemetry-plan` instrumentation of user actions.
+
+Output: `docs/DESIGN.md`, `docs/EXPERIENCE.md`.
+
+## Close-out (do not skip)
+
+Follow the always-on `05-stage-closeout` rule: **preview → confirm → gate → announce**.
+
+Ask for the developer's own references, screenshots or interaction preferences **before** you write
+— most will not volunteer them, and a UX contract they never pictured is one they will ask you to
+redo after the MVP. Then digest the screens, flows and states in the reply itself, ask them to amend
+or confirm, and run the gate yourself:
+
+```sh
+node .github/eos/eos.mjs check --gate ux-ready
+```
+
+> **Next (after G-UX):** switch to the `eos-architecture` agent in the Chat mode picker
+> (this hop is manual — a skill can't render a handoff button). That agent honors
+> `docs/EXPERIENCE.md` + `docs/DESIGN.md` as contracts and produces the architecture (Gate G4);
+> run `/eos-adr` for each irreversible decision. From `eos-architecture` onward the chain is
+> button-driven: `eos-architecture → eos-plan → (dev)`.

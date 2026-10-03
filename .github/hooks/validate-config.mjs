@@ -6,6 +6,7 @@ import { join, relative } from 'node:path';
 import { loadProjectConfig, detectStacks, stacksInProse, complianceRequirementProblem, PROJECT_CONFIG_PATH } from './lib/project-config.mjs';
 import { loadWorkflow, loadGates, loadAgentMap } from '../eos/lib/registry.mjs';
 import { alignmentVocabulary, checkAlignment } from '../eos/lib/alignment.mjs';
+import { listSkills, skillProblems, skillExists } from '../eos/lib/skills.mjs';
 
 const root = process.cwd();
 const errors = [];
@@ -31,7 +32,7 @@ function walk(dir, acc = []) {
 const required = [
   '.github/copilot-instructions.md',
   '.github/instructions',
-  '.github/prompts',
+  '.agents/skills',
   '.github/agents',
   '.github/hooks',
   'docs/eos/agent-map.md',
@@ -152,14 +153,17 @@ if (existsSync(agentsDir)) {
   }
 }
 
-// S11 prompt files must have name + description frontmatter
-const promptsDir = join(root, '.github/prompts');
-if (existsSync(promptsDir)) {
-  for (const f of readdirSync(promptsDir).filter((f) => f.endsWith('.prompt.md'))) {
-    const head = fm(readFileSync(join(promptsDir, f), 'utf8'));
-    if (!head) { errors.push(`S11 prompts/${f}: missing YAML frontmatter`); continue; }
-    if (!/^description:\s*\S/m.test(head)) warns.push(`S11 prompts/${f}: missing "description"`);
-  }
+// S11 every skill — EOS's slash commands since 2.2 (ADR-017) — must load: a name that does not match
+// its directory, or a missing description, makes a skill fail SILENTLY in every agent. EOS's own
+// skills also stay portable (name + description only), so every platform reads the same file.
+for (const name of listSkills(root)) {
+  for (const p of skillProblems(root, name)) errors.push(`S11 ${p}`);
+}
+// The prompt files 2.2 replaced are no longer loaded by VS Code's Agent Host, and two copies of a
+// workflow drift: one left behind after an upgrade is pointed out.
+if (existsSync(join(root, '.github/prompts'))) {
+  const stale = readdirSync(join(root, '.github/prompts')).filter((f) => f.endsWith('.prompt.md'));
+  if (stale.length) warns.push(`S11 .github/prompts/ still holds ${stale.length} prompt file(s) — since eos-2.2.0 EOS's slash commands are skills in .agents/skills/ (e.g. /spec is /eos-spec); delete the old prompts once yours are ported`);
 }
 
 // S12 the project declaration itself must be valid — it decides which product gates run, so a typo
@@ -237,8 +241,8 @@ if (am.agentMap) {
     if (entry.agent && entry.agent !== 'agent' && !existsSync(join(root, `.github/agents/${entry.agent}.agent.md`))) {
       errors.push(`S13 .eos/agent-map.json: action "${actionId}" maps to agent "${entry.agent}" but .github/agents/${entry.agent}.agent.md does not exist`);
     }
-    if (entry.prompt && !existsSync(join(root, `.github/prompts/${entry.prompt}.prompt.md`))) {
-      errors.push(`S13 .eos/agent-map.json: action "${actionId}" maps to prompt "/${entry.prompt}" but .github/prompts/${entry.prompt}.prompt.md does not exist`);
+    if (entry.prompt && !skillExists(root, entry.prompt)) {
+      errors.push(`S13 .eos/agent-map.json: action "${actionId}" maps to slash command "/${entry.prompt}" but .agents/skills/${entry.prompt}/SKILL.md does not exist`);
     }
   }
 }

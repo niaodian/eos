@@ -56,7 +56,7 @@ test('gate codes, transitions, prompts, agents and scripts in prose', () => {
   assert.deepEqual(refs('Release at G42.'), ['gate-code:G42']);
   assert.deepEqual(refs('A story moves DRAFT → IN_REVIEW → READY_FOR_DEV.'), []);
   assert.deepEqual(refs('A story moves DRAFT → MERGED.'), ['transition:DRAFT → MERGED']);
-  assert.deepEqual(refs('Run /eos-init, then (/spec) or `/release-gate`.'), []);
+  assert.deepEqual(refs('Run /eos-init, then (/eos-spec) or `/eos-release-gate`.'), []);
   assert.deepEqual(refs('Run /ghost-prompt.'), ['prompt:/ghost-prompt']);
   assert.deepEqual(refs('Hand off to the `eos-plan` agent, or Copilot agent: eos-review.'), []);
   assert.deepEqual(refs('Hand off to the `eos-ghost` agent.'), ['agent:eos-ghost']);
