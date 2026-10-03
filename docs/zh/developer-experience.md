@@ -353,8 +353,8 @@ Agent/Prompt/Skills、`doneWhen`，以及返回时执行的命令。它绝不包
 node .github/eos/eos.mjs <command> [flags]      （同一个 CLI：npx --offline eos <command>，需 npm 10.9+）
 
   status [--changed]        项目与当前 Scope 处在哪里，以及治理轨道
-  next [--why] [--all]      唯一的推荐下一步
-  resume                    在新 Session 中恢复本机焦点
+  next [--why] [--all] [--exit-zero]   唯一的推荐下一步
+  resume [--exit-zero]      在新 Session 中恢复本机焦点
   check --gate <id> [--scope <id>]      运行一个门禁并写入证据
   verify [--full] [--plan]  运行这次改动可能影响到的门禁
   transition --scope <type> --id <id> --to <STATE>
@@ -412,6 +412,11 @@ Done when
 
 `next` 与 `resume` 在存在 Blocker 时刻意退出 2，这样脚本或任务无需解析文本就能区分
 "有东西要解除阻断"和"可以继续前进"。
+
+`--exit-zero`（自 eos-2.4.0 起）供只需要卡片、不需要判定的调用方使用——shell 提示符、会话启动钩子、
+`&&` 串联：此时 `next` 与 `resume` 在 0、1、2 时都退出 0，3 仍为 3，因此 EOS 无法评估的配置永远不会被掩盖。
+改变的只是进程退出状态；JSON 中的 `exitCode` 仍是原判定。它需要显式开启，不会自行生效——无论是在终端
+还是在 CI 中。只想查看、不要任何判定时，`status` 与 `health` 在 EOS 能够评估时本来就退出 0。
 
 ### 10.2 诊断报告（`--json`）
 

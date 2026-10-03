@@ -982,12 +982,16 @@ Since eos-2.2.0 every slash command is an **Agent Skill** in `.agents/skills/eos
 ## 7.2 EOS CLI (`node .github/eos/eos.mjs <command>`)
 
 Everything below is offline, zero-dependency and cross-platform. Exit codes: `0` pass · `1` fail or
-rejected transition · `2` blocked/pending/stale · `3` EOS itself cannot be evaluated.
+rejected transition · `2` blocked/pending/stale · `3` EOS itself cannot be evaluated. To look rather
+than gate — a shell prompt, a session-start hook, an `&&` chain — use `status` or `health`, which exit
+`0` whenever EOS can evaluate, or `next --exit-zero` / `resume --exit-zero` (since eos-2.4.0), which
+exit `0` instead of `1` or `2` and still `3` when EOS cannot evaluate. The flag never switches on by
+itself, and the `--json` document keeps the real `exitCode`.
 
 | Command | Purpose |
 |---|---|
-| `next` | The ONE recommended next action, why, and how to start it (`--why`, `--all`) |
-| `resume` | Restore this machine's focus in a new session |
+| `next` | The ONE recommended next action, why, and how to start it (`--why`, `--all`, `--exit-zero`) |
+| `resume` | Restore this machine's focus in a new session (`--exit-zero`) |
 | `status` | Where the product and the active scope are (`--changed`), and — since eos-2.2.0 — what the release gate (G8) will need that does not exist yet: a dependency audit, NFR measurements, a runbook, a deployment-topology ADR (`next` names the missing ones once there is product code) |
 | `check --gate <id> [--scope <id>]` | Run one gate for real and record the evidence |
 | `explain <gate>` | The full rule set for one gate, on demand |

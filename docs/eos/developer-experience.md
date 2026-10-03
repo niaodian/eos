@@ -386,8 +386,8 @@ and reports `STALE` rather than letting an agent act on a stale package.
 node .github/eos/eos.mjs <command> [flags]      (same CLI: npx --offline eos <command>, npm 10.9+)
 
   status [--changed]        where the project and the active scope are, and the governance track
-  next [--why] [--all]      the single recommended next action
-  resume                    restore the local focus in a new session
+  next [--why] [--all] [--exit-zero]   the single recommended next action
+  resume [--exit-zero]      restore the local focus in a new session
   check --gate <id> [--scope <id>]      run one gate, write evidence
   verify [--full] [--plan]  run the gates this change can have affected
   transition --scope <type> --id <id> --to <STATE>
@@ -445,6 +445,12 @@ Done when
 
 `next` and `resume` deliberately exit 2 while a blocker exists, so a script or a task can tell
 "there is work to unblock" from "you are clear to proceed" without parsing text.
+
+`--exit-zero` (since eos-2.4.0) is for a caller that wants the card rather than the verdict — a shell
+prompt, a session-start hook, a `&&` chain: `next` and `resume` then exit 0 for 0, 1 and 2, and 3 stays
+3, so a configuration EOS cannot evaluate is never hidden. Only the process status changes; the JSON's
+`exitCode` still carries the verdict. It is opt-in and never switches on by itself, on a terminal or in
+CI. To look without any verdict, `status` and `health` already exit 0 whenever EOS can evaluate.
 
 ### 10.2 Diagnostic reports (`--json`)
 

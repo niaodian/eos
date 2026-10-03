@@ -1002,11 +1002,14 @@ node .github/eos/eos.mjs handoff --scope story --id STORY-012   # 写出 .eos/ha
 ## 7.2 EOS CLI（`node .github/eos/eos.mjs <command>`）
 
 以下全部离线、零依赖、跨平台。退出码：`0` 通过 · `1` 失败或迁移被拒 · `2` 阻塞/待执行/失效 · `3` EOS 自身无法求值。
+只想查看而不想设卡时（shell 提示符、会话启动钩子、`&&` 串联），请用 `status` 或 `health`——只要 EOS 能够求值，
+它们就退出 `0`；或用 `next --exit-zero` / `resume --exit-zero`（自 eos-2.4.0 起），它们以 `0` 代替 `1` 或 `2`，
+EOS 无法求值时仍退出 `3`。该参数不会自行生效，`--json` 文档中的 `exitCode` 仍是真实判定。
 
 | 命令 | 用途 |
 |---|---|
-| `next` | 唯一推荐的下一步动作、为什么、以及怎么开始（`--why`、`--all`） |
-| `resume` | 在新会话里恢复本机的关注点 |
+| `next` | 唯一推荐的下一步动作、为什么、以及怎么开始（`--why`、`--all`、`--exit-zero`） |
+| `resume` | 在新会话里恢复本机的关注点（`--exit-zero`） |
 | `status` | 产品与当前 scope 处在哪里（`--changed`）；自 eos-2.2.0 起还会列出发布门禁（G8）将需要、但目前还不存在的东西：依赖审计、NFR 测量结果、runbook、部署拓扑 ADR（有了产品代码之后，`next` 也会点名其中缺失的项） |
 | `check --gate <id> [--scope <id>]` | 真正跑一道门禁并记录证据 |
 | `explain <gate>` | 按需打印某一道门禁的完整规则 |
