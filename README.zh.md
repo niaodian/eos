@@ -18,8 +18,9 @@
 
 AI 助手写代码的速度，已经远超任何团队的评审能力。EOS 让这份速度保持诚实：交付的每个阶段 ——
 问题、需求、设计、架构、故事、代码、发布 —— 都要通过一道机器校验的门；每个结论都绑定到它所评判的
-那个确切提交；每次发布都能证明自己包含什么、在哪里构建。它完全运行在你的机器上：在 VS Code +
-GitHub Copilot 里用，或在任意终端里用，不需要服务、不需要账号，也没有任何依赖。
+那个确切提交；每次发布都能证明自己包含什么、在哪里构建。它完全运行在你的机器上：在 VS Code 的
+GitHub Copilot、Claude Code、OpenAI Codex 或 Google Antigravity 里用，或在任意终端里用，不需要服务、
+不需要账号，也没有任何依赖。
 
 ## 为什么需要 EOS
 
@@ -45,6 +46,9 @@ GitHub Copilot 里用，或在任意终端里用，不需要服务、不需要�
   不存在的门、命令或状态迁移。
 - **可审计的证据。** 每个结论都记录提交、门的版本和输入哈希。`eos report` 把账本变成一份治理报告，
   可以针对单个仓库，也可以覆盖整个组织。
+- **就在你已经在用的 agent 里工作。** 工作流、护栏和 MCP 服务只写一次，再为每个 agent 生成：
+  GitHub Copilot、Claude Code 和 Google Antigravity 开箱即用；OpenAI Codex、Cursor 和 Gemini CLI 只需一条命令。
+  在任何 agent 里，批准、豁免和推进工作都仍是由人运行的命令。
 - **任意技术栈，两种范式。** Node、Python、Go、Java、Rust、.NET；确定性的 SaaS 与概率性的
   LLM / Agent 产品（以评测驱动门禁）—— 二者显式隔离。
 
@@ -66,7 +70,7 @@ GitHub Copilot 里用，或在任意终端里用，不需要服务、不需要�
 
 ## 快速开始
 
-你需要 Node.js 20.10+ 和 Git。VS Code + GitHub Copilot 是可选的 —— CLI 在任何终端里都能用。
+你需要 Node.js 20.10+ 和 Git。AI agent 是可选的 —— CLI 在任何终端里都能用。
 
 ```bash
 # 1. 从一个固定的发布版本开始，并把它变成你的仓库
@@ -90,8 +94,14 @@ npx --offline eos verify                          # 重跑你的改动可能影�
 - **已经有代码了？** `npx --offline eos init` 会列出所有起步包（`node-service`、`python-service`、
   `go-service`、`java-service`、`rag-app`、`agentic-app`、`data-pipeline`、`library`、
   `regulated-app`），并指出与它所发现的代码相匹配的那些。
-- **在 Copilot Chat 里**，同样的循环就是 **eos-guide** Agent，或 `/eos-next` · `/eos-resume` ·
-  `/eos-status`。请把项目文件夹本身作为工作区根目录打开，否则这些 Agent 不会生效。
+- **在你的 agent 里**，同样的循环只需一条斜杠命令。各 agent 的一次性配置见
+  [用户手册第 6.6 章](docs/zh/user-manual.md#第-66-章-在-claude-code、codex-和-antigravity-中使用-eos)：
+  - **GitHub Copilot（VS Code）：** 使用 **eos-guide** Agent，或 `/eos-next` · `/eos-resume` · `/eos-status`。
+    请把项目文件夹本身作为工作区根目录打开，否则这些 Agent 不会生效。
+  - **Claude Code：** 在项目文件夹中运行 `claude`，批准一次 `eos` MCP 服务，然后输入 `/eos-next`。
+  - **OpenAI Codex：** 运行一次 `npx --offline eos agents sync --platform codex --write` 并提交，信任该项目，
+    用 `/hooks` 批准护栏，然后输入 `$eos-next`。
+  - **Google Antigravity：** 打开项目文件夹，输入 `/eos-next`，或选择一个阶段 agent（例如 `eos-architecture`）。
 
 ## 工作原理
 
@@ -137,6 +147,10 @@ flowchart LR
 | `eos report --format markdown` | 治理报告：门、豁免、证据、SBOM 与签名 |
 | `eos health` · `eos doctor` | 一屏看清项目健康度；检查 EOS 自身是否接线正确 |
 | `eos upgrade --from <新版> --base <旧版>` | 升级到新的 EOS 版本——逐文件三方比较，绝不覆盖你的修改 |
+| `eos agents sync --platform <名称>` | 生成某个 agent 需要读取的内容：技能、`eos` MCP 条目、护栏钩子与阶段 agent |
+| `eos mcp` | 把读取与验证类命令作为 MCP 工具提供给你的 agent；批准与豁免仍是 CLI 命令 |
+| `eos init <pack> --brownfield` | 让已在运行的系统在交付门禁处接入 EOS |
+| `eos stage init <阶段>` | 根据 schema 生成阶段记录骨架；每个答案都填写之前，没有门禁会通过 |
 
 加上 `--json` 即可得到机器可读的输出；退出码与诊断遵循同一份成文契约：
 [docs/zh/developer-experience.md](docs/zh/developer-experience.md)。
@@ -160,10 +174,12 @@ gh attestation verify eos-2.3.0.tar.gz --repo niaodian/eos
                     证据、豁免、账本、策略锁和发布清单
 .github/eos/        CLI 及其确定性引擎（零依赖），以及它的测试
 .github/hooks/      校验器与护栏：配置、文档对齐、机密扫描、产品质量门
-.github/agents/     eos-guide 以及各阶段的编排 Agent（供 Copilot Chat 使用）
+.github/agents/     eos-guide 以及各阶段的编排 Agent（供 Copilot 使用；也为 Codex 和 Antigravity 生成）
 .github/instructions/ 按文件范围生效的编码规则
 .agents/skills/     斜杠命令工作流，形式为 Agent Skills（/eos-next、/eos-spec 等）；
                     .claude/skills/ 是为 Claude Code 生成的副本
+.mcp.json、.claude/settings.json、.agents/hooks.json、.agents/mcp_config.json、.agents/agents/
+                    由 `eos agents sync` 为每个已声明的 agent 平台生成——不要手工编辑
 .github/workflows/  eos-ci.yml（Linux、macOS、Windows）与 eos-release.yml（带证明的发布）
 docs/               你的规格与 ADR；docs/eos/ 是 EOS 手册（中文版在 docs/zh/）
 ```
@@ -172,6 +188,7 @@ docs/               你的规格与 ADR；docs/eos/ 是 EOS 手册（中文版�
 
 - [快速开始](docs/zh/quickstart.md) —— 前置条件与你的第一天。
 - [用户手册](docs/zh/user-manual.md) —— 从想法到上线再到迭代，含分步的 SaaS 与 Agentic 路线。
+- [在 Claude Code、Codex 和 Antigravity 中使用 EOS](docs/zh/user-manual.md#第-66-章-在-claude-code、codex-和-antigravity-中使用-eos) —— 各 agent 的一次性配置与日常开发流程。
 - [升级到 eos-2.0.0](docs/zh/user-manual.md#105-从-eos-122x-升级到-eos-200) —— 改变了什么、你需要做什么。
 - [升级到 eos-2.0.1](docs/zh/user-manual.md#107-从-eos-200-升级到-eos-201) —— 密钥检测安全补丁。
 - [升级到 eos-2.3.0](docs/zh/user-manual.md#1010-从-eos-22x-升级到-eos-230) —— 所有 agent 平台从同一个源头生成、`eos mcp`、存量项目接入、`eos stage init`。
@@ -184,9 +201,10 @@ docs/               你的规格与 ADR；docs/eos/ 是 EOS 手册（中文版�
 - **Node.js 20.10+ 和 Git** —— 别无其他。CI 在 Linux、macOS 和 Windows 上运行 Node 20 与 22。
 - **永远不需要 API key。** EOS 从不调用模型。每一项附加（Copilot、BMAD、BMAD 运行时）带来什么，以及已知局限，
   见 [快速开始](docs/zh/quickstart.md#能力与依赖)。
-- **VS Code + GitHub Copilot 是可选的。** 只有当项目文件夹本身是工作区根目录时，Agent、技能和
-  hook 才会加载。hook 是 VS Code 的预览特性。
-- **一次性加固。** 真正的仓库建好后，在 Copilot Chat 中运行 `/eos-init`：分支保护、CODEOWNERS 与
+- **AI agent 是可选的。** GitHub Copilot（VS Code）、Claude Code、OpenAI Codex 和 Google Antigravity 都有分步指导；
+  Cursor、Gemini CLI 和五个第二梯队 agent 用 `eos agents sync --platform` 加入。请在项目文件夹本身启动 agent，
+  否则找不到它的技能和钩子。钩子是本地减速带；CI 才是最终权威。
+- **一次性加固。** 真正的仓库建好后，在你的 agent 中运行 `/eos-init`（Codex 中为 `$eos-init`）：分支保护、CODEOWNERS 与
   审批，进度记录在 [docs/zh/activation.md](docs/zh/activation.md)。
 - **本地 CI。** `act push` 在 Docker 中运行 [eos-ci.yml](.github/workflows/eos-ci.yml)；没有 Docker 时，
   `npm run verify` 会运行核心检查。

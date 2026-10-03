@@ -10,6 +10,7 @@
 ## eos-2.3.0 — 2026-10-03
 
 - **所有 agent 平台都从同一个源头生成**（ADR-019）：`eos agents sync` 写出 EOS 的 MCP 条目、按各平台自身格式运行的护栏钩子，以及不会冲突的编排 agent。Copilot、Claude Code 和 Antigravity 默认生成——模板新增了 `.mcp.json`、`.claude/settings.json` 和 `.agents/…`；Codex、Cursor、Gemini CLI 以及五个第二梯队平台按需生成：`eos agents sync --platform <名称> --write`。共享文件中不属于 EOS 的内容一律保留，`eos upgrade` 会重新生成这些文件，而不是拿它们做比较。
+- **用户手册覆盖 Claude Code、Codex 和 Antigravity**：新增的第 6.6 章逐一说明各平台的一次性配置和日常开发流程，以及 `eos next` 点名的每一步在其中如何操作。
 - **`eos mcp`**（ADR-018）：把 EOS 的读取与验证命令作为 MCP 工具提供——`eos_next`、`eos_check`、`eos_verify` 等。批准、豁免和状态迁移仍是由人运行的 CLI 命令。
 - **存量项目接入**（ADR-020）：`eos init <pack> --brownfield` 让已有系统使用 `delivery-only` profile：按现状记录系统，每项改动都是一个受 G5、G7、G8 约束的 story。
 - **`eos stage init <阶段>`** 根据 schema 写出阶段记录的骨架；在每个 `TODO(eos)` 被回答之前，所有门禁都会拒绝它。样例记录见 `docs/eos/examples/stage-records`。

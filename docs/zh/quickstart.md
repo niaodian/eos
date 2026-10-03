@@ -13,7 +13,7 @@
 | 工具 | 用于 | 缺失时 |
 |---|---|---|
 | **Node.js**（20.10+） | `eos` CLI、验证器、hooks、JS/TS 测试与 eval | 必需——唯一的硬依赖（`npx --offline eos` 快捷方式需要 npm 10.9+，Node 22 自带） |
-| **VS Code + GitHub Copilot** | `eos-*` 智能体、`/eos-*` 指令与常驻规则 | 引导式流程必需；`eos.mjs` CLI 本身不依赖它 |
+| **一个 AI agent**——VS Code + GitHub Copilot、Claude Code、OpenAI Codex 或 Google Antigravity | `eos-*` 智能体、`/eos-*` 斜杠命令（技能；Codex 中为 `$eos-*`）与护栏；Copilot 还会自动应用按范围生效的编码规则 | 引导式流程需要其中之一——各 agent 的配置见[用户手册第 6.6 章](user-manual.md#第-66-章-在-claude-code、codex-和-antigravity-中使用-eos)；`eos.mjs` CLI 本身不依赖任何 agent |
 | **BMAD 技能**（`bmad-*`） | 各阶段工作流（`bmad-prd`、`bmad-architecture`、`bmad-create-story` 等） | 引导式流程必需——EOS 只做编排，不重复实现它们。用 `node .github/hooks/eos-doctor.mjs --deep` 核验 |
 | **`gh` CLI**（已登录） | 创建远端仓库，以及在 `/eos-init` 中验证分支保护 | **可选**：也可在 GitHub 网页端完成。用 `gh auth login` 配置 |
 | **Docker** + `act` | 本地 CI（`act push`）——在本地跑 GitHub Actions | **可选**：跳过 CI，直接跑同样的检查（见下） |
@@ -57,7 +57,7 @@ EOS 本身从不调用任何模型，也不需要任何 API key。每一行都�
 |---|---|
 | **只有 Node.js** | 完整的治理引擎：`eos next` / `status` / `check` / `verify`、全部门禁、账本、策略锁、签名发布、密钥扫描 |
 | **+ VS Code 与 GitHub Copilot** | 引导式流程：`eos-*` agent、`/eos-*` 斜杠命令（技能）、常驻规则与 PreToolUse 护栏。所用模型就是你在 Copilot 里选的那个——无需任何配置 |
-| **或其他 agent**（Claude Code、Codex、Cursor、Antigravity、Gemini CLI …） | 同样的技能与 `AGENTS.md`、EOS 的 MCP 服务，以及按该 agent 自身钩子格式运行的护栏。Claude Code 与 Antigravity 开箱即用；其他平台用 `node .github/eos/eos.mjs agents sync --platform <名称> --write` 加入（[手册 §7.9](user-manual.md)） |
+| **或其他 agent**（Claude Code、Codex、Cursor、Antigravity、Gemini CLI …） | 同样的技能与 `AGENTS.md`、EOS 的 MCP 服务，以及按该 agent 自身钩子格式运行的护栏。Claude Code 与 Antigravity 开箱即用；其他平台用 `node .github/eos/eos.mjs agents sync --platform <名称> --write` 加入（[用户手册第 6.6 章](user-manual.md#第-66-章-在-claude-code、codex-和-antigravity-中使用-eos)与 §7.9） |
 | **+ BMAD 技能**（`bmad-*`） | 各阶段编排的撰写工作流（PRD、架构、story、测试设计）。没有它们，`eos next` 仍会点名每一步，由你手工完成 |
 | **+ BMAD 项目运行时**（`_bmad/`，需要 python3 与 uv） | BMAD 的项目级定制与会话记忆。可选：没有它，技能按自带默认值运行 |
 | **一个 agentic / LLM 产品** | 你产品自己的模型调用，由评估工具链来检验（[eval-starter](../eos/examples/eval-starter/README.md)）。那是你本来就要写的产品代码，不是 EOS 的配置 |

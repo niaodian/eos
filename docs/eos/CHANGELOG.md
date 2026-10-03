@@ -9,6 +9,7 @@
 ## eos-2.3.0 — 2026-10-03
 
 - **Every agent platform is generated from one source** (ADR-019): `eos agents sync` writes the EOS MCP entry, the guardrail hook in each platform's own dialect and, where they do not collide, the orchestrator agents. Copilot, Claude Code and Antigravity get theirs by default — `.mcp.json`, `.claude/settings.json` and `.agents/…` are new in the template; Codex, Cursor, Gemini CLI and five Tier-2 platforms on demand: `eos agents sync --platform <name> --write`. Shared files keep everything that is not EOS's, and `eos upgrade` regenerates these files instead of comparing them.
+- **The user manual covers Claude Code, Codex and Antigravity**: a new Chapter 6.6 walks through the one-time setup and the daily workflow in each, and how every step `eos next` names translates there.
 - **`eos mcp`** (ADR-018): EOS's read and verify commands as MCP tools — `eos_next`, `eos_check`, `eos_verify` and more. Approving, waiving and state changes stay CLI commands a person runs.
 - **Brownfield adoption** (ADR-020): `eos init <pack> --brownfield` puts an existing system on the `delivery-only` profile: it is documented as it is, and every change is a story held to G5, G7 and G8.
 - **`eos stage init <stage>`** writes a stage record's skeleton from its schema; every gate rejects it until each `TODO(eos)` is answered. Sample records are in `docs/eos/examples/stage-records`.
