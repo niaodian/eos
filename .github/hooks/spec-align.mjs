@@ -42,8 +42,43 @@ function storiesAreTheSpec() {
     return false;
   }
 }
-const storyFiles = () => (existsSync(storiesDir) ? readdirSync(storiesDir).filter((f) => f.endsWith('.md')).sort() : []);
-const fromStories = !existsSync(prdPath) && storiesAreTheSpec() && storyFiles().length > 0;
+/**
+ * The stories, read the way EOS reads them (.github/eos/lib/story.mjs — restated here because a hook
+ * runs without the engine): every *.md under docs/stories/, recursively, except README.md; the id from
+ * the front matter, else the file name; the acceptance criteria are the table rows whose first cell is
+ * an AC id, outside code fences.
+ */
+function readStories() {
+  const out = [];
+  const walk = (dir) => {
+    let entries;
+    try { entries = readdirSync(dir, { withFileTypes: true }); } catch { return; }
+    for (const e of entries.sort((a, b) => a.name.localeCompare(b.name))) {
+      const full = join(dir, e.name);
+      if (e.isDirectory()) { walk(full); continue; }
+      if (!e.name.endsWith('.md') || e.name === 'README.md') continue;
+      let text;
+      try { text = readFileSync(full, 'utf8'); } catch { continue; }
+      if (!text.length) continue;
+      const fm = /^---\r?\n([\s\S]*?)\r?\n---/.exec(text);
+      const declared = fm && /^id:\s*(.*)$/m.exec(fm[1]);
+      const id = (declared && declared[1].trim().replace(/^["']|["']$/g, '')) || e.name.replace(/\.md$/, '');
+      const acs = [];
+      let inFence = false;
+      for (const line of text.split(/\r?\n/)) {
+        if (/^\s*(```|~~~)/.test(line)) { inFence = !inFence; continue; }
+        if (inFence || !/^\s*\|/.test(line)) continue;
+        const first = line.split('|')[1]?.trim() || '';
+        if (/^AC\d+\.\d+$/.test(first)) acs.push(first);
+      }
+      out.push({ id, acs });
+    }
+  };
+  walk(storiesDir);
+  return out;
+}
+const stories = !existsSync(prdPath) && storiesAreTheSpec() ? readStories() : [];
+const fromStories = stories.length > 0;
 
 const missing = [
   ...(existsSync(prdPath) || fromStories ? [] : ['docs/prd.md']),
@@ -97,17 +132,19 @@ let specACs;
 let knownACs;
 let specLabel = 'PRD acceptance criteria';
 let specSource = 'docs/prd.md';
+const unknownStories = [];
 if (fromStories) {
-  const acsOf = (file) => readFileSync(join(storiesDir, file), 'utf8').match(AC) || [];
   let included = null;
   if (releaseId) {
     try {
       included = JSON.parse(readFileSync(join(root, '.eos/releases', `${releaseId.replace(/[^A-Za-z0-9._-]/g, '_')}.json`), 'utf8')).includedStories;
-    } catch { /* no readable manifest: every story is the spec */ }
+    } catch { /* no readable manifest: every story is the spec (the release gate reports the manifest itself) */ }
   }
-  const files = Array.isArray(included) ? included.map((id) => `${id}.md`).filter((f) => existsSync(join(storiesDir, f))) : storyFiles();
-  specACs = new Set(files.flatMap(acsOf));
-  knownACs = new Set(storyFiles().flatMap(acsOf));
+  const shipped = Array.isArray(included) ? stories.filter((st) => included.includes(st.id)) : stories;
+  // A story the release says it ships but no file declares cannot be covered — never quietly dropped.
+  if (Array.isArray(included)) unknownStories.push(...included.filter((id) => !stories.some((st) => st.id === id)));
+  specACs = new Set(shipped.flatMap((st) => st.acs));
+  knownACs = new Set(stories.flatMap((st) => st.acs));
   specLabel = Array.isArray(included) ? `Story acceptance criteria (${releaseId})` : 'Story acceptance criteria';
   specSource = 'the stories';
 } else {
@@ -151,8 +188,9 @@ console.log('');
 console.log(`  RECORD spec-align coverage=${coverage}% traced_pass=${tracedPass}% drift=${drift.length} orphan=${orphan.length}`);
 console.log('');
 
+if (unknownStories.length) console.log(`  ⚠ In the release, but no story declares them: ${unknownStories.join(', ')}`);
 const clean = drift.length === 0 && orphan.length === 0 && totalPrd > 0 && rows > 0
-  && coverage === 100 && tracedPass === 100;
+  && coverage === 100 && tracedPass === 100 && unknownStories.length === 0;
 if (!clean && strict) {
   // Name the reason: "gaps present" alone made an empty PRD indistinguishable from a failing row.
   const why = [];
@@ -160,6 +198,7 @@ if (!clean && strict) {
   if (rows === 0) why.push('docs/trace-matrix.md contains no AC rows');
   if (drift.length) why.push(`${drift.length} AC(s) with no trace row: ${drift.join(', ')}`);
   if (orphan.length) why.push(`${orphan.length} orphan row(s) not in ${fromStories ? 'any story' : 'the PRD'} (built beyond the approved spec): ${orphan.join(', ')}`);
+  if (unknownStories.length) why.push(`.eos/releases/${releaseId}.json ships ${unknownStories.join(', ')}, but no story under docs/stories/ declares ${unknownStories.length === 1 ? 'that id' : 'those ids'}`);
   if (rows > 0 && passed < rows) why.push(`${rows - passed} traced row(s) not passing${machine ? ' in docs/evidence/test-run.json (a row passes when every result recorded for its AC is PASS)' : ''}`);
   for (const w of why) console.log('  ERROR ' + w);
   console.log('');
