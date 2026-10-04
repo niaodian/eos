@@ -5,7 +5,7 @@
 
 # EOS 用户手册（Engineering Operating System User Manual）
 
-> 版本：与 `docs/eos/VERSION` 同步（当前 `eos-2.5.0`）
+> 版本：与 `docs/eos/VERSION` 同步（当前 `eos-2.6.0`）
 > 适用：较新版本的 VS Code + GitHub Copilot Chat（自定义 agent / hooks 属近版能力，用「关于 VS Code」面板确认版本），或 Claude Code、OpenAI Codex、Google Antigravity（[第 6.6 章](#第-66-章-在-claude-code、codex-和-antigravity-中使用-eos)）+ 已安装 73 个 `bmad-*` skill（用户级）
 > 定位：本手册是**操作指南（怎么用）**；设计原理与取舍见同目录 `blueprint.md`（为什么这么设计）。
 > 约定：正文中文；文件名/路径/命令/配置键保留英文原文。
@@ -25,7 +25,7 @@
 | 想查某个斜杠命令 / agent / 规则 | [第 7 章 完整参考](#第-7-章-完整参考（速查）) |
 | 配置坏了 / Agent 不按预期工作 | [第 9 章 故障定位](#第-9-章-故障定位与排错) |
 | 想把这套搬到别的项目/团队 | [第 10 章 跨项目复用与分发](#第-10-章-跨项目复用与分发) |
-| 升级到 `eos-2.0.0`、选择治理轨道或为发布签名 | [§10.5 升级](#105-从-eos-122x-升级到-eos-200) · [§10.6 轨道与签名发布](#106-治理轨道、签名发布与中心策略) · [§10.7 2.0.1 安全补丁](#107-从-eos-200-升级到-eos-201) · [§10.8 `eos upgrade` 与 2.1.0](#108-从-eos-20x-升级到-eos-210) · [§10.9 2.2.0](#109-从-eos-21x-升级到-eos-220) · [§10.10 2.3.0](#1010-从-eos-22x-升级到-eos-230) · [§10.11 2.4.0](#1011-从-eos-23x-升级到-eos-240) · [§10.12 2.5.0](#1012-从-eos-24x-升级到-eos-250) |
+| 升级到 `eos-2.0.0`、选择治理轨道或为发布签名 | [§10.5 升级](#105-从-eos-122x-升级到-eos-200) · [§10.6 轨道与签名发布](#106-治理轨道、签名发布与中心策略) · [§10.7 2.0.1 安全补丁](#107-从-eos-200-升级到-eos-201) · [§10.8 `eos upgrade` 与 2.1.0](#108-从-eos-20x-升级到-eos-210) · [§10.9 2.2.0](#109-从-eos-21x-升级到-eos-220) · [§10.10 2.3.0](#1010-从-eos-22x-升级到-eos-230) · [§10.11 2.4.0](#1011-从-eos-23x-升级到-eos-240) · [§10.12 2.5.0](#1012-从-eos-24x-升级到-eos-250) · [§10.13 2.6.0](#1013-从-eos-25x-升级到-eos-260) |
 
 ---
 
@@ -49,6 +49,7 @@
 - [附录 B 命令速查卡](#附录-b-命令速查卡)
 - [附录 C 端到端样例（my-app）](#附录-c-端到端样例（my-app）)
 - [附录 D 实例化后硬化（让门禁具备权威）](#附录-d-实例化后硬化（让门禁具备权威）)
+- [附录 E 平台冒烟清单（手工）](#附录-e-平台冒烟清单（手工）)
 
 ---
 
@@ -134,7 +135,7 @@ bmad-code-review                   → 审查无阻断项           (Gate G6)
 | VS Code | 较新版本（自定义 agent / hooks 需近版） | 关于面板查看真实版本（`code --version` 可能是 shim，不准） |
 | GitHub Copilot | 已登录（企业 license 仅作 license，不作配置依赖） | Chat 面板可用 |
 | 或其他 agent | 用 Claude Code、OpenAI Codex 或 Google Antigravity 代替 VS Code + Copilot——配置见 [第 6.6 章](#第-66-章-在-claude-code、codex-和-antigravity-中使用-eos) | 在项目文件夹中启动后，`/eos-next`（Codex：`$eos-next`）能给出结果 |
-| Node.js | 20.10+（CLI、验证器与 hooks 用）；请使用 22 或 24——Node 20 已于 2026-04-30 停止维护，只作为声明的最低版本保留 | `node -v` |
+| Node.js | 22.10+（CLI、验证器与 hooks 用）；`.nvmrc` 写明了 CI 使用的 Node 主版本（24）。Node 20 已在 eos-2.6.0 中移除；Node 26 本地验证通过（26.10），尚未纳入 EOS 的 CI 矩阵 | `node -v` |
 | BMAD skills | 73 个 `bmad-*`（用户级） | macOS/Linux `ls ~/.agents/skills &#124; grep -c '^bmad-'` · Windows `(Get-ChildItem ~/.agents/skills -Filter 'bmad-*').Count` |
 
 > **在 Windows 或 Linux 上？** 核心流程完全一致 —— 所有 hooks/validators 都是 Node、路径已跨平台归一化，
@@ -194,7 +195,7 @@ bmad-code-review                   → 审查无阻断项           (Gate G6)
 **方式 A — degit（推荐，最快）**
 ```sh
 # public 模板 —— 直接 degit（无需鉴权）
-npx degit niaodian/eos#eos-2.5.0 my-new-app
+npx degit niaodian/eos#eos-2.6.0 my-new-app
 cd my-new-app
 git init && git add -A && git commit -m "chore: scaffold from eos"
 ```
@@ -232,6 +233,8 @@ node .github/hooks/validate-config.mjs      # 期望：PASS
 （[ADR-022](../adr/022-first-declaration-starts-the-policy.md)）。选了起步包？在提交声明之前修改它的命令，
 再运行 `eos policy lock --write`：提交之前它仍是首次声明，其中没有任何内容需要审批。
 
+**替换仍在描述 EOS 的文件。** `init` 只替换声明。下面这些在你替换之前描述的仍是 EOS：`README.md` **和** `README.zh.md`，必须成对替换（doc-parity 检查比较这一对；`docs/zh/README.md` 属于 EOS 的手册——绝不要覆盖它）、`package.json`（名称、版本、`engines`；产品不是 Node 项目就删掉它）、`docs/adr/` 的编号（EOS 自己的系列到 ADR-023 为止——请有意识地开始你自己的）以及 `.github/CODEOWNERS`。`.nvmrc` 也归你：它写明 CI 与你的开发者共用的 Node 主版本。`/eos-init` 会打印这份清单。如果你是唯一的维护者，请在 Day-1 声明 solo 路径——`eos init <pack> --solo --write`——这样首次策略评审、发布批准与所有 waiver 都有一个诚实的出口（第 8 阶段，[ADR-023](../adr/023-low-assurance-exits-on-the-standard-track.md)）。
+
 打开 `.github/instructions/00-workspace.instructions.md`，把它改成**你这个项目**的真实情况：
 - `Local commands`：**已定栈**就换成你的栈的 install/lint/test/typecheck 命令——**成品行直接抄** `docs/eos/stack-presets.md`（Node/Python/Go/Java/Rust/.NET 全栈配方册，复制对应一块即可）。**还没定栈**（多数 0-1 项目在架构前都没定）就**保留 Node 占位**——这是 ⛳ PROVISIONAL 值，**权威锁定在阶段 4（架构）** 连同 `docs/adr/00X-tech-stack.md`，避免 always-on 规则与将来真实栈打架
 - `Layout`：若目录结构不同，更新
@@ -240,7 +243,7 @@ node .github/hooks/validate-config.mjs      # 期望：PASS
 ## 3.4 Day-1 完整序列（复制即用）
 
 ```sh
-npx degit niaodian/eos#eos-2.5.0 my-new-app && cd my-new-app
+npx degit niaodian/eos#eos-2.6.0 my-new-app && cd my-new-app
 git init && git add -A && git commit -q -m "chore: scaffold from eos"
 node .github/hooks/validate-config.mjs
 node .github/eos/eos.mjs init config-only --write   # 声明项目：还没有代码（或 init <pack> [--track regulated]）
@@ -262,7 +265,7 @@ code .
 已经在运行的系统，不必先重写规范才能用上 EOS。用 `delivery-only` 工作流 profile 在**交付门禁**处接入（自 eos-2.3.0 起）：正在运行的系统就是基线，此后的每一项改动都是一个 story，必须就绪（G5）、经过验证（G7）并通过发布门禁（G8）。
 
 ```sh
-npx degit niaodian/eos#eos-2.5.0 /tmp/eos                      # 模板，放在你的仓库之外
+npx degit niaodian/eos#eos-2.6.0 /tmp/eos                      # 模板，放在你的仓库之外
 # 复制到你的仓库：.eos/ .agents/ .github/{eos,hooks,agents,instructions}/ docs/eos/
 # 已有的文件请手工合并：AGENTS.md、.github/copilot-instructions.md、.github/workflows/eos-ci.yml
 node .github/hooks/validate-config.mjs                          # S7 会点名仍缺少的内容
@@ -384,12 +387,12 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 | 项 | 内容 |
 |---|---|
 | **目标** | 从模板得到一个配置健康的空项目 |
-| **怎么启动** | `npx degit niaodian/eos#eos-2.5.0 my-app && cd my-app`，然后声明项目：`node .github/eos/eos.mjs init config-only --write`（未定栈）或 `init <pack> --write` |
+| **怎么启动** | `npx degit niaodian/eos#eos-2.6.0 my-app && cd my-app`，然后声明项目：`node .github/eos/eos.mjs init config-only --write`（未定栈）或 `init <pack> --write` |
 | **产出** | 完整 `.github/` + `docs/` 骨架 |
 | **门** | `node .github/hooks/validate-config.mjs` → **PASS** |
 | **必查** | PASS 0 errors。**栈未定则先别改** `00-workspace`——保留 Node 占位即可；栈是不可逆决策，权威锁定在**阶段 4（ADR）**。已知栈可即抄 `docs/eos/stack-presets.md`（快路径）。 |
 | **打开方式** | 从 `my-app/` 内执行 `code .`——让**项目本身**成为工作区根。打开父目录会导致 agent/instructions/hooks 全部不生效（见 7.2）。 |
-| **★ 硬化（一次性）** | 跑 `/eos-init`：引导你开分支保护（runbook）+ 替换 CODEOWNERS handle + 固定审批基线，进度记入 `docs/eos/activation.md`。**这一步决定 CI 门是否真能阻断合并**（详见附录 D）；`eos-doctor` 每次会提示还剩几项，`/eos-release-gate` 发布前再核一次——避免"系统性遗忘"。个人试验仓可逐项豁免（`[~] … 原因：…`）。 |
+| **★ 硬化（一次性）** | 跑 `/eos-init`：引导你开分支保护（runbook）+ 替换 CODEOWNERS handle + 固定审批基线，进度记入 `docs/eos/activation.md`。**这一步决定 CI 门是否真能阻断合并**（详见附录 D）；`eos-doctor` 每次会提示还剩几项，`/eos-release-gate` 发布前再核一次——避免"系统性遗忘"。个人试验仓可逐项豁免（`[~] … 原因：…`）。 开始之前，`/eos-init` 会列出哪些步骤需要第二个人（或者，在用 `--solo` 声明的单人项目里，需要一次由**你自己**输入的带标签自批准——agent 永远不会运行 `--self`），以及要替换哪些模板文件。 |
 | **样例** | `my-app/` 全树（44 文件，validate PASS） |
 
 ---
@@ -506,7 +509,7 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 | **何时进入** | G4 通过 |
 | **怎么启动** | Chat 切到 **`（agent）eos-plan`**（`bmad-create-epics-and-stories` → `bmad-create-story` → `bmad-sprint-planning`），对每条 AC 用 **`bmad-testarch-atdd`** 先设计验收测试；**若含 LLM/agentic 组件,再跑 `/eos-eval-spec` 设计评估集(G-EVAL)**;最后用 `bmad-check-implementation-readiness` 验就绪 |
 | **输入** | `docs/prd.md`、`docs/architecture.md`、`docs/EXPERIENCE.md`（若做了 UX 阶段） |
-| **产出** | `docs/epics/*`、`docs/stories/*.md`（每个含**验收测试大纲**）**、`docs/eval-plan.md`（LLM 功能）** |
+| **产出** | `docs/epics/*`、`docs/stories/*.md`（每个含**验收测试大纲**）**、`docs/eval-plan.md`（LLM 功能）** 每个 story 是 `docs/stories/<ID>.md`——文件名就是 id——含 `## Acceptance criteria`（一张表：`AC | Statement | Test intent | Eval case`）、`## Operational tasks`（各子句用 `;` 或全角 `；` 分隔）和 `## Dependencies`。`eos stage init story --id <ID> --write` 会写出这个文件，每个需要回答的地方都放一个 `TODO(eos)`，仍含 `TODO(eos)` 的 story 不算就绪。声明 agentic 范式会让 `eos init` 列出缺少 `Eval case` 列的 story：由模型支撑的行为填 `EVAL-<n>` 编号，确定性行为填 `N/A — deterministic`。 |
 | **决策门 G5** | ☑ 每个 story 上下文自包含 ☑ 可独立实现 ☑ 含 AC **且每条 AC 有验收测试设计（ATDD）** ☑ 把 telemetry/authz/rollback 落成具体任务 **☑ LLM 功能有 eval-plan（G-EVAL）或显式 SKIP** |
 | **必查项** | 开发者拿到这个 story，**不回头翻别处**就能开工吗？DoD 写了吗？**每条 AC 的验收测试意图定义了吗**？**LLM 功能的 eval 集/grader/阈值定了吗**？ |
 | **防返工** | "就绪门"防开发中途缺上下文；**测试左移**让验收标准在写码前就可测，防"事后补测凑覆盖率"；**eval 左移**让非确定的 LLM 输出在写码前就有可度量基线。 |
@@ -551,8 +554,8 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 | **输入** | `docs/prd.md`（AC 清单）、**`docs/checklists/C-nfr.md`（NFR 目标值）**、**`docs/eval-plan.md`（LLM 功能）**、`src/` 代码 |
 | **产出** | 测试套件 + `docs/trace-matrix.md`（AC ↔ 测试映射，是*人*的判断）**+ `docs/evidence/test-run.json`**（*机器*的结果：哪个测试跑了、跑在哪棵产品树上、返回了什么）+ **`docs/evidence/nfr-summary.json`** + **`docs/evidence/eval-summary.json`**（LLM 功能）。自 eos-2.2.0 起，`verified` 门禁会根据你的测试运行器本就会输出的 JUnit XML 自行写出 `test-run.json`——只需声明 `"evidence": {"junit": ["reports/junit/*.xml"]}`；见 [examples/trace-evidence](../eos/examples/trace-evidence/README.md) |
 | **生效规则 R6** | 金字塔结构；**每条 AC ≥1 测试**；`describe(<criterion id>)` 命名；无真实计时器/无顺序依赖；改动行覆盖率 ≥80%；**NFR 目标用 `bmad-testarch-nfr` 验证**；**LLM 输出用 eval 集+grader 验(非 exact-match),见 `ai/10-ai-llm` 规则** |
-| **决策门 G7** | `node .github/eos/eos.mjs check --gate verified --scope <STORY-ID>` —— ☑ 每条 AC 追溯到一个**存在且真正跑过**的测试 ☑ 该次运行描述的是**这棵**产品树 ☑ **NFR 目标已验证，或延后且带负责人+触发条件** ☑ **LLM 功能：实测分数达阈值，且由 EOS 依据摘要自身的数字重算** ☑ **spec-alignment 量化（`/eos-spec-align`）**。1.13.0 之前，矩阵里手写一个 `PASS` 就够了 |
-| **必查项** | 有没有"没被任何测试覆盖的 AC"？**C-nfr 里定的 P95/吞吐/SLO 有没有被验证**（而不是定了就忘）？延后的有没有显式标 trigger？**LLM 的 eval 分达阈值了吗?prompt/模型改动有没有跑回归?** |
+| **决策门 G7** | `node .github/eos/eos.mjs check --gate verified --scope <STORY-ID>` —— ☑ 每条 AC 追溯到一个**存在且真正跑过**的测试 ☑ 该次运行描述的是**这棵**产品树 ☑ **NFR 目标已验证，或延后且带负责人 + 触发条件 + 将来的 `dueBy`** ☑ **LLM 功能：实测分数达阈值，且由 EOS 依据摘要自身的数字重算** ☑ **spec-alignment 量化（`/eos-spec-align`）**。1.13.0 之前，矩阵里手写一个 `PASS` 就够了 |
+| **必查项** | 有没有"没被任何测试覆盖的 AC"？**C-nfr 里定的 P95/吞吐/SLO 有没有被验证**（而不是定了就忘）？延后的有没有显式标 trigger？**LLM 的 eval 分达阈值了吗?prompt/模型改动有没有跑回归?** 失败的运行会点名第一个失败的测试，并且把“没有工具链”与“测试失败”分开报告。trace matrix 里的测试名会一直读到单元格末尾（或闭合的反引号），所以名字里的撇号和括号都没问题。 |
 | **防返工** | trace 矩阵让"漏测的验收标准"无所遁形；**NFR 验证让"定了目标却没人验"无所遁形**；**eval 回归让"改 prompt 改崩了别处"无所遁形**。 |
 | **样例** | `my-app/test/auth.test.js`（10 个 AC-traced 测试全绿）、`my-app/docs/trace-matrix.md`（11/12 AC 有测试，1 个性能项显式 deferred） |
 
@@ -564,11 +567,11 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 |---|---|
 | **目标** | 过质量/安全/回滚/灰度/NFR 门后才发布 |
 | **何时进入** | G7 通过 |
-| **怎么启动** | Chat 输入 **`/eos-release-gate`**；缺 runbook 就先 **`/eos-runbook <service>`** |
+| **怎么启动** | Chat 输入 **`/eos-release-gate`**；缺 runbook 就先 **`/eos-runbook <service>`** **先冻结：** 在验证之前，把所有修复合并、把 `docs/` 与 `src/` 下的所有编辑做完——此后的每一次改动都会让每个 story 的证据变 STALE。顺序是：冻结 → 验证每个 story → 测量 NFR 目标 → 绑定摘要 → `verify-release`。 |
 | **输入** | 测试结果、NFR 验证结果（`docs/evidence/nfr-summary.json`——逐项测量目标，再用 [examples/nfr-summary](../eos/examples/nfr-summary/README.md) 写出）、`ops/runbook.md`。自项目声明之日起，`eos status` 就一直列着 G8 需要什么 |
 | **产出** | 发布门禁报告（逐项 PASS/FAIL）、`ops/runbook.md`（每个服务一节） |
-| **决策门 G8（硬门）** | `node .github/eos/eos.mjs verify-release --release <id>` 会跑完提示词列出的全部 13 项：① 候选已提交 ② **质量命令在这个候选上重跑** ③ story 已 VERIFIED ④ **每个 story 的验证描述的就是这棵树** ⑤ 规格对齐 ⑥ 密钥扫描 ⑦ 依赖审计 ⑧ NFR 证据 ⑨ 合规边界 ⑩ Waiver ⑪ Runbook：回滚**+灰度+健康/就绪** ⑫ 部署拓扑 ADR ⑬ 执行权威。**任一 FAIL 阻断发布**；`DEFERRED`（离线审计、带负责人+触发条件的 NFR）可见且绝不算绿 |
-| **必查项** | 回滚步骤是"可执行的精确步骤"还是空话？灰度延后的有没有写 trigger？审计 0 漏洞吗？**NFR 目标验了没**？另外 `VERIFIED → APPROVED` 需要一位**不是候选准备者本人**记录的批准——任何模型、任何自动化都无法代劳 |
+| **决策门 G8（硬门）** | `node .github/eos/eos.mjs verify-release --release <id>` 会跑完提示词列出的全部 14 项：① 候选已提交 ② **质量命令在这个候选上重跑** ③ story 已 VERIFIED ④ **每个 story 的验证描述的就是这棵树** ⑤ 规格对齐 ⑥ 密钥扫描 ⑦ 依赖审计 ⑧ NFR 证据 ⑨ 合规边界 ⑩ Waiver ⑪ Runbook：回滚**+灰度+健康/就绪** ⑫ 部署拓扑 ADR ⑬ 执行权威 ⑭ **每个单向决策都已由人确认**（其 ADR 为 `accepted`，带 `Confirmed by` 与 `Confirmed at`）。**任一 FAIL 阻断发布**；`DEFERRED` 可见且绝不算绿——只有被推迟的 **NFR** 目标可以晋级：仅限 Standard 轨道，需有负责人、触发条件和将来的 `dueBy`（`dueBy` 已过即 FAIL），且批准绑定整份清单。被推迟的依赖审计仍然阻断，Regulated 或 Controlled 发布带任何推迟都不会晋级 |
+| **必查项** | 回滚步骤是"可执行的精确步骤"还是空话？灰度延后的有没有写 trigger？审计 0 漏洞吗？**NFR 目标验了没**？另外 `VERIFIED → APPROVED` 需要一位**不是候选准备者本人**记录的批准——任何模型、任何自动化都无法代劳 在声明了 `approvalMode: "solo"`（Standard 轨道）的单人项目里，这次批准是 `eos approve --self --reason "<原因>"`，由本人输入——agent 永远不会运行 `--self`——记录为 `assurance: "self"`，并在 `status`、`next` 与发布记录里显示为自批准。`eos approve` 会先打印每个被推迟的目标；`RELEASED` 之后，`eos next` 会列出欠什么、何时到期。runbook 按项目的 `language` 阅读（中文 runbook 需要写 回滚 · 灰度 · 健康检查）。 |
 | **防返工** | 无回滚/无灰度/NFR 未验不得上线——堵"带病上线"。 |
 | **样例** | `my-app/docs/release-gate.md`（适用项全过、`npm audit` 0 vulns）、`my-app/docs/trace-matrix.md`（性能 NFR 项显式 deferred+trigger）、`my-app/ops/runbook.md`（`FEATURE_LOGIN=off` 回滚） |
 
@@ -655,7 +658,7 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 
 ### 第 0 步：建项目 + 选栈（5 分钟）
 ```sh
-npx degit niaodian/eos#eos-2.5.0 todo-api && cd todo-api
+npx degit niaodian/eos#eos-2.6.0 todo-api && cd todo-api
 git init && git add -A && git commit -q -m "chore: scaffold from eos"
 node .github/hooks/validate-config.mjs          # 期望 PASS
 node .github/eos/eos.mjs init node-service --write   # 声明技术栈（或 python-service、go-service…——`eos init` 会列出全部）
@@ -722,7 +725,7 @@ SaaS 的 **G7** 要求：每条 AC ≥1 测试、**API 契约测试**（对 open
 
 ### 第 0 步：建项目 + 建 AI 目录
 ```sh
-npx degit niaodian/eos#eos-2.5.0 cs-agent && cd cs-agent
+npx degit niaodian/eos#eos-2.6.0 cs-agent && cd cs-agent
 git init && git add -A && git commit -q -m "chore: scaffold from eos"
 mkdir -p ai/prompts evals                       # AI 代码放这里，自动叠加 Agentic 规则
 node .github/hooks/validate-config.mjs          # 期望 PASS
@@ -905,7 +908,7 @@ agent to design the architecture." Codex 按名称查找自定义 agent，`/agen
 **接线情况与位置**
 
 - `.agents/skills/`——EOS 工作流，原生读取。
-- `.agents/hooks.json`——在每次 `run_command` 之前运行的护栏。
+- `.agents/hooks.json`——在每次 `run_command` 之前运行的护栏。它的命令用 `git rev-parse --show-toplevel` 找到仓库根目录，因为 Antigravity 是在 `.agents/` 里启动钩子的，而不是项目根目录。无头模式下没有人能批准 MCP 调用，所以只读的 EOS 工具（`eos_next`、`eos_status`、`eos_health`、`eos_explain` ……）会被拒绝，直到你在 Antigravity 的权限设置里为 `eos` 服务放行——只放行只读的那些；EOS 不会替你写这份清单。
 - `.agents/mcp_config.json`——`eos` 服务。
 - `.agents/agents/eos-*.md`——六个编排 agent，由 `.github/agents/` 渲染生成。
 
@@ -1016,6 +1019,8 @@ node .github/eos/eos.mjs handoff --scope story --id STORY-012   # 写出 .eos/ha
 它们就退出 `0`；或用 `next --exit-zero` / `resume --exit-zero`（自 eos-2.4.0 起），它们以 `0` 代替 `1` 或 `2`，
 EOS 无法求值时仍退出 `3`。该参数不会自行生效，`--json` 文档中的 `exitCode` 仍是真实判定。
 
+除了那一个推荐动作，`eos next` 还会说——每条只说一次，且仅在适用时——**尚未激活**（`/eos-init` 还没做）、**等待一个人**（某个单向 ADR 仍是 `proposed`）、**现在开始测量**（某个 NFR 带有规模条件：把这份数据集放进第一个涉及它的 story 里去测）；到发布时，还有 **先冻结** 以及发布之后要做的事（G9 与 G10 是离开 `RELEASED` 所需，而不是发布所需）。基线通过之后，过期的 `product` 焦点不再钉住 `next`；`verify` 只评估基线已到达的阶段。
+
 | 命令 | 用途 |
 |---|---|
 | `next` | 唯一推荐的下一步动作、为什么、以及怎么开始（`--why`、`--all`、`--exit-zero`） |
@@ -1024,7 +1029,7 @@ EOS 无法求值时仍退出 `3`。该参数不会自行生效，`--json` 文档
 | `check --gate <id> [--scope <id>]` | 真正跑一道门禁并记录证据 |
 | `explain <gate>` | 按需打印某一道门禁的完整规则 |
 | `transition --scope <type> --id <id> --to <STATE>` | 迁移一个 scope，由已记录的证据把守 |
-| `approve --scope <type> --id <id>` | 记录一次批准——必须是与申请人**不同**的人 |
+| `approve --scope <type> --id <id>` | 记录一次批准——必须是与申请人**不同**的人；除非项目声明了 `approvalMode: "solo"`，且本人加上 `--self --reason "<原因>"`（记录为自批准；agent 永远不会运行 `--self`）。会先打印被推迟的 NFR 清单，并把批准绑定到它 |
 | `release-status` / `verify-release --release <id>` | 汇总就绪度 / 候选绑定的发布验证（G8） |
 | **`product-tree`** | 一次验证所对应的产品树身份。`--json` 打印摘要；如果由你自己的运行器写摘要，必须把它写进去 |
 | **`evidence junit [<report.xml>…] [--write]`** | 用 JUnit XML 报告回答 `docs/trace-matrix.md` 的每条引用，并写出 `docs/evidence/test-run.json`——用于测试在 CI 另一个步骤中运行的情形。比任何产品文件更旧的报告一律拒绝（退出码 2）。不带文件时读取 `evidence.junit`；`verified` 门禁每次运行都会做同样的转换 |
@@ -1033,8 +1038,8 @@ EOS 无法求值时仍退出 `3`。该参数不会自行生效，`--json` 文档
 | `handoff --scope <type> --id <id>` | 把当前步骤交接给另一个 agent/会话 |
 | `ledger [--verify] [--against <ref>]` | 校验只追加的哈希链 |
 | `focus --scope <type> --id <id>` | 设置本机的本地关注点（不携带任何权威） |
-| `init [--write]` | 报告或创建本地的、非破坏性的集成文件 |
-| `stage init <stage> [--write] [--interactive]` | 根据 schema 生成某阶段机器记录（`docs/<stage>.json`）及其文档的骨架：每个必填字段都放一个 `TODO(eos)` 占位符——在逐一回答之前，所有门禁都会拒绝这份记录，因此骨架永远不会推进阶段。样例见 [examples/stage-records](../eos/examples/stage-records/README.md)（自 eos-2.3.0 起） |
+| `init [<pack>] [--solo] [--write]` | 报告或创建本地的、非破坏性的集成文件；带起步包时则声明项目（`--solo`：Standard 轨道的单人维护者批准路径）。它会保留你已选的 `language`、平台与排除项，并在声明 `agentic` 时列出需要 `Eval case` 列的 story |
+| `stage init <stage> [--write] [--interactive]` | 根据 schema 生成某阶段机器记录（`docs/<stage>.json`）及其文档的骨架：每个必填字段都放一个 `TODO(eos)` 占位符——在逐一回答之前，所有门禁都会拒绝这份记录，因此骨架永远不会推进阶段。样例见 [examples/stage-records](../eos/examples/stage-records/README.md)（自 eos-2.3.0 起） `stage init story --id <ID> [--ac AC1.1,AC1.2] [--write]` 写出 `story-ready` 读取的 story 文件格式；`stage init design` 同时写出 `docs/EXPERIENCE.md`。 |
 | `stack sync [--write]` | 依据 `.eos/project.json` 渲染常驻工作区规则的 `Local commands`，使散文不可能与 CI 实际执行的命令不一致。未声明技术栈时阻断而非猜测 |
 | `agents sync [--platform <x>] [--write] [--check]` | 从同一个源头生成各 agent 平台读取的内容：技能副本、EOS 的 MCP 条目、以平台自身格式运行的护栏钩子，以及不会冲突的 agent。共享配置文件中不属于 EOS 的内容一律保留；`--platform` 把平台加入 `agentPlatforms`；CI 运行 `--check`（自 eos-2.2.0 起；多平台自 eos-2.3.0 起，见 7.9） |
 | `mcp` | 通过 Model Context Protocol（stdio）把读取与验证类命令提供给 agent：`next`、`status`、`resume`、`health`、`explain`、`check`、`verify`、`release-status`、阶段骨架、`product-tree`、`doctor`、`policy check`。批准、豁免、状态迁移、发布签名以及一切改写治理文件的命令都刻意不作为工具提供（[ADR-018](../adr/018-mcp-server.md)）。各平台的客户端配置由 `eos agents sync` 生成（自 eos-2.3.0 起） |
@@ -1141,8 +1146,8 @@ echo '{"tool_input":{"command":"ls"}}' | node .github/hooks/deny-dangerous.js
 
 **本地 CI（第三道强制层，需 Docker）**：EOS 除"实时 Hook + 配置静态校验"外，还提供 `act` 跑的全仓批量门。
 ```sh
-act push -j verify            # 跑 .github/workflows/eos-ci.yml：validate-config + eos-doctor + tests + evals
-act push --pull=false --action-offline-mode   # 首次拉过镜像后可完全离线
+act push -W .github/workflows/eos-ci.yml -j verify   # 跑 .github/workflows/eos-ci.yml：validate-config + eos-doctor + tests + evals
+act push -W .github/workflows/eos-ci.yml --pull=false --action-offline-mode   # 首次拉过镜像后可完全离线
 ```
 > 三道强制层各司其职：**Hook（逐编辑实时）**=`config-check.json` 每次编辑跑 `validate-config.mjs`+`eos-doctor.mjs`（配置合规 + G-EVAL 连线）、`quality.json` 跑质量门、`guardrails.json` 拦危险操作 · **静态校验（手动/按需）**=同两个脚本可随时手跑 · **act CI（合并/发布前全仓批量）**=`eos-ci.yml` 跑 validate-config+eos-doctor+tests+evals。同一门（如 G-EVAL）在逐编辑与 CI 两处都强制，早发现也防漏网。
 
@@ -1287,6 +1292,8 @@ EOS 自己的测试套件（[ADR-021](../adr/021-eos-tests-run-only-in-eos.md)�
 另外每周在默认分支上运行一次，在项目中这次只运行很短的 `plan` 作业。没有 PR 的分支在推送时不会构建：
 请为它开一个 PR，或把该分支加入 `on.push.branches`（例如发布分支）。
 
+**用哪个 Node、哪个 runner。** `eos-ci.yml` 与 `eos-release.yml` 里的每个 `setup-node` 步骤都读取 `.nvmrc`（24），所以 CI 与你的开发者共用同一个来源；`coverage` 运行 Node 22，EOS 自己的矩阵运行 22 与 24。Linux 作业运行在 `ubuntu-24.04` 上，而不是会移动的 `ubuntu-latest`。**策略检查单独报告：**`EOS policy integrity` 步骤失败不再跳过产品质量门——另有一个步骤报告它的结论，所以仍在等待批准人的策略不会掩盖你的测试是否通过，反过来也一样。solo 项目的 `<name> (self)` 批准人在这里被接受。`plan` 作业的日志会打印 `self=<true|false>`。
+
 ---
 
 # 第 9 章 故障定位与排错
@@ -1348,21 +1355,22 @@ Agent 输出不符预期
 ```sh
 # 方式 A：degit（public 仓库，无需鉴权）
 # 固定到 release tag：默认分支会移动，tag 不会。
-npx degit niaodian/eos#eos-2.5.0 my-app
+npx degit niaodian/eos#eos-2.6.0 my-app
 cd my-app && git init
 
 # 方式 B：在 tag 上 clone，并开一段全新历史
-git clone --depth 1 --branch eos-2.5.0 https://github.com/niaodian/eos.git my-app
-cd my-app && git checkout --orphan main && git commit -m "chore: start from eos-2.5.0"
+git clone --depth 1 --branch eos-2.6.0 https://github.com/niaodian/eos.git my-app
+cd my-app && git checkout --orphan main && git commit -m "chore: start from eos-2.6.0"
 
 # 两种方式之后都要声明项目：模板自带的声明描述的是 EOS，而不是你的项目
 node .github/eos/eos.mjs init                       # 两条轨道、所有起步包，以及当前的声明
-node .github/eos/eos.mjs init config-only --write   # 还没有代码——或 <pack>，适用时加 --track regulated
+node .github/eos/eos.mjs init config-only --write   # 还没有代码——或 <pack>，适用时加 --track regulated（--solo：单人维护者）
+git add -A && git commit -q -m "chore: declare the project"   # 提交声明，连同本项目的策略锁与 SBOM
 ```
 
 ## 10.3 分发给团队（纯本地、无企业依赖）
 
-1. 所有人从**同一个 release tag**（`eos-2.5.0`）开始。默认分支会持续变动，
+1. 所有人从**同一个 release tag**（`eos-2.6.0`）开始。默认分支会持续变动，
    不固定版本就意味着每个人拿到的都是略有差异的 EOS。
 2. `【需组织/GitHub 设置】` GitHub **template repository** 属于所有者级设置：EOS 既无法替你设置，
    也无法在本地验证，所以别信本页面的说法——
@@ -1396,7 +1404,7 @@ node .github/eos/eos.mjs init config-only --write   # 还没有代码——或 <
 | **验收标准必须被定义，而不只是被提及**（EOS-AUD-004） | `prd-ready` 报告 "referenced but never defined: AC…" | 把每条标准写成以其 id 开头并带正文的列表项、表格行或标题。 |
 | **运营任务必须是决策**（EOS-AUD-005） | `story-ready` 报告 `Telemetry: "SKIP" with no reason` | 使用 `ADOPT — <任务>; owner: <谁>; verify: <如何验证>`、`SKIP — <理由>`，或 `DEFER — owner: <谁>; trigger: <什么条件结束它>`。 |
 | **Trace 行需要机器结果**（EOS-AUD-006） | `verified` 报告 "a hand-written PASS … is a claim, not a result" | 从你的测试运行器输出 `docs/evidence/test-run.json`——见 [examples/trace-evidence](../eos/examples/trace-evidence/README.md)。自 eos-2.2.0 起，声明 `evidence.junit` 即可取代这个映射步骤。 |
-| **发布门禁检查提示词所要求的一切**（EOS-AUD-007） | `release-ready` 新增候选质量、依赖审计、NFR 证据、灰度、健康/就绪、拓扑与执行权威 | 声明 `commands.audit`，记录 `docs/evidence/nfr-summary.json`，并扩展 `ops/runbook.md`。离线的审计是 `DEFERRED`，绝不是绿。 |
+| **发布门禁检查提示词所要求的一切**（EOS-AUD-007） | `release-ready` 新增候选质量、依赖审计、NFR 证据、灰度、健康/就绪、拓扑与执行权威 | 声明 `commands.audit`，记录 `docs/evidence/nfr-summary.json`，并扩展 `ops/runbook.md`。离线的审计是 `DEFERRED`，绝不是绿，也不能晋级；被推迟的 NFR 目标可以（Standard 轨道，需有负责人、触发条件和将来的 `dueBy`；见 §10.13）。 |
 | **RELEASED 继续走向 G9 与 G10**（EOS-AUD-010） | `RELEASED` 之后，`eos next` 要求遥测而不是再发一次版 | 产出 `docs/telemetry.json`（`/eos-telemetry-plan`），再产出 `docs/iteration.json`（`eos-review` Agent）。 |
 | **BMAD 运行时会被验证**（EOS-AUD-002） | `eos-doctor --deep` 可能报告 BLOCKED：技能已安装，但 `_bmad/` 运行时缺失 | 用 BMAD 自己的安装器安装项目运行时，或取消这些技能的映射。EOS 本身没有 BMAD 也能工作——见 [ADR-003](../adr/003-bmad-runtime-boundary.md)。 |
 
@@ -1893,6 +1901,32 @@ node /tmp/eos-next/.github/eos/eos.mjs upgrade --from /tmp/eos-next --base /tmp/
 node .github/eos/eos.mjs policy check && node .github/eos/eos.mjs verify --full
 ```
 
+## 10.13 从 `eos-2.5.x` 升级到 `eos-2.6.0`
+
+**本版本含破坏性变更**（它是 minor 版本，与 2.2.0 一样）：Node 20 已移除，推迟项需要 `dueBy` 才能晋级，`release-ready` 多了一项检查，门禁版本号也变了。策略摘要随之改变——其中没有任何内容是削弱，所以 `eos policy lock --write` 不需要批准人——`architecture-ready`、`story-ready`、`verified` 与 `release-ready` 已记录的 PASS 证据会变 STALE 一次：重跑 `eos verify --full`。
+
+| 改变了什么 | 你会看到什么 | 该怎么做 |
+|---|---|---|
+| **Node 20 已移除——`engines` 是 `>=22.10.0`** | 模板自带 `.nvmrc`（`24`）；`eos-ci.yml` 与 `eos-release.yml` 里每个 `setup-node` 步骤都读取它，跨平台矩阵是 Node 22 与 24，Linux 作业运行在 `ubuntu-24.04` | 把开发者与你自己的 CI 迁到 Node 22.10 或更新。保留 `.nvmrc`：它归你，Node 主版本只在这一处改。如果你改过 `eos-ci.yml`，升级会把新版本停放在 `.eos/local/upgrade/`——请手工合并，并把你自己写的 `node-version: '20'` 换成 `node-version-file: '.nvmrc'` |
+| **被推迟的 NFR 可以带着日期发布** | `release-ready` 仍是 `DEFERRED`（绝不是 PASS）。在 Standard 轨道上，当每个被推迟的目标都有 `owner`、`trigger` 和将来的 `dueBy` 时，`CANDIDATE → VERIFIED` 接受它；`dueBy` 已过会让 `nfr-evidence` 为 FAIL。`eos approve` 会先打印整份推迟清单，并把批准绑定到它；`RELEASED` 之后 `status` 与 `next` 会一直列出它 | 在 `docs/evidence/nfr-summary.json` 的每个 `DEFER` 上加 `dueBy`（`YYYY-MM-DD`）。被推迟的依赖审计仍然阻断，Regulated 或 Controlled 发布带任何推迟都不会晋级 |
+| **solo 路径**（`approvalMode`） | `.eos/project.json` 接受 `"approvalMode": "solo"`——仅限 Standard 轨道。此后 `eos approve --self --reason "<原因>"`、`eos policy lock --self` 和写成 `<name> (self)` 的 waiver 批准人都会被接受，记录为 `assurance: "self"`，所有显示这次批准的地方都会注明。切换到 `solo` 本身是一个需要独立批准人的 WEAKENING | 仅当你是唯一的维护者：`eos init <pack> --solo --write`。agent 永远不会运行 `--self`——护栏会拒绝它，MCP 服务也不暴露任何批准类工具 |
+| **单向决策需要人来确认** | `release-ready` 新增检查 `one-way-doors-confirmed`：每个引用了 ADR 的架构决策，其 ADR 都必须是 `Status: accepted`，并带 `Confirmed by` 与 `Confirmed at`。G4 对 `proposed` 的 ADR 仍然通过并给出提示。当技术栈已 DECIDED 但 `.eos/project.json` 没有声明 `stacks`，或工作区规则的 `Local commands` 与 `stack sync` 渲染的结果不同，G4 现在会失败 | 读一遍架构引用的每份 ADR，设置 `Status: accepted`，加上 `Confirmed by: <姓名>` 与 `Confirmed at: <日期>` 并提交；运行 `eos stack sync --write` |
+| **CI 单独报告策略检查** | `EOS policy integrity` 步骤失败不再跳过产品质量门；另有一个步骤报告它的结论。`plan` 作业会在日志里打印 `self=<true 或 false>` | 如果你改过 `eos-ci.yml`，升级会停放新版本：请合并 |
+| **护栏按命令真正执行的内容来判断** | heredoc 正文、`git commit` 或 `echo` 的带引号参数、注释，以及不是 shell 脚本的文件都是数据，不是命令。凭据规则需要一个高熵的单一 token。由 `node -e` 解析的下载内容放行，`kill $PID` 也放行；拒绝信息会点出规则、匹配到的文本和改法 | 无需操作 |
+| **`eos next` 说得更多** | 尚未激活 · 等待一个人（某个 `proposed` 的 ADR）· 现在开始测量（带规模条件的 NFR）· 先冻结，以及发布之后要做的事（G9、G10）。过期的 `product` 焦点不再钉住 `next`，`verify` 也不再为尚未到达的阶段记录 FAIL | 无需操作 |
+| **较小的变化** | `eos stage init story --id <ID>`，以及同时写出 `docs/EXPERIENCE.md` 的 design 记录；声明 `agentic` 时，`init` 会保留你已选的 `language` 与平台，并列出缺少 `Eval case` 的 story；`productTree.exclude` 让 `docs/pilot-log.md` 这类记录不进入产品树（新增一项属于策略 REVIEW）；trace matrix 里的测试名读到单元格末尾；失败的运行会点名第一个失败的测试；`language: zh` 的项目里中文 runbook 可以通过；`operability` 成为 NFR 类别；eval-starter 的 cassette 字段改为 `requestSha256`；`check-doc-parity` 会给出成对的两个文件名 | 如果 gitleaks 标记了某个 cassette，把其中的 `key` 改名为 `requestSha256`（旧名字仍可读取） |
+
+**升级步骤**
+
+```sh
+npx degit niaodian/eos#eos-2.5.0 /tmp/eos-base    # 你当前的版本——见 docs/eos/VERSION
+npx degit niaodian/eos#eos-2.6.0 /tmp/eos-next
+node /tmp/eos-next/.github/eos/eos.mjs upgrade --from /tmp/eos-next --base /tmp/eos-base          # 先审阅计划
+node /tmp/eos-next/.github/eos/eos.mjs upgrade --from /tmp/eos-next --base /tmp/eos-base --write  # 再执行，并重新生成各 agent 平台的文件
+node .github/eos/eos.mjs policy lock --write      # 门禁版本号变了；其中没有任何内容需要批准人
+node .github/eos/eos.mjs policy check && node .github/eos/eos.mjs verify --full
+```
+
 ---
 
 # 第 11 章 新增技术栈
@@ -1967,9 +2001,11 @@ EOS 的栈规则是**可插拔**的。新增一个栈 = 加一个 `*.instruction
 
 ```
 # ── 终端 —— 唯一循环（日常只需要这些）──
-npx degit niaodian/eos#eos-2.5.0 my-app   # 新建项目
+npx degit niaodian/eos#eos-2.6.0 my-app   # 新建项目
 node .github/eos/eos.mjs init                       # 当前声明、两条轨道、所有起步包
 node .github/eos/eos.mjs init <pack> --write        # 声明项目（未定栈时用 config-only；--track regulated）
+node .github/eos/eos.mjs init <pack> --solo --write  # 单人维护者：Standard 轨道带标签的自批准路径
+node .github/eos/eos.mjs stage init story --id <ID> --write  # 写出 story-ready 读取格式的 story 文件
 node .github/eos/eos.mjs init --write               # 本地 VS Code 任务（绝不覆盖已有文件）
 node .github/eos/eos.mjs next                       # 唯一的下一步、为什么、怎么开始
 node .github/eos/eos.mjs resume                     # 新会话？接着上次继续
@@ -2036,7 +2072,7 @@ bmad-tea / bmad-testarch-*   # 阶段7：测试+追溯        → G7
 
 **复现**（终端）：
 ```sh
-npx degit niaodian/eos#eos-2.5.0 my-app && cd my-app
+npx degit niaodian/eos#eos-2.6.0 my-app && cd my-app
 node .github/hooks/validate-config.mjs        # PASS
 npm test                                       # 10/10 green
 echo '{"tool_input":{"command":"rm -rf /tmp/x"}}' | node .github/hooks/deny-dangerous.js  # deny
@@ -2078,6 +2114,10 @@ gh api repos/<owner>/<repo>/branches/main/protection   # 仅用于经典分支�
 
 > 因为旧的 `/protection` 端点在使用 ruleset 时会返回 404，所以绝不能据此判断"未受保护" —— 请优先查 ruleset 端点。个人命名空间仓库默认**没有**这些保护。
 
+**私有仓库要用行为来证明。** ruleset 可能已保存、显示 "Active"，却什么也没强制。开一个会让 `verify` 失败的临时 PR，看合并按钮：如果它可点，或者 `verify` 没有被列为必需，保护就没有生效。之后删掉那个分支。
+
+**只有一个维护者？** 分支保护与 Code Owners 评审需要另一个能合并的人；在私有的 Free 仓库里请带理由地豁免这一项。EOS 要求第二个人的其他环节都有 solo 路径（`approvalMode: "solo"`，§10.13）：一次由你自己输入的带标签自批准，绝不是 agent。
+
 ## D.2 启用 CODEOWNERS 治理保护
 
 模板已随仓提供 `.github/CODEOWNERS`（覆盖 `instructions/ agents/ hooks/ workflows/ prompts/`
@@ -2109,8 +2149,27 @@ cp .vscode/settings.json.example .vscode/settings.json    # 活跃文件保持�
 | `gitleaks` 深扫在**本地是可选增强**，未装即回退到内置规则 | 只跑零依赖内置正则时，覆盖弱于 gitleaks 全量规则 | 内置 `secret-scan.mjs` 始终作为 CI 硬门运行（保底）。自 eos-2.3.0 起，EOS CI 会安装固定版本、校验过校验和的 `gitleaks` 并设置 `EOS_REQUIRE_GITLEAKS=1`，因此在 CI 中缺少 gitleaks 会失败而不是降级 |
 | **Windows**：核心 hook 为 Node（跨平台）；早期 `quality.json` 曾用 `sh -c`（round-2 N1 已改为 `node .github/hooks/quality.mjs`，原生 Windows 无需 WSL/Git-Bash） | 无 `git` 时的目录回退遍历在 Windows 上曾显示绝对路径（已用 `path.relative` 归一化）；`bmad-*` 与 `act`（需 Docker Desktop）等外部工具的可用性仍随平台 | 三个核心 hook + `quality.mjs` 已按跨平台实现；**权威质量门在 CI（`ubuntu-latest`）**，与本机 OS 无关 |
 
-**须组织决策（模板不代做，`【需组织标准】`）**：CI runner 标准（现 `ubuntu-latest`）、批准的密钥库、
+**须组织决策（模板不代做，`【需组织标准】`）**：CI runner 标准（现 `ubuntu-24.04`）、批准的密钥库、
 命名空间/仓库归属、模型 pin/注册策略、制品完整性（SBOM/签名/SLSA）。这些不是违规，是组织标准问题。
+
+---
+
+# 附录 E 平台冒烟清单（手工）
+
+EOS 无法替你登录 agent，它的自动化测试会启动自己生成的钩子命令，但从不驱动真实的 agent。所以当你配置好一个平台、或升级之后，请在你已登录的 agent 里**亲自**跑一遍这份清单。不要让模型来跑——它的回答恰恰是被测的对象。
+
+对每个平台：打开项目文件夹，开一个新会话，只问一句话——**"下一步做什么？"**
+
+| 平台 | 如何启动 | 你应该看到什么 |
+|---|---|---|
+| VS Code + GitHub Copilot Chat | Chat → **eos-guide** agent，或 `/eos-next` | 一次 `eos_next` 工具调用（或 `node .github/eos/eos.mjs next`），以及一个推荐动作和它的理由 |
+| Claude Code | 在项目文件夹里运行 `claude`，然后 `/eos-next` | 同一张卡片；第一条 shell 命令运行时没有钩子错误 |
+| OpenAI Codex | 在受信任的项目文件夹里运行 `codex`，然后 `$eos-next` | 卡片；护栏钩子请求一次批准（`/hooks`） |
+| Cursor | Agent 对话："下一步做什么？" | 一次 `eos_next` MCP 调用（Cursor 每次都会询问），以及 shell 护栏 |
+| Google Antigravity | IDE，或在项目文件夹里运行 `agy`，然后 `/eos-next` | 卡片；护栏**不会**拒绝 shell 命令（它从 `.agents/` 运行）；无头模式下必须放行只读的 EOS 工具（§6.6.3） |
+| Gemini CLI | 在项目文件夹里运行 `gemini`："下一步做什么？" | 一次 `eos_next` MCP 调用 |
+
+如果某个平台打印出 `MODULE_NOT_FOUND` 或钩子错误，先运行 `node .github/eos/eos.mjs agents sync --check`，再运行 `node .github/eos/eos.mjs agents sync --write`。如果它根本没有出现任何 EOS 调用，就去看该平台自己的 MCP 或钩子设置（§6.6.5）。
 
 ---
 

@@ -211,10 +211,24 @@ test('EOS-AUD-003: a locked tech stack that never reached the always-on workspac
   assert.notEqual(r.code, 0, r.out);
   assert.match(JSON.stringify(r.json.checks), /PROVISIONAL placeholder/);
 
-  // Replacing the block clears it — the check is about the contradiction, not about ceremony.
-  const landed = project(baselineFiles({ [RULE]: provisional.replace(/ {2}⛳ PROVISIONAL[^\n]*/, '') }));
-  const ok = runJson(landed, ['check', '--gate', 'architecture-ready']);
+  // Deleting the marker is not enough (eos-2.6.0): the block must say what the declared stack runs.
+  const markerOnly = project(baselineFiles({ [RULE]: provisional.replace(/ {2}⛳ PROVISIONAL[^\n]*/, '') }));
+  const wrong = runJson(markerOnly, ['check', '--gate', 'architecture-ready']);
+  assert.notEqual(wrong.code, 0, wrong.out);
+  assert.match(JSON.stringify(wrong.json.checks), /does not say what the declared stack runs/);
+
+  // `stack sync` renders the block from .eos/project.json — the same declaration CI runs.
+  assert.equal(run(stale, ['stack', 'sync', '--write']).code, 0);
+  const ok = runJson(stale, ['check', '--gate', 'architecture-ready']);
   assert.equal(ok.code, 0, ok.out);
+});
+
+test('eos-2.6.0 (pilot record 14): a DECIDED stack with no declared stacks does not pass G4', () => {
+  const RULE = '.github/instructions/00-workspace.instructions.md';
+  const dir = project(baselineFiles({ '.eos/project.json': { projectType: 'config-only' }, [RULE]: '---\napplyTo: "**"\n---\n# Workspace\n\n## Local commands\n- Test: `node .github/eos/run-tests.mjs`.\n' }));
+  const r = runJson(dir, ['check', '--gate', 'architecture-ready']);
+  assert.notEqual(r.code, 0, r.out);
+  assert.match(JSON.stringify(r.json.checks), /declares no \\"stacks\\"/);
 });
 
 test('EOS-AUD-003: the machine states say BASELINED, because no human approval was recorded', () => {

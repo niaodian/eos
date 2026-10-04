@@ -12,12 +12,12 @@
       "audit-regression": 38500,
       "contract": 16800,
       "integration": 53000,
-      "journey": 4200,
+      "journey": 11200,
       "unit": 9000
     }
   },
   "coverage": {
-    "description": "Thresholds for `run-tests.mjs --coverage`. Set just below the measured figure so they catch a real regression rather than chasing a round number: the CI coverage job (Node 22, no pytest) measured lines 97.80 / branches 80.45 / functions 96.60 at eos-2.4.0. Raise them when the figure rises; never lower them to let a change in. Enforced natively by Node 22+; on Node 20 the report still prints but the threshold is not applied, and run-tests says so rather than implying it passed.",
+    "description": "Thresholds for `run-tests.mjs --coverage`. Set just below the measured figure so they catch a real regression rather than chasing a round number: the CI coverage job (Node 22, no pytest) measured lines 97.80 / branches 80.45 / functions 96.60 at eos-2.4.0. Raise them when the figure rises; never lower them to let a change in. Enforced natively by Node 22+, the floor.",
     "lines": 97,
     "branches": 79,
     "functions": 96,
@@ -92,10 +92,12 @@
       ]
     },
     "journey": {
-      "description": "The whole developer loop end to end, executed through the real CLI, offline.",
-      "budgetMs": 10000,
+      "description": "The whole developer loop end to end, executed through the real CLI, offline. eos-2.6.0 added five release journeys (a bounded DEFERRED, the solo path, and their counter-examples), each driving a story to a release candidate through the CLI: the layer measured 11.2s on the CI runner, up from 4.2s, so the baseline was re-recorded once and the ceiling set to about 1.8x of it.",
+      "budgetMs": 20000,
       "files": [
-        ".github/eos/journey.test.mjs"
+        ".github/eos/journey.test.mjs",
+        ".github/eos/journey-solo.test.mjs",
+        ".github/eos/journey-deferral.test.mjs"
       ]
     },
     "audit-regression": {

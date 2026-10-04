@@ -227,6 +227,45 @@
         }
       }
     },
+    "activation": {
+      "type": "object",
+      "description": "Present only when the project has declared itself but docs/eos/activation.md still has unchecked hardening items (eos-2.6.0): nothing enforces the gates yet, and /eos-init is where that is done.",
+      "required": [
+        "pending",
+        "command"
+      ],
+      "properties": {
+        "pending": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "command": {
+          "type": "string"
+        }
+      }
+    },
+    "oneWayDoors": {
+      "type": "object",
+      "description": "Present only when an ADR for an irreversible decision is still \"proposed\" (eos-2.6.0): a person confirms it before release-ready passes.",
+      "required": [
+        "proposed"
+      ],
+      "properties": {
+        "proposed": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "nfrScale": {
+      "type": "array",
+      "description": "Present only before the first story is built, when an NFR is stated at a scale (eos-2.6.0): the dataset to measure it on belongs in the first story that touches it.",
+      "items": {
+        "type": "string"
+      }
+    },
     "releasePreview": {
       "type": "object",
       "description": "Present only when the release gate (G8) will need something that does not exist yet (eos-2.2.0): a declared dependency audit, NFR measurements, a runbook, a deployment-topology ADR, and on the Regulated track a release signing key. A preview from declarations and file presence — G8 still decides.",

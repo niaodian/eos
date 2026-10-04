@@ -13,6 +13,38 @@ Work through `docs/eos/activation.md` top to bottom. For each item: do what is l
 the ledger line (`- [ ]` → `- [x]` done, or `- [~] … · Reason: <reason>` if the developer waives it). Never
 mark an item `[x]` unless it is actually done or verified.
 
+## Before you start: who has to be there
+
+Say this first, so a one-person project does not find out at the release. Some steps need a person other
+than the one working with you; EOS records approvals and never grants them, and **you never run an
+approval, and never pass `--self`, yourself** — print the command and let the person type it.
+
+| Step | Needs a second person | One maintainer alone |
+|---|---|---|
+| Branch protection and Code Owners review (steps 5–6) | someone who can merge a pull request the author cannot | not available on a private Free repository — waive it with a reason (step 5) |
+| The first declaration's policy REVIEW (`eos policy check` asks for an `approver`) | the approver fills in `.eos/policy.lock.json` | declare `eos init <pack> --solo --write`: the approver may then be written `<name> (self)`, recorded as a self-approval |
+| `eos approve` at `VERIFIED → APPROVED` | someone who did not prepare the candidate | `eos approve --self --reason "<why>"`, **typed by the person**, only with `approvalMode: "solo"` (Standard track) |
+| Confirming the one-way decision ADRs | the person who owns the decision | the same person: set `Status: accepted`, `Confirmed by`, `Confirmed at` |
+| Waivers | an approver other than the requester | `<name> (self)` as the approver, solo projects only |
+
+`solo` is the Standard track's exit and nothing else: it is refused with the regulated or controlled
+profiles, switching to it is itself a weakening that needs an independent approver, and every self-approval
+shows as "self" in `status`, `next` and the release record. Ask which of the two this project is.
+
+## Replace these template files with your own
+
+`eos init <pack> --write` replaces the declaration; these files still describe EOS until you replace them.
+Print this list, then do each one with the user:
+
+- `README.md` **and** `README.zh.md` — replace both together (the doc-parity check compares the pair; the
+  Chinese project README is `README.zh.md` at the root, not `docs/zh/README.md`, which belongs to EOS's manual).
+- `package.json` — name, version, description, `engines`; a project that is not a Node project may delete it.
+- `docs/adr/` — the numbering continues EOS's own ADRs (the template ships ADR-003 … ADR-023): start your
+  own series, and keep or delete EOS's records on purpose.
+- `.github/CODEOWNERS` — the default owner is the template's author (step 2).
+- `.nvmrc` — the Node major CI and the people working on the project share (24 at the time of writing).
+- `LICENSE`, `SECURITY.md`, `CONTRIBUTING.md` — yours, not EOS's.
+
 ## Steps
 
 0. **GitHub remote + `gh` (do this first — everything server-side depends on it).**
@@ -81,6 +113,11 @@ mark an item `[x]` unless it is actually done or verified.
      Pro/Team, or (c) waive the item honestly:
      `- [~] Branch protection · Reason: private repo on a Free plan — rulesets are not enforced`.
      Do not walk them through a click-path that cannot work.
+   - **How to tell whether protection actually holds on a private repository (do not trust the UI).**
+     A ruleset can be saved, show "Active", and still enforce nothing. The proof is behavioural: open a
+     throwaway pull request that makes `verify` fail, and look at the merge button — if it is enabled, or
+     the required check is not listed as *required*, the protection is not in force. Delete the throwaway
+     branch afterwards. Ask the user to do it; report what they see, never infer it.
    - **Otherwise** print the click-path: repo → **Settings → Rules → Rulesets → New branch ruleset**
      → target the default branch →
      - **Enforcement status: `Active`** ← state this first and emphasise it. A new ruleset defaults

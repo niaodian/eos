@@ -10,11 +10,13 @@ import { gatePolicy, scopeState, ARTIFACTS } from '../state.mjs';
 import { readEvidence } from '../evidence.mjs';
 import { currentProductTree, compareProductTree, uncommittedProductChanges } from '../product-tree.mjs';
 import { readSummary, summaryTreeMismatch, producerTrust, SUMMARY_PATHS } from '../machine-summary.mjs';
-import { readStageRecord, substantive } from '../stage-record.mjs';
+import { readStageRecord, substantive, STAGE_RECORDS } from '../stage-record.mjs';
 import { readManifest, manifestProblems, manifestPath } from '../release.mjs';
 import { resolve as applyProviderVerdict } from '../../adapters/contract.mjs';
 import { expiredWaivers } from '../waivers.mjs';
 import { verifyRelease } from '../release-integrity.mjs';
+import { todayOf } from '../deferrals.mjs';
+import { readAdrConfirmation, oneWayDoors } from '../adr.mjs';
 import {
   ok, fail, blocked, na, awaiting, runHook, runProjectGate, manifestStories, thresholdMet,
   runCommandList, RUNBOOKS, findTopologyAdr, decisionIsPlaceholder, isRegulated, evidenceIntegrity,
@@ -180,10 +182,14 @@ export const evaluators = {
     const text = readFileSync(join(ctx.root, runbook), 'utf8');
     // The release prompt asks a human for rollback, gradual rollout and health/readiness. If the
     // machine gate only looks for "rollback", the other two are advisory theatre. (EOS-AUD-007)
+    // The words are English; a project that declares language "zh" writes its runbook in Chinese, so the
+    // same three topics are recognised by their Chinese terms too (eos-2.6.0).
+    const zh = /^zh\b/i.test(ctx.snapshot.project?.language || '');
+    const either = (en, cjk) => (zh ? new RegExp(`${en.source}|${cjk}`, 'i') : en);
     const required = [
-      { key: 'rollback', re: /\brollback\b/i, fix: 'the exact steps to undo this release' },
-      { key: 'canary / gradual rollout', re: /\b(canary|gradual rollout|progressive delivery|blue[- ]?green|ring deployment|percentage rollout)\b/i, fix: 'how the change reaches users incrementally (or why it cannot)' },
-      { key: 'health / readiness', re: /\b(health ?check|healthz|readiness|liveness|\/health\b|\/ready\b)\b/i, fix: 'the signal that says the deployment is serving' },
+      { key: 'rollback', re: either(/\brollback\b/i, '回滚|回退|撤销发布'), fix: 'the exact steps to undo this release' },
+      { key: 'canary / gradual rollout', re: either(/\b(canary|gradual rollout|progressive delivery|blue[- ]?green|ring deployment|percentage rollout)\b/i, '灰度|金丝雀|渐进(?:式)?发布|分批发布|逐步放量|蓝绿'), fix: 'how the change reaches users incrementally (or why it cannot)' },
+      { key: 'health / readiness', re: either(/\b(health ?check|healthz|readiness|liveness|\/health\b|\/ready\b)\b/i, '健康检查|就绪|存活|探针'), fix: 'the signal that says the deployment is serving' },
     ];
     const absent = required.filter((r) => !r.re.test(text));
     return absent.length
@@ -279,6 +285,28 @@ export const evaluators = {
       + `${weak && policy === 'local' ? '. Local evidence is honest but unattested; raise evidencePolicy to "ci" or "attested" when that matters.' : ''}`);
   },
 
+  /**
+   * A one-way door is not through until a person has confirmed it. An unattended run may decide the
+   * stack, the topology or the data model provisionally (G4 passes, and says so); shipping needs the
+   * ADR accepted and signed by name. Not waivable, like the rest of release-ready.
+   */
+  releaseOneWayDoorsConfirmed(ctx) {
+    const r = readStageRecord(ctx.root, 'architecture');
+    if (!r.data) return na(`${STAGE_RECORDS.architecture.path} does not exist, so there is no one-way decision to confirm`);
+    const doors = oneWayDoors(r.data);
+    if (!doors.length) return na('no architecture decision cites an ADR, so there is no one-way decision to confirm');
+    const open = [];
+    for (const door of doors) {
+      const adr = readAdrConfirmation(ctx.root, door.adr);
+      if (!adr.present) open.push(`${door.key}: ${door.adr} does not exist`);
+      else if (adr.status === 'proposed') open.push(`${door.key}: ${door.adr} is still "proposed"`);
+      else if (!adr.confirmedBy) open.push(`${door.key}: ${door.adr} has no "Confirmed by"`);
+    }
+    return open.length
+      ? fail(`one-way decision(s) no person has confirmed: ${open.join(' · ')} — read each ADR, set "Status: accepted" and add "Confirmed by: <name>" and "Confirmed at: <YYYY-MM-DD>", then commit`)
+      : ok(`${doors.length} one-way decision(s) confirmed by name`);
+  },
+
   releaseNfrEvidence(ctx) {
     const summary = readSummary(ctx.root, 'nfrSummary');
     if (summary.errors.length) return { status: 'ERROR', detail: `${summary.path}: ${summary.errors.join('; ')}` };
@@ -301,7 +329,8 @@ export const evaluators = {
         if (!substantive(t.reason, 15)) problems.push(`${t.id}: SKIP without a real reason`);
       } else if (t.decision === 'DEFER') {
         if (!substantive(t.owner, 1) || !substantive(t.trigger, 5)) problems.push(`${t.id}: DEFER without an owner and a trigger`);
-        else deferrals.push(`${t.id} → ${t.owner} (${t.trigger})`);
+        else if (t.dueBy && t.dueBy < todayOf(ctx.now)) problems.push(`${t.id}: the deferral is overdue (dueBy ${t.dueBy}) — measure it, or defer it again with a new dueBy and a fresh approval`);
+        else deferrals.push(`${t.id} → ${t.owner} (${t.trigger}; ${t.dueBy ? `due by ${t.dueBy}` : 'NO dueBy — it cannot be promoted without one'})`);
       }
     }
     // Only the targets the summary CHOOSES to mention were checked, so an NFR could be dropped
@@ -313,7 +342,7 @@ export const evaluators = {
       if (uncovered.length) problems.push(`no result for NFR(s) declared in ${req.path}: ${uncovered.join(', ')}`);
     }
     if (problems.length) return fail(`NFR evidence incomplete: ${problems.join(' · ')}`);
-    if (deferrals.length) return { status: 'DEFERRED', detail: `NFR target(s) deferred with an owner and a trigger: ${deferrals.join('; ')} — visible and time-bound, not passed` };
+    if (deferrals.length) return { status: 'DEFERRED', detail: `NFR target(s) deferred with an owner and a trigger: ${deferrals.join('; ')} — visible and time-bound, never passed. A Standard-track release can be promoted with these when each has a dueBy in the future and the approval is given for this list; a regulated or controlled release cannot` };
     return ok(`${summary.data.targets.length} NFR target(s) measured or explicitly scoped out`);
   },
   /**

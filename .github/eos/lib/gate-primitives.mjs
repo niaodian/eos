@@ -92,6 +92,28 @@ export function runHook(ctx, relScript, args = []) {
 export const PROJECT_GATE = '.github/hooks/project-gate.mjs';
 
 /**
+ * The name of the first failing test in a runner's output, best effort — node:test, TAP, pytest,
+ * jest / vitest, Go and cargo. A failure that says only "exited 1" sends a developer to the whole log.
+ * @returns {string|null}
+ */
+export function firstFailingTest(output) {
+  const text = String(output || '').replace(/\u001b\[[0-9;]*m/g, '');
+  const patterns = [
+    /^[ \t]*(?:✖|✗|✘|×)[ \t]+(.+?)(?:[ \t]+\([\d.]+ ?m?s\))?[ \t]*$/m,
+    /^not ok \d+ - (.+)$/m,
+    /^FAILED[ \t]+(\S+)/m,
+    /^[ \t]*●[ \t]+(.+)$/m,
+    /^[ \t]*--- FAIL:[ \t]+(\S+)/m,
+    /^test (\S+) \.\.\. FAILED/m,
+  ];
+  for (const re of patterns) {
+    const m = re.exec(text);
+    if (m) return m[1].trim().slice(0, 160);
+  }
+  return null;
+}
+
+/**
  * Run the product-quality gate and read its VERDICT, not its prose. (ADR-010)
  *
  * BLOCKED vs FAIL used to be decided by searching the hook's output for the word "BLOCKED". That
@@ -116,7 +138,7 @@ export function runProjectGate(ctx) {
     return { status: 'ERROR', detail: `${PROJECT_GATE} did not produce a valid diagnostic report: ${problems.slice(0, 3).join('; ')}`, command: r.command, exitCode: r.exitCode };
   }
   const first = report.problems.find((p) => p.level === 'error');
-  return { status: report.status, detail: first ? first.message : report.summary, command: r.command, exitCode: r.exitCode, report };
+  return { status: report.status, detail: first ? first.message : report.summary, command: r.command, exitCode: r.exitCode, report, out: r.out };
 }
 
 /**
@@ -128,10 +150,35 @@ export const TEST_REF = /(?:^|[\s(`"'])((?:[A-Za-z0-9_.@-]+\/)*[A-Za-z0-9_.@-]+\
 /** A header cell that names the column holding the tests. */
 const TEST_HEADER = /\b(?:tests?|tested|specs?)\b|测试|用例/i;
 
+const REF_PATH = '(?:[A-Za-z0-9_.@-]+\\/)*[A-Za-z0-9_.@-]+\\.[A-Za-z0-9]{1,10}';
+const REF_AT = new RegExp(`(?:^|[\\s(\`"'])(${REF_PATH})(::)?`, 'g');
+const NEXT_REF = new RegExp(`\\s*[,;]\\s+(?=${REF_PATH}(?:::|\\s|$))`);
+
+/**
+ * The references in the cells of one row. A selector is the test's name, and names hold apostrophes,
+ * quotes, brackets and parentheses, so it is read to the END of the cell — or to the closing backtick
+ * or quote when the reference opens with one, or to the next `, path` when a cell lists several. It used
+ * to stop at the first quote or ")", and the report said only that no such test exists. (pilot record 28)
+ */
 const refsIn = (cellList) => {
   const refs = [];
   for (const cell of cellList) {
-    for (const m of cell.matchAll(TEST_REF)) refs.push(m[2] ? `${m[1]}::${m[2].trim()}` : m[1]);
+    for (const m of cell.matchAll(REF_AT)) {
+      if (!m[2]) { refs.push(m[1]); continue; }
+      const lead = m[0].startsWith(m[1]) ? '' : m[0][0];
+      const rest = cell.slice(m.index + m[0].length);
+      let selector;
+      if (['`', '"', "'"].includes(lead)) {
+        const close = rest.indexOf(lead);
+        selector = close === -1 ? rest : rest.slice(0, close);
+      } else {
+        const cut = rest.search(NEXT_REF);
+        selector = cut === -1 ? rest : rest.slice(0, cut);
+        if (lead === '(' && selector.trimEnd().endsWith(')')) selector = selector.trimEnd().slice(0, -1);
+      }
+      selector = selector.trim().replace(/^([`"'])(.*)\1$/, '$2').trim();
+      refs.push(selector ? `${m[1]}::${selector}` : m[1]);
+    }
   }
   return [...new Set(refs)];
 };

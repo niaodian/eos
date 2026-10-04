@@ -40,7 +40,7 @@ export function productTree(root) {
 
 /**
  * One target, made complete: an ADOPT target gets the status its numbers imply; SKIP and DEFER are
- * checked for the reason / owner + trigger the gate requires. Throws on anything the gate would reject,
+ * checked for the reason / owner + trigger + dueBy the gate requires. Throws on anything the gate would reject,
  * so the problem surfaces where the measurement is, not at the release.
  */
 export function target(t) {
@@ -57,6 +57,9 @@ export function target(t) {
   }
   if (t.decision === 'DEFER') {
     if (!t.owner || typeof t.trigger !== 'string' || t.trigger.trim().length < 5) throw new Error(`${t.id}: DEFER needs an owner and a trigger`);
+    // eos-2.6.0: a deferral without a date cannot be promoted, and one whose date has passed is a FAIL.
+    if (typeof t.dueBy !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(t.dueBy)) throw new Error(`${t.id}: DEFER needs a dueBy date (YYYY-MM-DD) in the future — the release cannot be promoted without one`);
+    if (t.dueBy <= new Date().toISOString().slice(0, 10)) console.error(`warning: ${t.id}: dueBy ${t.dueBy} is not in the future — nfr-evidence will FAIL until it is measured, or deferred again with a new date`); // eslint-disable-line no-console
     return t;
   }
   throw new Error(`${t.id}: decision must be ADOPT, SKIP or DEFER`);

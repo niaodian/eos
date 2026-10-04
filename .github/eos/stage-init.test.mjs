@@ -8,7 +8,7 @@ import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { project, write, run, runJson, cleanup, REPO_ROOT, APP_PROJECT, baselineFiles } from './test-support.mjs';
+import { project, write, run, runJson, cleanup, REPO_ROOT, APP_PROJECT, baselineFiles, story } from './test-support.mjs';
 import { skeletonFor, setAt } from './lib/stage-skeleton.mjs';
 import { STAGE_RECORDS, PLACEHOLDER, placeholdersIn } from './lib/stage-record.mjs';
 import { validate } from './lib/schema.mjs';
@@ -107,4 +107,51 @@ test('the sample records keep their contract: each validates and passes its reco
     const r = runJson(dir, ['check', '--gate', gate]);
     assert.equal(r.json.status, 'PASS', `${gate}: ${JSON.stringify(r.json.checks.filter((c) => c.status !== 'PASS'))}`);
   }
+});
+
+// eos-2.6.0 (pilot records 12, 16): the story file and the whole design contract come from the CLI.
+test('stage init design writes BOTH contracts, and the skeleton asks for the coverage a UI product needs', () => {
+  const dir = project({ '.eos/project.json': APP_PROJECT });
+  const r = runJson(dir, ['stage', 'init', 'design', '--write']);
+  assert.equal(r.code, 0, r.out);
+  assert.ok(existsSync(join(dir, 'docs/DESIGN.md')));
+  assert.ok(existsSync(join(dir, 'docs/EXPERIENCE.md')), 'ux-ready reads docs/EXPERIENCE.md as well');
+  assert.deepEqual(r.json.extraDocs, ['docs/EXPERIENCE.md']);
+  const record = JSON.parse(readFileSync(join(dir, 'docs/design.json'), 'utf8'));
+  assert.deepEqual(Object.keys(record.coverage).sort(), ['accessibility', 'designTokens', 'flows', 'responsive', 'states']);
+  assert.match(run(dir, ['stage', 'init', 'design']).out, /no user-facing surface: set userInterface to false/);
+});
+
+test('stage init story writes the file story-ready reads — and a draft with TODO(eos) is not ready', () => {
+  const dir = project(baselineFiles({ 'docs/prd.md': '# PRD\n\n- AC1.1 the user can log in with a valid password\n- AC1.2 the user can log out\n' }));
+  const dry = runJson(dir, ['stage', 'init', 'story', '--id', 'S1']);
+  assert.equal(dry.code, 0, dry.out);
+  assert.equal(existsSync(join(dir, 'docs/stories/S1.md')), false, 'nothing is written without --write');
+  const made = runJson(dir, ['stage', 'init', 'story', '--id', 'S1', '--ac', 'AC1.1,AC1.2', '--write']);
+  assert.equal(made.json.action, 'written');
+  const text = readFileSync(join(dir, 'docs/stories/S1.md'), 'utf8');
+  assert.match(text, /\| AC \| Statement \| Test intent \| Eval case \|/);
+  assert.match(text, /## Dependencies/);
+  assert.match(text, /N\/A — deterministic/);
+  assert.equal(runJson(dir, ['stage', 'init', 'story', '--id', 'S1', '--write']).json.action, 'kept (exists — --force replaces it)');
+  assert.equal(run(dir, ['stage', 'init', 'story', '--id', '../x', '--write']).code, 1);
+
+  const draft = runJson(dir, ['check', '--gate', 'story-ready', '--scope', 'S1']);
+  assert.notEqual(draft.code, 0, draft.out);
+  assert.match(JSON.stringify(draft.json.checks), /TODO\(eos\) placeholder/);
+  write(dir, 'docs/stories/S1.md', story({ id: 'S1', rows: [['AC1.1', 'log in', 'tests/a.test.mjs::login', 'N/A — deterministic'], ['AC1.2', 'log out', 'tests/a.test.mjs::logout', 'N/A — deterministic']] }));
+  const ready = runJson(dir, ['check', '--gate', 'story-ready', '--scope', 'S1']);
+  assert.equal(ready.code, 0, ready.out);
+});
+
+test('a full-width ； separates the clauses of an operational task, like ;', () => {
+  const dir = project(baselineFiles({ 'docs/prd.md': '# PRD\n\n- AC1.1 the user can log in with a valid password\n' }));
+  write(dir, 'docs/stories/S2.md', ['---', 'id: S2', 'title: Login', 'changeType: FEATURE', '---', '', '## Acceptance criteria', '',
+    '| AC | Statement | Test intent | Eval case |', '| --- | --- | --- | --- |', '| AC1.1 | log in | tests/a.test.mjs::login | N/A — deterministic |', '',
+    '## Operational tasks', '',
+    '- Telemetry: ADOPT — emit auth.login.result；owner：@platform；verify：tests/a.test.mjs',
+    '- Authorization: ADOPT — session required；owner: @platform; verify: tests/a.test.mjs',
+    '- Rollback: ADOPT — feature flag；owner: @platform; verify: ops/runbook.md', '', '## Dependencies', '', '- none — nothing blocks it', ''].join('\n'));
+  const r = runJson(dir, ['check', '--gate', 'story-ready', '--scope', 'S2']);
+  assert.equal(r.code, 0, r.out);
 });

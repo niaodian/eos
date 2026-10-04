@@ -64,6 +64,7 @@ test('structure drift: an extra heading in zh FAILs', () => {
   assert.equal(status, 1, `expected FAIL:\n${out}`);
   assert.match(out, /structure drift/);
   assert.match(out, /headings/);
+  assert.match(out, /docs\/eos\/sample\.md ↔ docs\/zh\/sample\.md/, 'the error names both files of the pair');
 });
 
 test('factual-code drift: S11-style code mismatch FAILs (the exact class fixed this session)', () => {
@@ -71,7 +72,7 @@ test('factual-code drift: S11-style code mismatch FAILs (the exact class fixed t
   const { status, out } = runGate((dir) =>
     writeFileSync(join(dir, 'docs/zh/sample.md'), ZH_SAMPLE.replace('S1 ', 'S8 ')));
   assert.equal(status, 1, `expected FAIL:\n${out}`);
-  assert.match(out, /factual-code drift/);
+  assert.match(out, /docs\/eos\/sample\.md ↔ docs\/zh\/sample\.md: factual-code drift/);
   assert.match(out, /in EN not ZH: .*S1\b/);
   assert.match(out, /in ZH not EN: .*S8\b/);
 });

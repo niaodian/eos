@@ -97,7 +97,7 @@ for (const { en, zh, label } of pairs) {
   if (ef.tableRows !== zf.tableRows) sd.push(`table-rows ${ef.tableRows}\u2260${zf.tableRows}`);
   if (ef.fences !== zf.fences) sd.push(`code-fences ${ef.fences}\u2260${zf.fences}`);
   if (sd.length) {
-    errors.push(`${label}: structure drift (en vs zh) \u2014 ${sd.join(', ')}. A heading / table row / code block exists in one language but not the other; mirror the change.`);
+    errors.push(`${norm(en)} \u2194 ${norm(zh)}: structure drift (en vs zh) \u2014 ${sd.join(', ')}. A heading / table row / code block exists in one language but not the other; mirror the change.`);
   }
 
   // factual-code drift
@@ -109,7 +109,7 @@ for (const { en, zh, label } of pairs) {
     const bits = [];
     if (onlyEn.length) bits.push(`in EN not ZH: ${onlyEn.join(' ')}`);
     if (onlyZh.length) bits.push(`in ZH not EN: ${onlyZh.join(' ')}`);
-    errors.push(`${label}: factual-code drift (${bits.join(' ; ')}). S/G/P/D/R codes + eos-x.y.z versions must match verbatim across languages.`);
+    errors.push(`${norm(en)} \u2194 ${norm(zh)}: factual-code drift (${bits.join(' ; ')}). S/G/P/D/R codes + eos-x.y.z versions must match verbatim across languages.`);
   }
 }
 

@@ -193,7 +193,7 @@
       "id": "architecture-ready",
       "code": "G4",
       "scope": "product",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "waivable": false,
       "title": "The architecture decides what stories will assume",
       "summary": "docs/architecture.md is written, docs/architecture.json records a decision (or a reasoned N/A) for stack, topology, authz, security, audit, rollback, DR, data/API/event contracts — plus tool allow-list, bounded orchestration, memory layering, async boundary and eval architecture for an agentic product, and the data/approval boundary for a regulated one — and every NFR lands on a named component.",
@@ -228,7 +228,7 @@
       "id": "story-ready",
       "code": "G5",
       "scope": "story",
-      "version": "2.0.0",
+      "version": "2.1.0",
       "waivable": true,
       "title": "Story is ready for development",
       "summary": "The story is context-self-contained: it references real PRD acceptance criteria, every one of them has a designed test intent (ATDD), LLM-backed criteria carry an eval case, and telemetry / authorization / rollback are decided — adopted with an owner and a verification, or skipped/deferred with a reason.",
@@ -275,7 +275,7 @@
       "id": "verified",
       "code": "G7",
       "scope": "story",
-      "version": "2.0.0",
+      "version": "2.1.0",
       "waivable": false,
       "bindsProductTree": true,
       "enforces": [
@@ -321,7 +321,7 @@
       "id": "release-ready",
       "code": "G8",
       "scope": "release",
-      "version": "4.0.0",
+      "version": "5.0.0",
       "waivable": false,
       "bindsProductTree": true,
       "title": "Release candidate is shippable",
@@ -385,7 +385,7 @@
           "id": "dependency-audit",
           "title": "the dependency / supply-chain audit is clean",
           "evaluator": "releaseDependencyAudit",
-          "fix": "Run the declared commands.audit (npm audit / pip-audit / cargo audit …) and resolve findings; offline it is DEFERRED, never PASS — and for a regulated product it BLOCKS."
+          "fix": "Run the declared commands.audit (npm audit / pip-audit / cargo audit …) and resolve findings; offline it is DEFERRED, never PASS, and a DEFERRED audit cannot be promoted — re-run it online; for a regulated product it BLOCKS."
         },
         {
           "id": "evidence-trust",
@@ -397,7 +397,13 @@
           "id": "nfr-evidence",
           "title": "NFR targets have recorded evidence",
           "evaluator": "releaseNfrEvidence",
-          "fix": "Record measured NFR results in docs/evidence/nfr-summary.json (bmad-testarch-nfr); a deferral needs an owner and a trigger."
+          "fix": "Record measured NFR results in docs/evidence/nfr-summary.json (bmad-testarch-nfr); a deferral needs an owner, a trigger and a dueBy date in the future (it can be promoted on the Standard track, never passed, and a dueBy that has passed turns it into a FAIL)."
+        },
+        {
+          "id": "one-way-doors-confirmed",
+          "title": "every one-way decision was confirmed by a person",
+          "evaluator": "releaseOneWayDoorsConfirmed",
+          "fix": "Read each ADR the architecture cites for an irreversible decision (stack, topology, data model, auth), set \"Status: accepted\", add \"Confirmed by: <name>\" and \"Confirmed at: <YYYY-MM-DD>\", and commit it. An unattended run may decide provisionally; shipping needs a person."
         },
         {
           "id": "compliance-boundary",

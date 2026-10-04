@@ -266,19 +266,29 @@ for (const w of compliance.warnings) warns.push(`D5 Compliance: ${w}`);
 
 const regimeText = readIf('docs/compliance-profile.md') + '\n' + readIf('docs/requirements.md');
 const REGULATED = /\b(HIPAA|PCI[\s-]?DSS|SOC\s?2|SOX|GDPR|CCPA|CPRA|PIPL)\b/i;
-const proseRegulated = regimeText.trim() !== '' && REGULATED.test(regimeText);
-// A valid profile is authoritative about WHETHER a regime applies; prose only raises the question.
+const proseNamesRegime = regimeText.trim() !== '' && REGULATED.test(regimeText);
+// Whether a regime applies is read from STRUCTURED records only (eos-2.6.0, pilot record 11): the
+// profile's `regimes`, the requirements record's `compliance` decision (ADOPT = a regulated
+// product), and `.eos/project.json` `complianceProfile`. A sentence that explains why GDPR does NOT
+// apply, or when to re-assess it, names the regime too — prose can raise a question, never answer it.
 const declaredRegulated = compliance.profile ? compliance.profile.regulated : null;
-// `.eos/project.json` may ALSO declare `complianceProfile: "regulated"`. That flag can only ever
-// TIGHTEN: it switches the boundary check on before docs/compliance-profile.json exists, and
-// "none" there never switches anything off — the structured profile remains the sole authority.
+// `.eos/project.json` and the requirements record can only ever TIGHTEN: they switch the boundary
+// check on before docs/compliance-profile.json exists, and "none" there never switches anything off —
+// the structured profile remains the sole authority for "none".
 const projectRegulated = proj.config?.complianceProfile === 'regulated';
-const regulated = (declaredRegulated !== null ? declaredRegulated : proseRegulated) || projectRegulated;
-if (declaredRegulated === false && projectRegulated) {
-  warns.push(`D5 Compliance: ${PROJECT_CONFIG_PATH} declares complianceProfile "regulated" while ${COMPLIANCE_PROFILE_PATH} declares regimes ["none"]. The stricter of the two wins — resolve the disagreement.`);
+let requirementsRegulated = false;
+try {
+  requirementsRegulated = JSON.parse(readIf('docs/requirements.json') || '{}')?.operationalPreFlight?.compliance?.decision === 'ADOPT';
+} catch { /* an unreadable requirements record is the requirements gate's finding, not D5's */ }
+const regulated = declaredRegulated === true || projectRegulated || requirementsRegulated;
+if (declaredRegulated === false && (projectRegulated || requirementsRegulated)) {
+  warns.push(`D5 Compliance: ${PROJECT_CONFIG_PATH} or docs/requirements.json declares a regulated product while ${COMPLIANCE_PROFILE_PATH} declares regimes ["none"]. The stricter of the two wins — resolve the disagreement.`);
 }
-if (declaredRegulated === false && proseRegulated) {
+if (declaredRegulated === false && proseNamesRegime) {
   warns.push(`D5 Compliance: ${COMPLIANCE_PROFILE_PATH} declares regimes ["none"] while docs/requirements.md or docs/compliance-profile.md names a regulatory regime. The structured profile wins — make sure its noneRationale still holds.`);
+}
+if (declaredRegulated === null && proseNamesRegime && !regulated) {
+  warns.push(`D5 Compliance: docs/requirements.md or docs/compliance-profile.md names a regulatory regime, but no structured record declares one — D5 reads only ${COMPLIANCE_PROFILE_PATH} (regimes), docs/requirements.json (operationalPreFlight.compliance) and ${PROJECT_CONFIG_PATH} (complianceProfile). If a regime applies, record it there; if it does not, nothing is required.`);
 }
 
 if (regulated && (llmPresent || autoLlm)) {

@@ -14,7 +14,7 @@ the release.
 | Every NFR id in `docs/requirements.json` has a target here | leaving a target out must not drop it |
 | `ADOPT` has `threshold`, `observed` and `comparator`; the gate **recomputes** the verdict | a `PASS` beside numbers that miss the threshold is an intention, not a result |
 | `SKIP` has a real `reason` (15+ characters) | "n/a" is not a decision |
-| `DEFER` has an `owner` and a `trigger` (and ideally `dueBy`) | the release reports **DEFERRED** — visible and time-bound, never passed |
+| `DEFER` has an `owner`, a `trigger` and a `dueBy` (`YYYY-MM-DD`) | the release reports **DEFERRED** — visible and time-bound, never passed. On the Standard track it can still be promoted, but only with a `dueBy` in the future: once the date has passed, the check is a **FAIL** until the target is measured, or deferred again with a new date and a fresh approval. Regulated and Controlled releases are never promoted with a deferral |
 | `productTree.digest` equals the candidate's tree | a measurement of other code does not describe this release |
 | `producer` | local measurements are honest but `UNATTESTED_LOCAL`; `evidencePolicy` "ci" requires CI-produced ones |
 
@@ -34,7 +34,7 @@ the release.
    ```
 
    It computes each `ADOPT` verdict the way G8 does, refuses a `SKIP` without a reason or a `DEFER`
-   without an owner and trigger, binds the product tree (`eos product-tree --json`) and records the
+   without an owner, a trigger and a `dueBy`, binds the product tree (`eos product-tree --json`) and records the
    producer (`github-actions` in GitHub Actions, otherwise local). It exits 1 when a measured target
    misses its threshold. Run in place inside the template it is a demo and writes nothing.
 

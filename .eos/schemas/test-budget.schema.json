@@ -28,7 +28,7 @@
     "testTimeoutMs": {
       "type": "integer",
       "minimum": 1000,
-      "description": "Per-TEST limit passed to node --test-timeout (Node 20.11+). One stuck test cannot hold its whole layer hostage."
+      "description": "Per-TEST limit passed to node --test-timeout (Node 22+). One stuck test cannot hold its whole layer hostage."
     },
     "layerTimeoutMs": {
       "type": "integer",

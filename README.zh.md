@@ -70,12 +70,12 @@ GitHub Copilot、Claude Code、OpenAI Codex 或 Google Antigravity 里用，或�
 
 ## 快速开始
 
-你需要 Node.js 20.10+（推荐 22 或 24 —— Node 20 已于 2026-04-30 停止维护）和 Git。
+你需要 Node.js 22.10+（推荐 24 —— `.nvmrc` 写明了）和 Git。
 AI agent 是可选的 —— CLI 在任何终端里都能用。
 
 ```bash
 # 1. 从一个固定的发布版本开始，并把它变成你的仓库
-npx degit niaodian/eos#eos-2.5.0 my-app && cd my-app && git init
+npx degit niaodian/eos#eos-2.6.0 my-app && cd my-app && git init
 
 # 2. 声明项目 —— 还没有代码，技术栈留到架构阶段再定
 npx --offline eos init config-only --write        # 想走严格轨道就加上 --track regulated
@@ -166,8 +166,8 @@ EOS 的发布在 GitHub Actions 中构建并出具证明 —— 正是 EOS 要�
 你可以亲自核验：
 
 ```bash
-gh release download eos-2.5.0 --repo niaodian/eos --pattern 'eos-2.5.0.tar.gz'
-gh attestation verify eos-2.5.0.tar.gz --repo niaodian/eos
+gh release download eos-2.6.0 --repo niaodian/eos --pattern 'eos-2.6.0.tar.gz'
+gh attestation verify eos-2.6.0.tar.gz --repo niaodian/eos
 ```
 
 每个发布还附带它的 SBOM 和一个 `SHA256SUMS` 文件。
@@ -198,15 +198,17 @@ docs/               你的规格与 ADR；docs/eos/ 是 EOS 手册（中文版�
 - [升级到 eos-2.0.0](docs/zh/user-manual.md#105-从-eos-122x-升级到-eos-200) —— 改变了什么、你需要做什么。
 - [升级到 eos-2.0.1](docs/zh/user-manual.md#107-从-eos-200-升级到-eos-201) —— 密钥检测安全补丁。
 - [升级到 eos-2.5.0](docs/zh/user-manual.md#1012-从-eos-24x-升级到-eos-250) —— 你的 CI 运行你的项目而不是 EOS 的测试套件，首次声明会建立你自己的策略锁与 SBOM，每次变更只运行一次 CI。
+- [升级到 eos-2.6.0](docs/zh/user-manual.md#1013-从-eos-25x-升级到-eos-260) —— **Node 20 已移除（22.10+）**，有界的 `DEFERRED` 可以发布，单人维护者有带标签的自批准，单向决策需要人来确认。
 - [工作流契约](docs/zh/developer-experience.md) —— CLI、退出码、JSON 与诊断。
 - [技术栈预设与轨道](docs/zh/stack-presets.md) —— 所有受支持的技术栈，以及如何选择轨道。
 - [设计原理](docs/zh/blueprint.md) 与 [架构决策记录](docs/adr/)。
 
 ## 环境要求与说明
 
-- **Node.js 20.10+ 和 Git** —— 别无其他。请使用 Node 22 或 24：Node 20 已于 2026-04-30 停止维护，
-  只作为声明的最低版本继续受支持。EOS 自己的 CI 在每次合并、每个 tag 和每周一次的运行中，于 Linux、macOS 和
-  Windows 上测试 Node 20、22 与 24；PR 只在每个平台上用 Node 24 各跑一次。
+- **Node.js 22.10+ 和 Git** —— 别无其他。Node 20 已于 2026-04-30 停止维护，并已在 eos-2.6.0 中移除。
+  `.nvmrc` 写明了 CI 与你的开发者共用的 Node 主版本（24）。EOS 自己的 CI 在每次合并、每个 tag 和每周一次的运行中，
+  于 Linux、macOS 和 Windows 上测试 Node 22 与 24；PR 只在每个平台上用 Node 24 各跑一次。
+  Node 26 本地验证通过（26.10），尚未纳入 CI 矩阵。
 - **你的 CI。** [eos-ci.yml](.github/workflows/eos-ci.yml) 随模板一起提供。在你的仓库里，它运行治理门禁和你在声明中
   写明的命令。EOS 自己的测试套件、覆盖率与跨平台矩阵测试的是 EOS，所以只在 `.eos/project.json` 仍是模板自身的
   声明时运行，执行 `eos init` 之后即被跳过（见[手册 §8.4](docs/zh/user-manual.md#84-你的仓库里-ci-运行什么)、
@@ -218,7 +220,7 @@ docs/               你的规格与 ADR；docs/eos/ 是 EOS 手册（中文版�
   否则找不到它的技能和钩子。钩子是本地减速带；CI 才是最终权威。
 - **一次性加固。** 真正的仓库建好后，在你的 agent 中运行 `/eos-init`（Codex 中为 `$eos-init`）：分支保护、CODEOWNERS 与
   审批，进度记录在 [docs/zh/activation.md](docs/zh/activation.md)。
-- **本地 CI。** `act push` 在 Docker 中运行 [eos-ci.yml](.github/workflows/eos-ci.yml)；没有 Docker 时，
+- **本地 CI。** `act push -W .github/workflows/eos-ci.yml` 在 Docker 中运行 [eos-ci.yml](.github/workflows/eos-ci.yml)；没有 Docker 时，
   `npm run verify` 会运行核心检查。
 - **BMAD。** 安装了 `bmad-*` 技能时，EOS 会编排它们完成探索、PRD、架构与故事拆分；参见
   [docs/zh/agent-map.md](docs/zh/agent-map.md)。

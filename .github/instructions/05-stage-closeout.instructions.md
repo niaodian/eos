@@ -26,6 +26,12 @@ Before writing any irreversible decision (tech stack, deployment topology, data 
 present the options, the trade-offs and your recommendation, and get an explicit answer. Never bury
 a one-way door inside a document and treat silence as agreement.
 
+**Unattended (nobody is there to answer).** Do not stop the stage to wait. Decide, mark the decision
+provisional — write its ADR with `Status: proposed` (no `Confirmed by`) — and list every provisional
+decision in your final report with the one line "a person confirms these before release". `release-ready`
+(`one-way-doors-confirmed`) refuses to ship until a person has set `Status: accepted` and added
+`Confirmed by` and `Confirmed at`; you never write those two fields yourself.
+
 ## Language
 
 Answer in `.eos/project.json` → `language` (BCP-47) when it is set; otherwise mirror the

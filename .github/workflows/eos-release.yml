@@ -46,7 +46,7 @@ concurrency:
 
 jobs:
   plan:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
       contents: read
@@ -63,7 +63,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: '20'
+          node-version-file: '.nvmrc'
       - id: plan
         env:
           EOS_EVENT: ${{ github.event_name }}
@@ -76,7 +76,7 @@ jobs:
 
   build:
     needs: plan
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
       contents: read
@@ -88,7 +88,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: '20'
+          node-version-file: '.nvmrc'
       # REPLACE THIS STEP when your product ships built artifacts (a package, a binary, an image
       # digest file). Everything that lands in dist/ is attested; list the files in
       # .eos/project.json → release.artifacts (e.g. "dist/*.tgz") so the release manifest binds
@@ -115,7 +115,7 @@ jobs:
   attest:
     needs: [plan, build]
     if: needs.plan.outputs.attest == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
       id-token: write
@@ -172,7 +172,7 @@ jobs:
       always() && needs.plan.outputs.manifest == 'true' && needs.build.result == 'success'
       && contains(fromJSON('["success","skipped"]'), needs.attest.result)
       && contains(fromJSON('["success","skipped"]'), needs.slsa.result)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
       contents: read
@@ -185,7 +185,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: '20'
+          node-version-file: '.nvmrc'
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: release-dist
@@ -246,7 +246,7 @@ jobs:
       && (needs.plan.outputs.manifest != 'true' || needs.manifest.result == 'success')
       && (needs.plan.outputs.track != 'regulated'
           || (needs.slsa.result == 'success' && needs.manifest.result == 'success'))
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
       contents: write

@@ -12,6 +12,9 @@
 > **怎么用**：
 > - 想要引导式逐步执行 → 在 Copilot Chat 里跑 **`/eos-init`**（它会尽量替你改、改不了的打印确切步骤）。
 > - 想要完整原理与步骤 → 见 `docs/eos/user-manual.md` **附录 D**。
+> - 你是唯一的维护者？分支保护与 Code Owners 评审需要另一个能合并的人：在私有的 Free 仓库里请带理由地豁免它们
+>   （`- [~] … · Reason: …`）。EOS 其余需要"第二个人"的步骤都有 solo 路径——用 `eos init <pack> --solo --write` 声明
+>   （附录 D.1、ADR-023）；`/eos-init` 开始之前会列出哪些步骤需要谁。
 > - 本文件是**可勾选的进度台账**：`eos-doctor` 每次运行都会读它并 advisory 提示还剩几项；
 >   `/eos-release-gate`（G8）发布前会再核一次——**这就是"系统性遗忘"的防线**。
 >

@@ -324,12 +324,12 @@ export const ARCHITECTURE_RECORD = {
   nfrLandingPoints: [{ nfr: 'NFR1', component: 'auth-reset handler', mechanism: 'single round trip with a prepared statement' }],
 };
 
-export const ADR_STACK = ['# 1. Tech stack', '', '## Status', 'Accepted', '', '## Decision', '',
+export const ADR_STACK = ['# 1. Tech stack', '', '## Status', 'Accepted', '', '- Confirmed by: Priya Raman', '- Confirmed at: 2026-01-05', '', '## Decision', '',
   'The reset service is written in Node 20 and reuses the existing PostgreSQL credential store,',
   'because the auth service already owns those tables and a second datastore would split the',
   'transaction boundary that makes single-use reset tokens safe.', ''].join('\n');
 
-export const ADR_TOPOLOGY = ['# 2. Deployment topology', '', '## Status', 'Accepted', '', '## Decision', '',
+export const ADR_TOPOLOGY = ['# 2. Deployment topology', '', '## Status', 'Accepted', '', '- Confirmed by: Priya Raman', '- Confirmed at: 2026-01-05', '', '## Decision', '',
   'A rolling deployment behind the existing load balancer, with a 5% canary cohort for 24 hours.',
   'Rollback is an image rollback plus the login_v2 feature flag, and readiness is reported on',
   '/ready, which is the probe the load balancer already consumes.', ''].join('\n');

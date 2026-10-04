@@ -361,7 +361,7 @@ export function answerReference(cases, testPath, selector) {
       status: 'ERROR',
       detail: elsewhere.length
         ? `a testcase named "${selector}" ran, but the report places it in ${describeLocation(elsewhere[0])}, not ${testPath} — point the trace-matrix row at the file that declares it`
-        : `no testcase named "${selector}" in the ${where} (${reports.join(', ')})`,
+        : `no testcase named "${selector}" in the ${where} (${reports.join(', ')}) — the trace-matrix reference was read as file ${testPath}, test "${selector}"; a name is read to the end of its cell (or to the closing backtick), so check it against the report`,
     };
   }
   const match = unknown.length ? 'name' : 'file';

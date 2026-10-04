@@ -257,11 +257,38 @@ test('record against an OpenAI-compatible endpoint, then replay with no key: the
   const tape = readFileSync(join(dir, 'evals/cassettes/llm-agent.json'), 'utf8');
   assert.equal(JSON.parse(tape).model, 'loopback-model');
   assert.equal(tape.includes(LOOPBACK_KEY), false, 'the key must never be written to a cassette');
+  // eos-2.6.0 (pilot record 26): a request's hash is not called "key" — gitleaks reads every one of those as a credential.
+  const entries = JSON.parse(tape).entries;
+  assert.ok(entries.length === 3 && entries.every((e) => /^[0-9a-f]{64}$/.test(e.requestSha256) && !('key' in e)));
   assert.equal(readSummary(dir, 'evalSummary').data.subject.parameters.mode, 'record');
 
   const replay = boundedSpawnSync(process.execPath, ['--test', 'evals/eval.test.mjs'], { cwd: dir, encoding: 'utf8', env: { ...process.env, ...NO_KEY, EVAL_AGENT: 'llm' } });
   assert.equal(replay.status, 0, replay.stdout);
   assert.equal(readSummary(dir, 'evalSummary').data.subject.model, 'loopback-model');
+});
+
+test('a cassette recorded before 2.6.0 (entries named "key") still replays', () => {
+  const dir = llmProject();
+  const path = join(dir, 'evals/cassettes/llm-agent.json');
+  const tape = JSON.parse(readFileSync(path, 'utf8'));
+  tape.entries = tape.entries.map(({ requestSha256, ...rest }) => ({ key: requestSha256, ...rest }));
+  writeFileSync(path, JSON.stringify(tape, null, 2));
+  const r = boundedSpawnSync(process.execPath, ['--test', 'evals/eval.test.mjs'], { cwd: dir, encoding: 'utf8', env: { ...process.env, ...NO_KEY, EVAL_AGENT: 'llm' } });
+  assert.equal(r.status, 0, r.stdout);
+});
+
+test('a 200 that is not a chat-completions document is not an answer (pilot record 25)', async () => {
+  const dir = llmProject();
+  const server = createServer((req, res) => { req.resume(); req.on('end', () => { res.setHeader('content-type', 'text/plain'); res.end('OK'); }); });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  try {
+    const live = { ...process.env, EVAL_AGENT: 'llm', EVAL_MODE: 'record', EVAL_MODEL: 'loopback-model', OPENAI_BASE_URL: `http://127.0.0.1:${server.address().port}/v1`, [KEY_ENV]: LOOPBACK_KEY };
+    const rec = await spawnAsync(process.execPath, ['--test', 'evals/eval.test.mjs'], { cwd: dir, env: live });
+    assert.notEqual(rec.status, 0, 'recording against something that is not a model must fail');
+    assert.match(rec.out, /not with a chat-completions JSON/);
+  } finally {
+    server.close();
+  }
 });
 
 test('the Python twin replays the same recording', { skip: python ? false : 'no python on PATH' }, () => {

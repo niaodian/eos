@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node .github/hooks/deny-dangerous.js --format antigravity",
+            "command": "node \"$(git rev-parse --show-toplevel)/.github/hooks/deny-dangerous.js\" --format antigravity",
             "timeout": 30
           }
         ]

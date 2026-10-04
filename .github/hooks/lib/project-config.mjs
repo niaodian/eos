@@ -95,13 +95,28 @@ export const TOP_LEVEL_KEYS = new Set([
   '$schema', 'projectType', 'language', 'stacks', 'commands', 'productParadigms', 'evalRequired',
   'evalWaiver', 'rationale', 'workflowProfile', 'complianceProfile',
   'evidencePolicy', 'evidencePolicyReason', 'templateDefault', 'release', 'policyUpstream', 'evidence',
-  'agentPlatforms',
+  'agentPlatforms', 'approvalMode', 'productTree',
 ]);
 // Prose language only (BCP-47). Deliberately not an enum: EOS must not ship a closed list of
 // languages a team is allowed to think in.
 export const LANGUAGE_TAG = /^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})*$/;
 export const EVIDENCE_POLICIES = ['local', 'ci', 'attested'];
 export const COMPLIANCE_PROFILES = ['none', 'regulated'];
+// Who may approve (ADR-023): `independent` (the default) needs a second person; `solo` lets the one
+// maintainer of a Standard-track project record a labelled self-approval. Never with a strict track.
+export const APPROVAL_MODES = ['independent', 'solo'];
+export const STRICT_TRACKS = ['regulated', 'controlled'];
+
+/** Does this declaration (parsed project.json) put the project on the solo approval path? Standard track only. */
+export const isSoloProject = (project) => project?.approvalMode === 'solo'
+  && project.complianceProfile !== 'regulated' && !STRICT_TRACKS.includes(project.workflowProfile);
+
+/** `productTree.exclude`: exact repository paths of records that are not product (e.g. docs/pilot-log.md). */
+export function excludedPathProblem(path) {
+  if (typeof path !== 'string' || !path.trim()) return 'must be a non-empty path';
+  if (path.startsWith('/') || /(^|\/)\.\.(\/|$)/.test(path) || /[*?[\]{}\\]/.test(path)) return 'must be an exact repository-relative path with "/" separators (no globs, no "..")';
+  return null;
+}
 
 // Manifests that prove a real code project exists, so "config-only" can't be used to hide one.
 export const STACK_MANIFESTS = {
@@ -390,6 +405,27 @@ export function loadProjectConfig(root) {
     errors.push(`${PROJECT_CONFIG_PATH}: "evalRequired" must be a boolean`);
   }
 
+  if (parsed.approvalMode !== undefined && !APPROVAL_MODES.includes(parsed.approvalMode)) {
+    errors.push(`${PROJECT_CONFIG_PATH}: unknown approvalMode "${parsed.approvalMode}" (expected ${APPROVAL_MODES.join(' | ')})`);
+  }
+  if (parsed.approvalMode === 'solo'
+      && (parsed.complianceProfile === 'regulated' || STRICT_TRACKS.includes(parsed.workflowProfile))) {
+    errors.push(`${PROJECT_CONFIG_PATH}: approvalMode "solo" is a Standard-track exit and cannot be combined with ${parsed.complianceProfile === 'regulated' ? 'complianceProfile "regulated"' : `workflowProfile "${parsed.workflowProfile}"`} — a regulated or controlled project needs a second person for every approval.`);
+  }
+  const productTree = { exclude: [] };
+  if (parsed.productTree !== undefined) {
+    if (!isPlainObject(parsed.productTree) || Object.keys(parsed.productTree).some((k) => k !== 'exclude')
+        || (parsed.productTree.exclude !== undefined && !Array.isArray(parsed.productTree.exclude))) {
+      errors.push(`${PROJECT_CONFIG_PATH}: "productTree" must be { "exclude": [<repository paths>] }`);
+    } else {
+      for (const entry of parsed.productTree.exclude || []) {
+        const problem = excludedPathProblem(entry);
+        if (problem) errors.push(`${PROJECT_CONFIG_PATH}: productTree.exclude entry ${JSON.stringify(entry)} ${problem}`);
+        else productTree.exclude.push(entry);
+      }
+    }
+  }
+
   let evalWaiver = null;
   if (parsed.evalWaiver !== undefined) {
     if (!isPlainObject(parsed.evalWaiver)) {
@@ -431,6 +467,8 @@ export function loadProjectConfig(root) {
     evidencePolicy: EVIDENCE_POLICIES.includes(parsed.evidencePolicy) ? parsed.evidencePolicy : undefined,
     evidencePolicyReason: typeof parsed.evidencePolicyReason === 'string' ? parsed.evidencePolicyReason : undefined,
     evalRequired: parsed.evalRequired,
+    approvalMode: APPROVAL_MODES.includes(parsed.approvalMode) ? parsed.approvalMode : 'independent',
+    productTree,
     evalWaiver,
     rationale: typeof parsed.rationale === 'string' ? parsed.rationale : '',
     templateDefault: parsed.templateDefault === true,

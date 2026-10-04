@@ -3,15 +3,16 @@
 // Registered in ./index.mjs. A handler receives (snapshot, flags) and returns an exit code (./shared.mjs).
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { gatePolicy, changeTypeOf, gateInputs, gateCollections } from '../lib/state.mjs';
+import { gatePolicy, changeTypeOf, gateInputs, gateCollections, scopeState } from '../lib/state.mjs';
 import { prepareGateRun, isBlocking, gateProblems } from '../lib/gates.mjs';
 import { recordGateRun } from '../lib/record.mjs';
 import { crossBranchActivity, crossBranchLines } from '../lib/cross-branch.mjs';
-import { checkTransition, legalTransitions } from '../lib/transitions.mjs';
+import { checkTransition, legalTransitions, deriveProductState } from '../lib/transitions.mjs';
 import { appendEvent, withLedger } from '../lib/ledger.mjs';
 import { renderGate, renderExplain } from '../lib/render.mjs';
 import { listEvidence, evidenceFreshness, readEvidence } from '../lib/evidence.mjs';
 import { readManifest, manifestPath, listManifests } from '../lib/release.mjs';
+import { listDeferrals, deferralDigest, selfApprovalAllowed } from '../lib/deferrals.mjs';
 import { writeFileAtomic } from '../lib/atomic.mjs';
 import { EXIT, statusExit, emit, resolveScope, consultProviders } from './shared.mjs';
 
@@ -67,8 +68,21 @@ export const gateCommands = {
     const GOVERNANCE = ['.eos/gates.json', '.eos/workflow.json', '.eos/project.json'];
     const governanceChanged = changed === null ? [] : GOVERNANCE.filter((g) => changed.includes(g));
 
+    // Only stages the project has REACHED are evaluated. A gate for a stage that has not begun is not
+    // a failure, and a FAIL written to the append-only ledger for it can never be taken back.
+    const spine = ['discovery-ready', 'requirements-ready', 'prd-ready', 'ux-ready', 'architecture-ready'];
+    const blockingGate = deriveProductState(snapshot).blockedBy?.transition?.requiresGate;
+    const frontier = spine.includes(blockingGate) ? spine.indexOf(blockingGate) : spine.length - 1;
+    const notReached = (t) => {
+      if (t.scopeType === 'product' && spine.includes(t.def.id) && spine.indexOf(t.def.id) > frontier) return `not reached yet — the baseline is at ${spine[frontier]}`;
+      if (t.scopeType === 'story' && t.def.id === 'verified' && ['DRAFT', 'IN_REVIEW', 'READY_FOR_DEV'].includes(scopeState(snapshot, 'story', t.scopeId))) return 'not reached yet — the story has not entered development';
+      return null;
+    };
+
     const plan = [];
     for (const t of targets) {
+      const early = notReached(t);
+      if (early) { plan.push({ ...t, run: false, reason: early }); continue; }
       const policy = gatePolicy(snapshot, changeTypeOf(snapshot, t.scopeType, t.scopeId), t.def.id);
       if (policy === 'not_applicable') { plan.push({ ...t, run: false, reason: 'not applicable to this change type' }); continue; }
       if (full) { plan.push({ ...t, run: true, reason: '--full' }); continue; }
@@ -161,8 +175,20 @@ export const gateCommands = {
     if (!scopeId || scopeId === true) { console.log('approve requires --scope <type> --id <id>'); return EXIT.FAIL; }
     const actor = process.env.EOS_ACTOR || process.env.USER || process.env.USERNAME || '';
     const requesters = new Set(snapshot.events.filter((e) => e.type === 'transition' && e.scope?.id === scopeId).map((e) => e.actor));
-    if (requesters.has(actor)) {
-      console.log(`EOS approve · REJECTED — "${actor}" prepared this candidate and cannot also approve it. A second person must run this command.`);
+    // `--self` is the solo project's labelled exit (ADR-023): the person who prepared the work approves
+    // it, with a reason, and the record says so. Only where the project declared approvalMode "solo".
+    const self = flags.self === true;
+    if (self && !selfApprovalAllowed(snapshot)) {
+      console.log('EOS approve · REJECTED — --self needs approvalMode "solo" in .eos/project.json (Standard track). Otherwise a second person must record the approval.');
+      return EXIT.FAIL;
+    }
+    const selfReason = typeof flags.reason === 'string' ? flags.reason.trim() : '';
+    if (self && selfReason.length < 20) {
+      console.log('EOS approve · REJECTED — a self-approval needs --reason "<why no second person is involved, 20+ characters>".');
+      return EXIT.FAIL;
+    }
+    if (!self && requesters.has(actor)) {
+      console.log(`EOS approve · REJECTED — "${actor}" prepared this candidate and cannot also approve it. A second person must run this command.${selfApprovalAllowed(snapshot) ? ' In a solo project, record it yourself with --self --reason "<why>".' : ''}`);
       return EXIT.FAIL;
     }
     // An approval is consent to ship a SPECIFIC set of changes. Binding it to the manifest digest is
@@ -177,15 +203,30 @@ export const gateCommands = {
       }
       manifestDigest = m.digest;
     }
+    // What the approver is also accepting: every deferred NFR target, printed in full first and bound
+    // into the record, so a later change to the list voids the approval.
+    const deferred = scopeType === 'release' ? listDeferrals(snapshot.root) : [];
+    const deferredDigest = deferralDigest(deferred);
+    const deferredLines = deferred.length ? [
+      `  This release ships with ${deferred.length} DEFERRED NFR target(s) — your approval accepts them, bound to this exact list:`,
+      ...deferred.map((d) => `    ${d.id}  owner ${d.owner}  due by ${d.dueBy || '(no dueBy)'}  trigger: ${d.trigger}`),
+    ] : [];
     const event = appendEvent(snapshot.root, {
       type: 'approval',
       scope: { type: scopeType, id: String(scopeId) },
       ...(manifestDigest ? { manifestDigest } : {}),
+      assurance: self ? 'self' : 'independent',
+      ...(deferredDigest ? { deferredDigest, deferred } : {}),
       commit: snapshot.commit,
-      detail: String(flags.note || ''),
+      detail: self ? selfReason : String(flags.note || ''),
     });
-    emit(flags, { approved: true, event, manifestDigest: manifestDigest || null },
-      `EOS approve · ${scopeId} approved by ${event.actor} (seq ${event.seq})${manifestDigest ? `\n  bound to manifest ${manifestDigest.slice(0, 12)} — editing what this release ships invalidates this approval` : ''}\n`);
+    emit(flags, { approved: true, event, assurance: event.assurance, manifestDigest: manifestDigest || null, deferred },
+      [
+        ...(deferredLines.length ? [...deferredLines, ''] : []),
+        `EOS approve · ${scopeId} approved by ${event.actor} (seq ${event.seq})${self ? ' — a SELF-APPROVAL (solo project): no second person reviewed this' : ''}`,
+        ...(manifestDigest ? [`  bound to manifest ${manifestDigest.slice(0, 12)} — editing what this release ships invalidates this approval`] : []),
+        '',
+      ].join('\n'));
     return EXIT.OK;
   },
 

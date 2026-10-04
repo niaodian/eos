@@ -171,3 +171,88 @@ test('a story that is MERGED hands the focus back to the next change', () => {
   assert.equal(r.json.recommendedAction.id, 'start-next-change');
   assert.equal(r.code, 0);
 });
+
+// eos-2.6.0, pilot record 27: a `product` focus used to outlive the baseline.
+test('a stale product focus is ignored once the baseline passes and a story is waiting', () => {
+  const dir = project({ ...storyFiles(), '.eos/local/active-work.json': { schemaVersion: 1, scopeType: 'product', scopeId: 'product' } }, { withHooks: true });
+  const r = runJson(dir, ['next']);
+  assert.equal(r.json.current.scopeType, 'story', r.out);
+  assert.equal(r.json.current.scopeId, 'STORY-001');
+});
+
+test('a product focus is still honoured while the baseline is incomplete', () => {
+  const dir = project({ '.eos/project.json': APP_PROJECT, '.eos/local/active-work.json': { schemaVersion: 1, scopeType: 'product', scopeId: 'product' } });
+  assert.equal(runJson(dir, ['next']).json.current.scopeType, 'product');
+});
+
+test('resume never pins the product as the local focus', () => {
+  const dir = project(baselineFiles());
+  run(dir, ['resume']);
+  const focus = (() => { try { return readFileSync(join(dir, '.eos/local/active-work.main.json'), 'utf8'); } catch { return ''; } })();
+  assert.doesNotMatch(focus, /"scopeType": "product"/);
+});
+
+test('plan-stories looks at the directory before saying it is missing', () => {
+  const dir = project({ ...baselineFiles(), 'docs/stories/.gitkeep': '' });
+  const r = runJson(dir, ['next']);
+  assert.equal(r.json.recommendedAction.id, 'plan-stories');
+  assert.match(JSON.stringify(r.json.blockers), /docs\/stories\/ exists but holds no story file/);
+  assert.doesNotMatch(JSON.stringify(r.json.blockers), /does not exist/);
+});
+
+test('verify evaluates only the stages the baseline has reached, and records nothing for the rest', () => {
+  const dir = project({ '.eos/project.json': APP_PROJECT, 'docs/discovery.md': DISCOVERY_MD, 'docs/discovery.json': DISCOVERY_RECORD }, { withHooks: true });
+  const plan = runJson(dir, ['verify', '--plan']).json.planned;
+  const row = (gate) => plan.find((p) => p.gate === gate);
+  assert.equal(row('discovery-ready').run, true);
+  assert.equal(row('requirements-ready').run, true, 'the stage in progress is evaluated');
+  for (const gate of ['prd-ready', 'ux-ready', 'architecture-ready']) {
+    assert.equal(row(gate).run, false, gate);
+    assert.match(row(gate).reason, /not reached yet/);
+  }
+});
+
+// eos-2.6.0: what `next` says besides the one recommended action.
+test('next says the repository is not activated, once the project has declared itself — and not before', () => {
+  const declared = project({ '.eos/project.json': APP_PROJECT, 'docs/eos/activation.md': '# Activation\n\n- [ ] Branch protection on the default branch\n- [ ] CODEOWNERS names real owners\n' });
+  const r = runJson(declared, ['next']);
+  assert.equal(r.json.activation?.pending, 2, r.out);
+  assert.equal(r.json.activation.command, '/eos-init');
+  assert.match(run(declared, ['next']).out, /Not activated yet[\s\S]*Run \/eos-init first/);
+  const template = project({ '.eos/project.json': { ...APP_PROJECT, templateDefault: true }, 'docs/eos/activation.md': '# Activation\n\n- [ ] Branch protection\n' });
+  assert.equal(runJson(template, ['next']).json.activation, undefined, 'the template declaration is not a project yet');
+  const activated = project({ '.eos/project.json': APP_PROJECT, 'docs/eos/activation.md': '# Activation\n\n- [x] Branch protection on the default branch\n- [~] CODEOWNERS — waived: solo project\n' });
+  assert.equal(runJson(activated, ['next']).json.activation, undefined);
+});
+
+test('next lists the one-way decisions still waiting for a person', () => {
+  const proposed = ADR_STACK.replace('Accepted', 'Proposed').replace('- Confirmed by: Priya Raman\n- Confirmed at: 2026-01-05\n', '');
+  const dir = project(baselineFiles({ 'docs/adr/001-tech-stack.md': proposed }));
+  const r = runJson(dir, ['next']);
+  assert.deepEqual(r.json.oneWayDoors.proposed, ['techStack (docs/adr/001-tech-stack.md)']);
+  assert.match(run(dir, ['next']).out, /Awaiting a person[\s\S]*Confirmed by/);
+});
+
+test('a decided stack that no declaration carries makes "declare the stack" the mandatory next step', () => {
+  const RULE = '.github/instructions/00-workspace.instructions.md';
+  const dir = project(baselineFiles({ '.eos/project.json': { projectType: 'config-only' }, [RULE]: '---\napplyTo: "**"\n---\n# Workspace\n\n## Local commands\n- Test: `node .github/eos/run-tests.mjs`.\n' }));
+  const r = runJson(dir, ['next']);
+  assert.match(r.json.recommendedAction.reason, /^DECLARE THE TECH STACK/);
+  assert.match(r.json.recommendedAction.command, /init <pack> --write/);
+});
+
+test('a project that is ahead of its release is told what comes after it', () => {
+  const dir = project({ '.eos/project.json': { ...APP_PROJECT, commands: { test: 'node --version' } } });
+  assert.match(run(dir, ['status']).out, /After the release \(not needed to ship it\): G9 telemetry-ready.*G10 iteration-ready/);
+});
+
+test('an NFR stated at a scale is flagged before the first story is built, not at the release', () => {
+  const scaled = { ...REQUIREMENTS_RECORD, nfr: [{ id: 'NFR1', category: 'performance', statement: 'Search stays fast as the dataset grows', target: 'p95 <= 500 ms at 100000 rows' }] };
+  const dir = project(storyFiles({ 'docs/requirements.json': scaled }));
+  const r = runJson(dir, ['next']);
+  assert.equal(r.json.current.scopeType, 'story');
+  assert.deepEqual(r.json.nfrScale, ['NFR1 (p95 <= 500 ms at 100000 rows)']);
+  assert.match(run(dir, ['next']).out, /Start measuring now/);
+  const plain = { ...REQUIREMENTS_RECORD, nfr: [{ id: 'NFR1', category: 'performance', statement: 'Search stays fast for a single user', target: 'p95 <= 500 ms' }] };
+  assert.equal(runJson(project(storyFiles({ 'docs/requirements.json': plain })), ['next']).json.nfrScale, undefined);
+});

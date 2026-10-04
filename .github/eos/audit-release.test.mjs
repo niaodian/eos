@@ -16,7 +16,7 @@ import { spawnSync } from 'node:child_process';
 import {
   project, write, run, runJson, cleanup, git, commitAll, story, releaseFiles,
   APP_PROJECT, PRD_2AC, baselineFiles, storyFiles, testRun, treeDigest, DISCOVERY_RECORD,
-  writeManifest, bindDigests, ARCHITECTURE_RECORD, REQUIREMENTS_RECORD,
+  writeManifest, bindDigests, ARCHITECTURE_RECORD, REQUIREMENTS_RECORD, ADR_STACK,
   TELEMETRY_MD, TELEMETRY_RECORD, ITERATION_RECORD, REPO_ROOT,
   computeProductTree, compareProductTree, clearProductTreeCache, isSelfReference,
   emptyDocReason, readEvidence, evidenceFreshness,
@@ -105,6 +105,70 @@ test('EOS-AUD-007: NFR targets need measurements; a deferral needs an owner and 
   write(dir, 'docs/evidence/nfr-summary.json', nfr([{ id: 'NFR1', decision: 'DEFER', owner: '@platform', trigger: 'before the first paying customer' }]));
   r = runJson(dir, ['release-status', '--release', 'v1.0.0']);
   assert.equal(r.json.checks.find((c) => c.id === 'nfr-evidence').status, 'DEFERRED');
+});
+
+test('eos-2.6.0 (D3): a one-way decision no person confirmed passes G4 with a note and fails the release', () => {
+  const proposed = ADR_STACK.replace('Accepted', 'Proposed').replace('- Confirmed by: Priya Raman\n- Confirmed at: 2026-01-05\n', '');
+  const unsigned = ADR_STACK.replace('- Confirmed by: Priya Raman\n', '');
+  const doors = (adr) => {
+    const dir = verifiedStory(releaseFiles({ 'docs/adr/001-tech-stack.md': adr }));
+    return runJson(dir, ['release-status', '--release', 'v1.0.0']).json.checks.find((c) => c.id === 'one-way-doors-confirmed');
+  };
+  assert.equal(doors(ADR_STACK).status, 'PASS');
+  const open = doors(proposed);
+  assert.equal(open.status, 'FAIL');
+  assert.match(open.detail, /techStack: docs\/adr\/001-tech-stack\.md is still "proposed"/);
+  assert.match(doors(unsigned).detail, /has no "Confirmed by"/);
+
+  const g4 = runJson(project(baselineFiles({ 'docs/adr/001-tech-stack.md': proposed })), ['check', '--gate', 'architecture-ready']);
+  assert.equal(g4.code, 0, g4.out);
+  assert.match(JSON.stringify(g4.json.checks), /still \\"proposed\\"/);
+});
+
+test('eos-2.6.0: a Chinese runbook passes for a project that declares language zh, and only for it', () => {
+  const runbook = ['# 运行手册', '', '## 回滚', '关闭 login_v2 开关，再回滚到上一个镜像。', '', '## 灰度发布', '先放量 5%，观察 24 小时。', '', '## 健康检查', 'GET /health 与 GET /ready。', ''].join('\n');
+  const opsCheck = (project) => {
+    const dir = verifiedStory(releaseFiles({ 'ops/runbook.md': runbook, '.eos/project.json': { ...APP_PROJECT, ...project, commands: { test: 'node --version', audit: 'node --version' } } }));
+    return runJson(dir, ['release-status', '--release', 'v1.0.0']).json.checks.find((c) => c.id === 'ops-artifacts');
+  };
+  assert.equal(opsCheck({ language: 'zh-CN' }).status, 'PASS');
+  const english = opsCheck({ language: 'en' });
+  assert.equal(english.status, 'FAIL', 'the Chinese terms are recognised only where the project declared Chinese');
+});
+
+test('eos-2.6.0: the tests that could not run and the tests that failed are named apart, and the failing test is named', () => {
+  const failing = [
+    'process.stdout.write("✔ passes (1ms)\\n✖ rejects a bad token (3.2ms)\\n");',
+    'process.exit(1);', ''].join('\n');
+  const dir = project(storyFiles({
+    'tests/fail.mjs': failing,
+    '.eos/project.json': { ...APP_PROJECT, commands: { test: 'node tests/fail.mjs' } },
+  }), { withHooks: true });
+  let r = runJson(dir, ['check', '--gate', 'verified', '--scope', 'STORY-001']);
+  assert.match(JSON.stringify(r.json.checks.find((c) => c.id === 'tests-executed')), /the tests ran and FAILED \(exit 1\) — first failing test: rejects a bad token/);
+  write(dir, '.eos/project.json', { ...APP_PROJECT, commands: { test: 'definitely-not-a-real-binary run' } });
+  r = runJson(dir, ['check', '--gate', 'verified', '--scope', 'STORY-001']);
+  assert.match(JSON.stringify(r.json.checks.find((c) => c.id === 'tests-executed')), /the tests could not run — no toolchain/);
+});
+
+test('eos-2.6.0: a deferred NFR carries a dueBy; one that is overdue is a FAIL, not a longer wait', () => {
+  const dir = verifiedStory(releaseFiles({ 'docs/evidence/nfr-summary.json': undefined }));
+  const nfrDigest = treeDigest(dir);
+  const nfr = (targets) => ({ schemaVersion: 1, generatedAt: '2026-01-01T00:00:00.000Z', productTree: { digest: nfrDigest }, targets });
+  const nfrCheck = () => runJson(dir, ['release-status', '--release', 'v1.0.0']).json.checks.find((c) => c.id === 'nfr-evidence');
+  const deferral = (dueBy) => nfr([{ id: 'NFR1', decision: 'DEFER', owner: '@platform', trigger: 'the first month of production traffic', ...(dueBy ? { dueBy } : {}) }]);
+
+  write(dir, 'docs/evidence/nfr-summary.json', deferral('2999-01-31'));
+  assert.equal(nfrCheck().status, 'DEFERRED');
+  assert.match(nfrCheck().detail, /due by 2999-01-31/);
+
+  write(dir, 'docs/evidence/nfr-summary.json', deferral('2020-01-31'));
+  assert.equal(nfrCheck().status, 'FAIL');
+  assert.match(nfrCheck().detail, /overdue \(dueBy 2020-01-31\)/);
+
+  write(dir, 'docs/evidence/nfr-summary.json', deferral(null));
+  assert.equal(nfrCheck().status, 'DEFERRED', 'a missing dueBy stays visible as DEFERRED — it is the promotion that refuses it');
+  assert.match(nfrCheck().detail, /NO dueBy/);
 });
 
 test('EOS-AUD-007: unverifiable enforcement authority is BLOCKED, never a self-issued PASS', () => {

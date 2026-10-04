@@ -10,6 +10,10 @@
 > - Want a guided, step-by-step run → run **`/eos-init`** in Copilot Chat (it changes what it can for you,
 >   and prints the exact steps for what it can't).
 > - Want the full rationale and steps → see **Appendix D** of `docs/eos/user-manual.md`.
+> - The only maintainer? Branch protection and Code Owners review need someone else who can merge: on a private
+>   Free repository waive them with a reason (`- [~] … · Reason: …`). The rest of EOS's "second person" steps have a
+>   solo path — declare it with `eos init <pack> --solo --write` (Appendix D.1, ADR-023); `/eos-init` lists which steps
+>   need whom before it starts.
 > - This file is a **checkable progress ledger**: every run of `eos-doctor` reads it and advisory-reminds you
 >   how many items remain; **`/eos-release-gate` (G8)** re-checks it before you ship — **this is the defense against
 >   "systematic forgetting".**

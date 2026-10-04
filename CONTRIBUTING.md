@@ -35,9 +35,9 @@ These are the beliefs the template is built on. Changes are easiest to accept wh
 
 ## Prerequisites
 
-- **Node.js 20.10+** — the only hard dependency (runs the validators, hooks, tests, and evals). Develop on
-  Node 22 or 24: Node 20 reached end of life on 2026-04-30 and remains only the declared minimum, which CI
-  keeps testing.
+- **Node.js 22.10+** — the only hard dependency (runs the validators, hooks, tests, and evals). `.nvmrc` names
+  the Node major (24) CI uses and the one to develop on; CI also tests 22, the floor. Node 20 was removed in
+  eos-2.6.0.
 - *Optional:* Docker + [`act`](https://github.com/nektos/act) to run the CI workflow locally;
   [`gitleaks`](https://github.com/gitleaks/gitleaks) for deeper secret scanning. Both degrade gracefully
   if absent.
@@ -98,7 +98,7 @@ new top-level `#` appendix requires a matching Table-of-Contents line or `check-
 (`build-pdf.sh` can render any doc — incl. `docs/zh/*.md` — to a CJK-safe PDF; the manual is just the
 one whose TOC must stay in sync.)
 
-You can run the whole batch gate the way CI does (needs Docker): `act push -j verify --pull=false`.
+You can run the whole batch gate the way CI does (needs Docker): `act push -W .github/workflows/eos-ci.yml -j verify --pull=false`.
 
 ---
 

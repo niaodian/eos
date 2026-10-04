@@ -1,6 +1,6 @@
 # EOS User Manual (Engineering Operating System)
 
-> Version: synced with `docs/eos/VERSION` (current `eos-2.5.0`)
+> Version: synced with `docs/eos/VERSION` (current `eos-2.6.0`)
 > Applies to: recent VS Code + GitHub Copilot Chat (custom agent / hooks are recent-version capabilities; confirm the version in the "About VS Code" panel), or Claude Code, OpenAI Codex or Google Antigravity ([Chapter 6.6](#chapter-66-using-eos-with-claude-code-codex-and-antigravity)) + 73 installed `bmad-*` skills (user-level)
 > Positioning: this manual is an **operating guide (how to use it)**; for design rationale and trade-offs, see `blueprint.md` in the same directory (why it is designed this way).
 > Conventions: prose in English; file names / paths / commands / config keys kept verbatim.
@@ -20,7 +20,7 @@
 | Want to look up a slash command / agent / rule | [Chapter 7 Complete reference](#chapter-7-complete-reference-quick-reference) |
 | Configuration is broken / Agent is not working as expected | [Chapter 9 Failure localization](#chapter-9-failure-localization-and-troubleshooting) |
 | Want to move this system to another project/team | [Chapter 10 Cross-project reuse and distribution](#chapter-10-cross-project-reuse-and-distribution) |
-| Upgrading to `eos-2.0.0`, choosing a governance track, or signing releases | [§10.5 Upgrading](#105-upgrading-from-eos-122x-to-eos-200) · [§10.6 Tracks and signed releases](#106-governance-tracks-signed-releases-and-central-policy) · [§10.7 The 2.0.1 security patch](#107-upgrading-from-eos-200-to-eos-201) · [§10.8 `eos upgrade` and 2.1.0](#108-upgrading-from-eos-20x-to-eos-210) · [§10.9 2.2.0](#109-upgrading-from-eos-21x-to-eos-220) · [§10.10 2.3.0](#1010-upgrading-from-eos-22x-to-eos-230) · [§10.11 2.4.0](#1011-upgrading-from-eos-23x-to-eos-240) · [§10.12 2.5.0](#1012-upgrading-from-eos-24x-to-eos-250) |
+| Upgrading to `eos-2.0.0`, choosing a governance track, or signing releases | [§10.5 Upgrading](#105-upgrading-from-eos-122x-to-eos-200) · [§10.6 Tracks and signed releases](#106-governance-tracks-signed-releases-and-central-policy) · [§10.7 The 2.0.1 security patch](#107-upgrading-from-eos-200-to-eos-201) · [§10.8 `eos upgrade` and 2.1.0](#108-upgrading-from-eos-20x-to-eos-210) · [§10.9 2.2.0](#109-upgrading-from-eos-21x-to-eos-220) · [§10.10 2.3.0](#1010-upgrading-from-eos-22x-to-eos-230) · [§10.11 2.4.0](#1011-upgrading-from-eos-23x-to-eos-240) · [§10.12 2.5.0](#1012-upgrading-from-eos-24x-to-eos-250) · [§10.13 2.6.0](#1013-upgrading-from-eos-25x-to-eos-260) |
 
 ---
 
@@ -44,6 +44,7 @@
 - [Appendix B Command cheat sheet](#appendix-b-command-cheat-sheet)
 - [Appendix C End-to-end example (my-app)](#appendix-c-end-to-end-example-my-app)
 - [Appendix D Post-instantiation hardening (make gates authoritative)](#appendix-d-post-instantiation-hardening-make-gates-authoritative)
+- [Appendix E Platform smoke checklist (by hand)](#appendix-e-platform-smoke-checklist-by-hand)
 
 ---
 
@@ -128,7 +129,7 @@ bmad-code-review                   → review has no blockers  (Gate G6)
 | VS Code | Recent version (custom agent / hooks require a recent version) | Check the real version in the About panel (`code --version` may be a shim and is not reliable) |
 | GitHub Copilot | Logged in (enterprise license is only a license, not a configuration dependency) | Chat panel is usable |
 | Or another agent | Claude Code, OpenAI Codex or Google Antigravity instead of VS Code + Copilot — setup in [Chapter 6.6](#chapter-66-using-eos-with-claude-code-codex-and-antigravity) | it starts in the project folder, and `/eos-next` (Codex: `$eos-next`) answers |
-| Node.js | 20.10+ (the CLI, validators and hooks); use 22 or 24 — Node 20 reached end of life on 2026-04-30 and remains only the declared minimum | `node -v` |
+| Node.js | 22.10+ (the CLI, validators and hooks); `.nvmrc` names the Node major CI uses (24). Node 20 was removed in eos-2.6.0; Node 26 passed locally (26.10) and is not in EOS's CI matrix yet | `node -v` |
 | BMAD skills | 73 `bmad-*` (user-level) | macOS/Linux `ls ~/.agents/skills &#124; grep -c '^bmad-'` · Windows `(Get-ChildItem ~/.agents/skills -Filter 'bmad-*').Count` |
 
 > **On Windows or Linux?** The core flow is identical — all hooks/validators are Node and paths are
@@ -180,7 +181,7 @@ If you want to promote some `eos-*.agent.md` files to "available in all projects
 **Method A — degit (recommended, fastest)**
 ```sh
 # Public template — plain degit works (no auth needed)
-npx degit niaodian/eos#eos-2.5.0 my-new-app
+npx degit niaodian/eos#eos-2.6.0 my-new-app
 cd my-new-app
 git init && git add -A && git commit -m "chore: scaffold from eos"
 ```
@@ -221,6 +222,8 @@ was committed first or not, the first push and the first pull request pass CI
 commit the declaration, then `eos policy lock --write`: until it is committed it is the first declaration,
 and nothing in it needs approving.
 
+**Replace what still describes EOS.** `init` replaces only the declaration. These still describe EOS until you replace them: `README.md` **and** `README.zh.md`, together (the doc-parity check compares the pair; `docs/zh/README.md` belongs to EOS's manual — never overwrite it), `package.json` (name, version, `engines`; delete it if the product is not a Node project), the ADR numbering in `docs/adr/` (EOS's own series runs to ADR-023 — start yours on purpose) and `.github/CODEOWNERS`. `.nvmrc` is yours too: it names the Node major that CI and your developers share. `/eos-init` prints this list. If you are the only maintainer, declare the solo path on Day 1 — `eos init <pack> --solo --write` — so the first policy review, the release approval and any waiver have an honest exit (Phase 8, [ADR-023](../adr/023-low-assurance-exits-on-the-standard-track.md)).
+
 Open `.github/instructions/00-workspace.instructions.md` and change it to the real facts of **your project**:
 - `Local commands`: if the stack is **already decided**, replace this with the install/lint/test/typecheck commands for your stack--**copy the finished line directly** from `docs/eos/stack-presets.md` (a recipe book for Node/Python/Go/Java/Rust/.NET full stacks; copy the matching block). If the stack is **not decided yet** (most 0-1 projects are not before architecture), **keep the Node placeholder**--this is a ⛳ PROVISIONAL value, and the authoritative lock happens in **Phase 4 (Architecture)** together with `docs/adr/00X-tech-stack.md`, avoiding conflict between always-on rules and the future real stack.
 - `Layout`: update it if the directory structure differs.
@@ -229,7 +232,7 @@ Open `.github/instructions/00-workspace.instructions.md` and change it to the re
 ## 3.4 Full Day-1 sequence (copy-ready)
 
 ```sh
-npx degit niaodian/eos#eos-2.5.0 my-new-app && cd my-new-app
+npx degit niaodian/eos#eos-2.6.0 my-new-app && cd my-new-app
 git init && git add -A && git commit -q -m "chore: scaffold from eos"
 node .github/hooks/validate-config.mjs
 node .github/eos/eos.mjs init config-only --write   # declare it: no code yet (or init <pack> [--track regulated])
@@ -252,7 +255,7 @@ setup for each.
 A system that already runs does not have to be re-specified before EOS can help. Adopt it at the **delivery gates** with the `delivery-only` workflow profile (since eos-2.3.0): the running system is the baseline, and every change from now on is a story that must be ready (G5), verified (G7) and released (G8).
 
 ```sh
-npx degit niaodian/eos#eos-2.5.0 /tmp/eos                      # the template, outside your repository
+npx degit niaodian/eos#eos-2.6.0 /tmp/eos                      # the template, outside your repository
 # copy into your repository: .eos/ .agents/ .github/{eos,hooks,agents,instructions}/ docs/eos/
 # and merge by hand what you already have: AGENTS.md, .github/copilot-instructions.md, .github/workflows/eos-ci.yml
 node .github/hooks/validate-config.mjs                          # S7 names anything still missing
@@ -374,12 +377,12 @@ So EOS **never depends on "Rule A overriding Rule B"**. The only reliable contro
 | Item | Content |
 |---|---|
 | **Goal** | Get an empty project with healthy configuration from the template |
-| **How to start** | `npx degit niaodian/eos#eos-2.5.0 my-app && cd my-app`, then declare it: `node .github/eos/eos.mjs init config-only --write` (stack undecided) or `init <pack> --write` |
+| **How to start** | `npx degit niaodian/eos#eos-2.6.0 my-app && cd my-app`, then declare it: `node .github/eos/eos.mjs init config-only --write` (stack undecided) or `init <pack> --write` |
 | **Output** | Complete `.github/` + `docs/` skeleton |
 | **Gate** | `node .github/hooks/validate-config.mjs` → **PASS** |
 | **Must check** | PASS 0 errors. **If the stack is undecided, do not change** `00-workspace` yet--keep the Node placeholder; the stack is an irreversible decision, and the authority is locked in **Phase 4 (ADR)**. If the stack is known, copy `docs/eos/stack-presets.md` directly (fast path). |
 | **How to open** | Run `code .` from inside `my-app/`--make **the project itself** the workspace root. Opening the parent directory makes agent/instructions/hooks all ineffective (see 7.2). |
-| **★ Hardening (one-time)** | Run `/eos-init`: it guides you through enabling branch protection (runbook) + replacing CODEOWNERS handles + pinning the approval baseline, and records progress in `docs/eos/activation.md`. **This step determines whether CI gates can truly block merges** (see Appendix D); `eos-doctor` gives an advisory reminder of remaining items every time, and `/eos-release-gate` checks again before release--to avoid "systemic forgetting". Personal experiment repositories may exempt items one by one (`[~] ... reason: ...`). |
+| **★ Hardening (one-time)** | Run `/eos-init`: it guides you through enabling branch protection (runbook) + replacing CODEOWNERS handles + pinning the approval baseline, and records progress in `docs/eos/activation.md`. **This step determines whether CI gates can truly block merges** (see Appendix D); `eos-doctor` gives an advisory reminder of remaining items every time, and `/eos-release-gate` checks again before release--to avoid "systemic forgetting". Personal experiment repositories may exempt items one by one (`[~] ... reason: ...`). Before it starts, `/eos-init` lists which steps need a second person (or, on a solo project declared with `--solo`, a labelled self-approval that **you** type — an agent never runs `--self`) and which template files to replace. |
 | **Example** | Full `my-app/` tree (44 files, validate PASS) |
 
 ---
@@ -496,7 +499,7 @@ So EOS **never depends on "Rule A overriding Rule B"**. The only reliable contro
 | **When to enter** | G4 passed |
 | **How to start** | Switch Chat to **`(agent) eos-plan`** (`bmad-create-epics-and-stories` → `bmad-create-story` → `bmad-sprint-planning`); design acceptance tests first for every AC with **`bmad-testarch-atdd`**; **if it contains LLM/agentic components, also run `/eos-eval-spec` to design the evaluation set (G-EVAL)**; finally validate readiness with `bmad-check-implementation-readiness` |
 | **Input** | `docs/prd.md`, `docs/architecture.md`, `docs/EXPERIENCE.md` (if UX phase was done) |
-| **Output** | `docs/epics/*`, `docs/stories/*.md` (each includes **acceptance test outline**), **`docs/eval-plan.md` (LLM features)** |
+| **Output** | `docs/epics/*`, `docs/stories/*.md` (each includes **acceptance test outline**), **`docs/eval-plan.md` (LLM features)** Each story is `docs/stories/<ID>.md` — the file name is the id — with `## Acceptance criteria` (a table: `AC | Statement | Test intent | Eval case`), `## Operational tasks` (clauses separated by `;`, or the full-width `；`) and `## Dependencies`. `eos stage init story --id <ID> --write` writes it with a `TODO(eos)` where an answer belongs, and a story that still holds one is not ready. Declaring the agentic paradigm makes `eos init` list the stories that lack an `Eval case` column: model-backed behaviour takes an `EVAL-<n>` id, deterministic behaviour takes `N/A — deterministic`. |
 | **Decision gate G5** | ☑ Every story is self-contained ☑ independently implementable ☑ includes AC **and every AC has acceptance test design (ATDD)** ☑ telemetry/authz/rollback are landed as concrete tasks **☑ LLM features have eval-plan (G-EVAL) or explicit SKIP** |
 | **Must-check items** | Can a developer start work from this story **without going back to read elsewhere**? Is DoD written? **Is the acceptance test intent defined for every AC**? **Are the eval set/grader/threshold for LLM features defined**? |
 | **Anti-rework** | The "readiness gate" prevents missing context in the middle of development; **shifting testing left** makes acceptance criteria testable before coding and prevents "adding tests later just to fill coverage"; **shifting eval left** gives nondeterministic LLM output a measurable baseline before coding. |
@@ -537,8 +540,8 @@ So EOS **never depends on "Rule A overriding Rule B"**. The only reliable contro
 | **Input** | `docs/prd.md` (AC list), **`docs/checklists/C-nfr.md` (NFR targets)**, **`docs/eval-plan.md` (LLM features)**, `src/` code |
 | **Output** | Test suite + `docs/trace-matrix.md` (AC ↔ test mapping — the *human* decision) **+ `docs/evidence/test-run.json`** (the *machine* result: which test ran, against which product tree, and what it returned) + **`docs/evidence/nfr-summary.json`** + **`docs/evidence/eval-summary.json`** (LLM features). Since eos-2.2.0 the `verified` gate writes `test-run.json` itself from the JUnit XML your runner already emits — declare `"evidence": {"junit": ["reports/junit/*.xml"]}`; see [examples/trace-evidence](examples/trace-evidence/README.md) |
 | **Effective rule R6** | Test pyramid; **every AC has ≥1 test**; `describe(<criterion id>)` naming; no real timers/no order dependency; changed-line coverage ≥80%; **verify NFR targets with `bmad-testarch-nfr`**; **verify LLM output with eval set+grader (not exact-match), see `ai/10-ai-llm` rule** |
-| **Decision gate G7** | `node .github/eos/eos.mjs check --gate verified --scope <STORY-ID>` — ☑ every AC traces to a test that **exists and actually ran** ☑ the run describes **this** product tree ☑ **NFR targets verified or deferred with an owner+trigger** ☑ **LLM features: the measured score meets its threshold, recomputed by EOS from the summary's own numbers** ☑ **spec-alignment quantified (`/eos-spec-align`)**. Before 1.13.0 a hand-written `PASS` in the matrix was enough |
-| **Must-check items** | Are there ACs not covered by any test? **Were the P95/throughput/SLO targets defined in C-nfr verified** (instead of set and forgotten)? Are deferred items explicitly marked with triggers? **Did the LLM eval score reach the threshold? Were regressions run after prompt/model changes?** Since 1.13.0, editing the source, tests, prompts or eval data **after** verifying makes the recorded PASS `STALE` and blocks the merge — re-run, do not re-assert |
+| **Decision gate G7** | `node .github/eos/eos.mjs check --gate verified --scope <STORY-ID>` — ☑ every AC traces to a test that **exists and actually ran** ☑ the run describes **this** product tree ☑ **NFR targets verified, or deferred with an owner + trigger + a future `dueBy`** ☑ **LLM features: the measured score meets its threshold, recomputed by EOS from the summary's own numbers** ☑ **spec-alignment quantified (`/eos-spec-align`)**. Before 1.13.0 a hand-written `PASS` in the matrix was enough |
+| **Must-check items** | Are there ACs not covered by any test? **Were the P95/throughput/SLO targets defined in C-nfr verified** (instead of set and forgotten)? Are deferred items explicitly marked with triggers? **Did the LLM eval score reach the threshold? Were regressions run after prompt/model changes?** Since 1.13.0, editing the source, tests, prompts or eval data **after** verifying makes the recorded PASS `STALE` and blocks the merge — re-run, do not re-assert A failing run names the first failing test, and "no toolchain" is reported apart from "the tests failed". A trace-matrix test name is read to the end of its cell (or to the closing backtick), so apostrophes and brackets in a name are fine. |
 | **Anti-rework** | The trace matrix exposes "untested acceptance criteria"; **NFR verification exposes "targets set but never verified"**; **eval regression exposes "prompt changes broke something else"**. |
 | **Example** | `my-app/test/auth.test.js` (10 AC-traced tests all green), `my-app/docs/trace-matrix.md` (11/12 ACs have tests, 1 performance item explicitly deferred) |
 
@@ -550,11 +553,11 @@ So EOS **never depends on "Rule A overriding Rule B"**. The only reliable contro
 |---|---|
 | **Goal** | Release only after passing quality/security/rollback/canary/NFR gates |
 | **When to enter** | G7 passed |
-| **How to start** | Enter **`/eos-release-gate`** in Chat; if runbook is missing, run **`/eos-runbook <service>`** first |
+| **How to start** | Enter **`/eos-release-gate`** in Chat; if runbook is missing, run **`/eos-runbook <service>`** first **Freeze first:** merge every fix and finish every edit under `docs/` and `src/` before you verify — each later change makes every story's evidence STALE. The order is: freeze → verify every story → measure the NFR targets → bind the summaries → `verify-release`. |
 | **Input** | Test results, NFR verification results (`docs/evidence/nfr-summary.json` — measure each target and write it with [examples/nfr-summary](examples/nfr-summary/README.md)), `ops/runbook.md`. `eos status` has listed what G8 needs since the project was declared |
 | **Output** | Release-gate report (PASS/FAIL item by item), `ops/runbook.md` (one section per service) |
-| **Decision gate G8 (hard gate)** | `node .github/eos/eos.mjs verify-release --release <id>` runs all 13 checks the prompt lists: ① the candidate is committed ② **the quality commands re-run ON THIS candidate** ③ stories VERIFIED ④ **each story's verification describes THIS tree** ⑤ spec alignment ⑥ secret scan ⑦ dependency audit ⑧ NFR evidence ⑨ compliance boundary ⑩ waivers ⑪ runbook: rollback **+ canary + health/readiness** ⑫ deployment-topology ADR ⑬ enforcement authority. **Any FAIL blocks release**; `DEFERRED` (an offline audit, an NFR with owner+trigger) is visible and never green |
-| **Must-check items** | Are rollback steps "exact executable steps" or empty words? Do deferred canary items have triggers? Does audit show 0 vulnerabilities? **Were NFR targets verified**? Note that `VERIFIED → APPROVED` needs an approval recorded by **someone other than whoever prepared the candidate** — no model, and no automation, can supply it |
+| **Decision gate G8 (hard gate)** | `node .github/eos/eos.mjs verify-release --release <id>` runs all 14 checks the prompt lists: ① the candidate is committed ② **the quality commands re-run ON THIS candidate** ③ stories VERIFIED ④ **each story's verification describes THIS tree** ⑤ spec alignment ⑥ secret scan ⑦ dependency audit ⑧ NFR evidence ⑨ compliance boundary ⑩ waivers ⑪ runbook: rollback **+ canary + health/readiness** ⑫ deployment-topology ADR ⑬ enforcement authority ⑭ **every one-way decision confirmed by a person** (its ADR is `accepted`, with `Confirmed by` and `Confirmed at`). **Any FAIL blocks release**; `DEFERRED` is visible and never green — and only a deferred **NFR** target can be promoted: on the Standard track, with an owner, a trigger and a `dueBy` in the future (a `dueBy` that has passed is a FAIL), with the approval bound to the whole list. A deferred dependency audit still blocks, and a Regulated or Controlled release is never promoted with any deferral |
+| **Must-check items** | Are rollback steps "exact executable steps" or empty words? Do deferred canary items have triggers? Does audit show 0 vulnerabilities? **Were NFR targets verified**? Note that `VERIFIED → APPROVED` needs an approval recorded by **someone other than whoever prepared the candidate** — no model, and no automation, can supply it On a one-person project declared `approvalMode: "solo"` (Standard track), that approval is `eos approve --self --reason "<why>"`, typed by the person — an agent never runs `--self` — recorded as `assurance: "self"` and shown as a self-approval in `status`, `next` and the release record. `eos approve` prints every deferred target first; after `RELEASED`, `eos next` lists what is owed and by when. The runbook is read in the project's `language` (a Chinese runbook needs 回滚 · 灰度 · 健康检查). |
 | **Anti-rework** | No rollback/no canary/unverified NFR means no launch--blocks "launching while sick". |
 | **Example** | `my-app/docs/release-gate.md` (all applicable items pass, `npm audit` 0 vulns), `my-app/docs/trace-matrix.md` (performance NFR item explicitly deferred+trigger), `my-app/ops/runbook.md` (`FEATURE_LOGIN=off` rollback) |
 
@@ -637,7 +640,7 @@ So EOS **never depends on "Rule A overriding Rule B"**. The only reliable contro
 
 ### Step 0: Create project + choose stack (5 minutes)
 ```sh
-npx degit niaodian/eos#eos-2.5.0 todo-api && cd todo-api
+npx degit niaodian/eos#eos-2.6.0 todo-api && cd todo-api
 git init && git add -A && git commit -q -m "chore: scaffold from eos"
 node .github/hooks/validate-config.mjs          # expect PASS
 node .github/eos/eos.mjs init node-service --write   # declare the stack (or python-service, go-service… — `eos init` lists them)
@@ -700,7 +703,7 @@ The gate reads the *machine* result, not a hand-written PASS — and since eos-2
 
 ### Step 0: Create project + create AI directories
 ```sh
-npx degit niaodian/eos#eos-2.5.0 cs-agent && cd cs-agent
+npx degit niaodian/eos#eos-2.6.0 cs-agent && cd cs-agent
 git init && git add -A && git commit -q -m "chore: scaffold from eos"
 mkdir -p ai/prompts evals                       # AI code goes here; Agentic rules overlay automatically
 node .github/hooks/validate-config.mjs          # expect PASS
@@ -885,7 +888,7 @@ eos-architecture agent to design the architecture." Codex finds a custom agent b
 **What is wired, and where**
 
 - `.agents/skills/` — the EOS workflows, read natively.
-- `.agents/hooks.json` — the guardrail before every `run_command`.
+- `.agents/hooks.json` — the guardrail before every `run_command`. Its command finds the repository root with `git rev-parse --show-toplevel`, because Antigravity starts a hook in `.agents/`, not in the project root. In headless mode nobody can approve an MCP call, so a read-only EOS tool (`eos_next`, `eos_status`, `eos_health`, `eos_explain` …) is refused until you allow it for the `eos` server in Antigravity's permission settings — allow the read-only ones only; EOS does not write that list for you.
 - `.agents/mcp_config.json` — the `eos` server.
 - `.agents/agents/eos-*.md` — the six orchestrators, rendered from `.github/agents/`.
 
@@ -1000,6 +1003,8 @@ than gate — a shell prompt, a session-start hook, an `&&` chain — use `statu
 exit `0` instead of `1` or `2` and still `3` when EOS cannot evaluate. The flag never switches on by
 itself, and the `--json` document keeps the real `exitCode`.
 
+Besides the one recommended action, `eos next` says — once each, and only when it applies — **Not activated yet** (`/eos-init` is still pending), **Awaiting a person** (a one-way ADR is still `proposed`), **Start measuring now** (an NFR is stated at a scale: build that dataset into the first story that touches it) and, at the release, **freeze first** and what comes after it (G9 and G10 are needed to leave `RELEASED`, not to ship it). A stale `product` focus no longer pins `next` once the baseline passes, and `verify` evaluates only the stages the baseline has reached.
+
 | Command | Purpose |
 |---|---|
 | `next` | The ONE recommended next action, why, and how to start it (`--why`, `--all`, `--exit-zero`) |
@@ -1008,7 +1013,7 @@ itself, and the `--json` document keeps the real `exitCode`.
 | `check --gate <id> [--scope <id>]` | Run one gate for real and record the evidence |
 | `explain <gate>` | The full rule set for one gate, on demand |
 | `transition --scope <type> --id <id> --to <STATE>` | Move a scope, guarded by recorded evidence |
-| `approve --scope <type> --id <id>` | Record an approval — must be a **different** person from the requester |
+| `approve --scope <type> --id <id>` | Record an approval — must be a **different** person from the requester, unless the project declared `approvalMode: "solo"` and the person adds `--self --reason "<why>"` (recorded as a self-approval; an agent never runs `--self`). Prints the deferred NFR list first and binds the approval to it |
 | `release-status` / `verify-release --release <id>` | Aggregate readiness / candidate-bound verification (G8) |
 | **`product-tree`** | The identity of the tree a verification applies to. `--json` prints the digest a summary your own runner writes must embed |
 | **`evidence junit [<report.xml>…] [--write]`** | Answers every `docs/trace-matrix.md` reference from JUnit XML reports and writes `docs/evidence/test-run.json` — for tests that ran in another CI step. Refuses a report older than any product file (exit 2). Without files it reads `evidence.junit`; the `verified` gate does the same conversion on every run |
@@ -1017,8 +1022,8 @@ itself, and the `--json` document keeps the real `exitCode`.
 | `handoff --scope <type> --id <id>` | Hand the current step to another agent/session |
 | `ledger [--verify] [--against <ref>]` | Verify the append-only hash chain |
 | `focus --scope <type> --id <id>` | Set this machine's local focus (carries no authority) |
-| `init [--write]` | Report or create local, non-destructive integration files |
-| `stage init <stage> [--write] [--interactive]` | The skeleton of a stage's machine record (`docs/<stage>.json`) and its document, generated from the schema: every required field with a `TODO(eos)` placeholder — every gate rejects the record until each is answered, so a skeleton never advances a stage. Samples: [examples/stage-records](examples/stage-records/README.md) (since eos-2.3.0) |
+| `init [<pack>] [--solo] [--write]` | Report or create local, non-destructive integration files; with a pack, declare the project (`--solo`: the Standard track's one-maintainer approval path). It keeps the `language`, platforms and exclusions you already chose, and lists the stories that need an `Eval case` column when you declare `agentic` |
+| `stage init <stage> [--write] [--interactive]` | The skeleton of a stage's machine record (`docs/<stage>.json`) and its document, generated from the schema: every required field with a `TODO(eos)` placeholder — every gate rejects the record until each is answered, so a skeleton never advances a stage. Samples: [examples/stage-records](examples/stage-records/README.md) (since eos-2.3.0) `stage init story --id <ID> [--ac AC1.1,AC1.2] [--write]` writes the story file in the format `story-ready` reads; `stage init design` also writes `docs/EXPERIENCE.md`. |
 | `stack sync [--write]` | Render the always-on workspace rule's `Local commands` from `.eos/project.json`, so the prose cannot disagree with what CI runs. Blocks rather than guessing when no stack is declared |
 | `agents sync [--platform <x>] [--write] [--check]` | Generate what each agent platform reads from one source: skill copies, the EOS MCP entry, the guardrail hook in the platform's dialect, agents where they do not collide. Shared configuration files keep everything that is not EOS's; `--platform` adds a platform to `agentPlatforms`; CI runs `--check` (since eos-2.2.0; platforms since eos-2.3.0, see 7.9) |
 | `mcp` | Serve the read and verify commands to an agent over the Model Context Protocol (stdio): `next`, `status`, `resume`, `health`, `explain`, `check`, `verify`, `release-status`, a stage skeleton, `product-tree`, `doctor`, `policy check`. Approving, waiving, transitions, release signing and everything that rewrites governance files are deliberately not tools ([ADR-018](../adr/018-mcp-server.md)). `eos agents sync` writes each platform's client configuration (since eos-2.3.0) |
@@ -1118,8 +1123,8 @@ echo '{"tool_input":{"command":"ls"}}' | node .github/hooks/deny-dangerous.js
 
 **Local CI (third enforcement layer, requires Docker)**: besides "real-time Hook + configuration static validation", EOS provides repository-wide batch gates run by `act`.
 ```sh
-act push -j verify            # runs .github/workflows/eos-ci.yml: validate-config + eos-doctor + tests + evals
-act push --pull=false --action-offline-mode   # fully offline after images have been pulled once
+act push -W .github/workflows/eos-ci.yml -j verify   # runs .github/workflows/eos-ci.yml: validate-config + eos-doctor + tests + evals
+act push -W .github/workflows/eos-ci.yml --pull=false --action-offline-mode   # fully offline after images have been pulled once
 ```
 > The three enforcement layers divide responsibilities: **Hook (real-time per edit)**=`config-check.json` runs `validate-config.mjs`+`eos-doctor.mjs` after every edit (configuration compliance + G-EVAL wiring), `quality.json` runs quality gates, `guardrails.json` blocks dangerous operations · **static validation (manual/on demand)**=the same two scripts can be run anytime · **act CI (whole-repo batch before merge/release)**=`eos-ci.yml` runs validate-config+eos-doctor+tests+evals. The same gate (such as G-EVAL) is enforced both per-edit and in CI, so issues are found early and cannot slip through.
 
@@ -1257,6 +1262,8 @@ cancels the pull request's earlier run; and once a week on the default branch, w
 the short `plan` job. A branch without a pull request is not built when you push it: open a pull request,
 or add the branch to `on.push.branches` (a release branch, say).
 
+**Which Node, which runner.** Every `setup-node` step in `eos-ci.yml` and `eos-release.yml` reads `.nvmrc` (24), so CI and your developers share one source; `coverage` runs Node 22 and EOS's own matrix runs 22 and 24. Linux jobs run on `ubuntu-24.04`, not the moving `ubuntu-latest`. **The policy check is reported on its own:** a failing `EOS policy integrity` step no longer skips the product quality gate — a separate step reports its verdict, so a policy that still needs its approver cannot hide whether your tests pass, and the other way round. A solo project's `<name> (self)` approver is accepted there. The `plan` job's log prints `self=<true|false>`.
+
 ---
 
 # Chapter 9 Failure localization and troubleshooting
@@ -1318,21 +1325,22 @@ Agent output does not match expectation
 ```sh
 # Method A: degit (public repository — no auth needed)
 # Pin the release tag: the default branch moves, a tag does not.
-npx degit niaodian/eos#eos-2.5.0 my-app
+npx degit niaodian/eos#eos-2.6.0 my-app
 cd my-app && git init
 
 # Method B: git clone at the tag, into a fresh history
-git clone --depth 1 --branch eos-2.5.0 https://github.com/niaodian/eos.git my-app
-cd my-app && git checkout --orphan main && git commit -m "chore: start from eos-2.5.0"
+git clone --depth 1 --branch eos-2.6.0 https://github.com/niaodian/eos.git my-app
+cd my-app && git checkout --orphan main && git commit -m "chore: start from eos-2.6.0"
 
 # Either way, declare the project: the template's own declaration describes EOS, not you
 node .github/eos/eos.mjs init                       # the tracks, the packs, and what is declared
-node .github/eos/eos.mjs init config-only --write   # no code yet — or <pack>, with --track regulated if it applies
+node .github/eos/eos.mjs init config-only --write   # no code yet — or <pack>, with --track regulated if it applies (--solo: one maintainer)
+git add -A && git commit -q -m "chore: declare the project"   # the declaration, with this project's policy lock and SBOM
 ```
 
 ## 10.3 Distribution to a team (purely local, no enterprise dependency)
 
-1. Everyone starts from the **same release tag** (`eos-2.5.0`). The default branch keeps moving, so
+1. Everyone starts from the **same release tag** (`eos-2.6.0`). The default branch keeps moving, so
    an unpinned copy is a slightly different EOS for every person who takes one.
 2. `【Needs org/GitHub settings】` The GitHub **template repository** setting is owner-level: EOS can
    neither apply nor verify it locally, so do not take this page's word for it —
@@ -1366,7 +1374,7 @@ existing repository will go red before it goes green, and each red line names ex
 | **Acceptance criteria must be defined, not mentioned** (EOS-AUD-004) | `prd-ready` reports "referenced but never defined: AC…" | State each criterion as a list item, table row or heading that opens with its id and carries the text. |
 | **Operational tasks need a decision** (EOS-AUD-005) | `story-ready` reports `Telemetry: "SKIP" with no reason` | Use `ADOPT — <task>; owner: <who>; verify: <how>`, `SKIP — <reason>`, or `DEFER — owner: <who>; trigger: <what ends it>`. |
 | **Trace rows need a machine result** (EOS-AUD-006) | `verified` reports "a hand-written PASS … is a claim, not a result" | Emit `docs/evidence/test-run.json` from your runner — see [examples/trace-evidence](examples/trace-evidence/README.md). Since eos-2.2.0, declaring `evidence.junit` replaces that mapping step. |
-| **The release gate checks what the prompt asks for** (EOS-AUD-007) | `release-ready` adds candidate quality, dependency audit, NFR evidence, canary, health/readiness, topology and enforcement authority | Declare `commands.audit`, record `docs/evidence/nfr-summary.json`, and extend `ops/runbook.md`. An offline audit is `DEFERRED`, never green. |
+| **The release gate checks what the prompt asks for** (EOS-AUD-007) | `release-ready` adds candidate quality, dependency audit, NFR evidence, canary, health/readiness, topology and enforcement authority | Declare `commands.audit`, record `docs/evidence/nfr-summary.json`, and extend `ops/runbook.md`. An offline audit is `DEFERRED`, never green — and cannot be promoted. A deferred NFR target can be, on the Standard track, with an owner, a trigger and a future `dueBy` (§10.13). |
 | **RELEASED continues into G9 and G10** (EOS-AUD-010) | After `RELEASED`, `eos next` asks for telemetry rather than another release | Produce `docs/telemetry.json` (`/eos-telemetry-plan`), then `docs/iteration.json` (`eos-review` agent). |
 | **BMAD runtime is verified** (EOS-AUD-002) | `eos-doctor --deep` may report BLOCKED: skills installed, `_bmad/` runtime absent | Install the BMAD project runtime with its own installer, or unmap those skills. EOS itself works without BMAD — see [ADR-003](../adr/003-bmad-runtime-boundary.md). |
 
@@ -1898,6 +1906,32 @@ node /tmp/eos-next/.github/eos/eos.mjs upgrade --from /tmp/eos-next --base /tmp/
 node .github/eos/eos.mjs policy check && node .github/eos/eos.mjs verify --full
 ```
 
+## 10.13 Upgrading from `eos-2.5.x` to `eos-2.6.0`
+
+**This release has breaking changes** (it is a minor version, as 2.2.0 was): Node 20 is gone, a deferral needs a `dueBy` to be promoted, `release-ready` has a new check, and the gate versions change. The policy digest changes with them — nothing in it weakens anything, so `eos policy lock --write` needs no approver — and recorded PASS evidence for `architecture-ready`, `story-ready`, `verified` and `release-ready` reads STALE once: re-run `eos verify --full`.
+
+| What changed | What you will see | What to do |
+|---|---|---|
+| **Node 20 is gone — `engines` is `>=22.10.0`** | The template ships `.nvmrc` (`24`); every `setup-node` step in `eos-ci.yml` and `eos-release.yml` reads it, the cross-platform matrix is Node 22 and 24, and Linux jobs run on `ubuntu-24.04` | Move developers and your own CI to Node 22.10 or later. Keep `.nvmrc`: it is yours, and the Node major changes in that one place. If you edited `eos-ci.yml`, the upgrade parks the new version under `.eos/local/upgrade/` — merge it by hand, and replace any `node-version: '20'` of yours with `node-version-file: '.nvmrc'` |
+| **A deferred NFR can ship — with a date** | `release-ready` stays `DEFERRED` (never PASS). On the Standard track `CANDIDATE → VERIFIED` accepts it when every deferred target has an `owner`, a `trigger` and a `dueBy` in the future; a `dueBy` that has passed makes `nfr-evidence` FAIL. `eos approve` prints the whole deferred list first and binds the approval to it; after `RELEASED`, `status` and `next` keep listing it | Add `dueBy` (`YYYY-MM-DD`) to each `DEFER` in `docs/evidence/nfr-summary.json`. A deferred dependency audit still blocks, and a Regulated or Controlled release is never promoted with a deferral |
+| **The solo path** (`approvalMode`) | `.eos/project.json` accepts `"approvalMode": "solo"` — Standard track only. Then `eos approve --self --reason "<why>"`, `eos policy lock --self` and a waiver approver written `<name> (self)` are accepted and recorded as `assurance: "self"`, and every place that shows the approval says so. Switching to `solo` is itself a WEAKENING that needs an independent approver | Only if you are the one maintainer: `eos init <pack> --solo --write`. An agent never runs `--self` — the guardrail refuses it, and the MCP server exposes no approving tool |
+| **A person confirms the one-way decisions** | `release-ready` has a new check, `one-way-doors-confirmed`: every architecture decision that cites an ADR needs that ADR at `Status: accepted` with `Confirmed by` and `Confirmed at`. G4 still passes with a `proposed` ADR and says so. G4 now also fails when the stack is DECIDED but `.eos/project.json` declares no `stacks`, or the workspace rule's `Local commands` differ from what `stack sync` renders | Read each ADR the architecture cites, set `Status: accepted`, add `Confirmed by: <name>` and `Confirmed at: <date>`, commit it; run `eos stack sync --write` |
+| **CI reports the policy check on its own** | A failing `EOS policy integrity` step no longer skips the product quality gate; a separate step reports its verdict. The `plan` job logs `self=<true or false>` | If you edited `eos-ci.yml`, the upgrade parks the new version: merge it |
+| **The guardrail judges what a command executes** | Heredoc bodies, the quoted arguments of `git commit` or `echo`, comments, and files that are not shell scripts are data, not commands. A credential rule needs one high-entropy token. A download parsed by `node -e` is allowed, and so is `kill $PID`; the refusal names the rule, the text it matched and a fix | Nothing |
+| **`eos next` says more** | Not activated yet · awaiting a person (a `proposed` ADR) · start measuring now (an NFR stated at a scale) · freeze first, and what comes after the release (G9, G10). A stale `product` focus no longer pins `next`, and `verify` no longer records a FAIL for a stage not reached | Nothing |
+| **Smaller changes** | `eos stage init story --id <ID>`, and a design record that also writes `docs/EXPERIENCE.md`; `init` keeps the `language` and platforms you chose and lists the stories lacking an `Eval case` when you declare `agentic`; `productTree.exclude` keeps a record such as `docs/pilot-log.md` out of the product tree (adding one is a policy REVIEW); a trace-matrix test name is read to the end of its cell; a failing run names its first failing test; a Chinese runbook passes for `language: zh`; `operability` is an NFR category; the eval-starter cassette field is `requestSha256`; `check-doc-parity` names both files | If gitleaks flags a cassette, rename `key` to `requestSha256` in it (the old name is still read) |
+
+**Upgrade steps**
+
+```sh
+npx degit niaodian/eos#eos-2.5.0 /tmp/eos-base    # the version you are on — see docs/eos/VERSION
+npx degit niaodian/eos#eos-2.6.0 /tmp/eos-next
+node /tmp/eos-next/.github/eos/eos.mjs upgrade --from /tmp/eos-next --base /tmp/eos-base          # review the plan
+node /tmp/eos-next/.github/eos/eos.mjs upgrade --from /tmp/eos-next --base /tmp/eos-base --write  # apply it, and regenerate the agent-platform files
+node .github/eos/eos.mjs policy lock --write      # the gate versions changed; nothing in it needs an approver
+node .github/eos/eos.mjs policy check && node .github/eos/eos.mjs verify --full
+```
+
 ---
 
 # Chapter 11 Adding a technology stack
@@ -1972,9 +2006,11 @@ EOS stack rules are **pluggable**. Adding a stack = add one `*.instructions.md` 
 
 ```
 # ── Terminal — the loop (this is all you need day to day) ──
-npx degit niaodian/eos#eos-2.5.0 my-app   # create new project
+npx degit niaodian/eos#eos-2.6.0 my-app   # create new project
 node .github/eos/eos.mjs init                       # what is declared, the two tracks, the starter packs
 node .github/eos/eos.mjs init <pack> --write        # declare it (config-only until the stack is decided; --track regulated)
+node .github/eos/eos.mjs init <pack> --solo --write  # one maintainer: the Standard track's labelled self-approval path
+node .github/eos/eos.mjs stage init story --id <ID> --write  # a story file in the format story-ready reads
 node .github/eos/eos.mjs init --write               # local VS Code tasks (never overwrites)
 node .github/eos/eos.mjs next                       # the ONE next action, why, how to start it
 node .github/eos/eos.mjs resume                     # new session? pick up where you stopped
@@ -2041,7 +2077,7 @@ A real dry-run that passed end to end (feature: user login), **12/12 gates passe
 
 **Reproduce** (terminal):
 ```sh
-npx degit niaodian/eos#eos-2.5.0 my-app && cd my-app
+npx degit niaodian/eos#eos-2.6.0 my-app && cd my-app
 node .github/hooks/validate-config.mjs        # PASS
 npm test                                      # 10/10 green
 echo '{"tool_input":{"command":"rm -rf /tmp/x"}}' | node .github/hooks/deny-dangerous.js  # deny
@@ -2082,6 +2118,10 @@ gh api repos/<owner>/<repo>/branches/main/protection   # classic protection only
 
 > Because the legacy `/protection` endpoint 404s for a ruleset, never read that 404 as "unprotected" -- check the ruleset endpoint first. Personal namespace repositories have **no** such protection by default.
 
+**On a private repository, prove it by behaviour.** A ruleset can be saved, show "Active" and still enforce nothing. Open a throwaway pull request that makes `verify` fail and look at the merge button: if it is enabled, or `verify` is not listed as required, the protection is not in force. Delete the branch afterwards.
+
+**One maintainer?** Branch protection and Code Owners review need someone else who can merge; on a private Free repository waive the item with a reason. Everything else EOS asks a second person for has the solo path (`approvalMode: "solo"`, §10.13): a labelled self-approval you type yourself, never an agent.
+
 ## D.2 Enable CODEOWNERS governance protection
 
 The template provides `.github/CODEOWNERS` with the repo (covering `instructions/ agents/ hooks/ workflows/ prompts/` and `docs/eos/`, security/compliance checklists). **After instantiation**, replace all `@niaodian` entries with your team handle (teams recommended over individuals, e.g., `@your-org/platform-team`). Together with D.1 "Require review from Code Owners", this prevents agents or anyone with write access from **modifying governance files without review** (answering audit E1/H5: agent `editFiles` self-modifying rules).
@@ -2109,7 +2149,26 @@ The following are **intentional design trade-offs** in EOS (inherent costs of lo
 | `gitleaks` deep scan is an **optional enhancement locally**; if absent it degrades to the built-in rules | Running only zero-dependency built-in regexes is weaker than full gitleaks rules | Built-in `secret-scan.mjs` always runs as a CI hard gate (baseline). Since eos-2.3.0 EOS CI installs a pinned, checksum-verified `gitleaks` and sets `EOS_REQUIRE_GITLEAKS=1`, so there a missing gitleaks fails instead of degrading |
 | **Windows**: core hooks are Node (cross-platform); early `quality.json` once used `sh -c` (round-2 N1 changed it to `node .github/hooks/quality.mjs`, native Windows no longer needs WSL/Git-Bash) | Directory fallback traversal without `git` once showed absolute paths on Windows (normalized with `path.relative`); availability of external tools such as `bmad-*` and `act` (requires Docker Desktop) still varies by platform | Three core hooks + `quality.mjs` are implemented cross-platform; **authoritative quality gate is in CI (`ubuntu-latest`)**, independent of local OS |
 
-**Requires organization decision (template does not decide, `【Needs org standard】`)**: CI runner standard (currently `ubuntu-latest`), approved secret store, namespace/repository ownership, model pin/registration strategy, artifact integrity (SBOM/signing/SLSA). These are not violations; they are organization-standard questions.
+**Requires organization decision (template does not decide, `【Needs org standard】`)**: CI runner standard (currently `ubuntu-24.04`), approved secret store, namespace/repository ownership, model pin/registration strategy, artifact integrity (SBOM/signing/SLSA). These are not violations; they are organization-standard questions.
+
+---
+
+# Appendix E Platform smoke checklist (by hand)
+
+EOS cannot log in to your agent, and its automated tests spawn the hook commands it generates but never drive a real agent. So when you set a platform up, or after an upgrade, run this once **yourself**, in an agent where you are logged in. A model does not run this checklist — its answer would be the thing under test.
+
+For each platform: open the project folder, start a fresh session and ask one question — **"What should I do next?"**
+
+| Platform | How to start it | What you should see |
+|---|---|---|
+| VS Code + GitHub Copilot Chat | Chat → the **eos-guide** agent, or `/eos-next` | a call to the `eos_next` tool (or to `node .github/eos/eos.mjs next`) and one recommended action with its reason |
+| Claude Code | `claude` in the project folder, then `/eos-next` | the same card; the first shell command runs without a hook error |
+| OpenAI Codex | `codex` in a trusted project folder, then `$eos-next` | the card; the guardrail hook asks for approval once (`/hooks`) |
+| Cursor | the Agent chat: "What should I do next?" | an `eos_next` MCP call (Cursor asks per call), and the shell guardrail |
+| Google Antigravity | the IDE, or `agy` in the project folder, then `/eos-next` | the card; a shell command is **not** refused by the guardrail (it runs from `.agents/`); in headless mode the read-only EOS tools must be allowed (§6.6.3) |
+| Gemini CLI | `gemini` in the project folder: "What should I do next?" | an `eos_next` MCP call |
+
+If a platform prints `MODULE_NOT_FOUND` or a hook error, run `node .github/eos/eos.mjs agents sync --check` and then `node .github/eos/eos.mjs agents sync --write`. If it shows no EOS call at all, the platform's own MCP or hook settings are the place to look (§6.6.5).
 
 ---
 
