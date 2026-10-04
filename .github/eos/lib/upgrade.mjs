@@ -29,6 +29,7 @@ export const PROJECT_OWNED = [
   /^(src|api|ops)\//,
   /^(README(\.zh)?\.md|LICENSE|CONTRIBUTING\.md|CODE_OF_CONDUCT\.md|SECURITY\.md|package(-lock)?\.json)$/,
   /^\.github\/CODEOWNERS$/,
+  /^\.nvmrc$/, // the Node major a project's CI and its developers share (eos-2.6.0)
 ];
 const SKIP_DIRS = new Set(['.git', 'node_modules']);
 export const PARK_DIR = '.eos/local/upgrade';

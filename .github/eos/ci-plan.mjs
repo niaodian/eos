@@ -16,11 +16,12 @@
 // read from the declaration by this script, never from a repository name in the workflow, so a team
 // that maintains its own distribution of EOS keeps EOS's tests. (ADR-021)
 //
-// Where EOS's own matrix runs (2.5.0). A pull request runs each platform once, on Node 24 — Linux also
-// runs `verify` on 20 and `coverage` on 22, so every supported runtime still runs on every change. The
-// default branch, tags, the weekly schedule and a manual run take the full matrix: every runtime the
-// README claims, on every platform. A pull request that only changes documentation skips the matrix;
-// `verify` still runs everything on Linux.
+// Where EOS's own matrix runs (2.5.0, runtimes 2.6.0). The supported Node majors are 22 and 24 (`engines`
+// is >=22.10.0). A pull request runs each platform once, on Node 24 — Linux also runs `coverage` on 22,
+// so both supported runtimes still run on every change. The default branch, tags, the weekly schedule and
+// a manual run take the full matrix: both runtimes, on every platform. `verify` runs on the Node major in
+// `.nvmrc`. A pull request that only changes documentation skips the matrix; `verify` still runs
+// everything on Linux. Node 26 becomes an LTS on 2026-10-28 and joins the matrix then, not before.
 //
 //   node .github/eos/ci-plan.mjs >> "$GITHUB_OUTPUT"      env: EOS_EVENT (github.event_name)
 import { spawnSync } from 'node:child_process';
@@ -29,19 +30,20 @@ import { loadProjectConfig } from '../hooks/lib/project-config.mjs';
 
 /** A pull request: Node 24, the current LTS, once on each platform. */
 export const LEAN_MATRIX = [
-  { os: 'ubuntu-latest', node: '24' },
+  { os: 'ubuntu-24.04', node: '24' },
   { os: 'windows-latest', node: '24' },
   { os: 'macos-latest', node: '24' },
 ];
 
 /**
- * The default branch, tags, the weekly schedule, a manual run: every runtime the README claims, on
- * every platform. Node 20 is end of life (2026-04-30) but stays while it is the declared minimum
- * (`engines`). Linux runs 20 in `verify` and 22 in `coverage`, so it joins here for 24 only.
+ * The default branch, tags, the weekly schedule, a manual run: both supported runtimes on every
+ * platform. Linux runs 24 in `verify` (the `.nvmrc` major) and 22 in `coverage`, so it joins here for 24
+ * only. The Linux image is pinned: `ubuntu-latest` moves to a new release on GitHub's schedule, and a
+ * moving runner is a change nobody reviewed.
  */
 export const FULL_MATRIX = [
-  ...['windows-latest', 'macos-latest'].flatMap((os) => ['20', '22', '24'].map((node) => ({ os, node }))),
-  { os: 'ubuntu-latest', node: '24' },
+  ...['windows-latest', 'macos-latest'].flatMap((os) => ['22', '24'].map((node) => ({ os, node }))),
+  { os: 'ubuntu-24.04', node: '24' },
 ];
 
 /**
@@ -86,7 +88,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   if (plan.self !== 'true') {
     process.stderr.write('EOS CI plan: a project\'s own declaration — the governance checks and its declared commands run; EOS\'s own test suites do not (they test EOS, not this project).\n');
   } else {
-    const cells = JSON.parse(plan.matrix).include.map((c) => `${c.os.replace('-latest', '')}/${c.node}`).join(', ');
+    const cells = JSON.parse(plan.matrix).include.map((c) => `${c.os.replace(/-latest$/, '')}/${c.node}`).join(', ');
     process.stderr.write(`EOS CI plan: .eos/project.json is the EOS template's own declaration — EOS's own test suites run.\n  cross-platform: ${plan.cross_platform === 'true' ? cells : `skipped — the pull request changes documentation only (${changedFiles.length} file(s))`}\n`);
   }
 }

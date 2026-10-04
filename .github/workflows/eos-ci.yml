@@ -1,13 +1,14 @@
 name: EOS CI
 # Local-first CI. Runnable with `act` (nektos/act) — no cloud runner required:
-#   act push            # run the whole workflow locally in Docker
-#   act -j verify       # run just the verify job
-#   act -l              # list jobs (fast, no Docker execution)
+#   act push -W .github/workflows/eos-ci.yml            # run the whole workflow locally in Docker
+#   act -W .github/workflows/eos-ci.yml -j verify       # run just the verify job
+#   act -W .github/workflows/eos-ci.yml -l              # list jobs (fast, no Docker execution)
+# (-W names this file: act cannot load .github/workflows/eos-release.yml, so a bare `act push` stops there.)
 #
 # PREREQUISITE: Docker must be running. FIRST RUN needs network ONCE to pull a runner
 # image (~500MB) + the actions (checkout, setup-node); they are cached under ~/.cache/act
 # and ~/Library/Containers/com.docker.*, so EVERY LATER RUN is fully offline:
-#   act push --pull=false --action-offline-mode
+#   act push -W .github/workflows/eos-ci.yml --pull=false --action-offline-mode
 # No Docker? Skip CI and run the same checks directly (see docs/eos/quickstart.md Prerequisites):
 #   node .github/hooks/validate-config.mjs && node .github/hooks/check-doc-parity.mjs \
 #     && node .github/hooks/eos-doctor.mjs && node .github/hooks/project-gate.mjs
@@ -26,7 +27,10 @@ name: EOS CI
 # NON-NODE STACKS: the product-quality step below runs whatever `.eos/project.json` declares, so a
 # Python/Go/Java/Rust/.NET project's tests DO run and DO fail CI. Add your toolchain's setup step
 # (actions/setup-python, setup-go, setup-java, dtolnay/rust-toolchain, setup-dotnet…) before it —
-# a missing toolchain is reported as BLOCKED and fails, it is never silently skipped.
+# a missing toolchain is reported as BLOCKED and fails, it is never silently skipped. Keep `.nvmrc`
+# (Node 24, shipped with the template) even when the product is not a Node project: every setup-node step
+# below reads it, because EOS's own tools are Node programs and it is the one file that says which Node
+# runs them, for CI and for the people who work on the project alike.
 #
 # SUPPLY CHAIN (EOS-AUD-009): every action is pinned to an immutable commit SHA with the
 # human-readable version in a trailing comment. A tag is a moving pointer its owner can repoint at
@@ -69,7 +73,7 @@ jobs:
     # Not on the weekly schedule: that run exists for EOS's full matrix, and a project's governance
     # gate has already run on every change that reached its default branch.
     if: github.event_name != 'schedule'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
       contents: read
@@ -88,9 +92,10 @@ jobs:
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          # The declared minimum (`engines`), end of life since 2026-04-30: the gate proves the floor
-          # still works, and the ci-linux timing baseline is recorded on it. 22 and 24 run below.
-          node-version: '20'
+          # The Node major in .nvmrc — one file for CI and for the people who work on the project, so
+          # the two cannot drift. 22 (the floor in `engines`) runs in `coverage`, both runtimes run in
+          # the cross-platform matrix, and the ci-linux timing baseline is recorded on this one.
+          node-version-file: '.nvmrc'
 
       - name: EOS itself, or a project that copied it? (decides whether EOS's own tests run)
         id: scope
@@ -229,6 +234,12 @@ jobs:
           GITHUB_EVENT_BEFORE: ${{ github.event.before }}
 
       - name: EOS policy integrity (no gate gets weaker without a second person)
+        id: policy
+        # Reported on its own, below: a policy that still needs its approver must not hide whether the
+        # product's own tests pass, and the other way round. Before 2.6.0 this step failing skipped the
+        # product quality gate, so the first declaration — which needs a second person's signature —
+        # turned CI red without a single lint, typecheck or test of the project having run.
+        continue-on-error: true
         # One edit to .eos/workflow.json can switch a gate off for a whole kind of work, and
         # re-running under the weaker rule then passes. This compares the policy with what the change
         # merges into: every weakening must be recorded in .eos/policy.lock.json with a reason and an
@@ -265,6 +276,12 @@ jobs:
         # vacuous green this gate exists to refuse. In a project, this is the step that runs its tests.
         run: node .github/hooks/project-gate.mjs
 
+      - name: EOS policy integrity verdict (reported apart from the product quality gate)
+        if: always() && steps.policy.outcome == 'failure'
+        run: |
+          echo "::error::EOS policy integrity FAILED: the policy changed in a way that still needs a reason and an approver (see the 'EOS policy integrity' step). The product quality gate ran on its own and is reported above. A solo project (approvalMode \"solo\") may record the approver as '<name> (self)'; every other change needs a second person."
+          exit 1
+
       - name: EOS gate summary (published to the PR / run summary)
         # Always runs, even when a step above failed, so the summary explains WHY the run is red
         # and what the single next action is — instead of "see the logs".
@@ -289,7 +306,7 @@ jobs:
   # `verify` does not depend on this job: it asks the same script in its own step (see there).
   # ---------------------------------------------------------------------------------------------
   plan:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
       contents: read
@@ -306,11 +323,13 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: '20'
+          node-version-file: '.nvmrc'
       - id: plan
         env:
           EOS_EVENT: ${{ github.event_name }}
-        run: node .github/eos/ci-plan.mjs >> "$GITHUB_OUTPUT"
+        # `tee`: the same key=value lines go to the outputs and to the log, so a run that skipped EOS's
+        # own tests says in its log why — `self=false` — instead of only in a job that did not start.
+        run: node .github/eos/ci-plan.mjs | tee -a "$GITHUB_OUTPUT"
 
   # ---------------------------------------------------------------------------------------------
   # CROSS-PLATFORM. EOS is a path-handling program — product-tree digests, porcelain parsing, the
@@ -414,7 +433,7 @@ jobs:
   coverage:
     needs: plan
     if: needs.plan.outputs.self == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
       contents: read
@@ -437,7 +456,7 @@ jobs:
   release-candidate:
     if: startsWith(github.ref, 'refs/tags/')
     needs: verify
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
       contents: read
@@ -449,7 +468,7 @@ jobs:
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: '20'
+          node-version-file: '.nvmrc'
 
       - name: Candidate product-tree identity
         run: node .github/eos/eos.mjs product-tree
