@@ -63,11 +63,13 @@ export function previewLines(preview, { compact = false } = {}) {
   const missing = preview.items.filter((i) => !i.ready);
   if (compact) {
     return missing.length
-      ? ['', `Ahead at release (${preview.code})`, `  not ready yet: ${missing.map((i) => i.what).join(' · ')}`, `  ${CLI} status lists what each one needs`]
+      ? ['', `Ahead at release (${preview.code})`, `  not ready yet: ${missing.map((i) => i.what).join(' · ')}`,
+        '  after the release — not needed to ship it: G9 telemetry-ready (leaving RELEASED) and G10 iteration-ready (closing the loop)',
+        `  ${CLI} status lists what each one needs`]
       : [];
   }
   const out = [`Release gate ahead (${preview.code})`];
   for (const i of preview.items) out.push(`  ${i.ready ? '✓' : '·'} ${i.what}`, `      ${i.detail}`);
-  out.push('');
+  out.push('  After the release (not needed to ship it): G9 telemetry-ready to leave RELEASED, G10 iteration-ready to close the loop', '');
   return out;
 }

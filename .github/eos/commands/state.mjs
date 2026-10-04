@@ -20,6 +20,7 @@ import { trackSummary } from '../lib/track.mjs';
 import { policyDrift } from '../lib/policy.mjs';
 import { releasePreview, previewLines } from '../lib/release-preview.mjs';
 import { acceptedDeferrals } from '../lib/deferrals.mjs';
+import { nextNotes } from '../lib/next-notes.mjs';
 import { EXIT, emit } from './shared.mjs';
 
 const CLI = 'node .github/eos/eos.mjs';
@@ -160,7 +161,9 @@ export const stateCommands = {
     const preview = decision.current?.scopeType === 'release' || snapshot.project?.projectType === 'config-only' ? null : releasePreview(snapshot);
     const ahead = preview && preview.items.some((i) => !i.ready) ? preview : null;
     if (ahead) decision.releasePreview = ahead;
-    const extra = [...previewLines(ahead, { compact: true }), ...crossBranchLines(cross), ...policyDriftLines(drift)];
+    const notes = nextNotes(snapshot, decision);
+    Object.assign(decision, notes.json);
+    const extra = [...previewLines(ahead, { compact: true }), ...crossBranchLines(cross), ...policyDriftLines(drift), ...notes.lines];
     emit(flags, decision, renderCard(decision, { why: !!flags.why, all: !!flags.all }) + (extra.length ? `\n${extra.join('\n')}` : ''));
     return cardExit(flags, decision.exitCode);
   },

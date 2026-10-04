@@ -10,6 +10,7 @@ import { evaluateGate, isBlocking } from './gates.mjs';
 import { deriveProductState, classificationBlock } from './transitions.mjs';
 import { scopeState, changeTypeOf, gatePolicy, ARTIFACTS } from './state.mjs';
 import { trackSummary } from './track.mjs';
+import { deferralPromotion, acceptedDeferrals } from './deferrals.mjs';
 
 const CLI = 'node .github/eos/eos.mjs';
 
@@ -310,11 +311,14 @@ export function route(snapshot, { now = new Date() } = {}) {
       if (isBlocking(g.status)) {
         const driver = drivingCheck(g);
         const repair = repairFor(g, driver, stage.repair, `${CLI} check --gate ${stage.gate} --scope ${scope.id}`);
+        // What this release shipped DEFERRED is collected here, at RELEASED → OBSERVED: say what and by when.
+        const accepted = ['RELEASED', 'OBSERVED'].includes(releaseState) ? acceptedDeferrals(snapshot, scope.id) : null;
+        const owed = (accepted?.deferred || []).map((d) => `measure the deferred NFR target ${d.id} (owner ${d.owner}, due by ${d.dueBy}) — trigger: ${d.trigger}`);
         take(action(snapshot, repair.id, {
           reason: driver?.detail || stage.reason,
           targetGate: stage.gate,
           command: repair.command,
-          doneWhen: stage.doneWhen,
+          doneWhen: [...stage.doneWhen, ...owed],
         }));
         blockers.push(...blockersOf(g));
         exitCode = 2;
@@ -365,19 +369,25 @@ export function route(snapshot, { now = new Date() } = {}) {
       return finish();
     }
     const g = gate('release-ready', 'release', scope.id);
-    if (isBlocking(g.status)) {
+    // DEFERRED is promotable only on the bounded terms of lib/deferrals.mjs; say which side of that this is.
+    const deferred = g.status === 'DEFERRED' ? deferralPromotion(snapshot, g) : null;
+    if (isBlocking(g.status) && !deferred?.ok) {
       const driver = drivingCheck(g);
       const repair = repairFor(g, driver, 'repair-release', `${CLI} check --gate release-ready --scope ${scope.id}`);
       take(action(snapshot, repair.id, {
-        reason: driver?.detail || 'the release is not ready',
+        reason: `${driver?.detail || 'the release is not ready'}${deferred ? ` — DEFERRED cannot be promoted yet: ${deferred.reason}` : ''}`,
         targetGate: 'release-ready',
         command: repair.command,
-        doneWhen: ['`eos check --gate release-ready` passes', 'every required story was verified against THIS candidate tree'],
+        doneWhen: [
+          'FREEZE FIRST: merge every fix and finish every edit under docs/ and src/ before verifying — each later change makes the release evidence STALE and every story must be verified again',
+          '`eos check --gate release-ready` passes (or is DEFERRED on a Standard-track release whose deferred NFR targets each have an owner, a trigger and a future dueBy)',
+          'every required story was verified against THIS candidate tree',
+        ],
       }));
       blockers.push(...blockersOf(g));
     } else {
       take(action(snapshot, 'prepare-release', {
-        reason: `release-ready is ${g.status} for ${scope.id}; record the candidate and its approval.`,
+        reason: `release-ready is ${g.status} for ${scope.id}${deferred ? ' — DEFERRED, accepted at approval: the approver sees the full list of deferred NFR targets and the approval is bound to it' : ''}; record the candidate and its approval.`,
         targetGate: 'release-ready',
         command: `${CLI} verify-release --release ${scope.id}`,
         doneWhen: ['release evidence is bound to the candidate commit', 'an approver other than the requester has recorded the approval'],
@@ -403,11 +413,13 @@ export function route(snapshot, { now = new Date() } = {}) {
       if (!isBlocking(g.status)) continue;
       const driver = drivingCheck(g);
       const repair = repairFor(g, driver, CHECK_ACTION[driver?.id] || stage.fallback, `${CLI} check --gate ${stage.gate}`);
+      // A decided stack that no declaration carries: declaring it is the mandatory next step, not an option.
+      const stackUndeclared = driver?.id === 'stack-landed-in-workspace-rule' && !snapshot.project?.stacks?.length;
       take(action(snapshot, repair.id === 'refresh-stale-evidence' ? repair.id : (CHECK_ACTION[driver?.id] || stage.id), {
-        reason: driver?.detail || `${stage.gate} is ${g.status}`,
+        reason: stackUndeclared ? `DECLARE THE TECH STACK: ${driver.detail}` : driver?.detail || `${stage.gate} is ${g.status}`,
         targetGate: stage.gate,
-        command: repair.command,
-        doneWhen: stage.doneWhen,
+        command: stackUndeclared ? `${CLI} init <pack> --write` : driver?.id === 'stack-landed-in-workspace-rule' ? `${CLI} stack sync --write` : repair.command,
+        doneWhen: stackUndeclared ? ['.eos/project.json declares the stack (`eos init <pack> --write`; `eos init` lists the packs)', `\`${CLI} stack sync --write\` has rendered the always-on rule`, ...stage.doneWhen] : stage.doneWhen,
       }));
       blockers.push(...blockersOf(g));
       exitCode = 2;
