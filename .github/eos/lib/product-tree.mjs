@@ -314,3 +314,9 @@ export function uncommittedProductChanges(root) {
   if (paths === null) return null;
   return [...new Set(paths.filter((p) => !isSelfReference(p) && !isExcluded(root, p)))].sort();
 }
+
+/** Product files git does not track yet (and does not ignore): they count toward the tree identity all the same. */
+export function untrackedProductFiles(root) {
+  const untracked = zsplit(git(root, ['ls-files', '--others', '--exclude-standard', '-z']));
+  return (untracked || []).filter((p) => !isSelfReference(p) && !isExcluded(root, p)).sort();
+}

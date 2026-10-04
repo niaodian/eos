@@ -22,7 +22,7 @@ import {
   emptyDocReason, readEvidence, evidenceFreshness,
   bmadReadiness, deprecatedMappings, skillRoots,
   resolveProjectRoot, foreignProjectReferences, RESOLUTION_ORDER,
-  producerTrust, parseTraceMatrix,
+  producerTrust, parseTraceMatrix, firstFailingTest,
   prdAcceptanceCriteria, parseOpsDecision, opsDecisionProblem,
   verifiedStory, mergeRefused,
 } from './audit-support.mjs';
@@ -155,6 +155,36 @@ test('eos-2.6.0: a path the project declares as not product (productTree.exclude
   write(other, 'src/a.js', 'changed\n');
   clearProductTreeCache();
   assert.notEqual(computeProductTree(other).identity.digest, sourceBefore, 'everything else still counts');
+});
+
+test('eos-2.6.0 (pilot record 28): a test name is read to the end of its cell, whatever punctuation it holds', () => {
+  const rows = parseTraceMatrix([
+    '| AC | Test | Result |', '| --- | --- | --- |',
+    "| AC1.1 | tests/a.test.mjs::it's fine (really) | PASS |",
+    '| AC1.2 | tests/a.test.mjs::says "hello" and leaves | PASS |',
+    '| AC1.3 | `tests/a.test.mjs::handles [x] and (y)` | PASS |',
+    '| AC1.4 | (tests/a.test.mjs::valid password) | PASS |',
+    '| AC1.5 | tests/a.test.mjs::first case, tests/b.test.mjs::second case | PASS |',
+    '| AC1.6 | tests/a.test.mjs::`quoted name` | PASS |',
+    '| AC1.7 | tests/c.test.mjs | PASS |',
+  ].join('\n'));
+  const refs = (id) => rows.get(id).testColumnRefs;
+  assert.deepEqual(refs('AC1.1'), ["tests/a.test.mjs::it's fine (really)"]);
+  assert.deepEqual(refs('AC1.2'), ['tests/a.test.mjs::says "hello" and leaves']);
+  assert.deepEqual(refs('AC1.3'), ['tests/a.test.mjs::handles [x] and (y)']);
+  assert.deepEqual(refs('AC1.4'), ['tests/a.test.mjs::valid password']);
+  assert.deepEqual(refs('AC1.5'), ['tests/a.test.mjs::first case', 'tests/b.test.mjs::second case']);
+  assert.deepEqual(refs('AC1.6'), ['tests/a.test.mjs::quoted name']);
+  assert.deepEqual(refs('AC1.7'), ['tests/c.test.mjs']);
+});
+
+test('eos-2.6.0: the first failing test is named from the runner\'s output', () => {
+  assert.equal(firstFailingTest('✔ ok (1ms)\n✖ rejects a bad token (3.2ms)\n'), 'rejects a bad token');
+  assert.equal(firstFailingTest('ok 1 - a\nnot ok 2 - clears the session\n'), 'clears the session');
+  assert.equal(firstFailingTest('FAILED tests/test_auth.py::test_login - assert 1 == 2'), 'tests/test_auth.py::test_login');
+  assert.equal(firstFailingTest('--- FAIL: TestLogin (0.00s)'), 'TestLogin');
+  assert.equal(firstFailingTest('test auth::login ... FAILED'), 'auth::login');
+  assert.equal(firstFailingTest('all green'), null);
 });
 
 test('EOS-AUD-001: release-ready re-runs the quality commands on the CANDIDATE, not on story state', () => {

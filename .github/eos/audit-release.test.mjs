@@ -125,6 +125,32 @@ test('eos-2.6.0 (D3): a one-way decision no person confirmed passes G4 with a no
   assert.match(JSON.stringify(g4.json.checks), /still \\"proposed\\"/);
 });
 
+test('eos-2.6.0: a Chinese runbook passes for a project that declares language zh, and only for it', () => {
+  const runbook = ['# 运行手册', '', '## 回滚', '关闭 login_v2 开关，再回滚到上一个镜像。', '', '## 灰度发布', '先放量 5%，观察 24 小时。', '', '## 健康检查', 'GET /health 与 GET /ready。', ''].join('\n');
+  const opsCheck = (project) => {
+    const dir = verifiedStory(releaseFiles({ 'ops/runbook.md': runbook, '.eos/project.json': { ...APP_PROJECT, ...project, commands: { test: 'node --version', audit: 'node --version' } } }));
+    return runJson(dir, ['release-status', '--release', 'v1.0.0']).json.checks.find((c) => c.id === 'ops-artifacts');
+  };
+  assert.equal(opsCheck({ language: 'zh-CN' }).status, 'PASS');
+  const english = opsCheck({ language: 'en' });
+  assert.equal(english.status, 'FAIL', 'the Chinese terms are recognised only where the project declared Chinese');
+});
+
+test('eos-2.6.0: the tests that could not run and the tests that failed are named apart, and the failing test is named', () => {
+  const failing = [
+    'process.stdout.write("✔ passes (1ms)\\n✖ rejects a bad token (3.2ms)\\n");',
+    'process.exit(1);', ''].join('\n');
+  const dir = project(storyFiles({
+    'tests/fail.mjs': failing,
+    '.eos/project.json': { ...APP_PROJECT, commands: { test: 'node tests/fail.mjs' } },
+  }), { withHooks: true });
+  let r = runJson(dir, ['check', '--gate', 'verified', '--scope', 'STORY-001']);
+  assert.match(JSON.stringify(r.json.checks.find((c) => c.id === 'tests-executed')), /the tests ran and FAILED \(exit 1\) — first failing test: rejects a bad token/);
+  write(dir, '.eos/project.json', { ...APP_PROJECT, commands: { test: 'definitely-not-a-real-binary run' } });
+  r = runJson(dir, ['check', '--gate', 'verified', '--scope', 'STORY-001']);
+  assert.match(JSON.stringify(r.json.checks.find((c) => c.id === 'tests-executed')), /the tests could not run — no toolchain/);
+});
+
 test('eos-2.6.0: a deferred NFR carries a dueBy; one that is overdue is a FAIL, not a longer wait', () => {
   const dir = verifiedStory(releaseFiles({ 'docs/evidence/nfr-summary.json': undefined }));
   const nfrDigest = treeDigest(dir);

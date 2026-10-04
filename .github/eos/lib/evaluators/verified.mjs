@@ -7,12 +7,12 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { gatePolicy, gateInputs, gateCollections, ARTIFACTS } from '../state.mjs';
 import { readEvidence, evidenceFreshness } from '../evidence.mjs';
-import { currentProductTree } from '../product-tree.mjs';
+import { currentProductTree, untrackedProductFiles } from '../product-tree.mjs';
 import { readSummary, summaryTreeMismatch, SUMMARY_PATHS } from '../machine-summary.mjs';
 import { beginCapture, finishCapture } from '../test-evidence.mjs';
 import { nameOnlyOwnership } from '../test-source.mjs';
 import {
-  parseTraceMatrix, ok, fail, blocked, na, runProjectGate, refMatches, selectorPresent,
+  parseTraceMatrix, ok, fail, blocked, na, runProjectGate, refMatches, selectorPresent, firstFailingTest,
   thresholdMet, repoFileExists, evidenceIntegrity,
 } from '../gate-primitives.mjs';
 
@@ -29,11 +29,17 @@ export const evaluators = {
     const r = runProjectGate(ctx);
     if (r.command) ctx.commands.push(r.command);
     if (capture) ctx.junit = finishCapture(ctx.root, capture, { project: p, gateRun: r });
-    if (r.status === 'PASS') return ok('the declared quality commands ran and passed');
+    if (r.status === 'PASS') {
+      const untracked = untrackedProductFiles(ctx.root);
+      return ok(`the declared quality commands ran and passed${untracked.length ? ` — NOTE: ${untracked.length} product file(s) are untracked (${untracked.slice(0, 3).join(', ')}${untracked.length > 3 ? ', …' : ''}); \`git add\` them before verifying, because staging them later changes the tree identity and makes this evidence STALE` : ''}`);
+    }
     if (r.status === 'ERROR') return { status: 'ERROR', detail: r.detail };
-    if (r.status === 'BLOCKED') return blocked(`the product-quality gate is BLOCKED: ${r.detail}`);
+    // Two different problems with two different names: the tests could not RUN (no toolchain: install it)
+    // and the tests RAN and failed (fix the test or the code, starting from the one named here).
+    if (r.status === 'BLOCKED') return blocked(`the tests could not run — no toolchain: ${r.detail}`);
     if (r.status === 'NOT_APPLICABLE') return blocked('the product-quality gate executed no quality command, so nothing about the product was verified');
-    return fail(`the product-quality gate failed (exit ${r.exitCode}): ${r.detail}`);
+    const first = firstFailingTest(r.out);
+    return fail(`the tests ran and FAILED (exit ${r.exitCode})${first ? ` — first failing test: ${first}` : ' — the output names no failing test; re-run the command to read it'}: ${r.detail}`);
   },
   traceComplete(ctx) {
     if (!ctx.story) return blocked('no story file');

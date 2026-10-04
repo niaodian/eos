@@ -20,6 +20,7 @@ export { bmadReadiness, deprecatedMappings, skillRoots } from '../hooks/lib/bmad
 export { resolveProjectRoot, foreignProjectReferences, RESOLUTION_ORDER } from './lib/project-context.mjs';
 export { producerTrust } from './lib/machine-summary.mjs';
 export { parseTraceMatrix } from './lib/gates.mjs';
+export { firstFailingTest } from './lib/gate-primitives.mjs';
 export { prdAcceptanceCriteria, parseOpsDecision, opsDecisionProblem } from './lib/story.mjs';
 
 import assert from 'node:assert/strict';

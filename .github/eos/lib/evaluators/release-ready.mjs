@@ -182,10 +182,14 @@ export const evaluators = {
     const text = readFileSync(join(ctx.root, runbook), 'utf8');
     // The release prompt asks a human for rollback, gradual rollout and health/readiness. If the
     // machine gate only looks for "rollback", the other two are advisory theatre. (EOS-AUD-007)
+    // The words are English; a project that declares language "zh" writes its runbook in Chinese, so the
+    // same three topics are recognised by their Chinese terms too (eos-2.6.0).
+    const zh = /^zh\b/i.test(ctx.snapshot.project?.language || '');
+    const either = (en, cjk) => (zh ? new RegExp(`${en.source}|${cjk}`, 'i') : en);
     const required = [
-      { key: 'rollback', re: /\brollback\b/i, fix: 'the exact steps to undo this release' },
-      { key: 'canary / gradual rollout', re: /\b(canary|gradual rollout|progressive delivery|blue[- ]?green|ring deployment|percentage rollout)\b/i, fix: 'how the change reaches users incrementally (or why it cannot)' },
-      { key: 'health / readiness', re: /\b(health ?check|healthz|readiness|liveness|\/health\b|\/ready\b)\b/i, fix: 'the signal that says the deployment is serving' },
+      { key: 'rollback', re: either(/\brollback\b/i, '回滚|回退|撤销发布'), fix: 'the exact steps to undo this release' },
+      { key: 'canary / gradual rollout', re: either(/\b(canary|gradual rollout|progressive delivery|blue[- ]?green|ring deployment|percentage rollout)\b/i, '灰度|金丝雀|渐进(?:式)?发布|分批发布|逐步放量|蓝绿'), fix: 'how the change reaches users incrementally (or why it cannot)' },
+      { key: 'health / readiness', re: either(/\b(health ?check|healthz|readiness|liveness|\/health\b|\/ready\b)\b/i, '健康检查|就绪|存活|探针'), fix: 'the signal that says the deployment is serving' },
     ];
     const absent = required.filter((r) => !r.re.test(text));
     return absent.length
