@@ -17,6 +17,7 @@ import { planMigration, applyMigration } from '../lib/migrate.mjs';
 import { buildSbom, sbomFreshness, sbomDigest, SBOM_PATH } from '../lib/sbom.mjs';
 import { PACKS, packDeclaration, packIds } from '../lib/packs.mjs';
 import { loadWaivers } from '../lib/waivers.mjs';
+import { listStories } from '../lib/story.mjs';
 import { writeFileAtomic } from '../lib/atomic.mjs';
 import { resolveAction } from '../lib/registry.mjs';
 import { TRACKS, TRACK_NAMES, trackOf, applyTrack } from '../lib/track.mjs';
@@ -199,6 +200,24 @@ function declareProject(snapshot, flags, verb) {
     return EXIT.FAIL;
   }
   if (brownfield) declaration.workflowProfile = 'delivery-only';
+  // What the user already decided survives a re-declaration (eos-2.6.0): `init <pack> --write` used to
+  // replace the whole file, so the language /eos-init set, the agent platforms, a solo declaration or
+  // an excluded record vanished. A pack describes the STACK; these describe the team. From the
+  // template's own declaration only the language is the user's (the rest describes EOS).
+  const kept = state === 'declared' ? ['language', 'agentPlatforms', 'approvalMode', 'productTree', 'policyUpstream', 'release', 'rationale'] : state === 'template' ? ['language'] : [];
+  for (const key of kept) if (existing?.[key] !== undefined && declaration[key] === undefined) declaration[key] = existing[key];
+  const initNotes = [];
+  if (flags.solo === true) {
+    if (chosen.name === 'regulated') {
+      console.log(['EOS ' + verb + ' · refused  --solo is the Standard track\'s exit: one maintainer records labelled self-approvals.',
+        '  A regulated project needs a second person for every approval. Drop --solo, or declare the Standard track.', ''].join('\n'));
+      return EXIT.FAIL;
+    }
+    declaration.approvalMode = 'solo';
+  } else if (declaration.approvalMode === 'solo' && chosen.name === 'regulated') {
+    delete declaration.approvalMode;
+    initNotes.push('approvalMode "solo" was dropped: the Regulated track needs a second person for every approval');
+  }
   const lines = [`EOS ${verb} · ${packId} — ${PACKS[packId].title} · ${chosen.title} track`, ''];
   // A config-only declaration has no stack to lose: when code lands it takes a pack without --force,
   // as long as the track stays what the project chose. Anything else the project declared is its own.
@@ -227,17 +246,30 @@ function declareProject(snapshot, flags, verb) {
     `  stacks           ${declaration.stacks.join(', ')}`,
     `  paradigms        ${declaration.productParadigms.join(', ')}`,
     `  workflowProfile  ${declaration.workflowProfile}${declaration.complianceProfile ? `\n  complianceProfile ${declaration.complianceProfile} · evidencePolicy ${declaration.evidencePolicy}` : ''}`,
+    ...(declaration.approvalMode === 'solo' ? ['  approvalMode     solo — you may record a labelled self-approval (approve --self --reason, policy lock --self); shown as "self" everywhere'] : []),
     `  commands         ${declaration.commands ? Object.entries(declaration.commands).map(([k, v]) => `${k}: ${v}`).join('\n                   ') : '(none — no product code yet; the product gate reports NOT_APPLICABLE)'}`, '',
     ...['Track', `  ${chosen.title} — ${chosen.summary}`, '  A release needs:', ...chosen.releaseRequires.map((r) => `    · ${r}`), '']);
   for (const r of files) lines.push(`  ${r.action.padEnd(12)} ${r.path}`);
   if (files.length) lines.push('');
   if (PACKS[packId].notes.length) { lines.push('Before you rely on this'); for (const n of PACKS[packId].notes) lines.push(`  · ${n}`); lines.push(''); }
+  // Declaring the agentic paradigm changes the answer for stories already written: story-ready now asks
+  // each acceptance criterion for an eval case. Say so in the change that causes it, not at the release.
+  const needEval = (declaration.productParadigms || []).includes('agentic')
+    ? listStories(snapshot.root).map((st) => ({ id: st.id, acs: st.acs.filter((a) => !/EVAL-\d+/i.test(a.evalCase) && !a.evalDeclaredNotApplicable).map((a) => a.id) })).filter((st) => st.acs.length)
+    : [];
+  if (needEval.length) {
+    lines.push('Stories that need an "Eval case" column', '  The project is agentic, so story-ready now asks every acceptance criterion for an eval case:');
+    for (const st of needEval) lines.push(`    ${st.id}  ${st.acs.join(', ')}`);
+    lines.push('  Model-backed behaviour takes an EVAL-<n> id (/eos-eval-spec). Deterministic behaviour (validation, sessions, CRUD)',
+      '  takes "N/A — deterministic" in a column headed "Eval case". Add the column in this same change.', '');
+  }
+  for (const n of initNotes) lines.push(`  NOTE  ${n}`);
   if (state === 'declared') {
     lines.push('Policy', `  The declaration is part of the policy: ${CLI} policy lock shows what this changes, --write records it.`,
       '  A weakening also needs --reason and a second person — re-declaring never resets the lock (ADR-022).', '');
   }
   const json = { pack: packId, track: chosen.name, brownfield, written: !!flags.write, replaced: state, declaration, notes: PACKS[packId].notes, localFiles: files,
-    derivedFiles: derived.rows.map(({ path, action }) => ({ path, action })), policyNotes: derived.notes };
+    derivedFiles: derived.rows.map(({ path, action }) => ({ path, action })), policyNotes: derived.notes, storiesNeedingEvalCase: needEval };
   if (declaration.projectType === 'config-only') {
     lines.push('Next', `  1. ${CLI} next                 (start the guided loop)`,
       `  2. When code lands: ${CLI} init <pack> --write — this track carries over`, '');

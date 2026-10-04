@@ -12,6 +12,7 @@ export const evaluators = {
   storyPresent(ctx) {
     if (!ctx.story) return blocked(`no story with id "${ctx.scopeId}" under docs/stories/ — the gate has nothing to evaluate (create it with the eos-plan agent)`);
     if (ctx.story.errors?.length) return { status: 'ERROR', detail: ctx.story.errors.join(' · ') };
+    if (ctx.story.placeholders) return fail(`${ctx.story.path} still holds ${ctx.story.placeholders} TODO(eos) placeholder(s) from \`eos stage init story\` — replace each with the real answer`);
     return ok(`${ctx.story.path}`);
   },
   storyStateNotHandEdited(ctx) {

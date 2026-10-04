@@ -35,7 +35,7 @@ function hint(node, parent) {
  * The skeleton record a schema describes: required fields only, placeholders at every leaf.
  * @returns {{record: object, leaves: Array<{keys: Array<string|number>, path: string, node: object, hint: string}>}}
  */
-export function skeletonFor(schema) {
+export function skeletonFor(schema, { alsoInclude = [] } = {}) {
   const leaves = [];
   const build = (raw, keys, parent) => {
     const node = deref(raw, schema);
@@ -44,7 +44,10 @@ export function skeletonFor(schema) {
     const types = [].concat(node.type || (node.properties ? 'object' : node.items ? 'array' : 'string'));
     if (types.includes('object') && !node.enum) {
       const out = {};
-      for (const k of node.required || []) out[k] = build(node.properties?.[k] || {}, [...keys, k], node);
+      // `alsoInclude`: optional top-level fields a stage's skeleton should still ask about (a user-facing
+      // product's design record needs `coverage`, which the schema leaves optional for one that has none).
+      const wanted = keys.length === 0 ? [...(node.required || []), ...alsoInclude.filter((k) => node.properties?.[k] && !(node.required || []).includes(k))] : node.required || [];
+      for (const k of wanted) out[k] = build(node.properties?.[k] || {}, [...keys, k], node);
       return out;
     }
     if (types.includes('array')) {
@@ -111,3 +114,40 @@ export const DOC_TEMPLATES = {
     '## Written back', '<!-- Which spec documents changed, and how. -->', '',
     '## Decision', '<!-- Continue, correct course or stop — and who owns it. -->', ''],
 };
+
+/** Documents a stage's gate reads besides its main one: `ux-ready` needs BOTH design contracts. */
+export const EXTRA_DOCS = {
+  design: {
+    'docs/EXPERIENCE.md': ['# Experience', '',
+      '## Flows', '<!-- The journeys a user takes, step by step, including the unhappy paths. -->', '',
+      '## States', '<!-- Empty, loading, error, partial and success states of each screen or command. -->', '',
+      '## Accessibility', '<!-- Keyboard, screen-reader, contrast and motion decisions. -->', '',
+      '## Responsive behaviour', '<!-- How each flow behaves from a phone to a wide window — or why it does not need to. -->', ''],
+  },
+};
+
+/** Stage records whose skeleton asks about optional fields too. */
+export const SKELETON_OPTIONS = { design: { alsoInclude: ['coverage'] } };
+
+/**
+ * `eos stage init story`: the file `story-ready` reads. Its format used to be learned from the
+ * gate's error messages — the file name must be `<ID>.md`, there must be a `## Dependencies` section,
+ * `Eval case` is a column of its own, and operational clauses are separated by `;`.
+ */
+export function storyTemplate({ id, title = 'TODO(eos): the story in a few words', acs = ['AC1.1'] }) {
+  return ['---', `id: ${id}`, `title: ${title}`, 'changeType: FEATURE', '---', '',
+    '<!-- The file name must be exactly <id>.md. Delete these comments once the story is written. -->', '',
+    '## Acceptance criteria', '',
+    '<!-- One row per criterion defined in docs/prd.md. "Test intent": the test that proves it, as path::test name.',
+    '     "Eval case": an EVAL-<n> id for model-backed behaviour; for deterministic behaviour write "N/A — deterministic"',
+    '     (the column is required once the project declares the agentic paradigm). -->',
+    '| AC | Statement | Test intent | Eval case |', '| --- | --- | --- | --- |',
+    ...acs.map((ac) => `| ${ac} | TODO(eos): what the user can do | TODO(eos): tests/<file>::<test name> | N/A — deterministic |`), '',
+    '## Operational tasks', '',
+    '<!-- Each is ADOPT — <task>; owner: <who>; verify: <how it is proven>, or SKIP — <a real reason>,',
+    '     or DEFER — owner: <who>; trigger: <what ends it>. Separate the clauses with ";". -->',
+    '- Telemetry: ADOPT — TODO(eos): the signal this story emits; owner: TODO(eos); verify: TODO(eos)',
+    '- Authorization: ADOPT — TODO(eos): who may do this and how it is enforced; owner: TODO(eos); verify: TODO(eos)',
+    '- Rollback: ADOPT — TODO(eos): how this change is undone; owner: TODO(eos); verify: TODO(eos)', '',
+    '## Dependencies', '', '- none — TODO(eos): say why nothing else blocks this story', ''].join('\n');
+}

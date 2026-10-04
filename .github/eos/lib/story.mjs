@@ -81,6 +81,8 @@ export function parseStory(root, rel) {
       rollback: readOp('Rollback'),
     },
     dependencies: depsText === null ? null : depsText.trim(),
+    // `eos stage init story` leaves TODO(eos) where an answer belongs; a story that still holds one is a draft.
+    placeholders: (text.match(/TODO\(eos\)/g) || []).length,
     errors,
   };
 }
@@ -108,15 +110,16 @@ export function parseOpsDecision(raw) {
   const kw = value.match(/^(ADOPT|SKIP|DEFER|N\/?A)\b[\s:—–-]*/i);
   const decision = kw ? { ADOPT: 'ADOPT', SKIP: 'SKIP', DEFER: 'DEFER', NA: 'SKIP', 'N/A': 'SKIP' }[kw[1].toUpperCase()] : 'ADOPT';
   const rest = kw ? value.slice(kw[0].length) : value;
-  const clauses = rest.split(/[;|]/).map((c) => c.trim()).filter(Boolean);
+  // "；" (full-width) separates clauses like ";" does: a Chinese keyboard produces it by default.
+  const clauses = rest.split(/[;；|]/).map((c) => c.trim()).filter(Boolean);
   const field = (re) => {
     const hit = clauses.find((c) => re.test(c));
     return hit ? hit.replace(re, '').trim() : '';
   };
-  const owner = field(/^owners?\s*[:=]\s*/i);
-  const verify = field(/^(?:verify|verification|verified by|proof)\s*[:=]\s*/i);
-  const trigger = field(/^triggers?\s*[:=]\s*/i);
-  const text = clauses.filter((c) => !/^(?:owners?|verify|verification|verified by|proof|triggers?|due(?:By)?)\s*[:=]/i.test(c)).join('; ').trim();
+  const owner = field(/^owners?\s*[:=：]\s*/i);
+  const verify = field(/^(?:verify|verification|verified by|proof)\s*[:=：]\s*/i);
+  const trigger = field(/^triggers?\s*[:=：]\s*/i);
+  const text = clauses.filter((c) => !/^(?:owners?|verify|verification|verified by|proof|triggers?|due(?:By)?)\s*[:=：]/i.test(c)).join('; ').trim();
   return { raw: value, decision, text, owner, verify, trigger };
 }
 

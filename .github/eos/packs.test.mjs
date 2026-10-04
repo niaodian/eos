@@ -90,3 +90,51 @@ test('listing packs is machine readable', () => {
   assert.equal(r.json.packs.length, packIds().length);
   for (const p of r.json.packs) assert.ok(PACKS[p.id].title === p.title);
 });
+
+// eos-2.6.0: `init` keeps what the team already decided, can declare the solo path, and says which
+// stories the agentic paradigm turns red — in the change that declares it.
+const readDeclaration = (dir) => JSON.parse(readFileSync(join(dir, '.eos/project.json'), 'utf8'));
+
+test('init keeps the language, platforms and exclusions a declared project already chose', () => {
+  const dir = project({ '.eos/project.json': { projectType: 'config-only', language: 'zh-CN', agentPlatforms: ['copilot', 'claude'], productTree: { exclude: ['docs/pilot-log.md'] } } });
+  const r = run(dir, ['init', 'node-service', '--write']);
+  assert.equal(r.code, 0, r.out);
+  const d = readDeclaration(dir);
+  assert.equal(d.language, 'zh-CN');
+  assert.deepEqual(d.agentPlatforms, ['copilot', 'claude']);
+  assert.deepEqual(d.productTree, { exclude: ['docs/pilot-log.md'] });
+  assert.equal(d.projectType, 'application', 'the pack still decides the stack');
+});
+
+test('init on the template keeps only the language — the rest of that declaration describes EOS', () => {
+  const dir = project({ '.eos/project.json': { ...APP_PROJECT, templateDefault: true, language: 'ja', rationale: 'EOS itself' } });
+  assert.equal(run(dir, ['init', 'node-service', '--write']).code, 0);
+  const d = readDeclaration(dir);
+  assert.equal(d.language, 'ja');
+  assert.doesNotMatch(d.rationale || '', /EOS itself/);
+  assert.equal(d.templateDefault, undefined);
+});
+
+test('init --solo declares the solo path on the Standard track and refuses it on the Regulated one', () => {
+  const dir = project({ '.eos/project.json': { ...APP_PROJECT, templateDefault: true } });
+  assert.equal(run(dir, ['init', 'node-service', '--solo', '--write']).code, 0);
+  assert.equal(readDeclaration(dir).approvalMode, 'solo');
+  const regulated = project({ '.eos/project.json': { ...APP_PROJECT, templateDefault: true } });
+  const r = run(regulated, ['init', 'node-service', '--track', 'regulated', '--solo', '--write']);
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.out, /needs a second person for every approval/);
+  assert.notEqual(readDeclaration(regulated).approvalMode, 'solo');
+});
+
+test('declaring agentic lists the existing stories that lack an Eval case column', () => {
+  const dir = project({
+    '.eos/project.json': { projectType: 'config-only' },
+    'docs/stories/S1.md': '---\nid: S1\ntitle: Login\nchangeType: FEATURE\n---\n\n## Acceptance criteria\n\n| AC | Statement | Test intent |\n| --- | --- | --- |\n| AC1.1 | log in | tests/a.test.mjs::login |\n| AC1.2 | log out | tests/a.test.mjs::logout |\n',
+  });
+  const r = runJson(dir, ['init', 'agentic-app', '--write']);
+  assert.equal(r.code, 0, r.out);
+  assert.deepEqual(r.json.storiesNeedingEvalCase, [{ id: 'S1', acs: ['AC1.1', 'AC1.2'] }]);
+  const text = run(dir, ['init', 'agentic-app', '--force']).out;
+  assert.match(text, /Stories that need an "Eval case" column/);
+  assert.match(text, /N\/A — deterministic/);
+});
