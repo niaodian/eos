@@ -8,8 +8,7 @@ import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { project, write, run, runJson, cleanup, story, baselineFiles, TEST_FILE, releaseFiles, writeManifest, treeDigest, APP_PROJECT } from './test-support.mjs';
-import { verifiedStory } from './audit-support.mjs';
+import { project, write, run, runJson, cleanup, story, baselineFiles, TEST_FILE } from './test-support.mjs';
 
 after(cleanup);
 
@@ -226,95 +225,4 @@ test('journey: an undeclared change type is refused rather than defaulted into f
   const r = run(dir, ['transition', '--scope', 'story', '--id', 'X-1', '--to', 'IN_REVIEW']);
   assert.equal(r.code, 1, r.out);
   assert.match(r.out, /not defined in workflow profile/);
-});
-
-// ---------------------------------------------------------------------------------------------
-// eos-2.6.0 (D1 + D2, ADR-023): the path a one-person project takes to ship a release whose monthly
-// availability target cannot be measured before shipping — and the three ways it must NOT work.
-// ---------------------------------------------------------------------------------------------
-const SOLO = { EOS_ACTOR: 'solo-dev' };
-const deferralSummary = (dir, dueBy) => ({
-  schemaVersion: 1, generatedAt: '2026-01-01T00:00:00.000Z', productTree: { digest: treeDigest(dir) },
-  targets: [{ id: 'NFR1', category: 'availability', decision: 'DEFER', owner: '@platform', trigger: 'the first full month in production', dueBy }],
-});
-/** A merged story, a release candidate whose only NFR is deferred, ready for `verify-release`. */
-function candidate(projectExtra, dueBy) {
-  const dir = verifiedStory(releaseFiles({ '.eos/project.json': { ...APP_PROJECT, commands: { test: 'node --version', audit: 'node --version' }, ...projectExtra } }));
-  assert.equal(run(dir, ['transition', '--scope', 'story', '--id', 'STORY-001', '--to', 'MERGED'], SOLO).code, 0);
-  write(dir, 'docs/evidence/nfr-summary.json', deferralSummary(dir, dueBy));
-  writeManifest(dir, { releaseId: 'R-1' });
-  assert.equal(run(dir, ['transition', '--scope', 'release', '--id', 'R-1', '--to', 'CANDIDATE'], SOLO).code, 0);
-  run(dir, ['verify-release', '--release', 'R-1'], SOLO);
-  return dir;
-}
-const toState = (dir, to) => run(dir, ['transition', '--scope', 'release', '--id', 'R-1', '--to', to], SOLO);
-
-test('journey: a solo project ships with a bounded DEFERRED — labelled, bound to its list, and never PASS', () => {
-  const dir = candidate({ approvalMode: 'solo' }, '2999-01-31');
-  const gate = runJson(dir, ['release-status', '--release', 'R-1'], SOLO);
-  assert.equal(gate.json.checks.find((c) => c.id === 'nfr-evidence').status, 'DEFERRED');
-  assert.notEqual(gate.code, 0, 'DEFERRED is never a green gate');
-
-  assert.equal(toState(dir, 'VERIFIED').code, 0, 'the one deferral is bounded, so the candidate may be promoted');
-
-  // The person who prepared the candidate cannot approve it, and cannot self-approve without saying why.
-  const plain = run(dir, ['approve', '--scope', 'release', '--id', 'R-1'], SOLO);
-  assert.equal(plain.code, 1);
-  assert.match(plain.out, /record it yourself with --self --reason/);
-  assert.equal(run(dir, ['approve', '--scope', 'release', '--id', 'R-1', '--self'], SOLO).code, 1, '--self needs a reason');
-
-  const approved = run(dir, ['approve', '--scope', 'release', '--id', 'R-1', '--self', '--reason', 'solo maintainer; no second reviewer exists'], SOLO);
-  assert.equal(approved.code, 0, approved.out);
-  assert.match(approved.out, /NFR1 {2}owner @platform {2}due by 2999-01-31/, 'the full deferred list is printed before the approval is recorded');
-  assert.match(approved.out, /SELF-APPROVAL/);
-  const event = readFileSync(join(dir, '.eos/ledger/events.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l)).filter((e) => e.type === 'approval').at(-1);
-  assert.equal(event.assurance, 'self');
-  assert.deepEqual(event.deferred, [{ id: 'NFR1', owner: '@platform', trigger: 'the first full month in production', dueBy: '2999-01-31' }]);
-  assert.match(event.deferredDigest, /^[0-9a-f]{64}$/);
-
-  assert.equal(toState(dir, 'APPROVED').code, 0);
-  assert.equal(toState(dir, 'RELEASED').code, 0);
-
-  // After the release the deferral is on record: status keeps saying DEFERRED, next says when it is due.
-  const health = run(dir, ['health'], SOLO).out;
-  assert.match(health, /DEFERRED {2}NFR1 → @platform, due by 2999-01-31 \(accepted by solo-dev, a self-approval\)/);
-  write(dir, '.eos/local/active-work.json', { schemaVersion: 1, scopeType: 'release', scopeId: 'R-1' });
-  const next = runJson(dir, ['next'], SOLO).json.recommendedAction.doneWhen.join('\n');
-  assert.match(next, /measure the deferred NFR target NFR1 \(owner @platform, due by 2999-01-31\)/);
-  assert.equal(run(dir, ['ledger', '--verify']).code, 0);
-});
-
-test('journey: a deferral whose dueBy has passed is a FAIL, and cannot be promoted', () => {
-  const dir = candidate({ approvalMode: 'solo' }, '2020-01-31');
-  const nfr = runJson(dir, ['release-status', '--release', 'R-1'], SOLO).json.checks.find((c) => c.id === 'nfr-evidence');
-  assert.equal(nfr.status, 'FAIL');
-  assert.match(nfr.detail, /overdue/);
-  const refused = toState(dir, 'VERIFIED');
-  assert.equal(refused.code, 1);
-  assert.match(refused.out, /release-ready/);
-});
-
-test('journey: a controlled (or regulated) release is never promoted with a deferral', () => {
-  const dir = candidate({ workflowProfile: 'controlled' }, '2999-01-31');
-  const refused = toState(dir, 'VERIFIED');
-  assert.equal(refused.code, 1, refused.out);
-  assert.match(refused.out, /never promoted with a deferred check/);
-});
-
-test('journey: an approval is bound to the deferred list — change the list and it must be given again', () => {
-  const dir = candidate({ approvalMode: 'solo' }, '2999-01-31');
-  assert.equal(toState(dir, 'VERIFIED').code, 0);
-  assert.equal(run(dir, ['approve', '--scope', 'release', '--id', 'R-1', '--self', '--reason', 'solo maintainer; no second reviewer exists'], SOLO).code, 0);
-  write(dir, 'docs/evidence/nfr-summary.json', deferralSummary(dir, '2999-06-30'));
-  const refused = toState(dir, 'APPROVED');
-  assert.equal(refused.code, 1, refused.out);
-  assert.match(refused.out, /list of deferred NFR targets changed after it was approved/);
-});
-
-test('journey: --self is refused unless the project declared the solo path', () => {
-  const dir = candidate({}, '2999-01-31');
-  assert.equal(toState(dir, 'VERIFIED').code, 0);
-  const r = run(dir, ['approve', '--scope', 'release', '--id', 'R-1', '--self', '--reason', 'solo maintainer; no second reviewer exists'], SOLO);
-  assert.equal(r.code, 1);
-  assert.match(r.out, /--self needs approvalMode "solo"/);
 });

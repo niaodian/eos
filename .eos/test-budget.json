@@ -95,7 +95,9 @@
       "description": "The whole developer loop end to end, executed through the real CLI, offline.",
       "budgetMs": 10000,
       "files": [
-        ".github/eos/journey.test.mjs"
+        ".github/eos/journey.test.mjs",
+        ".github/eos/journey-solo.test.mjs",
+        ".github/eos/journey-deferral.test.mjs"
       ]
     },
     "audit-regression": {
