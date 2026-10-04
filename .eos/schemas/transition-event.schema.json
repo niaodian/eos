@@ -106,6 +106,49 @@
     "detail": {
       "type": "string"
     },
+    "manifestDigest": {
+      "type": "string",
+      "description": "Approval events only: an approval is given for ONE release manifest, and changing what ships voids it."
+    },
+    "assurance": {
+      "enum": [
+        "independent",
+        "self"
+      ],
+      "description": "Approval events only. `self`: recorded by the person who prepared the work, which a solo project (approvalMode solo, Standard track) may do; shown wherever the approval is shown."
+    },
+    "deferredDigest": {
+      "type": "string",
+      "description": "Approval events only: digest of the deferred NFR list the approval was given for. Absent when nothing was deferred."
+    },
+    "deferred": {
+      "type": "array",
+      "description": "Approval events only: the deferred NFR targets the approver accepted, kept in the release record.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "owner",
+          "trigger",
+          "dueBy"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "owner": {
+            "type": "string"
+          },
+          "trigger": {
+            "type": "string"
+          },
+          "dueBy": {
+            "type": "string"
+          }
+        }
+      }
+    },
     "prevHash": {
       "type": [
         "string",

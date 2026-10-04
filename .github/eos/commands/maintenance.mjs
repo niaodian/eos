@@ -646,7 +646,7 @@ export const maintenanceCommands = {
     if (sub === 'lock') {
       const actor = process.env.EOS_ACTOR || process.env.USER || process.env.USERNAME || 'unknown';
       const reason = typeof flags.reason === 'string' ? flags.reason : null;
-      const plan = planLock(snapshot.root, { against, reason, actor, write: !!flags.write });
+      const plan = planLock(snapshot.root, { against, reason, actor, self: !!flags.self, write: !!flags.write });
       const lines = [`EOS policy lock · against ${plan.base ? plan.base.label : '(nothing to compare with)'}`, ''];
       lines.push(...listChanges(plan.changes.filter((c) => c.requiresAck)));
       if (!plan.changes.some((c) => c.requiresAck)) lines.push('  no change needs acknowledgement');
@@ -656,8 +656,13 @@ export const maintenanceCommands = {
         emit(flags, { ...plan, written: false }, lines.join('\n'));
         return EXIT.FAIL;
       }
-      if (plan.drafted.length) {
-        lines.push('', `  ${plan.drafted.length} acknowledgement(s) drafted with an EMPTY approver. A second person must fill in`,
+      const selfApproved = plan.drafted.filter((d) => d.assurance === 'self');
+      const awaiting = plan.drafted.length - selfApproved.length;
+      if (selfApproved.length) {
+        lines.push('', `  ${selfApproved.length} acknowledgement(s) recorded as a SELF-APPROVAL (solo project): approver "${selfApproved[0].approver}", assurance "self".`);
+      }
+      if (awaiting) {
+        lines.push('', `  ${awaiting} acknowledgement(s) drafted with an EMPTY approver. A second person must fill in`,
           `  "approver" in ${POLICY_LOCK_PATH} and commit it; until then \`eos policy check\` fails.`);
       }
       lines.push('', plan.written ? `  written ${POLICY_LOCK_PATH}` : '  Nothing was written. Re-run with --write to apply.', '');

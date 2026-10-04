@@ -135,6 +135,28 @@ test('EOS-AUD-001: the product-tree identity is path-based, so it is stable acro
   assert.equal(compareProductTree(dir, null).status, 'UNBOUND');
 });
 
+test('eos-2.6.0: a path the project declares as not product (productTree.exclude) stays out of the identity', () => {
+  const files = { 'src/a.js': 'x\n', 'docs/pilot-log.md': 'one\n' };
+  const digestAfterEditing = (declaration) => {
+    const dir = project({ '.eos/project.json': declaration, ...files });
+    clearProductTreeCache();
+    const before = computeProductTree(dir).identity.digest;
+    write(dir, 'docs/pilot-log.md', 'two\n');
+    clearProductTreeCache();
+    return { before, after: computeProductTree(dir).identity.digest };
+  };
+  const counted = digestAfterEditing(APP_PROJECT);
+  assert.notEqual(counted.before, counted.after, 'by default every file under docs/ is product');
+  const excluded = digestAfterEditing({ ...APP_PROJECT, productTree: { exclude: ['docs/pilot-log.md'] } });
+  assert.equal(excluded.before, excluded.after, 'editing an excluded record does not move the identity');
+  const other = project({ '.eos/project.json': { ...APP_PROJECT, productTree: { exclude: ['docs/pilot-log.md'] } }, ...files });
+  clearProductTreeCache();
+  const sourceBefore = computeProductTree(other).identity.digest;
+  write(other, 'src/a.js', 'changed\n');
+  clearProductTreeCache();
+  assert.notEqual(computeProductTree(other).identity.digest, sourceBefore, 'everything else still counts');
+});
+
 test('EOS-AUD-001: release-ready re-runs the quality commands on the CANDIDATE, not on story state', () => {
   const dir = verifiedStory(releaseFiles());
   assert.equal(run(dir, ['transition', '--scope', 'story', '--id', 'STORY-001', '--to', 'MERGED']).code, 0);

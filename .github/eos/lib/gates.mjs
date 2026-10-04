@@ -55,7 +55,7 @@ export function evaluateGate(snapshot, gateId, scopeType, scopeId, { mode = 'all
 
   const story = scopeType === 'story' ? snapshot.stories.find((s) => s.id === scopeId) || null : null;
   const prior = readEvidence(snapshot.root, def.id, scopeType, scopeId);
-  const ctx = { root: snapshot.root, snapshot, scopeType, scopeId, story, changeType, commands: [], results: [], providerVerdicts: providerVerdicts || {} };
+  const ctx = { root: snapshot.root, snapshot, scopeType, scopeId, story, changeType, now, commands: [], results: [], providerVerdicts: providerVerdicts || {} };
 
   for (const check of def.checks) {
     let result;

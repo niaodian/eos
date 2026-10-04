@@ -8,6 +8,7 @@ import { recordedGateStatus, evaluateGate } from './gates.mjs';
 import { readEvidence, evidenceFreshness } from './evidence.mjs';
 import { scopeState, changeTypeOf, gateInputs, gateCollections } from './state.mjs';
 import { readManifest } from './release.mjs';
+import { deferralPromotion, listDeferrals, deferralDigest, selfApprovalAllowed } from './deferrals.mjs';
 
 export const PROMOTABLE = new Set(['PASS', 'WAIVED', 'NOT_APPLICABLE']);
 
@@ -73,9 +74,14 @@ export function guardResult(snapshot, transition, scopeType, scopeId, { live = f
     const g = live
       ? evaluateGate(snapshot, transition.requiresGate, target, scopeId, { mode: 'cheap' })
       : recordedGateStatus(snapshot, transition.requiresGate, target, scopeId);
-    if (!PROMOTABLE.has(g.status)) {
+    // A DEFERRED release-ready is promotable only under the bounded-deferral rule (lib/deferrals.mjs):
+    // a Standard-track release whose only deferrals are NFR targets with an owner, a trigger and a
+    // dueBy in the future. It stays DEFERRED everywhere it is shown.
+    const deferred = g.status === 'DEFERRED' && scopeType === 'release' && transition.requiresGate === 'release-ready'
+      ? deferralPromotion(snapshot, g) : null;
+    if (!PROMOTABLE.has(g.status) && !deferred?.ok) {
       const why = g.detail || (g.checks || []).filter((c) => !PROMOTABLE.has(c.status)).map((c) => c.detail).filter(Boolean)[0] || '';
-      return { ok: false, reason: `gate "${transition.requiresGate}" is ${g.status}${why ? ` — ${why}` : ''}`, kind: 'gate', gate: transition.requiresGate, status: g.status };
+      return { ok: false, reason: `gate "${transition.requiresGate}" is ${g.status}${why ? ` — ${why}` : ''}${deferred ? ` — NOT promotable: ${deferred.reason}` : ''}`, kind: 'gate', gate: transition.requiresGate, status: g.status };
     }
     if (transition.requiresFresh) {
       const def = snapshot.gates?.gates.find((x) => x.id === transition.requiresGate);
@@ -95,7 +101,9 @@ export function guardResult(snapshot, transition, scopeType, scopeId, { live = f
   if (transition.requiresSeparateApprover) {
     const approvals = snapshot.events.filter((e) => e.type === 'approval' && e.scope?.type === scopeType && e.scope?.id === scopeId);
     const requesters = new Set(snapshot.events.filter((e) => e.type === 'transition' && e.scope?.id === scopeId).map((e) => e.actor));
-    let eligible = approvals.filter((a) => !requesters.has(a.actor));
+    // A self-approval (assurance "self") stands only in a solo project; any other approval must come
+    // from someone who did not prepare the candidate.
+    let eligible = approvals.filter((a) => (a.assurance === 'self' ? selfApprovalAllowed(snapshot) : !requesters.has(a.actor)));
     if (scopeType === 'release') {
       // The approval must have been given for the manifest that is on disk NOW. Without this, a
       // candidate could be approved and then have its contents rewritten under the approval.
@@ -107,6 +115,14 @@ export function guardResult(snapshot, transition, scopeType, scopeId, { live = f
       eligible = eligible.filter((a) => a.manifestDigest === m.digest);
       if (!eligible.length && stale.length) {
         return { ok: false, reason: `what this release ships changed after it was approved (the approval was given for manifest ${String(stale.at(-1).manifestDigest || 'none').slice(0, 12)}, the manifest is now ${m.digest.slice(0, 12)}) — it must be approved again`, kind: 'approval' };
+      }
+      // The approval is also bound to the list of deferred NFR targets it was given for, so a target
+      // cannot be deferred (or its date moved) after somebody agreed to ship without it.
+      const deferredNow = deferralDigest(listDeferrals(snapshot.root));
+      const unbound = eligible.filter((a) => (a.deferredDigest ?? null) !== deferredNow);
+      eligible = eligible.filter((a) => (a.deferredDigest ?? null) === deferredNow);
+      if (!eligible.length && unbound.length) {
+        return { ok: false, reason: 'the list of deferred NFR targets changed after it was approved — it must be approved again (`eos approve` prints the list)', kind: 'approval' };
       }
       const required = m.manifest.requiredApprovals?.count ?? 1;
       const distinct = new Set(eligible.map((a) => a.actor));

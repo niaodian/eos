@@ -14,7 +14,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { project, write, run, runJson, git, commitAll, cleanup, APP_PROJECT, REPO_ROOT } from './test-support.mjs';
-import { policySnapshot, diffPolicy, policyDigest } from './lib/policy.mjs';
+import { policySnapshot, diffPolicy, policyDigest, acknowledgementProblem, SOLO_SWITCH } from './lib/policy.mjs';
 import { schemaTightenings } from './lib/schema-diff.mjs';
 
 after(cleanup);
@@ -383,4 +383,65 @@ test('the two-step route is closed: marking the declaration as the template\'s n
   const step2 = run(dir, ['policy', 'check', '--against', 'main']);
   assert.equal(step2.code, 1, step2.out);
   assert.match(step2.out, /WEAKENING project:projectType:application->config-only/);
+});
+
+// -------------------------------------------------------------------------- eos-2.6.0 (ADR-023)
+test('approvalMode, productTree.exclude and a deleted declaration are classified', () => {
+  const base = shipped();
+  const diff = (mutate) => { const next = clone(base); mutate(next); return diffPolicy(policySnapshot(base), policySnapshot(next)); };
+  const ids = (changes, kind) => changes.filter((c) => c.kind === kind).map((c) => c.id);
+
+  assert.deepEqual(ids(diff((p) => { p.project.approvalMode = 'solo'; }), 'WEAKENING'), ['project:approvalMode:independent->solo']);
+  const soloBase = clone(base);
+  soloBase.project.approvalMode = 'solo';
+  const back = diffPolicy(policySnapshot(soloBase), policySnapshot(base));
+  assert.deepEqual(ids(back, 'STRENGTHENING'), ['project:approvalMode:solo->independent']);
+  assert.deepEqual(ids(diff((p) => { p.project.productTree = { exclude: ['docs/pilot-log.md'] }; }), 'REVIEW'), ['project:productTree-exclude:docs/pilot-log.md']);
+  assert.deepEqual(ids(diff((p) => { p.project = null; }), 'WEAKENING'), ['project:declaration-removed']);
+  // Declared but equal to the default: the digest every project locked with must not move.
+  const same = clone(base);
+  same.project.approvalMode = 'independent';
+  same.project.productTree = { exclude: [] };
+  assert.equal(policyDigest(policySnapshot(same)), policyDigest(policySnapshot(base)));
+});
+
+test('a self-approval is accepted only in a solo project, and never for the switch to solo itself', () => {
+  const ack = (change, approver) => ({ change, reason: 'one maintainer, no second reviewer exists', requestedBy: 'tester', approver });
+  assert.equal(acknowledgementProblem(ack('x', 'tester (self)'), { solo: true }), null);
+  assert.match(acknowledgementProblem(ack('x', 'tester (self)'), { solo: false }), /needs approvalMode "solo"/);
+  assert.match(acknowledgementProblem(ack(SOLO_SWITCH, 'tester (self)'), { solo: true }), /independent approver/);
+  assert.match(acknowledgementProblem(ack('x', 'tester'), { solo: true }), /approver is the requester/, 'an unlabelled self-approval is still refused');
+});
+
+test('policy lock --self: refused in an independent project; in a solo one it labels the approval, except for the switch itself', () => {
+  const dir = lockedRepo();
+  weaken(dir);
+  const refused = run(dir, ['policy', 'lock', '--write', '--self', '--reason', 'feature work is verified by the release gate instead']);
+  assert.equal(refused.code, 1, refused.out);
+  assert.match(refused.out, /needs approvalMode "solo"/);
+
+  write(dir, '.eos/project.json', { ...APP_PROJECT, approvalMode: 'solo' });
+  const lock = run(dir, ['policy', 'lock', '--write', '--self', '--reason', 'one maintainer, and no second reviewer exists']);
+  assert.equal(lock.code, 0, lock.out);
+  const acknowledged = JSON.parse(readFileSync(join(dir, '.eos/policy.lock.json'), 'utf8')).acknowledged;
+  const soloSwitch = acknowledged.find((a) => a.change === 'project:approvalMode:independent->solo');
+  const feature = acknowledged.find((a) => /FEATURE\/verified/.test(a.change));
+  assert.equal(soloSwitch.approver, '', 'EOS never self-approves the switch to solo');
+  assert.match(feature.approver, / \(self\)$/);
+  assert.equal(feature.assurance, 'self');
+  const waiting = run(dir, ['policy', 'check', '--against', 'main']);
+  assert.equal(waiting.code, 1, waiting.out);
+  assert.match(waiting.out, /project:approvalMode:independent->solo.*awaiting an approver/);
+
+  approve(dir, 'alice'); // the independent approver agrees to the switch (and, here, to everything else)
+  const ok = run(dir, ['policy', 'check', '--against', 'main']);
+  assert.equal(ok.code, 0, ok.out);
+});
+
+test('solo cannot be combined with a regulated or controlled track', () => {
+  const dir = project({ '.eos/project.json': { ...APP_PROJECT, approvalMode: 'solo', workflowProfile: 'controlled' } });
+  const r = run(dir, ['status']);
+  assert.match(r.out, /approvalMode "solo" is a Standard-track exit/);
+  const dir2 = project({ '.eos/project.json': { ...APP_PROJECT, approvalMode: 'solo', complianceProfile: 'regulated', evidencePolicy: 'ci' } });
+  assert.match(run(dir2, ['status']).out, /approvalMode "solo" is a Standard-track exit/);
 });

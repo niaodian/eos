@@ -313,6 +313,30 @@ test('waiver: self-approval is not honored', () => {
   assert.match(s.reason, /approver/i);
 });
 
+test('waiver: a "<name> (self)" approver is honored in a solo project, labelled, and only there (eos-2.6.0)', () => {
+  const w = {
+    schemaVersion: 1,
+    gate: 'story-ready',
+    scope: { type: 'story', id: 'STORY-001' },
+    reason: 'Production outage; readiness review deferred by 24h.',
+    riskOwner: 'dev-a',
+    requestedBy: 'dev-a',
+    approver: 'dev-a (self)',
+    assurance: 'self',
+    expiresOn: '2999-01-01',
+    compensatingControls: ['manual smoke test'],
+  };
+  const at = { gateId: 'story-ready', scopeType: 'story', scopeId: 'STORY-001', now: new Date() };
+  const independent = waiverStatus(w, at);
+  assert.equal(independent.honored, false);
+  assert.match(independent.reason, /needs approvalMode "solo"/);
+  const solo = waiverStatus(w, { ...at, solo: true });
+  assert.equal(solo.honored, true);
+  assert.equal(solo.assurance, 'self');
+  assert.match(solo.reason, /self-approval/);
+  assert.equal(waiverStatus({ ...w, approver: 'dev-a' }, { ...at, solo: true }).honored, false, 'unlabelled is still the requester approving');
+});
+
 test('waiver: a valid waiver turns a FAIL into WAIVED for a waivable gate only', () => {
   const dir = project({
     '.eos/project.json': APP_PROJECT,

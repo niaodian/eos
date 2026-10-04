@@ -9,7 +9,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { posix, EVALUATOR_VERSION, WORKFLOW_PATH, GATES_PATH } from './registry.mjs';
 import { validate, loadSchema } from './schema.mjs';
-import { waiverStatus } from './waivers.mjs';
+import { waiverStatus, soloApprovals } from './waivers.mjs';
 import { compareProductTree } from './product-tree.mjs';
 import { writeFileAtomic } from './atomic.mjs';
 
@@ -91,7 +91,7 @@ export function evidenceFreshness(root, evidence, { gateDefinition = null, expec
     else {
       let waiver = null;
       try { waiver = JSON.parse(readFileSync(join(root, wPath), 'utf8')); } catch { /* handled below */ }
-      const s = waiver ? waiverStatus(waiver, { gateId: evidence.gate, scopeType: evidence.scope.type, scopeId: evidence.scope.id, now }) : { honored: false, reason: `${wPath} is missing or unreadable` };
+      const s = waiver ? waiverStatus(waiver, { gateId: evidence.gate, scopeType: evidence.scope.type, scopeId: evidence.scope.id, now, solo: soloApprovals(root) }) : { honored: false, reason: `${wPath} is missing or unreadable` };
       if (!s.honored) reasons.push(`the waiver no longer holds: ${s.reason}`);
     }
   }

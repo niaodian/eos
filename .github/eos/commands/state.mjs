@@ -14,11 +14,12 @@ import { listEvidence, evidenceFreshness } from '../lib/evidence.mjs';
 import { listManifests } from '../lib/release.mjs';
 import { loadProviders } from '../adapters/contract.mjs';
 import { testDurationTrend } from '../lib/test-history.mjs';
-import { loadWaivers, expiredWaivers, waiverStatus } from '../lib/waivers.mjs';
+import { loadWaivers, expiredWaivers, waiverStatus, soloApprovals } from '../lib/waivers.mjs';
 import { activeWorkPath } from '../lib/registry.mjs';
 import { trackSummary } from '../lib/track.mjs';
 import { policyDrift } from '../lib/policy.mjs';
 import { releasePreview, previewLines } from '../lib/release-preview.mjs';
+import { acceptedDeferrals } from '../lib/deferrals.mjs';
 import { EXIT, emit } from './shared.mjs';
 
 const CLI = 'node .github/eos/eos.mjs';
@@ -230,6 +231,7 @@ export const stateCommands = {
     const waiverRows = waivers.map((w) => {
       const s = waiverStatus(w.waiver, {
         gateId: w.waiver?.gate, scopeType: w.waiver?.scope?.type, scopeId: w.waiver?.scope?.id,
+        solo: soloApprovals(snapshot.root),
       });
       return {
         gate: w.waiver?.gate ?? null,
@@ -242,6 +244,7 @@ export const stateCommands = {
         // take. Hiding it until approval would mean the one moment it is worth reviewing — before
         // it starts lifting a gate — is the one moment it is invisible.
         inEffect: s.honored,
+        assurance: s.honored ? (s.assurance || null) : null,
         why: s.reason,
         file: w.file,
       };
@@ -263,7 +266,7 @@ export const stateCommands = {
     // --- releases
     const releases = listManifests(snapshot.root)
       .filter((m) => m.releaseId)
-      .map((m) => ({ releaseId: m.releaseId, state: scopeState(snapshot, 'release', m.releaseId), stories: m.manifest?.includedStories?.length ?? 0 }));
+      .map((m) => ({ releaseId: m.releaseId, state: scopeState(snapshot, 'release', m.releaseId), stories: m.manifest?.includedStories?.length ?? 0, accepted: acceptedDeferrals(snapshot, m.releaseId) }));
 
     const decision = route(snapshot);
     const blockers = decision.blockers || [];
@@ -314,7 +317,13 @@ export const stateCommands = {
     lines.push('');
     lines.push('Releases');
     if (!releases.length) lines.push('  none');
-    for (const r of releases) lines.push(`  ${String(r.releaseId).padEnd(14)} ${String(r.state).padEnd(12)} ${r.stories} story/stories`);
+    for (const r of releases) {
+      lines.push(`  ${String(r.releaseId).padEnd(14)} ${String(r.state).padEnd(12)} ${r.stories} story/stories`);
+      // Still DEFERRED — accepted, never passed — and shown for as long as the release is on record.
+      for (const d of r.accepted?.deferred || []) {
+        lines.push(`    DEFERRED  ${d.id} → ${d.owner}, due by ${d.dueBy} (accepted by ${r.accepted.actor}${r.accepted.assurance === 'self' ? ', a self-approval' : ''})`);
+      }
+    }
     lines.push('');
     lines.push('Gate trend',
       trend.total ? `  ${trend.total} gate run(s) recorded · first-pass rate ${trend.allTimePassRate}% all time · ${trend.recentPassRate}% over the last ${trend.recentWindow}` : '  no gate has been run yet');

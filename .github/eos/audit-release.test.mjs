@@ -107,6 +107,26 @@ test('EOS-AUD-007: NFR targets need measurements; a deferral needs an owner and 
   assert.equal(r.json.checks.find((c) => c.id === 'nfr-evidence').status, 'DEFERRED');
 });
 
+test('eos-2.6.0: a deferred NFR carries a dueBy; one that is overdue is a FAIL, not a longer wait', () => {
+  const dir = verifiedStory(releaseFiles({ 'docs/evidence/nfr-summary.json': undefined }));
+  const nfrDigest = treeDigest(dir);
+  const nfr = (targets) => ({ schemaVersion: 1, generatedAt: '2026-01-01T00:00:00.000Z', productTree: { digest: nfrDigest }, targets });
+  const nfrCheck = () => runJson(dir, ['release-status', '--release', 'v1.0.0']).json.checks.find((c) => c.id === 'nfr-evidence');
+  const deferral = (dueBy) => nfr([{ id: 'NFR1', decision: 'DEFER', owner: '@platform', trigger: 'the first month of production traffic', ...(dueBy ? { dueBy } : {}) }]);
+
+  write(dir, 'docs/evidence/nfr-summary.json', deferral('2999-01-31'));
+  assert.equal(nfrCheck().status, 'DEFERRED');
+  assert.match(nfrCheck().detail, /due by 2999-01-31/);
+
+  write(dir, 'docs/evidence/nfr-summary.json', deferral('2020-01-31'));
+  assert.equal(nfrCheck().status, 'FAIL');
+  assert.match(nfrCheck().detail, /overdue \(dueBy 2020-01-31\)/);
+
+  write(dir, 'docs/evidence/nfr-summary.json', deferral(null));
+  assert.equal(nfrCheck().status, 'DEFERRED', 'a missing dueBy stays visible as DEFERRED — it is the promotion that refuses it');
+  assert.match(nfrCheck().detail, /NO dueBy/);
+});
+
 test('EOS-AUD-007: unverifiable enforcement authority is BLOCKED, never a self-issued PASS', () => {
   const dir = verifiedStory(releaseFiles({
     'docs/eos/activation.md': '# Activation\n\n- [ ] Branch protection on the default branch\n',

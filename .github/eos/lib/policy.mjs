@@ -26,9 +26,15 @@ import { loadSchema, validate } from './schema.mjs';
 import { resolveBaseRef, fileAt, gitOut } from './git-base.mjs';
 import { schemaChanges } from './schema-diff.mjs';
 import { verifyDocument, loadPublicKey } from './signing.mjs';
+import { isSoloProject } from '../../hooks/lib/project-config.mjs';
 
 export const POLICY_LOCK_PATH = '.eos/policy.lock.json';
 export const POLICY_FILES = { gates: '.eos/gates.json', workflow: '.eos/workflow.json', project: '.eos/project.json' };
+
+/** The one change a self-approval can never stand behind (ADR-023). */
+export const SOLO_SWITCH = 'project:approvalMode:independent->solo';
+const SELF_APPROVER = /\s\(self\)$/i;
+export const isSelfApprover = (approver) => SELF_APPROVER.test(String(approver || '').trim());
 
 const POLICY_RANK = { not_applicable: 0, waivable: 1, required: 2 };
 const EVIDENCE_RANK = { local: 0, ci: 1, attested: 2 };
@@ -97,6 +103,10 @@ export function policySnapshot({ gates, workflow, project }) {
       // project's first declaration, compared with no earlier project policy. Present only when
       // true, so a project's own declaration keeps the digest it was locked with.
       ...(project.templateDefault === true ? { templateDefault: true } : {}),
+      // Who may approve, and which records stay out of the product tree (eos-2.6.0, ADR-023). Present
+      // only when they differ from the default, so every project keeps the digest it was locked with.
+      ...(project.approvalMode === 'solo' ? { approvalMode: 'solo' } : {}),
+      ...((project.productTree?.exclude || []).length ? { productTreeExclude: [...project.productTree.exclude].sort() } : {}),
     };
   }
   return { gates: gateMap, workflow: { defaultProfile: workflow?.defaultProfile ?? null, profiles, stateMachines }, project: proj };
@@ -216,6 +226,10 @@ export function diffPolicy(a, b) {
     // what the template shipped is the floor the project starts from. While a declaration stays the
     // template's own (in EOS's repository), it is compared like any other.
     add('INFO', `project:first-declaration:${pb.projectType}`, `this project's first declaration (${pb.projectType}, ${pb.workflowProfile}) replaces the EOS template's own — there was no earlier project policy to weaken`);
+  } else if (pa && !pb && !pa.templateDefault) {
+    // Deleting .eos/project.json used to compare as "nothing to compare": the product-quality gate
+    // simply stopped knowing what to run. A removed declaration is the weakest declaration there is.
+    add('WEAKENING', 'project:declaration-removed', '.eos/project.json was deleted — nothing declares what the project is or how it is verified');
   } else if (pa && pb) {
     // Marking a project's declaration as the template's own again would make the NEXT change to it a
     // first declaration, compared with nothing — the two-step way around this check. It needs the
@@ -248,6 +262,17 @@ export function diffPolicy(a, b) {
           weaker.length ? `the project moved to a weaker profile: ${weaker.slice(0, 3).map((c) => c.detail).join('; ')}${weaker.length > 3 ? ` (+${weaker.length - 3} more)` : ''}` : `the project moved to ${pb.workflowProfile}`);
       }
     }
+    // Moving to `solo` lets the person who prepared the work approve it (ADR-023). That is a
+    // weakening, and the one change a self-approval can never stand behind: it needs a second person.
+    if (pa.approvalMode !== 'solo' && pb.approvalMode === 'solo') {
+      add('WEAKENING', SOLO_SWITCH, 'approvals may now be recorded by the person who prepared the work (assurance "self") — an independent approver must agree to this change');
+    } else if (pa.approvalMode === 'solo' && pb.approvalMode !== 'solo') {
+      add('STRENGTHENING', 'project:approvalMode:solo->independent', 'every approval needs a person other than the one who prepared the work again');
+    }
+    const excludedBefore = new Set(pa.productTreeExclude || []);
+    const excludedAfter = new Set(pb.productTreeExclude || []);
+    for (const path of excludedAfter) if (!excludedBefore.has(path)) add('REVIEW', `project:productTree-exclude:${path}`, `${path} no longer counts as product: editing it will not make verified evidence STALE`);
+    for (const path of excludedBefore) if (!excludedAfter.has(path)) add('STRENGTHENING', `project:productTree-include:${path}`, `${path} counts as product again`);
     if (pa.complianceProfile === 'regulated' && pb.complianceProfile !== 'regulated') {
       add('WEAKENING', 'project:complianceProfile:regulated->none', 'the compliance boundary is switched off');
     }
@@ -335,11 +360,20 @@ export function policyChanges(root, against = null) {
 
 const sameActor = (x, y) => String(x || '').trim().toLowerCase() === String(y || '').trim().toLowerCase();
 
-/** Is this acknowledgement good enough to stand behind a weakening? */
-export function acknowledgementProblem(ack) {
+/**
+ * Is this acknowledgement good enough to stand behind a weakening?
+ * `solo`: the project declared approvalMode "solo" (Standard track), so an approver written
+ * `<name> (self)` — the person who asked — is accepted, labelled as a self-approval. Never for the
+ * change that switches to solo itself.
+ */
+export function acknowledgementProblem(ack, { solo = false } = {}) {
   if (!ack) return 'not acknowledged';
   if (!ack.reason || ack.reason.trim().length < 20) return 'acknowledged without a real reason (20+ characters)';
   if (!ack.approver || !ack.approver.trim()) return `awaiting an approver — requested by ${ack.requestedBy}; EOS records approvals, it never grants them`;
+  if (isSelfApprover(ack.approver)) {
+    if (ack.change === SOLO_SWITCH) return 'the switch to approvalMode "solo" needs an independent approver — a self-approval cannot grant itself';
+    return solo ? null : 'a self-approval needs approvalMode "solo" in .eos/project.json (Standard track) — otherwise a second person must approve';
+  }
   if (sameActor(ack.approver, ack.requestedBy)) return 'the approver is the requester — weakening a control needs a second person';
   return null;
 }
@@ -361,7 +395,8 @@ export function policyDrift(root) {
   const currentDigest = policyDigest(policySnapshot(current.files));
   if (currentDigest === lock.policyDigest) return null;
   const { changes, base } = policyChanges(root);
-  const covered = new Set((lock.acknowledged || []).filter((a) => !acknowledgementProblem(a)).map((a) => a.change));
+  const solo = isSoloProject(current.files.project);
+  const covered = new Set((lock.acknowledged || []).filter((a) => !acknowledgementProblem(a, { solo })).map((a) => a.change));
   const weakenings = changes.filter((c) => c.requiresAck && !covered.has(c.id)).map((c) => c.id);
   return { lockDigest: lock.policyDigest, currentDigest, base: base?.label || null, weakenings, otherChanges: changes.length - weakenings.length };
 }
@@ -378,6 +413,7 @@ export function checkPolicy(root, { against = null } = {}) {
   const { present, lock, errors: lockErrors } = readLock(root);
   problems.push(...lockErrors);
   const needing = changes.filter((c) => c.requiresAck);
+  const solo = isSoloProject(readPolicy(root).files.project);
 
   if (!present) {
     if (needing.length) problems.push(`${needing.length} policy change(s) need acknowledgement but there is no ${POLICY_LOCK_PATH} — run \`eos policy lock --write --reason "<why>"\``);
@@ -389,7 +425,7 @@ export function checkPolicy(root, { against = null } = {}) {
     }
     for (const c of needing) {
       const ack = (lock.acknowledged || []).find((a) => a.change === c.id);
-      const problem = acknowledgementProblem(ack);
+      const problem = acknowledgementProblem(ack, { solo });
       if (problem) problems.push(`${c.kind} ${c.id} — ${c.detail}: ${problem}`);
     }
   }
@@ -414,7 +450,7 @@ export function checkPolicy(root, { against = null } = {}) {
       if (signature) problems.push(signature);
       for (const c of up.changes.filter((x) => x.requiresAck)) {
         const ack = (lock?.acknowledged || []).find((a) => a.change === c.id);
-        const problem = acknowledgementProblem(ack);
+        const problem = acknowledgementProblem(ack, { solo: false }); // an organization baseline is never self-approved
         if (problem) problems.push(`${c.kind} ${c.id} — weaker than the organization baseline ${label}: ${c.detail}: ${problem}`);
       }
       notes.push(`follows the organization baseline ${label} (${up.changes.filter((x) => x.requiresAck).length} acknowledged deviation(s) checked)`);
@@ -427,8 +463,11 @@ export function checkPolicy(root, { against = null } = {}) {
  * Plan (and optionally write) a new lock. Existing acknowledgements are kept — they are the record
  * of who agreed to what — and every newly needed one is drafted with an EMPTY approver.
  */
-export function planLock(root, { against = null, reason = null, actor = null, write = false, now = new Date() } = {}) {
+export function planLock(root, { against = null, reason = null, actor = null, self = false, write = false, now = new Date() } = {}) {
   const { base, changes, errors, current } = policyChanges(root, against);
+  const selfRefused = self && !isSoloProject(readPolicy(root).files.project)
+    ? 'a self-approval needs approvalMode "solo" in .eos/project.json (Standard track); otherwise leave the approver for a second person'
+    : null;
   const existing = readLock(root).lock;
   const acknowledged = [...(existing?.acknowledged || [])];
   const drafted = [];
@@ -437,6 +476,8 @@ export function planLock(root, { against = null, reason = null, actor = null, wr
   for (const c of lockable.filter((x) => x.requiresAck)) {
     if (acknowledged.some((a) => a.change === c.id)) continue;
     const entry = { change: c.id, kind: c.kind, detail: c.detail, reason: reason || '', requestedBy: actor || 'unknown', approver: '', recordedAt: now.toISOString().slice(0, 10) };
+    // A labelled self-approval, for a solo project; the switch to solo itself keeps its empty approver.
+    if (self && !selfRefused && c.id !== SOLO_SWITCH) { entry.approver = `${actor || 'unknown'} (self)`; entry.assurance = 'self'; }
     acknowledged.push(entry);
     drafted.push(entry);
   }
@@ -448,9 +489,9 @@ export function planLock(root, { against = null, reason = null, actor = null, wr
     : null;
   const pinned = up.declared ? (existing?.upstream || firstPin) : null;
   const lock = { $schema: './schemas/policy-lock.schema.json', schemaVersion: 1, policyDigest: policyDigest(current), acknowledged, ...(pinned ? { upstream: pinned } : {}) };
-  const refused = drafted.length && (!reason || reason.trim().length < 20)
+  const refused = selfRefused || (drafted.length && (!reason || reason.trim().length < 20)
     ? `${drafted.length} change(s) need acknowledgement: pass --reason "<why, 20+ characters>"`
-    : null;
+    : null);
   if (write && !refused && !errors.length) writeFileAtomic(join(root, POLICY_LOCK_PATH), `${JSON.stringify(lock, null, 2)}\n`);
   return { base, changes, errors, lock, drafted, refused, written: write && !refused && !errors.length };
 }

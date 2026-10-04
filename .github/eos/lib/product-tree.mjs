@@ -52,6 +52,27 @@ export const SELF_REFERENCE_PREFIXES = [
 
 export const isSelfReference = (rel) => SELF_REFERENCE_PREFIXES.some((p) => rel.startsWith(p));
 
+/**
+ * Records the project declared as "not product" (`productTree.exclude` in .eos/project.json, eos-2.6.0):
+ * a pilot log or a changelog is edited all the time and says nothing about what the product does, yet
+ * every edit made every story's evidence STALE. Exact paths only, read straight from the declaration so
+ * this module stays free of the project loader; an unreadable declaration excludes nothing, which can
+ * only make the tree stricter. Adding an entry is a policy REVIEW (lib/policy.mjs).
+ */
+const excludedCache = new Map();
+function excludedPaths(root) {
+  if (!excludedCache.has(root)) {
+    let list = [];
+    try {
+      const exclude = JSON.parse(readFileSync(join(root, '.eos/project.json'), 'utf8'))?.productTree?.exclude;
+      if (Array.isArray(exclude)) list = exclude.filter((e) => typeof e === 'string');
+    } catch { /* no declaration, or not JSON: nothing is excluded */ }
+    excludedCache.set(root, new Set(list));
+  }
+  return excludedCache.get(root);
+}
+const isExcluded = (root, rel) => excludedPaths(root).has(rel);
+
 const git = (root, args) => {
   const r = spawnSync('git', args, { cwd: root, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
   return r.status === 0 ? (r.stdout || '') : null;
@@ -92,7 +113,7 @@ function productFiles(root) {
   for (const path of untracked) if (!modes.has(path)) modes.set(path, { mode: '100644', object: null });
 
   return [...modes.entries()]
-    .filter(([path]) => !isSelfReference(path))
+    .filter(([path]) => !isSelfReference(path) && !isExcluded(root, path))
     .map(([path, meta]) => ({ path, ...meta }))
     .sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
 }
@@ -182,7 +203,7 @@ export function productFilePaths(root) {
   if (!pathCache.has(root)) pathCache.set(root, productFiles(root)?.map((f) => f.path) ?? null);
   return pathCache.get(root);
 }
-export const clearProductTreeCache = () => { cache.clear(); pathCache.clear(); };
+export const clearProductTreeCache = () => { cache.clear(); pathCache.clear(); excludedCache.clear(); };
 
 /**
  * Name the files behind a digest mismatch. The digest DECIDES; this only explains, so it is allowed
@@ -197,7 +218,7 @@ function changedPaths(root, recordedCommit) {
     }
   }
   for (const p of porcelainPaths(root) || []) out.add(p);
-  return [...out].filter((p) => !isSelfReference(p)).sort();
+  return [...out].filter((p) => !isSelfReference(p) && !isExcluded(root, p)).sort();
 }
 
 /**
@@ -267,7 +288,7 @@ export function productTreeMembers(root, paths) {
   const tracked = zsplit(git(root, ['--literal-pathspecs', 'ls-files', '-z', '--', ...paths]));
   const untracked = zsplit(git(root, ['--literal-pathspecs', 'ls-files', '--others', '--exclude-standard', '-z', '--', ...paths]));
   if (tracked === null || untracked === null) return null;
-  return [...new Set([...tracked, ...untracked])].filter((p) => !isSelfReference(p)).sort();
+  return [...new Set([...tracked, ...untracked])].filter((p) => !isSelfReference(p) && !isExcluded(root, p)).sort();
 }
 
 /**
@@ -291,5 +312,5 @@ export function newestProductFile(root) {
 export function uncommittedProductChanges(root) {
   const paths = porcelainPaths(root);
   if (paths === null) return null;
-  return [...new Set(paths.filter((p) => !isSelfReference(p)))].sort();
+  return [...new Set(paths.filter((p) => !isSelfReference(p) && !isExcluded(root, p)))].sort();
 }

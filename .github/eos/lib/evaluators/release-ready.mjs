@@ -15,6 +15,7 @@ import { readManifest, manifestProblems, manifestPath } from '../release.mjs';
 import { resolve as applyProviderVerdict } from '../../adapters/contract.mjs';
 import { expiredWaivers } from '../waivers.mjs';
 import { verifyRelease } from '../release-integrity.mjs';
+import { todayOf } from '../deferrals.mjs';
 import {
   ok, fail, blocked, na, awaiting, runHook, runProjectGate, manifestStories, thresholdMet,
   runCommandList, RUNBOOKS, findTopologyAdr, decisionIsPlaceholder, isRegulated, evidenceIntegrity,
@@ -301,7 +302,8 @@ export const evaluators = {
         if (!substantive(t.reason, 15)) problems.push(`${t.id}: SKIP without a real reason`);
       } else if (t.decision === 'DEFER') {
         if (!substantive(t.owner, 1) || !substantive(t.trigger, 5)) problems.push(`${t.id}: DEFER without an owner and a trigger`);
-        else deferrals.push(`${t.id} → ${t.owner} (${t.trigger})`);
+        else if (t.dueBy && t.dueBy < todayOf(ctx.now)) problems.push(`${t.id}: the deferral is overdue (dueBy ${t.dueBy}) — measure it, or defer it again with a new dueBy and a fresh approval`);
+        else deferrals.push(`${t.id} → ${t.owner} (${t.trigger}; ${t.dueBy ? `due by ${t.dueBy}` : 'NO dueBy — it cannot be promoted without one'})`);
       }
     }
     // Only the targets the summary CHOOSES to mention were checked, so an NFR could be dropped
@@ -313,7 +315,7 @@ export const evaluators = {
       if (uncovered.length) problems.push(`no result for NFR(s) declared in ${req.path}: ${uncovered.join(', ')}`);
     }
     if (problems.length) return fail(`NFR evidence incomplete: ${problems.join(' · ')}`);
-    if (deferrals.length) return { status: 'DEFERRED', detail: `NFR target(s) deferred with an owner and a trigger: ${deferrals.join('; ')} — visible and time-bound, not passed` };
+    if (deferrals.length) return { status: 'DEFERRED', detail: `NFR target(s) deferred with an owner and a trigger: ${deferrals.join('; ')} — visible and time-bound, never passed. A Standard-track release can be promoted with these when each has a dueBy in the future and the approval is given for this list; a regulated or controlled release cannot` };
     return ok(`${summary.data.targets.length} NFR target(s) measured or explicitly scoped out`);
   },
   /**
