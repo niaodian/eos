@@ -16,7 +16,7 @@ import { spawnSync } from 'node:child_process';
 import {
   project, write, run, runJson, cleanup, git, commitAll, story, releaseFiles,
   APP_PROJECT, PRD_2AC, baselineFiles, storyFiles, testRun, treeDigest, DISCOVERY_RECORD,
-  writeManifest, bindDigests, ARCHITECTURE_RECORD, REQUIREMENTS_RECORD,
+  writeManifest, bindDigests, ARCHITECTURE_RECORD, REQUIREMENTS_RECORD, ADR_STACK,
   TELEMETRY_MD, TELEMETRY_RECORD, ITERATION_RECORD, REPO_ROOT,
   computeProductTree, compareProductTree, clearProductTreeCache, isSelfReference,
   emptyDocReason, readEvidence, evidenceFreshness,
@@ -105,6 +105,24 @@ test('EOS-AUD-007: NFR targets need measurements; a deferral needs an owner and 
   write(dir, 'docs/evidence/nfr-summary.json', nfr([{ id: 'NFR1', decision: 'DEFER', owner: '@platform', trigger: 'before the first paying customer' }]));
   r = runJson(dir, ['release-status', '--release', 'v1.0.0']);
   assert.equal(r.json.checks.find((c) => c.id === 'nfr-evidence').status, 'DEFERRED');
+});
+
+test('eos-2.6.0 (D3): a one-way decision no person confirmed passes G4 with a note and fails the release', () => {
+  const proposed = ADR_STACK.replace('Accepted', 'Proposed').replace('- Confirmed by: Priya Raman\n- Confirmed at: 2026-01-05\n', '');
+  const unsigned = ADR_STACK.replace('- Confirmed by: Priya Raman\n', '');
+  const doors = (adr) => {
+    const dir = verifiedStory(releaseFiles({ 'docs/adr/001-tech-stack.md': adr }));
+    return runJson(dir, ['release-status', '--release', 'v1.0.0']).json.checks.find((c) => c.id === 'one-way-doors-confirmed');
+  };
+  assert.equal(doors(ADR_STACK).status, 'PASS');
+  const open = doors(proposed);
+  assert.equal(open.status, 'FAIL');
+  assert.match(open.detail, /techStack: docs\/adr\/001-tech-stack\.md is still "proposed"/);
+  assert.match(doors(unsigned).detail, /has no "Confirmed by"/);
+
+  const g4 = runJson(project(baselineFiles({ 'docs/adr/001-tech-stack.md': proposed })), ['check', '--gate', 'architecture-ready']);
+  assert.equal(g4.code, 0, g4.out);
+  assert.match(JSON.stringify(g4.json.checks), /still \\"proposed\\"/);
 });
 
 test('eos-2.6.0: a deferred NFR carries a dueBy; one that is overdue is a FAIL, not a longer wait', () => {

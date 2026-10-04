@@ -6,6 +6,8 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { readStageRecord, decisionProblem, STAGE_RECORDS } from '../stage-record.mjs';
+import { readAdrConfirmation, oneWayDoors } from '../adr.mjs';
+import { syncWorkspaceRule } from '../workspace-rule.mjs';
 import {
   ok, fail, blocked, na, awaiting, stageDocCheck, WORKSPACE_RULE, PROVISIONAL_STACK, repoFileExists,
   isRegulated,
@@ -37,9 +39,13 @@ export const evaluators = {
       if (d[key]?.status === 'NOT_APPLICABLE') problems.push(`${key}: cannot be NOT_APPLICABLE — every product runs on some stack, in some topology`);
       else if (d[key]?.status === 'DECIDED' && !d[key].adr) problems.push(`${key}: an irreversible decision needs an ADR (docs/adr/…)`);
     }
+    // G4 does not wait for a person: an unattended run decides provisionally and development goes on.
+    // It says so here, and `release-ready` (one-way-doors-confirmed) is where a person must answer.
+    const proposed = oneWayDoors(r.data).filter((door) => readAdrConfirmation(ctx.root, door.adr).status === 'proposed').map((door) => `${door.key} (${door.adr})`);
+    const pending = proposed.length ? ` — NOTE: ${proposed.length} one-way decision(s) are still "proposed" (${proposed.join(', ')}); a person confirms them (Status: accepted, Confirmed by, Confirmed at) before release` : '';
     return problems.length
       ? fail(`architecture decisions incomplete: ${problems.slice(0, 4).join(' · ')}${problems.length > 4 ? ` · +${problems.length - 4} more` : ''}`)
-      : ok(`${required.length} architectural concern(s) decided or explicitly N/A with a reason`);
+      : ok(`${required.length} architectural concern(s) decided or explicitly N/A with a reason${pending}`);
   },
   architectureNfrLanding(ctx) {
     const r = readStageRecord(ctx.root, 'architecture');
@@ -64,15 +70,26 @@ export const evaluators = {
     if (r.data.decisions?.techStack?.status !== 'DECIDED') {
       return na('the tech stack is not DECIDED yet, so there is nothing to land in the workspace rule');
     }
+    // The stack must be declared, and the always-on rule must say what `stack sync` would render from
+    // that declaration. Looking only for the PROVISIONAL marker passed for every adopter: the template's
+    // rule never carried one, so a project whose `stacks` was still empty and whose rule still named
+    // EOS's own test command went through G4 as "architecture decided". (pilot record 14)
+    const project = ctx.snapshot.project;
+    if (!project?.stacks?.length) {
+      return fail('docs/architecture.json declares the stack DECIDED but .eos/project.json declares no "stacks" — declare the stack (`node .github/eos/eos.mjs init <pack> --write`), then run `node .github/eos/eos.mjs stack sync --write`');
+    }
     if (!repoFileExists(ctx.root, WORKSPACE_RULE)) {
       // The failure this check exists to prevent is a placeholder CONTRADICTING the ADR. With no
       // workspace rule there is no contradiction, and inventing a file-must-exist requirement here
       // would be G4 enforcing something it was never about.
       return na(`${WORKSPACE_RULE} does not exist, so no always-on rule can contradict the locked stack`);
     }
+    const sync = syncWorkspaceRule(ctx.root, project, { write: false });
+    if (!sync.ok) return fail(`${WORKSPACE_RULE} cannot be brought in line with the declared stack: ${sync.reason}`);
     const text = readFileSync(join(ctx.root, WORKSPACE_RULE), 'utf8');
-    return PROVISIONAL_STACK.test(text)
-      ? fail(`${WORKSPACE_RULE} still carries the PROVISIONAL placeholder while docs/architecture.json declares the stack DECIDED — declare the stack in .eos/project.json, then run \`node .github/eos/eos.mjs stack sync --write\` to render the "Local commands" block from it`)
-      : ok(`${WORKSPACE_RULE} no longer carries the provisional stack placeholder`);
+    if (PROVISIONAL_STACK.test(text) || sync.changed) {
+      return fail(`${WORKSPACE_RULE} ${PROVISIONAL_STACK.test(text) ? 'still carries the PROVISIONAL placeholder' : 'does not say what the declared stack runs'} while docs/architecture.json declares the stack DECIDED — run \`node .github/eos/eos.mjs stack sync --write\` to render the "Local commands" block from .eos/project.json (expected: ${sync.line})`);
+    }
+    return ok(`${WORKSPACE_RULE} states the commands the declared stack (${project.stacks.join(' + ')}) runs`);
   },
 };

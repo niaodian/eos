@@ -10,12 +10,13 @@ import { gatePolicy, scopeState, ARTIFACTS } from '../state.mjs';
 import { readEvidence } from '../evidence.mjs';
 import { currentProductTree, compareProductTree, uncommittedProductChanges } from '../product-tree.mjs';
 import { readSummary, summaryTreeMismatch, producerTrust, SUMMARY_PATHS } from '../machine-summary.mjs';
-import { readStageRecord, substantive } from '../stage-record.mjs';
+import { readStageRecord, substantive, STAGE_RECORDS } from '../stage-record.mjs';
 import { readManifest, manifestProblems, manifestPath } from '../release.mjs';
 import { resolve as applyProviderVerdict } from '../../adapters/contract.mjs';
 import { expiredWaivers } from '../waivers.mjs';
 import { verifyRelease } from '../release-integrity.mjs';
 import { todayOf } from '../deferrals.mjs';
+import { readAdrConfirmation, oneWayDoors } from '../adr.mjs';
 import {
   ok, fail, blocked, na, awaiting, runHook, runProjectGate, manifestStories, thresholdMet,
   runCommandList, RUNBOOKS, findTopologyAdr, decisionIsPlaceholder, isRegulated, evidenceIntegrity,
@@ -278,6 +279,28 @@ export const evaluators = {
     const weak = levels.some((l) => l.includes('UNATTESTED_LOCAL'));
     return ok(`policy "${policy}" satisfied — ${levels.join(', ')}`
       + `${weak && policy === 'local' ? '. Local evidence is honest but unattested; raise evidencePolicy to "ci" or "attested" when that matters.' : ''}`);
+  },
+
+  /**
+   * A one-way door is not through until a person has confirmed it. An unattended run may decide the
+   * stack, the topology or the data model provisionally (G4 passes, and says so); shipping needs the
+   * ADR accepted and signed by name. Not waivable, like the rest of release-ready.
+   */
+  releaseOneWayDoorsConfirmed(ctx) {
+    const r = readStageRecord(ctx.root, 'architecture');
+    if (!r.data) return na(`${STAGE_RECORDS.architecture.path} does not exist, so there is no one-way decision to confirm`);
+    const doors = oneWayDoors(r.data);
+    if (!doors.length) return na('no architecture decision cites an ADR, so there is no one-way decision to confirm');
+    const open = [];
+    for (const door of doors) {
+      const adr = readAdrConfirmation(ctx.root, door.adr);
+      if (!adr.present) open.push(`${door.key}: ${door.adr} does not exist`);
+      else if (adr.status === 'proposed') open.push(`${door.key}: ${door.adr} is still "proposed"`);
+      else if (!adr.confirmedBy) open.push(`${door.key}: ${door.adr} has no "Confirmed by"`);
+    }
+    return open.length
+      ? fail(`one-way decision(s) no person has confirmed: ${open.join(' · ')} — read each ADR, set "Status: accepted" and add "Confirmed by: <name>" and "Confirmed at: <YYYY-MM-DD>", then commit`)
+      : ok(`${doors.length} one-way decision(s) confirmed by name`);
   },
 
   releaseNfrEvidence(ctx) {
