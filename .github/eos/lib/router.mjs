@@ -193,18 +193,25 @@ function action(snapshot, id, { reason, targetGate = null, command = null, doneW
 
 const artifactAction = (snapshot, id, { file, reason, doneWhen, command = null }) => ({
   ...action(snapshot, id, { reason, command: command || `${CLI} handoff`, doneWhen }),
-  blocker: { gate: 'product', check: id, status: 'FAIL', detail: `${file} does not exist` },
+  // Look before saying "does not exist": a directory that is there but holds nothing EOS can read is
+  // a different problem from a missing one. (pilot record 27)
+  blocker: { gate: 'product', check: id, status: 'FAIL', detail: existsSync(join(snapshot.root, file)) ? `${file} exists but holds no story file EOS can read (docs/stories/<id>.md with the story front matter)` : `${file} does not exist` },
 });
 
-/** Pick the active scope: the local focus wins, then the first unfinished story, then the product. */
+/**
+ * Pick the active scope: the local focus wins, then the first unfinished story, then the product.
+ * A `product` focus is the one exception to "focus wins": it says "work on the baseline", and once
+ * the baseline gates all pass and a story is waiting it is stale — it used to outlive the baseline
+ * and keep `eos next` on a product that was already done. (pilot record 27)
+ */
 export function activeScope(snapshot) {
   const aw = snapshot.activeWork;
+  const unfinished = snapshot.stories.find((s) => scopeState(snapshot, 'story', s.id) !== 'MERGED');
   if (aw) {
     if (aw.scopeType === 'release') return { type: 'release', id: aw.scopeId };
     if (aw.scopeType === 'story' && snapshot.stories.some((s) => s.id === aw.scopeId)) return { type: 'story', id: aw.scopeId };
-    if (aw.scopeType === 'product') return { type: 'product', id: 'product' };
+    if (aw.scopeType === 'product' && !(unfinished && snapshot.workflow && deriveProductState(snapshot).state === 'ACTIVE')) return { type: 'product', id: 'product' };
   }
-  const unfinished = snapshot.stories.find((s) => scopeState(snapshot, 'story', s.id) !== 'MERGED');
   if (unfinished) return { type: 'story', id: unfinished.id };
   if (snapshot.stories.length) return { type: 'story', id: snapshot.stories.at(-1).id };
   return { type: 'product', id: 'product' };

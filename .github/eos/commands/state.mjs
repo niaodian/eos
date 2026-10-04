@@ -167,8 +167,9 @@ export const stateCommands = {
   resume(snapshot, flags) {
     const decision = route(snapshot);
     // Record the focus locally so a new chat session starts where the last one stopped. This file
-    // is gitignored and carries no authority — only a scope id and a change type.
-    if (decision.current.scopeId) {
+    // is gitignored and carries no authority — only a scope id and a change type. The product is
+    // never pinned: it is where `next` starts anyway, and a pinned one outlived the baseline.
+    if (decision.current.scopeId && decision.current.scopeType !== 'product') {
       const { path, branch } = activeWorkPath(snapshot.root);
       const full = join(snapshot.root, path);
       mkdirSync(dirname(full), { recursive: true });

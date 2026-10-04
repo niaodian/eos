@@ -171,3 +171,43 @@ test('a story that is MERGED hands the focus back to the next change', () => {
   assert.equal(r.json.recommendedAction.id, 'start-next-change');
   assert.equal(r.code, 0);
 });
+
+// eos-2.6.0, pilot record 27: a `product` focus used to outlive the baseline.
+test('a stale product focus is ignored once the baseline passes and a story is waiting', () => {
+  const dir = project({ ...storyFiles(), '.eos/local/active-work.json': { schemaVersion: 1, scopeType: 'product', scopeId: 'product' } }, { withHooks: true });
+  const r = runJson(dir, ['next']);
+  assert.equal(r.json.current.scopeType, 'story', r.out);
+  assert.equal(r.json.current.scopeId, 'STORY-001');
+});
+
+test('a product focus is still honoured while the baseline is incomplete', () => {
+  const dir = project({ '.eos/project.json': APP_PROJECT, '.eos/local/active-work.json': { schemaVersion: 1, scopeType: 'product', scopeId: 'product' } });
+  assert.equal(runJson(dir, ['next']).json.current.scopeType, 'product');
+});
+
+test('resume never pins the product as the local focus', () => {
+  const dir = project(baselineFiles());
+  run(dir, ['resume']);
+  const focus = (() => { try { return readFileSync(join(dir, '.eos/local/active-work.main.json'), 'utf8'); } catch { return ''; } })();
+  assert.doesNotMatch(focus, /"scopeType": "product"/);
+});
+
+test('plan-stories looks at the directory before saying it is missing', () => {
+  const dir = project({ ...baselineFiles(), 'docs/stories/.gitkeep': '' });
+  const r = runJson(dir, ['next']);
+  assert.equal(r.json.recommendedAction.id, 'plan-stories');
+  assert.match(JSON.stringify(r.json.blockers), /docs\/stories\/ exists but holds no story file/);
+  assert.doesNotMatch(JSON.stringify(r.json.blockers), /does not exist/);
+});
+
+test('verify evaluates only the stages the baseline has reached, and records nothing for the rest', () => {
+  const dir = project({ '.eos/project.json': APP_PROJECT, 'docs/discovery.md': DISCOVERY_MD, 'docs/discovery.json': DISCOVERY_RECORD }, { withHooks: true });
+  const plan = runJson(dir, ['verify', '--plan']).json.planned;
+  const row = (gate) => plan.find((p) => p.gate === gate);
+  assert.equal(row('discovery-ready').run, true);
+  assert.equal(row('requirements-ready').run, true, 'the stage in progress is evaluated');
+  for (const gate of ['prd-ready', 'ux-ready', 'architecture-ready']) {
+    assert.equal(row(gate).run, false, gate);
+    assert.match(row(gate).reason, /not reached yet/);
+  }
+});

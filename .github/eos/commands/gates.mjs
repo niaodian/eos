@@ -3,11 +3,11 @@
 // Registered in ./index.mjs. A handler receives (snapshot, flags) and returns an exit code (./shared.mjs).
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { gatePolicy, changeTypeOf, gateInputs, gateCollections } from '../lib/state.mjs';
+import { gatePolicy, changeTypeOf, gateInputs, gateCollections, scopeState } from '../lib/state.mjs';
 import { prepareGateRun, isBlocking, gateProblems } from '../lib/gates.mjs';
 import { recordGateRun } from '../lib/record.mjs';
 import { crossBranchActivity, crossBranchLines } from '../lib/cross-branch.mjs';
-import { checkTransition, legalTransitions } from '../lib/transitions.mjs';
+import { checkTransition, legalTransitions, deriveProductState } from '../lib/transitions.mjs';
 import { appendEvent, withLedger } from '../lib/ledger.mjs';
 import { renderGate, renderExplain } from '../lib/render.mjs';
 import { listEvidence, evidenceFreshness, readEvidence } from '../lib/evidence.mjs';
@@ -67,8 +67,21 @@ export const gateCommands = {
     const GOVERNANCE = ['.eos/gates.json', '.eos/workflow.json', '.eos/project.json'];
     const governanceChanged = changed === null ? [] : GOVERNANCE.filter((g) => changed.includes(g));
 
+    // Only stages the project has REACHED are evaluated. A gate for a stage that has not begun is not
+    // a failure, and a FAIL written to the append-only ledger for it can never be taken back.
+    const spine = ['discovery-ready', 'requirements-ready', 'prd-ready', 'ux-ready', 'architecture-ready'];
+    const blockingGate = deriveProductState(snapshot).blockedBy?.transition?.requiresGate;
+    const frontier = spine.includes(blockingGate) ? spine.indexOf(blockingGate) : spine.length - 1;
+    const notReached = (t) => {
+      if (t.scopeType === 'product' && spine.includes(t.def.id) && spine.indexOf(t.def.id) > frontier) return `not reached yet — the baseline is at ${spine[frontier]}`;
+      if (t.scopeType === 'story' && t.def.id === 'verified' && ['DRAFT', 'IN_REVIEW', 'READY_FOR_DEV'].includes(scopeState(snapshot, 'story', t.scopeId))) return 'not reached yet — the story has not entered development';
+      return null;
+    };
+
     const plan = [];
     for (const t of targets) {
+      const early = notReached(t);
+      if (early) { plan.push({ ...t, run: false, reason: early }); continue; }
       const policy = gatePolicy(snapshot, changeTypeOf(snapshot, t.scopeType, t.scopeId), t.def.id);
       if (policy === 'not_applicable') { plan.push({ ...t, run: false, reason: 'not applicable to this change type' }); continue; }
       if (full) { plan.push({ ...t, run: true, reason: '--full' }); continue; }
