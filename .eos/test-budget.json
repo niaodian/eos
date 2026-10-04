@@ -12,7 +12,7 @@
       "audit-regression": 38500,
       "contract": 16800,
       "integration": 53000,
-      "journey": 4200,
+      "journey": 11200,
       "unit": 9000
     }
   },
@@ -92,8 +92,8 @@
       ]
     },
     "journey": {
-      "description": "The whole developer loop end to end, executed through the real CLI, offline.",
-      "budgetMs": 10000,
+      "description": "The whole developer loop end to end, executed through the real CLI, offline. eos-2.6.0 added five release journeys (a bounded DEFERRED, the solo path, and their counter-examples), each driving a story to a release candidate through the CLI: the layer measured 11.2s on the CI runner, up from 4.2s, so the baseline was re-recorded once and the ceiling set to about 1.8x of it.",
+      "budgetMs": 20000,
       "files": [
         ".github/eos/journey.test.mjs",
         ".github/eos/journey-solo.test.mjs",
