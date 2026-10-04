@@ -148,7 +148,7 @@ test('an eval waiver must NOT switch off the D5 compliance boundary', () => {
   const { code, out } = run(project({
     '.eos/project.json': {
       projectType: 'application', stacks: ['python'], productParadigms: ['deterministic'],
-      commands: { test: 'pytest -q' },
+      commands: { test: 'pytest -q' }, complianceProfile: 'regulated',
       evalWaiver: { reason: 'openai is only used by an offline doc generator', approvedBy: 'ada@example.com' },
     },
     'requirements.txt': 'openai==1.40.0\n',
@@ -231,14 +231,34 @@ test('TOML dependency tables and arrays DO trip the gate', () => {
 const AGENTIC_DECL = { projectType: 'application', stacks: ['node'], productParadigms: ['agentic'], commands: { test: 'npm test', eval: 'npm run eval' } };
 const EVAL_OK = { ...EVAL_PLAN, ...EVAL_RUNNER };
 
-test('EOS-004: regulated + LLM + "no redaction is implemented" prose: exit 1', () => {
+test('EOS-004: a regulated project + LLM + "no redaction is implemented" prose: exit 1', () => {
   const { code, out } = run(project({
-    '.eos/project.json': AGENTIC_DECL, ...EVAL_OK,
+    '.eos/project.json': { ...AGENTIC_DECL, complianceProfile: 'regulated' }, ...EVAL_OK,
     'docs/requirements.md': '# Requirements\n\nGDPR applies to this product.\n',
     'docs/compliance-profile.md': '**Regulatory regime:** GDPR\n\nDecision: no redaction is implemented;\nregulated data may be sent to third-party models.\n',
   }));
   assert.equal(code, 1);
   assert.match(out, /D5 Compliance/);
+});
+
+test('a regime named only in prose is a warning, not a blocker; a structured ADOPT is a regulated product (pilot record 11)', () => {
+  const prose = {
+    '.eos/project.json': AGENTIC_DECL, ...EVAL_OK,
+    'docs/requirements.md': '# Requirements\n\n**Regulatory regime:** none. GDPR and PIPL do not apply to a local tool; re-assess if accounts are added.\n',
+    'docs/compliance-profile.md': '**Regulatory regime:** none\n\nWhy not GDPR: no personal data leaves the device. Revisit PIPL before a hosted release.\n',
+  };
+  const named = run(project(prose));
+  assert.equal(named.code, 0, named.out);
+  assert.match(named.out, /names a regulatory regime, but no structured record declares one/);
+  const record = (decision) => ({
+    ...prose,
+    'docs/requirements.json': { operationalPreFlight: { compliance: decision } },
+  });
+  const deferred = run(project(record({ decision: 'DEFER', owner: '@owner', trigger: 'before any hosted release that handles GDPR or PIPL data' })));
+  assert.equal(deferred.code, 0, deferred.out);
+  const adopted = run(project(record({ decision: 'ADOPT', note: 'GDPR applies to the hosted product' })));
+  assert.equal(adopted.code, 1);
+  assert.match(adopted.out, /D5 Compliance \(BLOCKER\)/);
 });
 
 test('regulated + LLM + a structured, approved, implemented boundary: exit 0', () => {
@@ -331,6 +351,7 @@ test('regulated + LLM but no structured profile at all: exit 1 (deny by default)
   const { code, out } = run(project({
     '.eos/project.json': AGENTIC_DECL, ...EVAL_OK,
     'docs/requirements.md': '# Requirements\n\nGDPR applies to this product.\n',
+    'docs/requirements.json': { operationalPreFlight: { compliance: { decision: 'ADOPT', note: 'GDPR applies to this product' } } },
   }));
   assert.equal(code, 1);
   assert.match(out, /compliance-profile\.json/);

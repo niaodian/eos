@@ -100,6 +100,20 @@ test('what EOS cannot merge safely is refused, not half-written', () => {
   assert.equal(run(dir, ['agents', 'sync', '--check']).code, 1);
 });
 
+test('the Antigravity hook runs from .agents/, the directory the platform starts it in (PL-2)', { skip: process.platform === 'win32' && 'the hook command is a POSIX shell line' }, () => {
+  const dir = sandbox({ ...APP_PROJECT, agentPlatforms: ['antigravity'] });
+  assert.equal(run(dir, ['agents', 'sync', '--write']).code, 0);
+  const command = json(dir, '.agents/hooks.json')['eos-guardrail'].PreToolUse[0].hooks[0].command;
+  const payload = (c) => JSON.stringify({ toolCall: { name: 'run_command', args: { CommandLine: c } } });
+  const inAgentsDir = (c) => boundedSpawnSync('sh', ['-c', command], { cwd: join(dir, '.agents'), input: payload(c), encoding: 'utf8', env: cleanEnv({ ...process.env }) });
+  const denied = inAgentsDir(['git', 'push', '--force'].join(' '));
+  assert.equal(denied.status, 0, denied.stderr);
+  assert.equal(JSON.parse(denied.stdout).decision, 'deny');
+  const allowed = inAgentsDir('ls');
+  assert.equal(allowed.status, 0, allowed.stderr);
+  assert.equal(allowed.stdout, '{}');
+});
+
 test('every generated hook runs the guardrail in its platform\'s dialect', { skip: process.platform === 'win32' && 'the hook commands are POSIX shell lines' }, () => {
   const dir = sandbox({ ...APP_PROJECT, agentPlatforms: ALL });
   assert.equal(run(dir, ['agents', 'sync', '--write']).code, 0);
