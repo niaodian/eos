@@ -56,13 +56,21 @@ class OpenAICompatible:
                                          headers={"content-type": "application/json", "authorization": f"Bearer {key}"})
             try:
                 with urllib.request.urlopen(req, timeout=self.timeout) as res:
-                    data = json.loads(res.read().decode("utf-8"))
+                    text = res.read().decode("utf-8", "replace")
+                try:
+                    data = json.loads(text)
+                except ValueError:
+                    raise RuntimeError(f"{self.base_url}/chat/completions answered 200 but not with JSON — this is not a model endpoint: {' '.join(text.split())[:120]}") from None
             except urllib.error.HTTPError as e:
                 # Bounded retry with backoff on rate limits and server errors; everything else is final.
                 if (e.code == 429 or e.code >= 500) and attempt < self.retries:
                     time.sleep(0.5 * 2 ** attempt)
                     continue
                 raise RuntimeError(f"{self.base_url} answered {e.code}: {e.read().decode('utf-8', 'replace')[:200]}") from None
+            # A 200 is not an answer: a gateway or a login page answers 200 too. Only a chat-completions
+            # document is the model.
+            if not isinstance(data, dict) or not isinstance(data.get("choices"), list) or not data["choices"] or not (data["choices"][0] or {}).get("message"):
+                raise RuntimeError(f"{self.base_url}/chat/completions answered 200 but not with a chat-completions JSON (no choices[0].message) — this is not a model endpoint")
             usage = data.get("usage") or {}
             return {
                 "text": ((data.get("choices") or [{}])[0].get("message") or {}).get("content") or "",
@@ -94,12 +102,17 @@ class Cassette:
         tape = json.loads(self.path.read_text(encoding="utf-8")) if self.path.exists() else {"entries": []}
         self.tape_model = tape.get("model")
         # A recording starts from an empty tape, so the cassette holds exactly what this run asked.
-        self.entries = {} if self.mode == "record" else {e["key"]: e for e in tape.get("entries", [])}
+        # `requestSha256` is the field's name since eos-2.6.0; `key` (older cassettes) is still read.
+        self.usage_comparable = tape.get("usageComparable")
+        self.entries = {} if self.mode == "record" else {e.get("requestSha256") or e["key"]: e for e in tape.get("entries", [])}
         self.provider = model.provider
         self.model = self.tape_model if self.mode == "replay" else model.model
 
     def cassette(self):
-        return {"path": self.path.as_posix(), "version": hashlib.sha256(self.path.read_bytes()).hexdigest()[:12]}
+        info = {"path": self.path.as_posix(), "version": hashlib.sha256(self.path.read_bytes()).hexdigest()[:12]}
+        if self.usage_comparable is False:
+            info["usageComparable"] = False  # answers came through a relay: token counts and latency are not the provider's
+        return info
 
     def complete(self, messages, temperature=0, seed=None):
         request = {"model": self.model, "messages": messages, "temperature": temperature, "seed": seed}
@@ -111,7 +124,7 @@ class Cassette:
             return {**hit["response"], "model": self.tape_model}
         response = self.inner.complete(messages, temperature, seed)
         if self.mode == "record":
-            self.entries[key] = {"key": key, "request": request, "response": {k: response[k] for k in ("text", "usage", "latencyMs")}}
+            self.entries[key] = {"requestSha256": key, "request": request, "response": {k: response[k] for k in ("text", "usage", "latencyMs")}}
         return response
 
     def save(self):
@@ -119,7 +132,8 @@ class Cassette:
             return None
         out = {"schemaVersion": 1, "provider": self.provider, "model": self.inner.model,
                "recordedAt": datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z"),
-               "entries": sorted(self.entries.values(), key=lambda e: e["key"])}
+               **({"usageComparable": False} if getattr(self.inner, "usage_comparable", None) is False else {}),
+               "entries": sorted(self.entries.values(), key=lambda e: e["requestSha256"])}
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.path.write_text(json.dumps(out, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
         return self.path

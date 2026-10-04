@@ -76,9 +76,30 @@ it. Record in CI with the secret when that matters. Changing the prompt, the mod
 makes replay fail until you record again — by design, the same way the product tree makes the summary
 stale. A cassette stores prompts and answers: record with the dataset, **never with production data**.
 
+### No key, or no route to a model endpoint
+
+Recording needs an OpenAI-compatible endpoint you can reach. Where there is none — no key, a network that
+blocks the provider — record through a **relay**: a local command-line client you are already logged in to
+(a vendor CLI, `ollama run`, anything that takes a prompt and prints a completion). Wrap it in the same
+one-function shape `model.mjs` uses (`complete({ messages, temperature, seed }) → { text, usage, latencyMs,
+model }`), give it `provider: 'relay:<name>'` and **`usageComparable: false`**, and record with
+`EVAL_MODE=record` as usual. `usageComparable: false` is written into the cassette and carried into the
+summary's `parameters.cassette`, and it means: *the answers are real, the token counts and latencies are the
+relay's, not the provider's.* So declare the quality cases (`EVAL-1`, `EVAL-2`) from such a recording and do
+**not** declare a budget or latency case (`EVAL-3`) from it — measure those once against the real provider,
+or record the limit in `docs/eval-plan.md` as unmeasured.
+
+**Probe before you record, and read the body.** A reachable URL is not a model. A gateway, a login page or a
+proxy answers `200 OK` with `OK` or HTML, and a probe that checks only the status records every exchange
+as a success. `model.mjs` therefore accepts an answer only when it is a chat-completions document
+(`{"choices":[{"message":{"content":…}}]}`) and otherwise stops with
+`answered 200 but not with a chat-completions JSON`; apply the same rule to any probe or relay you write.
+
 The model's output is untrusted: `llm-agent.mjs` parses and validates it, and anything outside the
 allowed shape is graded as a failure (`invalid-output`), never passed through. The Node and Python
-twins compute the same request key, so one recording replays in both.
+twins compute the same request hash, so one recording replays in both. Each cassette entry names it
+`requestSha256` (called `key` before eos-2.6.0 — `key` is still read, but secret scanners such as
+gitleaks mistook every hash for a credential, so re-record or rename the field).
 
 ## The summary contract
 The runner writes three cases. Their ids are what your stories cite in an AC's eval case

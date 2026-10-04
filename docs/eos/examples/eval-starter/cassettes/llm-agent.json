@@ -6,7 +6,7 @@
   "recordedAt": "2026-10-03T00:00:00.000Z",
   "entries": [
     {
-      "key": "10328a0a7f637b9325380436b5904d84573daae8d774d139eb89cadcc408c325",
+      "requestSha256": "10328a0a7f637b9325380436b5904d84573daae8d774d139eb89cadcc408c325",
       "request": {
         "model": "example-model",
         "messages": [
@@ -32,7 +32,7 @@
       }
     },
     {
-      "key": "afc052672fca4c2d921a47f88b7bc94c8a97ae2a7a5e95219e82c3334f7f9c96",
+      "requestSha256": "afc052672fca4c2d921a47f88b7bc94c8a97ae2a7a5e95219e82c3334f7f9c96",
       "request": {
         "model": "example-model",
         "messages": [
@@ -58,7 +58,7 @@
       }
     },
     {
-      "key": "f2dba91603949766dce38d0c6f189da3425f24512ce77f9ba753092e03335580",
+      "requestSha256": "f2dba91603949766dce38d0c6f189da3425f24512ce77f9ba753092e03335580",
       "request": {
         "model": "example-model",
         "messages": [
