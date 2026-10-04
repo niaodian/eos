@@ -4,7 +4,7 @@
 //   node --test .github/hooks/secret-rules.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { findSecret, findSecretInText, evaluateToolCall, isConfigFile, isSecretName, redact } from './lib/secret-rules.mjs';
+import { findSecret, findSecretInText, evaluateToolCall, isConfigFile, isSecretName, looksLikeSecretValue, redact } from './lib/secret-rules.mjs';
 
 const Q = '"';
 const S = "'";
@@ -120,4 +120,16 @@ test('hook: payload shapes from every harness, and a payload that is not JSON', 
   const v = evaluateToolCall(JSON.stringify({ tool_name: 'Write', tool_input: { path: 'a.py', file_text: `${PW} = ${Q}${VAL}${Q}` } }));
   assert.match(v.reason, /hardcoded credential/);
   assert.doesNotMatch(v.reason, new RegExp(VAL), 'a denial must not echo the secret');
+});
+
+test('a credential needs a high-entropy single-token value (eos-2.6.0)', () => {
+  assert.equal(looksLikeSecretValue(VAL), true);
+  assert.equal(looksLikeSecretValue('Zq8vT3mLx9Rb'), true);
+  for (const v of ['Enter your account name', 'correct-horse-battery-staple', '请输入登录口令，区分大小写', 'short', '/run/secrets/db_password', 'aaaaaaaa1']) {
+    assert.equal(looksLikeSecretValue(v), false, v);
+  }
+  assert.equal(findSecret(`${PW}: ${Q}Enter your account name${Q}`), null);
+  assert.equal(findSecret(`${PW}: ${Q}test-${PW}-fixture${Q}`), null);
+  assert.ok(findSecret(`${PW}: ${Q}${VAL}${Q}`));
+  assert.ok(findSecret(`k = ${Q}${SK}${Q}`), 'a vendor format needs no entropy test');
 });

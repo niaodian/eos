@@ -15,9 +15,15 @@
 //   - current key formats (project-scoped OpenAI keys, Anthropic keys, fine-grained GitHub tokens,
 //     Stripe live keys) slipped past the older vendor patterns.
 //
+// eos-2.6.0 (pilot records 18, 19, 24, 26): the command rules now judge what a command EXECUTES, not
+// every character a tool call carries (lib/command-words.mjs), written files other than shell
+// scripts are not commands at all, and a credential needs a high-entropy single-token value.
+//
 // Zero dependencies by design (package.json comments.zeroDependency). Both guards are heuristics: a
 // determined author can always obfuscate a literal. Their job is to catch the honest mistake — above
 // all the one an AI assistant makes while it writes code — not to replace review.
+
+import { executableText } from './command-words.mjs';
 
 /** An environment-variable name that holds a secret: a literal fallback for one is a hardcoded secret. */
 const SECRET_NAME = /KEY|SECRET|TOKEN|PASSWORD|PASSWD|CREDENTIAL/i;
@@ -36,7 +42,29 @@ export function isSecretName(name) {
  */
 export const PLACEHOLDER = /\$\{|<[A-Z_]+>|example|placeholder|change[_-]?me|your[_-]|\*{3,}|\b(?:x{3,}|dummy|sample|redacted|replace|todo)\b/i;
 
-const vendor = (kind, re) => ({ kind, re, value: (m) => m[0] });
+const vendor = (kind, re) => ({ kind, re, value: (m) => m[0], vendor: true });
+
+/** Shannon entropy of a string, in bits per character. */
+function entropy(value) {
+  const counts = new Map();
+  for (const ch of value) counts.set(ch, (counts.get(ch) || 0) + 1);
+  let bits = 0;
+  for (const count of counts.values()) bits -= (count / value.length) * Math.log2(count / value.length);
+  return bits;
+}
+
+/**
+ * Does a literal assigned to a secret-sounding NAME look like a credential? One ASCII token (a
+ * sentence, UI text or non-Latin text is not a credential), at least two character classes (a
+ * lowercase passphrase or an identifier is not one), and 3+ bits of entropy per character. Vendor
+ * formats (sk-…, ghp_…) do not need this: their shape is the evidence.
+ */
+export function looksLikeSecretValue(value) {
+  const v = String(value);
+  if (!/^[\x21-\x7e]{8,}$/.test(v)) return false;
+  const classes = [/[a-z]/, /[A-Z]/, /\d/, /[^A-Za-z\d_\-./:]/].filter((re) => re.test(v)).length;
+  return classes >= 2 && entropy(v) >= 3;
+}
 
 /** High-signal vendor formats, applied to every line of every text file. */
 const VENDOR_RULES = [
@@ -111,6 +139,7 @@ export function findSecret(line, { configFile = false } = {}) {
       if (rule.name && !isSecretName(rule.name(m))) continue;
       const value = rule.value(m);
       if (PLACEHOLDER.test(value)) continue;
+      if (!rule.vendor && !looksLikeSecretValue(value)) continue;
       return { kind: rule.kind, value };
     }
   }
@@ -133,31 +162,42 @@ export function redact(value) {
   return v.length > 8 ? `${v.slice(0, 4)}***${v.slice(-2)}` : '***';
 }
 /**
- * Destructive, supply-chain-poisoning and safety-disabling commands. Applied to a COMMAND a tool will
- * run, and to content written to a non-documentation file (a script, a workflow, a Makefile) — never
- * to prose, and never to the old text an edit replaces. The patterns are the pre-2.0.1 hook's,
- * unchanged; what changed is that they now see real line breaks.
+ * Destructive, supply-chain-poisoning and safety-disabling commands: [pattern, what, how to fix].
+ * Applied to the EXECUTABLE text of a command (executableText: heredoc bodies, quoted arguments of
+ * commands that do not run them, and comments are blanked out) and to shell scripts, Makefiles and
+ * Dockerfiles being written — never to prose, never to documentation, SQL or other files, and never
+ * to the old text an edit replaces.
  */
+const INTERPRETER_RUNS_ARGUMENT = String.raw`(?![^|;&\n]*[ \t](?:-[A-Za-z]*[ce]|--eval)(?![\w-]))`;
 export const DESTRUCTIVE_RULES = [
-  [/\brm\s+(-[a-z]*[rf]|--(?:recursive|force))/i, 'recursive or forced file removal'],
-  [/\bfind\b[^\n]*-delete/i, 'mass deletion through a file search'],
-  [/DROP\s+TABLE/i, 'a destructive SQL statement'],
-  [/\bgit\s+push\b[^\n]*\s(-f|--force)(?![\w-])/i, 'a force push (the lease-checked variant is allowed)'],
-  [/\bgit\s+reset\s+--hard\b/, 'discarding local work'],
-  [/:\s*>\s*\//, 'truncating a file at the filesystem root'],
-  [/\bdd\s+if=/i, 'a raw disk write'],
-  [/\bmkfs\b|>\s*\/dev\/sd[a-z]/i, 'formatting or writing a block device'],
-  [/\bchmod\s+-?R?\s*777\b/i, 'making files world-writable'],
+  [/\brm\s+(-[a-z]*[rf]|--(?:recursive|force))/i, 'recursive or forced file removal', 'name the files without -r / -f, or move them aside with mv'],
+  [/\bfind\b[^\n]*-delete/i, 'mass deletion through a file search', 'list the matches with find first and remove the named files'],
+  [/DROP\s+TABLE/i, 'a destructive SQL statement', 'write it into a .sql migration file (a file is not executed), or have the user run it'],
+  [/\bgit\s+push\b[^\n]*\s(-f|--force)(?![\w-])/i, 'a force push (the lease-checked variant is allowed)', 'use git push --force-with-lease'],
+  [/\bgit\s+reset\s+--hard\b/, 'discarding local work', 'use git stash, or git switch to another branch'],
+  [/:\s*>\s*\//, 'truncating a file at the filesystem root', null],
+  [/\bdd\s+if=/i, 'a raw disk write', null],
+  [/\bmkfs\b|>\s*\/dev\/sd[a-z]/i, 'formatting or writing a block device', null],
+  [/\bchmod\s+-?R?\s*777\b/i, 'making files world-writable', 'grant the narrowest mode that works, e.g. 755 or 644'],
+  [/\bkill\s+(?:-\S+\s+|[A-Z]{3,}\s+)*(?:0|-1)(?![\w.])/, 'signalling every process in the group or every process of the user', 'kill the specific process, e.g. kill "$PID"'],
+  // An approval flag that records the person who asked for it. The rule is that an AI agent never
+  // approves its own work (ADR-023): a person types this one.
+  [/(?:\beos\b|eos\.mjs)[^\n;&|]*[ \t]--self(?![\w-])/i, 'an approval recorded by the agent itself (--self)', 'print the command for the person to run: only a human gives a self-approval'],
   // One logical command line: a backslash-newline continuation joins lines, while an unrelated later
   // line does not — a download on one line and a checksum pipe on the next are not a remote script
   // piped into a shell. And the shell is a whole word: piping into sha256sum, shasum or shellcheck is
-  // not piping into sh. (deny-dangerous.test.mjs pins both directions.)
-  [/(curl|wget)\s+(?:[^|\n]|\\\r?\n)*\|\s*(sudo\s+)?(ba|z|k|c)?sh\b/i, 'a remote script piped into a shell'],
-  [/(curl|wget)\s+(?:[^|\n]|\\\r?\n)*\|\s*(sudo\s+)?(python3?|node|perl|ruby)\b/i, 'a remote script piped into an interpreter'],
-  [/base64\s+-d[^\n]*\|\s*(sudo\s+)?(ba|z)?sh\b/i, 'decoded content piped into a shell'],
-  [/\bnpm\s+(i|install|ci)\b[^\n]*--(unsafe-perm|no-verify)/i, 'disabling install-script safety'],
-  [/\bpip\s+install\b[^\n]*--(trusted-host|index-url\s+http:)/i, 'installing from an untrusted index'],
+  // not piping into sh. An interpreter that is given its code with -e / -c reads stdin as DATA: a
+  // download parsed by `node -e` is a response being read, not a script being run.
+  // (deny-dangerous.test.mjs pins all three.)
+  [new RegExp(String.raw`(curl|wget)\s+(?:[^|\n]|\\\r?\n)*\|\s*(sudo\s+)?(ba|z|k|c)?sh\b${INTERPRETER_RUNS_ARGUMENT}`, 'i'), 'a remote script piped into a shell', 'download to a file, read it, then run it; or pipe into a checksum tool'],
+  [new RegExp(String.raw`(curl|wget)\s+(?:[^|\n]|\\\r?\n)*\|\s*(sudo\s+)?(python3?|node|perl|ruby)\b${INTERPRETER_RUNS_ARGUMENT}`, 'i'), 'a remote script piped into an interpreter', 'to parse a response, give the interpreter its code with -e / -c; otherwise download to a file first'],
+  [/base64\s+-d[^\n]*\|\s*(sudo\s+)?(ba|z)?sh\b/i, 'decoded content piped into a shell', null],
+  [/\bnpm\s+(i|install|ci)\b[^\n]*--(unsafe-perm|no-verify)/i, 'disabling install-script safety', null],
+  [/\bpip\s+install\b[^\n]*--(trusted-host|index-url\s+http:)/i, 'installing from an untrusted index', null],
 ];
+
+/** Files whose CONTENT is a list of commands: writing one is as good as running it. */
+const SCRIPT_FILE = /(?:\.(?:sh|bash|zsh|ksh|fish|command)$|(?:^|[\\/])(?:Makefile|makefile|GNUmakefile|Dockerfile|Containerfile)$)/;
 
 // How a tool call's fields are read. Harnesses differ (VS Code Local, Copilot CLI/SDK, Claude Code,
 // Codex), so fields are recognised by name wherever they sit, and anything unrecognised is treated as
@@ -167,7 +207,6 @@ const PATH_KEY = /^(?:path|file_?path|filename|file|target_?file|notebook_?path|
 const OLD_TEXT_KEY = /^old_?(?:str(?:ing)?|text)$/i;
 const COMMAND_KEY = /^(?:command|cmd|command_?line|script|args|argv)$/i;
 const PROSE_KEY = /^(?:description|explanation|reason|summary|title|goal|prompt|query|search|pattern|url|message|label|intent)$/i;
-const DOC_FILE = /\.(?:md|mdx|markdown|txt|rst|adoc|asciidoc)$/i;
 
 function collect(node, key, target, out) {
   if (node === null || node === undefined) return;
@@ -207,6 +246,19 @@ function writtenPart(text) {
 
 const where = (key, targets) => `${key ? `the ${key} field` : 'the tool call'}${targets.length ? ` (${targets[0]})` : ''}`;
 const deny = (reason) => ({ decision: 'deny', reason: `Blocked by EOS guardrail: ${reason}` });
+const snippet = (text) => {
+  const flat = String(text).replace(/\s+/g, ' ').trim();
+  return flat.length > 60 ? `${flat.slice(0, 57)}...` : flat;
+};
+
+/** The first destructive rule an executable text trips, as a denial, or null. */
+function dangerous(executable, place) {
+  for (const [re, what, fix] of DESTRUCTIVE_RULES) {
+    const m = re.exec(executable);
+    if (m) return deny(`${what} — matched "${snippet(m[0])}" in ${place}. ${fix ? `${fix[0].toUpperCase()}${fix.slice(1)}. ` : ''}If it is really intended, run it yourself; the agent may not.`);
+  }
+  return null;
+}
 
 function judge(strings) {
   for (const { key, text, target } of strings) {
@@ -219,13 +271,14 @@ function judge(strings) {
     }
     const secret = findSecretInText(body, { configFile: targets.some(isConfigFile) });
     if (secret) {
-      return deny(`a hardcoded secret (${secret.kind}) in ${where(key, targets)}. Move it to an environment variable or a secret store, and keep only a placeholder in examples.`);
+      return deny(`a hardcoded secret (${secret.kind}, line ${secret.line}) in ${where(key, targets)}. Move it to an environment variable or a secret store, and keep only a placeholder in examples.`);
     }
-    const docsOnly = targets.length > 0 && targets.every((t) => DOC_FILE.test(t));
-    if (kind === 'command' || (kind === 'content' && !docsOnly)) {
-      for (const [re, what] of DESTRUCTIVE_RULES) {
-        if (re.test(body)) return deny(`${what} in ${where(key, targets)}. If it is really intended, run it yourself; the agent may not.`);
-      }
+    // Only what is EXECUTED is a command. A file other than a shell script is written, not run;
+    // when the harness gives no path, the text is judged as a command (the conservative choice).
+    const executed = kind === 'command' || (kind === 'content' && (targets.length === 0 || targets.some((t) => SCRIPT_FILE.test(t))));
+    if (executed) {
+      const hit = dangerous(executableText(body), where(key, targets));
+      if (hit) return hit;
     }
   }
   return { decision: 'allow' };

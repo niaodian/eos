@@ -16,9 +16,10 @@
 // (validate-config / eos-doctor / secret-scan) + branch protection + human review. [audit G1/G2]
 //
 // The rules live in ./lib/secret-rules.mjs, shared with secret-scan.mjs so the two cannot drift.
-// Each field of the tool call is judged on its own: commands get the destructive-command rules,
-// content written to a file gets the secret rules (and the command rules unless the file is
-// documentation), prose and the old text an edit replaces are not treated as commands. A payload
+// Each field of the tool call is judged on its own: commands get the destructive-command rules, but
+// only over what they EXECUTE (heredoc bodies, quoted arguments and comments are data); content
+// written to a file gets the secret rules, and the command rules only when the file is a shell
+// script, Makefile or Dockerfile; prose and the old text an edit replaces are not commands. A payload
 // that is not JSON is scanned as raw text with every rule. An internal error in THIS hook fails
 // OPEN, with a warning on stderr: a broken speed bump must not stop all work — CI still decides.
 const hookSpecific = (reason) => ({ hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: reason } });
