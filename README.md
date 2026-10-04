@@ -74,12 +74,12 @@ shows it with the exact `eos policy lock --write --reason "<why>"` that acknowle
 
 ## Quickstart
 
-You need Node.js 20.10+ (22 or 24 recommended — Node 20 reached end of life on 2026-04-30) and Git. An
+You need Node.js 22.10+ (24 recommended — `.nvmrc` names it) and Git. An
 AI agent is optional — the CLI works in any terminal.
 
 ```bash
 # 1. Start from a pinned release and make it your repository
-npx degit niaodian/eos#eos-2.5.0 my-app && cd my-app && git init
+npx degit niaodian/eos#eos-2.6.0 my-app && cd my-app && git init
 
 # 2. Declare the project — no code yet, so the stack is decided at architecture time
 npx --offline eos init config-only --write        # add --track regulated for the strict track
@@ -175,8 +175,8 @@ EOS releases are built and attested in GitHub Actions, the way EOS asks your rel
 yourself before you adopt it:
 
 ```bash
-gh release download eos-2.5.0 --repo niaodian/eos --pattern 'eos-2.5.0.tar.gz'
-gh attestation verify eos-2.5.0.tar.gz --repo niaodian/eos
+gh release download eos-2.6.0 --repo niaodian/eos --pattern 'eos-2.6.0.tar.gz'
+gh attestation verify eos-2.6.0.tar.gz --repo niaodian/eos
 ```
 
 Each release also ships its SBOM and a `SHA256SUMS` file.
@@ -207,15 +207,17 @@ docs/               your specs and ADRs; docs/eos/ is the EOS manual set (中文
 - [Upgrading to eos-2.0.0](docs/eos/user-manual.md#105-upgrading-from-eos-122x-to-eos-200) — what changes and what to do.
 - [Upgrading to eos-2.0.1](docs/eos/user-manual.md#107-upgrading-from-eos-200-to-eos-201) — the secret-detection security patch.
 - [Upgrading to eos-2.5.0](docs/eos/user-manual.md#1012-upgrading-from-eos-24x-to-eos-250) — your CI runs your project instead of EOS's test suite, your first declaration starts your own policy lock and SBOM, CI runs once per change.
+- [Upgrading to eos-2.6.0](docs/eos/user-manual.md#1013-upgrading-from-eos-25x-to-eos-260) — **Node 20 is gone (22.10+)**, a bounded `DEFERRED` can ship, a solo maintainer has a labelled self-approval, one-way decisions need a person's confirmation.
 - [Workflow contract](docs/eos/developer-experience.md) — the CLI, exit codes, JSON and diagnostics.
 - [Stack presets and tracks](docs/eos/stack-presets.md) — every supported stack, and how to choose a track.
 - [Design rationale](docs/eos/blueprint.md) and [architecture decisions](docs/adr/).
 
 ## Requirements and notes
 
-- **Node.js 20.10+ and Git** — nothing else. Use Node 22 or 24: Node 20 reached end of life on 2026-04-30
-  and stays supported only as the declared minimum. EOS's own CI tests Node 20, 22 and 24 on Linux, macOS and
-  Windows on every merge, tag and week; a pull request runs each platform once, on Node 24.
+- **Node.js 22.10+ and Git** — nothing else. Node 20 reached end of life on 2026-04-30 and was removed in
+  eos-2.6.0. `.nvmrc` names the Node major (24) that CI and your developers share. EOS's own CI tests Node 22 and
+  24 on Linux, macOS and Windows on every merge, tag and week; a pull request runs each platform once, on Node 24.
+  Node 26 passed locally (26.10) and is not in the CI matrix yet.
 - **Your CI.** [eos-ci.yml](.github/workflows/eos-ci.yml) comes with the template. In your repository it runs the
   governance gate and the commands your declaration names. EOS's own test suites, coverage and cross-platform
   matrix test EOS, so they run only while `.eos/project.json` is still the template's own, and are skipped once
@@ -228,7 +230,7 @@ docs/               your specs and ADRs; docs/eos/ is the EOS manual set (中文
   bumps; CI is the authority.
 - **One-time hardening.** Once your real repository exists, run `/eos-init` in your agent (`$eos-init` in Codex): branch
   protection, CODEOWNERS and approvals, tracked in [docs/eos/activation.md](docs/eos/activation.md).
-- **Local CI.** `act push` runs [eos-ci.yml](.github/workflows/eos-ci.yml) in Docker; without Docker,
+- **Local CI.** `act push -W .github/workflows/eos-ci.yml` runs [eos-ci.yml](.github/workflows/eos-ci.yml) in Docker; without Docker,
   `npm run verify` runs the core checks.
 - **BMAD.** When the `bmad-*` skills are installed, EOS orchestrates them for discovery, PRD, architecture
   and stories; see [docs/eos/agent-map.md](docs/eos/agent-map.md).

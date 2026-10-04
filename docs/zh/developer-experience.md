@@ -177,7 +177,7 @@ G0 到 G10 现在全部是求值器，而不是阅读练习。每个阶段同时
 | `PENDING` | 门禁适用但从未运行过 | 否 |
 | `WAIVED` | 有未过期且已批准的 Waiver 覆盖 | 是（已记录） |
 | `NOT_APPLICABLE` | Change Type 策略判定该门禁不适用 | 是（已记录） |
-| `DEFERRED` | 某项检查无法完成且原因已记录（离线的依赖审计、带负责人与触发条件的 NFR 目标） | **否** —— 可见且有时限，但绝不算绿 |
+| `DEFERRED` | 某项检查无法完成且原因已记录（离线的依赖审计、带负责人、触发条件与 `dueBy` 的 NFR 目标） | **否**，只有一个有界的例外（§6.2）：仅有 NFR 目标被推迟、且每个都有负责人、触发条件和将来的 `dueBy` 的 Standard 轨道发布，可以离开 `CANDIDATE`。它显示为 `DEFERRED (accepted by …)`，绝不显示为 `PASS` |
 | `STALE` | 之前 PASS，但输入或定义已改变 | 否 |
 | `ERROR` | Evaluator 自身无法运行 | 否 |
 
@@ -277,7 +277,26 @@ Change Type（`SPIKE`、`DOC_ONLY`、`GOVERNANCE`）必须在 Story front matter
 
 Waiver 是 `.eos/waivers/` 下的一个文件，包含 `gate`、`scope`、`reason`、`riskOwner`、`approver`、
 `expiresOn`（或触发条件）和 `compensatingControls`。当审批人等于申请人、已过期，或门禁策略标记该门禁
-不可豁免时，一律拒绝。EOS 可以*建议*豁免，但绝不批准豁免。
+不可豁免时，一律拒绝。EOS 可以*建议*豁免，但绝不批准豁免。（在 `solo` 项目里，批准人可以写成
+`<name> (self)`：见 §6.2。）
+
+### 6.2 批准的保证级别与有界推迟
+
+对于给不出第二位批准人、或目标在发布前无法测量的人，有两个出口。两者都是声明式的、可见的、仅限
+**Standard** 轨道，到 Regulated 与 Controlled 轨道为止（[ADR-023](../adr/023-low-assurance-exits-on-the-standard-track.md)）。
+
+| | `independent`（默认） | `solo`（`.eos/project.json` 里的 `approvalMode`） |
+|---|---|---|
+| 谁可以批准 | 准备这项工作的人以外的人 | 维护者本人，用 `eos approve --self --reason "<原因>"`、`eos policy lock --self`，或写成 `<name> (self)` 的 waiver 批准人 |
+| 记录什么 | `assurance: "independent"` | `assurance: "self"`，在 `status`、`next` 与发布记录里显示为自批准 |
+| agent | 不得批准 | 同样不得运行 `--self`：护栏会在任何 `eos` 命令上拒绝它，MCP 服务也不暴露任何批准类工具 |
+| Regulated / controlled | 必需 | 属于配置错误；切换到 `solo` 是需要独立批准人的 WEAKENING |
+
+**有界的 `DEFERRED`**：当 `nfr-evidence`（或者对非受监管发布而言的 `evidence-trust`）被推迟时，`release-ready`
+保持 `DEFERRED`。只有同时满足以下条件，`CANDIDATE → VERIFIED` 才接受它：（1）没有其他检查被推迟；（2）每个被推迟的
+NFR 目标都有 `owner`、`trigger` 和将来的 `dueBy`——一旦 `dueBy` 已过，`nfr-evidence` 即 **FAIL**；（3）`eos approve`
+先打印这份清单并把批准绑定到它的摘要，清单变了批准即失效；（4）项目在 Standard 轨道上。`RELEASED` 之后这份清单成为
+发布记录的一部分：`eos status` 与 `eos next` 会列出欠什么、何时到期，目标最终在 G9 被测量。
 
 ## 7. Next-Best-Action JSON 契约
 

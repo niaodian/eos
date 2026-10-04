@@ -8,7 +8,7 @@
 
 # Gate reference
 
-11 gates, 60 checks. This is a projection of the gate definitions the engine executes — if a rule is here, it runs.
+11 gates, 61 checks. This is a projection of the gate definitions the engine executes — if a rule is here, it runs.
 
 ## Summary
 
@@ -19,10 +19,10 @@
 | `requirements-ready` | G2 | product | 1.0.0 | no | 5 |
 | `prd-ready` | G3 | product | 2.0.0 | no | 5 |
 | `ux-ready` | G-UX | product | 1.0.0 | no | 3 |
-| `architecture-ready` | G4 | product | 1.1.0 | no | 4 |
-| `story-ready` | G5 | story | 2.0.0 | yes | 6 |
-| `verified` | G7 | story | 2.0.0 | no | 5 |
-| `release-ready` | G8 | release | 4.0.0 | no | 17 |
+| `architecture-ready` | G4 | product | 1.2.0 | no | 4 |
+| `story-ready` | G5 | story | 2.1.0 | yes | 6 |
+| `verified` | G7 | story | 2.1.0 | no | 5 |
+| `release-ready` | G8 | release | 5.0.0 | no | 18 |
 | `telemetry-ready` | G9 | release | 1.0.0 | no | 3 |
 | `iteration-ready` | G10 | release | 2.0.0 | no | 3 |
 
@@ -159,9 +159,10 @@ The manifest states exactly which stories this release ships, and the candidate 
 | `story-evidence-current` | each story's verification describes THIS candidate | Re-run `eos check --gate verified --scope <STORY-ID>` for the stories whose verification predates the candidate tree. |
 | `spec-alignment` | spec-align --strict passes (no drift, no orphans) | Run `node .github/hooks/spec-align.mjs --strict` and close drift/orphans/failing rows. |
 | `secret-scan` | secret scan is clean | Run `node .github/hooks/secret-scan.mjs` and remove or rotate anything it finds. |
-| `dependency-audit` | the dependency / supply-chain audit is clean | Run the declared commands.audit (npm audit / pip-audit / cargo audit …) and resolve findings; offline it is DEFERRED, never PASS — and for a regulated product it BLOCKS. |
+| `dependency-audit` | the dependency / supply-chain audit is clean | Run the declared commands.audit (npm audit / pip-audit / cargo audit …) and resolve findings; offline it is DEFERRED, never PASS, and a DEFERRED audit cannot be promoted — re-run it online; for a regulated product it BLOCKS. |
 | `evidence-trust` | the release states how trustworthy its evidence is | Evidence produced locally is honest but indistinguishable from a hand-written file. Produce it from CI (producer.type = ci), or record an attestation, or accept DEFERRED for a non-regulated release. |
-| `nfr-evidence` | NFR targets have recorded evidence | Record measured NFR results in docs/evidence/nfr-summary.json (bmad-testarch-nfr); a deferral needs an owner and a trigger. |
+| `nfr-evidence` | NFR targets have recorded evidence | Record measured NFR results in docs/evidence/nfr-summary.json (bmad-testarch-nfr); a deferral needs an owner, a trigger and a dueBy date in the future (it can be promoted on the Standard track, never passed, and a dueBy that has passed turns it into a FAIL). |
+| `one-way-doors-confirmed` | every one-way decision was confirmed by a person | Read each ADR the architecture cites for an irreversible decision (stack, topology, data model, auth), set "Status: accepted", add "Confirmed by: <name>" and "Confirmed at: <YYYY-MM-DD>", and commit it. An unattended run may decide provisionally; shipping needs a person. |
 | `compliance-boundary` | the compliance data boundary holds | Run /eos-compliance to record docs/compliance-profile.json; eos-doctor D5 explains what is missing. |
 | `no-expired-waivers` | no waiver in this release has expired | Renew the waiver with a new expiry and approver, or close the gap it was covering. |
 | `ops-artifacts` | runbook, rollback, canary and health/readiness are documented | Run /eos-runbook and /eos-deploy-topology so rollback, gradual rollout and health/readiness are written down before shipping. |

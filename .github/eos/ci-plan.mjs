@@ -16,7 +16,7 @@
 // read from the declaration by this script, never from a repository name in the workflow, so a team
 // that maintains its own distribution of EOS keeps EOS's tests. (ADR-021)
 //
-// Where EOS's own matrix runs (2.5.0, runtimes 2.6.0). The supported Node majors are 22 and 24 (`engines`
+// Where EOS's own matrix runs (2.5.0; the runtimes since 2.6.0). The supported Node majors are 22 and 24 (`engines`
 // is >=22.10.0). A pull request runs each platform once, on Node 24 — Linux also runs `coverage` on 22,
 // so both supported runtimes still run on every change. The default branch, tags, the weekly schedule and
 // a manual run take the full matrix: both runtimes, on every platform. `verify` runs on the Node major in

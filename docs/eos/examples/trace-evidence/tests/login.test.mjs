@@ -1,4 +1,4 @@
-// AC1.1 — node:test. The JUnit reporter is built in (Node >= 20.8); see project.json.
+// AC1.1 — node:test. The JUnit reporter is built in (Node 22+); see project.json.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 

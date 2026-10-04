@@ -219,7 +219,7 @@ declaration**, executed by the zero-dependency, cross-platform `node .github/hoo
 - **Starter skeleton**: copy `docs/eos/examples/eval-starter/` (a zero-dependency runnable dataset + graders + runner + stub) and swap the stub
 - **quality.json inner command**: `ruff check . && pytest -q && pytest evals/ -q`
   (Node projects use `node --test evals/*.test.mjs` instead — pass an explicit glob; a bare `evals/` directory errors on Node 23)
-- **CI**: `.github/workflows/eos-ci.yml` (run locally with `act push`) executes evals + `eos-doctor` (G-EVAL machine-enforced), failing on regression
+- **CI**: `.github/workflows/eos-ci.yml` (run locally with `act push -W .github/workflows/eos-ci.yml`) executes evals + `eos-doctor` (G-EVAL machine-enforced), failing on regression
 
 ---
 

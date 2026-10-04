@@ -186,7 +186,7 @@ detailed rules need to be read.
 | `PENDING` | the gate applies but has never been run | no |
 | `WAIVED` | an unexpired, approved waiver covers it | yes (recorded) |
 | `NOT_APPLICABLE` | the change-type policy says this gate does not apply | yes (recorded) |
-| `DEFERRED` | a check could not be completed and the reason is recorded (an offline dependency audit, an NFR target with an owner and a trigger) | **no** — visible and time-bound, never green |
+| `DEFERRED` | a check could not be completed and the reason is recorded (an offline dependency audit, an NFR target with an owner, a trigger and a `dueBy`) | **no**, with one bounded exception (§6.2): a Standard-track release whose only deferrals are NFR targets with an owner, a trigger and a future `dueBy` may leave `CANDIDATE`. It is shown as `DEFERRED (accepted by …)`, never as `PASS` |
 | `STALE` | a previous PASS whose inputs or definitions changed | no |
 | `ERROR` | the evaluator itself could not run | no |
 
@@ -306,7 +306,29 @@ type is refused outright rather than defaulted into freedom.
 A waiver is a file in `.eos/waivers/` with `gate`, `scope`, `reason`, `riskOwner`, `approver`,
 `expiresOn` (or a trigger) and `compensatingControls`. It is rejected when the approver equals the
 requester, when it has expired, or when the gate policy marks the gate non-waivable. EOS can
-*suggest* a waiver; it never approves one.
+*suggest* a waiver; it never approves one. (In a `solo` project the approver may be written
+`<name> (self)`: §6.2.)
+
+### 6.2 Approval assurance and bounded deferral
+
+Two exits exist for the people who cannot give EOS a second approver or an unmeasurable target.
+Both are declared, visible, limited to the **Standard** track, and end where the Regulated and
+Controlled tracks begin ([ADR-023](../adr/023-low-assurance-exits-on-the-standard-track.md)).
+
+| | `independent` (default) | `solo` (`approvalMode` in `.eos/project.json`) |
+|---|---|---|
+| Who may approve | someone other than the person who prepared the work | the maintainer, with `eos approve --self --reason "<why>"`, `eos policy lock --self`, or a waiver approver written `<name> (self)` |
+| What is recorded | `assurance: "independent"` | `assurance: "self"`, shown as a self-approval in `status`, `next` and the release record |
+| An agent | may not approve | may not run `--self` either: the guardrail refuses it on any `eos` command, and the MCP server exposes no approving tool |
+| Regulated / controlled | required | a configuration error; switching to `solo` is a WEAKENING that needs an independent approver |
+
+A **bounded `DEFERRED`**: `release-ready` stays `DEFERRED` when `nfr-evidence` (or, for a non-regulated
+release, `evidence-trust`) is deferred. `CANDIDATE → VERIFIED` accepts it only when (1) nothing else is
+deferred, (2) every deferred NFR target has an `owner`, a `trigger` and a `dueBy` in the future — once it
+has passed, `nfr-evidence` is **FAIL** — (3) `eos approve` prints that list first and binds the approval
+to its digest, so a changed list voids the approval, and (4) the project is on the Standard track. After
+`RELEASED` the list is part of the release record: `eos status` and `eos next` list what is owed and by
+when, and G9 is where the targets are finally measured.
 
 ## 7. Next-Best-Action JSON contract
 

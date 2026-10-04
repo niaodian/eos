@@ -59,7 +59,7 @@ its own report, nothing else declared:
 - When the report says **where** a testcase lives — a `file` attribute, a path or dotted module in
   `classname`, a file-named suite — only cases in the row's file count, and the result says
   `"match": "file"` (node:test records the file from Node 24.11 on, as an absolute path EOS makes
-  repository-relative). When it does not (node:test on Node 20 and 22 writes `classname="test"` and
+  repository-relative). When it does not (node:test before Node 24.11, so Node 22, writes `classname="test"` and
   no file), the name alone matches and the result says `"match": "name"`. The file is then settled
   from the source: the file the matrix names must declare the test (a string literal or function
   name, not a comment), and no other test file may declare the same name — if two do, the row is an
@@ -80,7 +80,7 @@ its own report, nothing else declared:
 
 | Stack | How the runner writes JUnit XML |
 |---|---|
-| node:test (Node ≥ 20.8) | `--test-reporter=junit --test-reporter-destination=reports/junit/node.xml` (add `--test-reporter=spec --test-reporter-destination=stdout` to keep console output). Name the test files — a bare directory is read as a module on Node ≥ 21 |
+| node:test (built in, Node 22+) | `--test-reporter=junit --test-reporter-destination=reports/junit/node.xml` (add `--test-reporter=spec --test-reporter-destination=stdout` to keep console output). Name the test files — a bare directory is read as a module on Node ≥ 21 |
 | vitest | `vitest run --reporter=junit --outputFile=reports/junit/vitest.xml` |
 | Playwright | `reporter: [['junit', { outputFile: 'reports/junit/e2e.xml' }]]` in `playwright.config` (declared commands run without a shell, so no `VAR=… cmd` prefix) |
 | pytest | `--junitxml=reports/junit/python.xml` |
