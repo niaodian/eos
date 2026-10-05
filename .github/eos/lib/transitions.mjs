@@ -7,7 +7,7 @@ import { listStories } from './story.mjs';
 import { recordedGateStatus, evaluateGate } from './gates.mjs';
 import { readEvidence, evidenceFreshness } from './evidence.mjs';
 import { scopeState, changeTypeOf, gateInputs, gateCollections } from './state.mjs';
-import { readManifest } from './release.mjs';
+import { readManifest, manifestPath } from './release.mjs';
 import { deferralPromotion, listDeferrals, deferralDigest, selfApprovalAllowed } from './deferrals.mjs';
 
 export const PROMOTABLE = new Set(['PASS', 'WAIVED', 'NOT_APPLICABLE']);
@@ -183,6 +183,16 @@ export function classificationBlock(snapshot, { scopeType, scopeId, to }) {
   return null;
 }
 
+function missingScope(snapshot, scopeType, scopeId) {
+  if (scopeType === 'story' && !snapshot.stories.some((s) => String(s.id) === String(scopeId))) {
+    return `no story "${scopeId}" exists (known: ${snapshot.stories.map((s) => s.id).join(', ') || 'none'}). Create docs/stories/${scopeId}.md first — nothing is recorded for a scope that is not there.`;
+  }
+  if (scopeType === 'release' && !readManifest(snapshot.root, scopeId).present) {
+    return `no release "${scopeId}" exists — ${manifestPath(scopeId)} is missing. Create the manifest first — nothing is recorded for a scope that is not there.`;
+  }
+  return null;
+}
+
 export function checkTransition(snapshot, { scopeType, scopeId, to }) {
   if (scopeType === 'product') {
     const derived = deriveProductState(snapshot);
@@ -197,6 +207,10 @@ export function checkTransition(snapshot, { scopeType, scopeId, to }) {
       ],
     };
   }
+  // A ledger entry is permanent, so a scope that does not exist must be refused before anything is
+  // recorded: a typo would otherwise leave a state for a story or release nobody ever created.
+  const missing = missingScope(snapshot, scopeType, scopeId);
+  if (missing) return { allowed: false, from: null, to, transition: null, reasons: [missing] };
   const from = scopeState(snapshot, scopeType, scopeId);
   const plan = planTransition(snapshot, { scopeType, from, to });
   if (!plan.legal) return { allowed: false, from, to, transition: null, reasons: [plan.reason] };

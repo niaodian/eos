@@ -3,7 +3,7 @@
 // Registered in ./index.mjs. A handler receives (snapshot, flags) and returns an exit code (./shared.mjs).
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { gatePolicy, changeTypeOf, gateInputs, gateCollections, scopeState } from '../lib/state.mjs';
+import { gatePolicy, changeTypeOf, gateInputs, gateCollections, scopeState, readSnapshot } from '../lib/state.mjs';
 import { prepareGateRun, isBlocking, gateProblems } from '../lib/gates.mjs';
 import { recordGateRun } from '../lib/record.mjs';
 import { crossBranchActivity, crossBranchLines } from '../lib/cross-branch.mjs';
@@ -115,14 +115,19 @@ export const gateCommands = {
     }
 
     const results = [];
+    let current = snapshot;
     for (const p of selected) {
-      const providerVerdicts = await consultProviders(snapshot, p.def.id);
-      const { result, evidence, evidenceFile } = prepareGateRun(snapshot, p.def.id, p.scopeType, p.scopeId, { providerVerdicts });
-      recordGateRun(snapshot.root, {
+      const providerVerdicts = await consultProviders(current, p.def.id);
+      const { result, evidence, evidenceFile } = prepareGateRun(current, p.def.id, p.scopeType, p.scopeId, { providerVerdicts });
+      recordGateRun(current.root, {
         evidence,
         evidenceFile,
-        event: { type: 'gate', scope: { type: p.scopeType, id: String(p.scopeId) }, changeType: result.changeType, gate: result.gate, status: result.status, commit: snapshot.commit },
+        event: { type: 'gate', scope: { type: p.scopeType, id: String(p.scopeId) }, changeType: result.changeType, gate: result.gate, status: result.status, commit: current.commit },
       });
+      // Each run writes evidence and a ledger event that the NEXT gate reads (verified checks the
+      // digest story-ready just pinned). A snapshot taken before the loop would judge it by the old
+      // events and report an ERROR no fresh `check` ever shows.
+      current = readSnapshot(current.root);
       results.push({ gate: p.def.id, scopeType: p.scopeType, scopeId: p.scopeId, status: result.status, reason: p.reason, rerunCommand: result.rerunCommand });
     }
     const skipped = plan.filter((p) => !p.run);
@@ -148,9 +153,9 @@ export const gateCommands = {
     const verdict = checkTransition(snapshot, { scopeType, scopeId, to });
     if (!verdict.allowed) {
       emit(flags, { allowed: false, ...verdict }, [
-        `EOS transition · ${scopeId}: ${verdict.from} → ${to} REJECTED`, '',
+        `EOS transition · ${scopeId}: ${verdict.from ?? '(no such scope)'} → ${to} REJECTED`, '',
         ...verdict.reasons.map((r) => `  ${r}`), '',
-        scopeType !== 'product' ? `  legal next state(s) from ${verdict.from}: ${legalTransitions(snapshot.workflow, scopeType, verdict.from).map((t) => t.to).join(', ') || '(none)'}` : '',
+        scopeType !== 'product' && verdict.from !== null ? `  legal next state(s) from ${verdict.from}: ${legalTransitions(snapshot.workflow, scopeType, verdict.from).map((t) => t.to).join(', ') || '(none)'}` : '',
         '',
       ].join('\n'));
       return EXIT.FAIL;
@@ -225,6 +230,7 @@ export const gateCommands = {
         ...(deferredLines.length ? [...deferredLines, ''] : []),
         `EOS approve · ${scopeId} approved by ${event.actor} (seq ${event.seq})${self ? ' — a SELF-APPROVAL (solo project): no second person reviewed this' : ''}`,
         ...(manifestDigest ? [`  bound to manifest ${manifestDigest.slice(0, 12)} — editing what this release ships invalidates this approval`] : []),
+        `  "${event.actor}" is self-asserted (EOS_ACTOR, USER): the record says who claimed this approval, not who was authenticated`,
         '',
       ].join('\n'));
     return EXIT.OK;

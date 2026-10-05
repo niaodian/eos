@@ -17,16 +17,17 @@
     }
   },
   "coverage": {
-    "description": "Thresholds for `run-tests.mjs --coverage`. Set just below the measured figure so they catch a real regression rather than chasing a round number: the CI coverage job (Node 22, no pytest) measured lines 97.80 / branches 80.45 / functions 96.60 at eos-2.4.0. Raise them when the figure rises; never lower them to let a change in. Enforced natively by Node 22+, the floor.",
-    "lines": 97,
-    "branches": 79,
-    "functions": 96,
+    "description": "Thresholds for `run-tests.mjs --coverage`. Set just below the measured figure so they catch a real regression rather than chasing a round number. Re-based once at eos-2.6.0+: the earlier floors (97 / 79 / 96, measured 97.80 / 80.45 / 96.60 at eos-2.4.0) were inflated because the exclude globs `**/*.test.mjs` did not match files under dot-directories (`.github/`), so test files and test helpers counted as covered code. With them excluded the measured figure is lines 96.67 / branches 75.50 / functions 94.44 — a correction of the measurement, not a loosening of the tests. From here, raise them when the figure rises and never lower them to let a change in. Enforced natively by Node 22+, the floor.",
+    "lines": 96,
+    "branches": 75,
+    "functions": 94,
     "exclude": [
-      "**/*.test.mjs",
-      "**/test-support.mjs",
-      "**/audit-support.mjs",
-      "**/journey.demo.mjs",
-      "**/run-tests.mjs"
+      ".github/**/*.test.mjs",
+      ".github/**/test-support.mjs",
+      ".github/**/audit-support.mjs",
+      ".github/**/journey.demo.mjs",
+      ".github/**/run-tests.mjs",
+      "docs/**/*.test.mjs"
     ]
   },
   "layers": {

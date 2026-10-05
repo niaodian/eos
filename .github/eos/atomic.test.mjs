@@ -330,7 +330,7 @@ test('a reader never misreads a SLOW writer (Windows-sized gaps, on any platform
   appendEvent(dir, { type: 'note', detail: 'seed', scope: { type: 'product', id: 'product' } });
   const writer = node(`
     import { withLock, writeFileAtomic, sleep } from ${JSON.stringify(ATOMIC_MODULE)};
-    import { hashEvent, readEvents, LEDGER_PATH, LEDGER_HEAD_PATH, LEDGER_LOCK_PATH } from ${JSON.stringify(LEDGER_MODULE)};
+    import { hashEvent, readEvents, HASH_SCHEME, LEDGER_PATH, LEDGER_HEAD_PATH, LEDGER_LOCK_PATH } from ${JSON.stringify(LEDGER_MODULE)};
     import { appendFileSync } from 'node:fs';
     import { join } from 'node:path';
     const dir = ${JSON.stringify(dir)};
@@ -338,7 +338,7 @@ test('a reader never misreads a SLOW writer (Windows-sized gaps, on any platform
       withLock(join(dir, LEDGER_LOCK_PATH), () => {
         const { events } = readEvents(dir);
         const prev = events.at(-1) || null;
-        const body = { seq: events.length + 1, ts: new Date().toISOString(), actor: 'w', type: 'note', detail: 'w' + i, scope: { type: 'product', id: 'product' }, prevHash: prev ? prev.hash : null };
+        const body = { seq: events.length + 1, ts: new Date().toISOString(), actor: 'w', type: 'note', detail: 'w' + i, scope: { type: 'product', id: 'product' }, hv: HASH_SCHEME, prevHash: prev ? prev.hash : null };
         body.hash = hashEvent(body);
         appendFileSync(join(dir, LEDGER_PATH), JSON.stringify(body) + '\\n');
         sleep(Math.floor(Math.random() * 4));

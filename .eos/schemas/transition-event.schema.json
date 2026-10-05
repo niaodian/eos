@@ -17,6 +17,12 @@
       "type": "integer",
       "minimum": 1
     },
+    "hv": {
+      "enum": [
+        2
+      ],
+      "description": "Hash scheme. 2: `hash` covers every field of the event. Absent: an event written before eos-2.6.1, hashed over a fixed list of fields."
+    },
     "ts": {
       "type": "string",
       "minLength": 20

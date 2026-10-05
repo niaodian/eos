@@ -7,6 +7,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { withLock, writeFileAtomic, sleep } from './atomic.mjs';
+import { canonicalJson } from './canonical.mjs';
 
 export const LEDGER_PATH = '.eos/ledger/events.jsonl';
 // A forward-only chain cannot notice that the TAIL was cut off: deleting the last lines leaves
@@ -17,12 +18,24 @@ export const LEDGER_HEAD_PATH = '.eos/ledger/head.json';
 // coordination, not project state.
 export const LEDGER_LOCK_PATH = '.eos/ledger/.lock';
 
-const HASHED_FIELDS = ['seq', 'ts', 'type', 'scope', 'changeType', 'from', 'to', 'gate', 'status', 'evidenceSha256', 'manifestDigest', 'actor', 'commit', 'notApplicableGates', 'detail', 'prevHash'];
+// Hash scheme 1 (events written before eos-2.6.1) covers only these fields: `assurance`, `deferred` and
+// `deferredDigest` were never protected, so rewriting them did not break the chain. Such events still
+// verify under this list, because their hashes were computed with it.
+const LEGACY_HASHED_FIELDS = ['seq', 'ts', 'type', 'scope', 'changeType', 'from', 'to', 'gate', 'status', 'evidenceSha256', 'manifestDigest', 'actor', 'commit', 'notApplicableGates', 'detail', 'prevHash'];
 
-/** Stable serialization: only the declared fields, in a fixed order, so the hash is reproducible. */
+// Hash scheme 2: every field of the event except `hash` itself, so a field added later is protected
+// by default instead of by someone remembering to list it. `hv` is inside the hash and the chain may
+// not step back to scheme 1, so stripping it does not buy an event an unprotected field.
+export const HASH_SCHEME = 2;
+
+/** Stable serialization, reproducible from the line as it is stored on disk. */
 function canonical(event) {
+  if (event.hv === HASH_SCHEME) {
+    const { hash, ...body } = event;
+    return canonicalJson(JSON.parse(JSON.stringify(body)));
+  }
   const out = {};
-  for (const f of HASHED_FIELDS) if (event[f] !== undefined) out[f] = event[f];
+  for (const f of LEGACY_HASHED_FIELDS) if (event[f] !== undefined) out[f] = event[f];
   return JSON.stringify(out);
 }
 
@@ -122,9 +135,10 @@ export function reconcileEvents(groups) {
   const replayed = [];
   let prevHash = null;
   for (const [index, source] of ordered.entries()) {
-    const body = {};
-    for (const f of HASHED_FIELDS) if (f !== 'seq' && f !== 'prevHash' && source[f] !== undefined) body[f] = source[f];
-    const event = { seq: index + 1, ts: source.ts, ...body, prevHash };
+    // Every field travels, not a fixed list: replay used to drop whatever scheme 1 did not hash, which
+    // silently turned an approval into one with no assurance level. Replayed events move to scheme 2.
+    const { seq, prevHash: previous, hash, ...fields } = source;
+    const event = { ...fields, hv: HASH_SCHEME, seq: index + 1, prevHash };
     event.hash = hashEvent(event);
     replayed.push(event);
     prevHash = event.hash;
@@ -193,8 +207,11 @@ export function verifyChain(events, { root = null, headRecord = null } = {}) {
     return { ok: false, problems, warnings };
   }
   let prevHash = null;
+  let onScheme2 = false;
   events.forEach((e, i) => {
     const at = `event #${i + 1}`;
+    if (e.hv === HASH_SCHEME) onScheme2 = true;
+    else if (onScheme2) problems.push(`${at}: hash scheme went back from ${HASH_SCHEME} to 1 — an event after a fully hashed one cannot protect fewer fields`);
     if (e.seq !== i + 1) problems.push(`${at}: seq ${e.seq} is out of order (expected ${i + 1}) — a line was inserted or removed`);
     if ((e.prevHash ?? null) !== prevHash) problems.push(`${at}: prevHash does not chain to the previous event — the ledger was rewritten`);
     const expected = hashEvent(e);
@@ -243,6 +260,7 @@ function appendUnlocked(root, event) {
     ts: new Date().toISOString(),
     actor: process.env.EOS_ACTOR || process.env.USER || process.env.USERNAME || 'unknown',
     ...event,
+    hv: HASH_SCHEME,
     prevHash: prev ? prev.hash : null,
   };
   body.hash = hashEvent(body);

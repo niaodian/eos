@@ -14,7 +14,7 @@ import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { project, write, run, runJson, cleanup, commitAll, baselineFiles, story, APP_PROJECT } from './test-support.mjs';
+import { project, write, run, runJson, cleanup, commitAll, baselineFiles, storyFiles, story, APP_PROJECT } from './test-support.mjs';
 
 after(cleanup);
 
@@ -94,4 +94,20 @@ test('verify reports what it skipped, so a fast run is never a silent one', () =
   assert.equal(r.json.ran.length, 0);
   assert.ok(r.json.skipped.length > 0, 'the skipped set must be visible, not implied');
   for (const s of r.json.skipped) assert.match(s.reason, /FRESH|not applicable/);
+});
+
+test('--full re-verifies a story in development without erroring on the evidence the previous gate just wrote', () => {
+  // story-ready records evidence and pins its digest in the ledger; verified reads that pin. Judging
+  // it by the events from before the run reported an ERROR (exit 3) that a plain `check` never shows.
+  const dir = project(storyFiles(), { withHooks: true });
+  commitAll(dir, 'baseline');
+  run(dir, ['transition', '--scope', 'story', '--id', 'STORY-001', '--to', 'IN_REVIEW']);
+  run(dir, ['check', '--gate', 'story-ready', '--scope', 'story', '--id', 'STORY-001']);
+  for (const to of ['READY_FOR_DEV', 'IN_DEVELOPMENT', 'READY_FOR_TEST']) assert.equal(run(dir, ['transition', '--scope', 'story', '--id', 'STORY-001', '--to', to]).code, 0);
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    const { code, json } = runJson(dir, ['verify', '--full']);
+    const bad = json.ran.filter((r) => ['ERROR', 'FAIL', 'BLOCKED'].includes(r.status)).map((r) => `${r.gate}/${r.scopeId}=${r.status}`);
+    assert.deepEqual(bad, [], `attempt ${attempt}`);
+    assert.equal(code, 0, `attempt ${attempt}`);
+  }
 });
