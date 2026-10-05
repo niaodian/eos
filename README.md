@@ -23,6 +23,19 @@ what it contains and where it was built. It runs entirely on your machine — wi
 Claude Code, OpenAI Codex or Google Antigravity, or from any terminal — with no services, no accounts and
 no dependencies.
 
+## Trust boundary — read this first
+
+EOS is a delivery discipline and an evidence record. It is **not a security boundary against an actor
+that can write your repository** — a developer or an AI agent can edit the engine, the evidence, the
+ledger and the name an approval is recorded under (`EOS_ACTOR`). Local gates are guidance and records.
+What actually stops a bypass is your platform: branch protection, CODEOWNERS, platform-authenticated
+reviews, an agent that does not hold admin credentials, and CI that the change under review cannot
+edit. Fields EOS cannot verify — an approver's name, a policy-lock or waiver `approver`, a CI producer
+claim — are self-asserted: `independent` means "recorded under a different name", not "a verified
+different person". Until the trust roots move outside the repository, the Regulated track cannot prove
+separation of duties, and EOS output is supporting evidence, not sole audit evidence. EOS is sealed as
+a reference implementation: security fixes and defects only ([ADR-024](docs/adr/024-trust-boundary-and-seal.md)).
+
 ## Why EOS
 
 | The problem | What EOS does about it |
@@ -79,7 +92,7 @@ AI agent is optional — the CLI works in any terminal.
 
 ```bash
 # 1. Start from a pinned release and make it your repository
-npx degit niaodian/eos#eos-2.6.0 my-app && cd my-app && git init
+npx degit niaodian/eos#eos-2.7.0 my-app && cd my-app && git init
 
 # 2. Declare the project — no code yet, so the stack is decided at architecture time
 npx --offline eos init config-only --write        # add --track regulated for the strict track
@@ -175,8 +188,8 @@ EOS releases are built and attested in GitHub Actions, the way EOS asks your rel
 yourself before you adopt it:
 
 ```bash
-gh release download eos-2.6.0 --repo niaodian/eos --pattern 'eos-2.6.0.tar.gz'
-gh attestation verify eos-2.6.0.tar.gz --repo niaodian/eos
+gh release download eos-2.7.0 --repo niaodian/eos --pattern 'eos-2.7.0.tar.gz'
+gh attestation verify eos-2.7.0.tar.gz --repo niaodian/eos
 ```
 
 Each release also ships its SBOM and a `SHA256SUMS` file.
@@ -208,6 +221,7 @@ docs/               your specs and ADRs; docs/eos/ is the EOS manual set (中文
 - [Upgrading to eos-2.0.1](docs/eos/user-manual.md#107-upgrading-from-eos-200-to-eos-201) — the secret-detection security patch.
 - [Upgrading to eos-2.5.0](docs/eos/user-manual.md#1012-upgrading-from-eos-24x-to-eos-250) — your CI runs your project instead of EOS's test suite, your first declaration starts your own policy lock and SBOM, CI runs once per change.
 - [Upgrading to eos-2.6.0](docs/eos/user-manual.md#1013-upgrading-from-eos-25x-to-eos-260) — **Node 20 is gone (22.10+)**, a bounded `DEFERRED` can ship, a solo maintainer has a labelled self-approval, one-way decisions need a person's confirmation.
+- [Upgrading to eos-2.7.0](docs/eos/user-manual.md#1014-upgrading-from-eos-26x-to-eos-270) — the trust boundary is written down, ledger events hash every field (move everyone to 2.7.0 together), and four audit defects are fixed.
 - [Workflow contract](docs/eos/developer-experience.md) — the CLI, exit codes, JSON and diagnostics.
 - [Stack presets and tracks](docs/eos/stack-presets.md) — every supported stack, and how to choose a track.
 - [Design rationale](docs/eos/blueprint.md) and [architecture decisions](docs/adr/).

@@ -12,7 +12,7 @@ import { loadWorkflow, loadGates, loadAgentMap } from './lib/registry.mjs';
 import { readSnapshot, gateCollections, parsePorcelain } from './lib/state.mjs';
 import { testDurationTrend } from './lib/test-history.mjs';
 import { legalTransitions, planTransition } from './lib/transitions.mjs';
-import { readEvents, appendEvent, verifyChain, stateOf } from './lib/ledger.mjs';
+import { readEvents, appendEvent, verifyChain, stateOf, hashEvent, reconcileEvents, HASH_SCHEME } from './lib/ledger.mjs';
 import { evidenceFreshness } from './lib/evidence.mjs';
 import { waiverStatus } from './lib/waivers.mjs';
 
@@ -114,6 +114,18 @@ test('transitions: an unknown target state is rejected, not silently accepted', 
   assert.match(out, /unknown state/i);
 });
 
+test('transitions: a story or release that does not exist is refused and nothing is recorded', () => {
+  const dir = project({ '.eos/project.json': APP_PROJECT, 'docs/stories/STORY-001.md': story() });
+  const ghostStory = run(dir, ['transition', '--scope', 'story', '--id', 'GHOST-999', '--to', 'IN_REVIEW']);
+  assert.equal(ghostStory.code, 1, ghostStory.out);
+  assert.match(ghostStory.out, /no story "GHOST-999" exists/);
+  const ghostRelease = run(dir, ['transition', '--scope', 'release', '--id', 'GHOST-REL', '--to', 'CANDIDATE']);
+  assert.equal(ghostRelease.code, 1, ghostRelease.out);
+  assert.match(ghostRelease.out, /no release "GHOST-REL" exists/);
+  assert.deepEqual(readEvents(dir).events, [], 'a refused transition must leave no event in the append-only ledger');
+  assert.equal(run(dir, ['transition', '--scope', 'story', '--id', 'STORY-001', '--to', 'IN_REVIEW']).code, 0, 'a real story is unaffected');
+});
+
 test('transitions: a rollback edge is legal and recorded as a rollback', () => {
   const dir = project({ '.eos/project.json': APP_PROJECT, 'docs/stories/STORY-001.md': story() });
   assert.equal(run(dir, ['transition', '--scope', 'story', '--id', 'STORY-001', '--to', 'IN_REVIEW']).code, 0);
@@ -174,6 +186,49 @@ test('ledger: appended garbage is an error, not a silent skip', () => {
   write(dir, '.eos/ledger/events.jsonl', '{"seq":1}\n');
   appendFileSync(join(dir, '.eos/ledger/events.jsonl'), 'not-json\n');
   assert.equal(run(dir, ['ledger', '--verify']).code, 1);
+});
+
+test('ledger: every field of an event is hashed — rewriting an approval\'s assurance or deferred list breaks the chain', () => {
+  const dir = project({ '.eos/project.json': APP_PROJECT });
+  appendEvent(dir, { type: 'approval', scope: { type: 'release', id: 'R-1' }, assurance: 'self', deferredDigest: 'a'.repeat(64), deferred: [{ id: 'NFR-1', owner: 'pat', trigger: 'launch', dueBy: '2026-12-01' }] });
+  assert.equal(readEvents(dir).events[0].hv, HASH_SCHEME);
+  const p = join(dir, '.eos/ledger/events.jsonl');
+  const original = readFileSync(p, 'utf8');
+  for (const rewrite of [(e) => { e.assurance = 'independent'; }, (e) => { e.deferred[0].owner = 'someone-else'; }, (e) => { delete e.deferredDigest; }, (e) => { e.hv = undefined; }]) {
+    const e = JSON.parse(original);
+    rewrite(e);
+    writeFileSync(p, `${JSON.stringify(e)}\n`);
+    const { events } = readEvents(dir);
+    assert.equal(verifyChain(events).ok, false, JSON.stringify(e));
+  }
+});
+
+test('ledger: an event hashed before eos-2.6.1 still verifies, but the chain may not step back to it', () => {
+  const dir = project({ '.eos/project.json': APP_PROJECT });
+  const legacy = { seq: 1, ts: '2026-10-01T00:00:00.000Z', type: 'approval', scope: { type: 'release', id: 'R-1' }, actor: 'pat', assurance: 'independent', prevHash: null };
+  legacy.hash = hashEvent(legacy);
+  write(dir, '.eos/ledger/events.jsonl', `${JSON.stringify(legacy)}\n`);
+  assert.equal(verifyChain(readEvents(dir).events).ok, true, 'an existing ledger must keep verifying');
+  appendEvent(dir, { type: 'note', scope: { type: 'product', id: 'product' } });
+  const events = readEvents(dir).events;
+  assert.equal(verifyChain(events).ok, true);
+  assert.equal(events[1].hv, HASH_SCHEME);
+
+  const stepBack = { seq: 3, ts: '2026-10-02T00:00:00.000Z', type: 'note', scope: { type: 'product', id: 'product' }, actor: 'x', prevHash: events[1].hash };
+  stepBack.hash = hashEvent(stepBack);
+  const chain = verifyChain([...events, stepBack]);
+  assert.equal(chain.ok, false);
+  assert.match(chain.problems.join('\n'), /hash scheme went back/);
+});
+
+test('ledger: replaying a conflicted ledger keeps every field, including the ones scheme 1 never hashed', () => {
+  const approval = { seq: 1, ts: '2026-10-01T00:00:00.000Z', type: 'approval', scope: { type: 'release', id: 'R-1' }, actor: 'pat', assurance: 'self', deferredDigest: 'b'.repeat(64), deferred: [{ id: 'NFR-1', owner: 'pat', trigger: 't', dueBy: '2026-12-01' }], prevHash: null };
+  approval.hash = hashEvent(approval);
+  const [replayed] = reconcileEvents([[approval]]);
+  assert.equal(replayed.assurance, 'self');
+  assert.deepEqual(replayed.deferred, approval.deferred);
+  assert.equal(replayed.hv, HASH_SCHEME);
+  assert.equal(verifyChain([replayed]).ok, true);
 });
 
 test('ledger: stateOf falls back to the machine initial state when there is no event', () => {

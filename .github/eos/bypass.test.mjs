@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync, existsSync, rmSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
-import { project, write, run, runJson, cleanup, story } from './test-support.mjs';
+import { project, write, run, runJson, cleanup, story, manifest, writeManifest } from './test-support.mjs';
 
 after(cleanup);
 
@@ -164,11 +164,15 @@ test('bypass: a story added after the release gate ran invalidates the release e
   for (const to of ['IN_REVIEW', 'READY_FOR_DEV', 'IN_DEVELOPMENT', 'READY_FOR_TEST']) run(dir, ['transition', '--scope', 'story', '--id', 'S1', '--to', to]);
   run(dir, ['check', '--gate', 'verified', '--scope', 'S1']);
   run(dir, ['transition', '--scope', 'story', '--id', 'S1', '--to', 'VERIFIED']);
+  // A release exists once its manifest does; a transition for a release nobody declared is refused.
+  writeManifest(dir, { releaseId: 'v1', includedStories: ['S1'] });
   run(dir, ['check', '--gate', 'release-ready', '--scope', 'v1']);
-  run(dir, ['transition', '--scope', 'release', '--id', 'v1', '--to', 'CANDIDATE']);
+  const candidate = run(dir, ['transition', '--scope', 'release', '--id', 'v1', '--to', 'CANDIDATE']);
+  assert.equal(candidate.code, 0, candidate.out);
 
-  // whatever the release gate concluded, adding an unverified story must invalidate it
+  // whatever the release gate concluded, adding an unverified story to what the release ships must invalidate it
   write(dir, 'docs/stories/S2.md', story({ id: 'S2', rows: [['AC1.2', 'the user can log out', 'b.test.mjs::x', '—']] }));
+  write(dir, '.eos/releases/v1.json', manifest(dir, { releaseId: 'v1', includedStories: ['S1', 'S2'] }));
   const t = run(dir, ['transition', '--scope', 'release', '--id', 'v1', '--to', 'VERIFIED']);
   assert.equal(t.code, 1, t.out);
   assert.match(t.out, /STALE|set of stories|FAIL|PENDING/);

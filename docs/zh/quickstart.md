@@ -64,6 +64,8 @@ EOS 本身从不调用任何模型，也不需要任何 API key。每一行都�
 
 ## 已知局限
 
+- **EOS 不是针对"能写入仓库的角色"的安全边界。** 引擎、证据、账本以及批准人姓名（`EOS_ACTOR`，否则取 `USER`）都是该角色可控的文件或环境；而 pull request 上的 CI 运行的是这个 PR 自带的引擎与工作流。权威来自平台：分支保护、CODEOWNERS、经平台认证的评审、不持有管理员凭据的 agent、被评审变更无法修改的 CI（[ADR-024](../adr/024-trust-boundary-and-seal.md)）。
+- **姓名是自我声明。** 批准人姓名、策略锁或豁免中的 `approver`，以及 `producer.type: ci` 声明，都按所述原样记录；`independent` 表示"以不同于准备者的名字记录"，而不是"已验证的另一个人"。因此在信任根移到仓库之外以前，Regulated 轨道无法证明职责分离——请把那里的 EOS 输出当作辅助证据，而不是唯一的审计证据。
 - **PreToolUse 护栏是减速带，不是权威。** VS Code hooks 是预览功能，不同 agent harness 的行为不同，按机器生效，CI 也不会运行它。钩子读不懂的负载会按文本扫描；钩子自身出错时仍会放行。真正做决定的是 CI、分支保护与评审。
 - **密钥检测是启发式的。** 两道防线匹配已知的密钥格式、凭据赋值，以及为敏感命名的环境变量写的字面量回退；经过混淆的字面量可能漏过。`gitleaks` 补充厂商格式与熵检测——本地可选，EOS CI 中则是必需的：CI 会安装固定版本并校验其校验和（自 eos-2.3.0 起）；两者都不能替代评审。
 - **在分支保护与 CODEOWNERS 就位之前，治理是契约式的。** EOS 无法在本机验证服务端保护，因此"放宽需要第二个人"只有在完成 `/eos-init` 加固后才成立；在此之前 `eos-doctor` 会报告 `CONTRACTUAL`（[ADR-014](../adr/014-trust-chain.md)）。
@@ -78,7 +80,7 @@ EOS 本身从不调用任何模型，也不需要任何 API key。每一行都�
 ## Day-1（可直接复制——与用户手册 §3.4 完全一致的序列）
 
 ```sh
-npx degit niaodian/eos#eos-2.6.0 my-new-app && cd my-new-app
+npx degit niaodian/eos#eos-2.7.0 my-new-app && cd my-new-app
 git init && git add -A && git commit -q -m "chore: scaffold from eos"
 node .github/hooks/validate-config.mjs        # 期望 PASS
 node .github/eos/eos.mjs init config-only --write   # 声明项目：还没有代码（或 init <pack>；--track regulated；只有你一个维护者时加 --solo）

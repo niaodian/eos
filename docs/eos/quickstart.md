@@ -59,6 +59,8 @@ EOS itself never calls a model and needs no API key. Each row adds to the one ab
 
 ## Known limitations
 
+- **EOS is not a security boundary against an actor who can write the repository.** The engine, the evidence, the ledger and the approver's name (`EOS_ACTOR`, else `USER`) are all files or environment the actor controls, and CI on a pull request runs the pull request's own engine and workflow. Authority comes from the platform: branch protection, CODEOWNERS, platform-authenticated reviews, an agent without admin credentials, a CI the change cannot edit ([ADR-024](../adr/024-trust-boundary-and-seal.md)).
+- **Names are self-asserted.** An approver's name, a policy-lock or waiver `approver` and a `producer.type: ci` claim are recorded as stated; `independent` means "recorded under a different name than the preparer", not "a verified different person". The Regulated track therefore cannot prove separation of duties until the trust roots move outside the repository — treat EOS output there as supporting evidence, not sole audit evidence.
 - **The PreToolUse guardrail is a speed bump, not the authority.** VS Code hooks are a Preview feature, differ per agent harness, run per machine and are not run in CI. A payload the hook cannot parse is scanned as text; an internal failure of the hook still lets the call through. CI, branch protection and review decide.
 - **Secret detection is heuristic.** Both guards match known key formats, credential assignments and literal fallbacks for secret-named environment variables; an obfuscated literal can pass. `gitleaks` adds vendor formats and entropy — optional locally, required in EOS CI, which installs a pinned, checksum-verified version (since eos-2.3.0); neither replaces review.
 - **Until branch protection and CODEOWNERS exist, governance is contractual.** EOS cannot verify server-side protection from a laptop, so "a weakening needs a second person" holds only after the `/eos-init` hardening; `eos-doctor` reports `CONTRACTUAL` until then ([ADR-014](../adr/014-trust-chain.md)).
@@ -73,7 +75,7 @@ EOS itself never calls a model and needs no API key. Each row adds to the one ab
 ## Day-1 (copy-ready — the same sequence as the manual, §3.4)
 
 ```sh
-npx degit niaodian/eos#eos-2.6.0 my-new-app && cd my-new-app
+npx degit niaodian/eos#eos-2.7.0 my-new-app && cd my-new-app
 git init && git add -A && git commit -q -m "chore: scaffold from eos"
 node .github/hooks/validate-config.mjs        # expect PASS
 node .github/eos/eos.mjs init config-only --write   # declare it: no code yet (or init <pack>; --track regulated; --solo if you are the only maintainer)

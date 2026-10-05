@@ -3,11 +3,11 @@
   "specVersion": "1.5",
   "version": 1,
   "metadata": {
-    "timestamp": "2026-10-04T11:08:16.362Z",
+    "timestamp": "2026-10-05T16:43:07.852Z",
     "component": {
       "type": "application",
       "name": "eos-template",
-      "version": "2.6.0"
+      "version": "2.7.0"
     },
     "tools": [
       {
@@ -19,11 +19,11 @@
     "properties": [
       {
         "name": "eos:commit",
-        "value": "a3df77e1267280aa0e4f0df36088a8e249d4fafd"
+        "value": "894c83dc41583f6afe1ba4c109fa280c6fc3f086"
       },
       {
         "name": "eos:productTreeDigest",
-        "value": "761261eb9ff3dbdfc363f8524d1a6a14b6071129c57609049118e3f76497861b"
+        "value": "de6fc17be8724252201a8559f3a922ad0c0c994a8f648fb5ae8a73ddb2d9dcd0"
       },
       {
         "name": "eos:stacks",
