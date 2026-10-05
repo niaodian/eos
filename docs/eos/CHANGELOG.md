@@ -6,6 +6,15 @@
 > [GitHub Releases](https://github.com/niaodian/eos/releases). How often EOS releases, and what a
 > patch may contain: [CONTRIBUTING.md](../../CONTRIBUTING.md#release-cadence).
 
+## eos-2.7.0 — 2026-10-06
+
+- **The trust boundary is now written down** (ADR-024): EOS is a delivery discipline and an evidence record, not a security boundary against an actor who can write the repository. README and the quickstart's Known limitations say so, name what does stop a bypass (platform controls), label approver and `approver` fields as self-asserted, and state that the Regulated track cannot prove separation of duties until the trust roots move outside the repository. `eos approve` now prints that the recorded name is self-asserted
+- **Ledger events hash every field — move everyone to 2.7.0 together:** new events carry `hv: 2` and the hash covers the whole event, so `assurance`, `deferred` and `deferredDigest` can no longer be edited without breaking the chain; replay (`reconcileEvents`) used to drop those fields and now keeps them. Existing ledgers verify unchanged, and a chain may not step back from `hv: 2` to the old scheme. A ledger written by this engine does not verify under an engine that predates `hv`
+- **A transition for something that does not exist is refused**: `eos transition` on a story that is not in the product, or a release with no manifest, now fails instead of recording an event for a ghost scope
+- **`verify --full` no longer fails a story against its own run**: the verify loop re-reads state after each recorded run, so a story in `READY_FOR_TEST` is not reported `ERROR` because it was judged against the ledger as it stood before
+- **EOS's own coverage floor is re-based:** the exclude globs `**/*.test.mjs` did not match files under `.github/`, so test files counted as covered code. With them excluded the measured figure is lines 96.67 / branches 75.50 / functions 94.44, and `.eos/test-budget.json` now sets 96 / 75 / 94. This corrects the measurement; the tests did not get weaker
+- **EOS is sealed as a reference implementation.** Only security fixes, defects in what already ships, and a single change the maintainer asks for will follow. Not fixed, and not scheduled: the remaining findings of the independent audit of eos-2.6.0 (for example, the README's Node badge still lists 20)
+
 ## eos-2.6.0 — 2026-10-04
 
 - **Breaking — Node 20 is removed.** `engines` is now `>=22.10.0`; the template ships `.nvmrc` (`24`) and every `setup-node` step in `eos-ci.yml` and `eos-release.yml` reads it, EOS's matrix runs Node 22 and 24, and Linux jobs are pinned to `ubuntu-24.04`. Node 26 passed locally (26.10) and joins CI after it becomes an LTS on 2026-10-28.
