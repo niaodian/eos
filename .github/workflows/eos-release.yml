@@ -21,7 +21,12 @@
 #
 # A push of a tag (`v*` or `eos-*`) builds, attests and — once everything the track requires has
 # passed — publishes to that tag's GitHub release, creating a draft if none exists. A manual dispatch, or a pull request that changes this file, is
-# a dry run: it builds and attests, and publishes nothing.
+# a dry run: it builds and publishes nothing, and since eos-2.8.0 it attests nothing either — an
+# attestation from a dry run would be a genuine signature on something nobody released (ADR-025).
+#
+# The attest job uses the environment `release`. Where the repository requires a reviewer for it
+# (`node .github/eos/harden-github.mjs` sets that up), a person approves before anything is signed;
+# the SLSA, manifest and publish jobs wait for the attest job, so that one approval gates them all.
 name: EOS release
 
 on:
@@ -115,6 +120,7 @@ jobs:
   attest:
     needs: [plan, build]
     if: needs.plan.outputs.attest == 'true'
+    environment: release
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -141,7 +147,8 @@ jobs:
           {
             echo "### Provenance"
             echo ""
-            echo "Verify any artifact of this run: \`gh attestation verify <file> -R ${GITHUB_REPOSITORY}\`"
+            echo "Verify any artifact of this run, pinned to the workflow that signed it:"
+            echo "\`gh attestation verify <file> -R ${GITHUB_REPOSITORY} --signer-workflow ${GITHUB_REPOSITORY}/.github/workflows/eos-release.yml --source-ref ${GITHUB_REF} --deny-self-hosted-runners\`"
           } >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -150,8 +157,9 @@ jobs:
           if-no-files-found: error
 
   # Regulated only: SLSA Build L3 provenance from the isolated generator. Tag-pinned — see the header.
+  # It waits for the attest job, so the person approving the `release` environment gates it too.
   slsa:
-    needs: [plan, build]
+    needs: [plan, build, attest]
     if: needs.plan.outputs.track == 'regulated' && needs.plan.outputs.attest == 'true'
     permissions:
       actions: read

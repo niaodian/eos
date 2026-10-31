@@ -35,6 +35,9 @@ claim — are self-asserted: `independent` means "recorded under a different nam
 different person". Until the trust roots move outside the repository, the Regulated track cannot prove
 separation of duties, and EOS output is supporting evidence, not sole audit evidence. EOS is sealed as
 a reference implementation: security fixes and defects only ([ADR-024](docs/adr/024-trust-boundary-and-seal.md)).
+Since eos-2.8.0 the platform side is one command a person runs — `node .github/eos/harden-github.mjs` —
+and the agent works as its own GitHub account, without admin rights
+([ADR-025](docs/adr/025-agent-safe-setup-and-trust-anchors.md), manual Appendix D).
 
 ## Why EOS
 
@@ -92,7 +95,7 @@ AI agent is optional — the CLI works in any terminal.
 
 ```bash
 # 1. Start from a pinned release and make it your repository
-npx degit niaodian/eos#eos-2.7.0 my-app && cd my-app && git init
+npx degit niaodian/eos#eos-2.8.0 my-app && cd my-app && git init
 
 # 2. Declare the project — no code yet, so the stack is decided at architecture time
 npx --offline eos init config-only --write        # add --track regulated for the strict track
@@ -188,8 +191,8 @@ EOS releases are built and attested in GitHub Actions, the way EOS asks your rel
 yourself before you adopt it:
 
 ```bash
-gh release download eos-2.7.0 --repo niaodian/eos --pattern 'eos-2.7.0.tar.gz'
-gh attestation verify eos-2.7.0.tar.gz --repo niaodian/eos
+gh release download eos-2.8.0 --repo niaodian/eos --pattern 'eos-2.8.0.tar.gz'
+gh attestation verify eos-2.8.0.tar.gz --repo niaodian/eos --signer-workflow niaodian/eos/.github/workflows/eos-release.yml
 ```
 
 Each release also ships its SBOM and a `SHA256SUMS` file.
@@ -222,6 +225,7 @@ docs/               your specs and ADRs; docs/eos/ is the EOS manual set (中文
 - [Upgrading to eos-2.5.0](docs/eos/user-manual.md#1012-upgrading-from-eos-24x-to-eos-250) — your CI runs your project instead of EOS's test suite, your first declaration starts your own policy lock and SBOM, CI runs once per change.
 - [Upgrading to eos-2.6.0](docs/eos/user-manual.md#1013-upgrading-from-eos-25x-to-eos-260) — **Node 20 is gone (22.10+)**, a bounded `DEFERRED` can ship, a solo maintainer has a labelled self-approval, one-way decisions need a person's confirmation.
 - [Upgrading to eos-2.7.0](docs/eos/user-manual.md#1014-upgrading-from-eos-26x-to-eos-270) — the trust boundary is written down, ledger events hash every field (move everyone to 2.7.0 together), and four audit defects are fixed.
+- [Upgrading to eos-2.8.0](docs/eos/user-manual.md#1015-upgrading-from-eos-27x-to-eos-280) — **agent-safe setup**: the agent works as its own account, one command hardens a repository, trust anchors are policy, the guardrail covers the governance surface.
 - [Workflow contract](docs/eos/developer-experience.md) — the CLI, exit codes, JSON and diagnostics.
 - [Stack presets and tracks](docs/eos/stack-presets.md) — every supported stack, and how to choose a track.
 - [Design rationale](docs/eos/blueprint.md) and [architecture decisions](docs/adr/).

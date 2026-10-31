@@ -99,6 +99,10 @@ test('the plan reads the track from the project, and a dispatch or a pull reques
 
   const fork = planRelease({ root: standard, event: 'pull_request', refType: 'branch', refName: '1/merge', headRepo: 'someone/app', repo: 'acme/app' });
   assert.equal(fork.attest, 'false', 'a fork gets no OIDC token, so it must not try to attest');
+  // eos-2.8.0 (ADR-025): a dry run attests nothing — its signature would be genuine, on nothing released.
+  assert.equal(dispatch.attest, 'false', 'a dispatch is a dry run');
+  const own = planRelease({ root: standard, event: 'pull_request', refType: 'branch', refName: '2/merge', headRepo: 'acme/app', repo: 'acme/app' });
+  assert.equal(own.attest, 'false', 'a pull request that edits the release workflow is a dry run too');
   assert.throws(() => planRelease({ root: standard, event: 'push', requested: 'enterprise' }), /unknown track/);
 });
 
@@ -107,4 +111,10 @@ test('a tag with a manifest is planned for binding', () => {
   assert.equal(run(dir, ['release', 'init', '--release', 'v3.0.0']).code, 0);
   commitAll(dir, 'manifest');
   assert.equal(planRelease({ root: dir, event: 'push', refType: 'tag', refName: 'v3.0.0', repo: 'acme/app' }).manifest, 'true');
+});
+
+test('a person approves a release before anything is signed: the attest job uses the release environment', () => {
+  assert.match(J.attest, /^ {4}environment: release$/m);
+  assert.match(J.slsa, /^ {4}needs: \[plan, build, attest\]$/m, 'the SLSA job waits for the approved attest job');
+  assert.match(J.attest, /--signer-workflow \$\{GITHUB_REPOSITORY\}\/\.github\/workflows\/eos-release\.yml/, 'the printed verify command pins the signer');
 });

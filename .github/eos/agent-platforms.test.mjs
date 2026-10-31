@@ -63,7 +63,7 @@ test('a shared configuration file keeps everything that is not EOS\'s — and na
   assert.equal(run(dir, ['agents', 'sync', '--write']).code, 0);
   const settings = json(dir, '.claude/settings.json');
   assert.deepEqual(settings.permissions, mine.permissions);
-  assert.deepEqual(settings.hooks.PreToolUse.map((h) => h.matcher), ['Write', 'Bash|PowerShell|Write|Edit|MultiEdit|NotebookEdit']);
+  assert.deepEqual(settings.hooks.PreToolUse.map((h) => h.matcher), ['Write', 'Bash|PowerShell|Write|Edit|MultiEdit|NotebookEdit|mcp__.*']);
   assert.deepEqual(Object.keys(json(dir, '.mcp.json').mcpServers), ['db', 'eos']);
 
   // A hand-edited EOS entry is drift; the team's own entries never are.
@@ -249,7 +249,7 @@ test('EOS owns its hook handlers, not a team\'s matcher group: mixed groups keep
   settings.hooks.PreToolUse[0].hooks[0].timeout = 5;
   write(fresh, '.claude/settings.json', settings);
   assert.equal(run(fresh, ['agents', 'sync', '--write']).code, 0);
-  assert.deepEqual(json(fresh, '.claude/settings.json').hooks.PreToolUse.map((g) => g.matcher), ['Bash|PowerShell|Write|Edit|MultiEdit|NotebookEdit', 'Write']);
+  assert.deepEqual(json(fresh, '.claude/settings.json').hooks.PreToolUse.map((g) => g.matcher), ['Bash|PowerShell|Write|Edit|MultiEdit|NotebookEdit|mcp__.*', 'Write']);
   assert.equal(json(fresh, '.claude/settings.json').hooks.PreToolUse[0].hooks[0].timeout, 30);
 });
 

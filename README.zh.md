@@ -30,7 +30,9 @@ EOS 是一套交付纪律和证据记录。它**不是针对"能写入你仓库�
 CI。EOS 无法验证的字段——批准人姓名、策略锁或豁免中的 `approver`、CI 产出方声明——都是自我声明：
 `independent` 表示"以另一个名字记录"，而不是"已验证的另一个人"。在信任根移到仓库之外以前，Regulated
 轨道无法证明职责分离，EOS 的输出只是辅助证据，不能作为唯一的审计证据。EOS 已封版为参考实现：只做安全修复
-与缺陷修复（[ADR-024](docs/adr/024-trust-boundary-and-seal.md)）。
+与缺陷修复（[ADR-024](docs/adr/024-trust-boundary-and-seal.md)）。自 eos-2.8.0 起，平台一侧的设置只需由人运行
+一条命令——`node .github/eos/harden-github.mjs`——而 agent 以它自己的 GitHub 账户工作，不持有管理员权限
+（[ADR-025](docs/adr/025-agent-safe-setup-and-trust-anchors.md)，用户手册附录 D）。
 
 ## 为什么需要 EOS
 
@@ -85,7 +87,7 @@ AI agent 是可选的 —— CLI 在任何终端里都能用。
 
 ```bash
 # 1. 从一个固定的发布版本开始，并把它变成你的仓库
-npx degit niaodian/eos#eos-2.7.0 my-app && cd my-app && git init
+npx degit niaodian/eos#eos-2.8.0 my-app && cd my-app && git init
 
 # 2. 声明项目 —— 还没有代码，技术栈留到架构阶段再定
 npx --offline eos init config-only --write        # 想走严格轨道就加上 --track regulated
@@ -176,8 +178,8 @@ EOS 的发布在 GitHub Actions 中构建并出具证明 —— 正是 EOS 要�
 你可以亲自核验：
 
 ```bash
-gh release download eos-2.7.0 --repo niaodian/eos --pattern 'eos-2.7.0.tar.gz'
-gh attestation verify eos-2.7.0.tar.gz --repo niaodian/eos
+gh release download eos-2.8.0 --repo niaodian/eos --pattern 'eos-2.8.0.tar.gz'
+gh attestation verify eos-2.8.0.tar.gz --repo niaodian/eos --signer-workflow niaodian/eos/.github/workflows/eos-release.yml
 ```
 
 每个发布还附带它的 SBOM 和一个 `SHA256SUMS` 文件。
@@ -210,6 +212,7 @@ docs/               你的规格与 ADR；docs/eos/ 是 EOS 手册（中文版�
 - [升级到 eos-2.5.0](docs/zh/user-manual.md#1012-从-eos-24x-升级到-eos-250) —— 你的 CI 运行你的项目而不是 EOS 的测试套件，首次声明会建立你自己的策略锁与 SBOM，每次变更只运行一次 CI。
 - [升级到 eos-2.6.0](docs/zh/user-manual.md#1013-从-eos-25x-升级到-eos-260) —— **Node 20 已移除（22.10+）**，有界的 `DEFERRED` 可以发布，单人维护者有带标签的自批准，单向决策需要人来确认。
 - [升级到 eos-2.7.0](docs/zh/user-manual.md#1014-从-eos-26x-升级到-eos-270) —— 信任边界已成文，账本事件对所有字段求哈希（请让所有人一起升到 2.7.0），并修复了四个审计缺陷。
+- [升级到 eos-2.8.0](docs/zh/user-manual.md#1015-从-eos-27x-升级到-eos-280) —— **对 Agent 安全的设置**：Agent 以自己的账户工作，一条命令加固一个仓库，信任锚纳入策略，护栏覆盖治理面。
 - [工作流契约](docs/zh/developer-experience.md) —— CLI、退出码、JSON 与诊断。
 - [技术栈预设与轨道](docs/zh/stack-presets.md) —— 所有受支持的技术栈，以及如何选择轨道。
 - [设计原理](docs/zh/blueprint.md) 与 [架构决策记录](docs/adr/)。

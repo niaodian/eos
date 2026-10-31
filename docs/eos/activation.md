@@ -32,11 +32,20 @@
 
 ## 1. Win back the "enforcement authority" axis (~+4 points) — every real repo should do this
 
+- [ ] Agent account: the agent works as its own GitHub account, without admin rights or the `workflow` scope, in its own computer user
+  - **Why**: an agent working with *your* credentials can do whatever you can — merge, change the rules, push
+    a release tag. The rules below hold it only when it is someone else. (ADR-025; the audit of 2026-10-31.)
+  - **Steps**: once per computer — Appendix D.5 (create the account and a `public_repo` token, a separate
+    computer user, sign `gh` in as the agent there).
+  - **Verify**: in the agent's terminal, `gh auth status` names the agent's account; `node .github/eos/harden-github.mjs --check --bot <agent-login>` shows ✓ agent account.
+
 - [ ] Branch protection: default branch requires a PR + the required check `verify` + Code Owner review
   - **Why**: without it, CI is only a "green-light suggestion" — anyone with write access (or an agent granted
     `editFiles`) can merge without review. This is the root cause the audit judged "contractual rather than
     technical authority", and the single biggest point loss.
-  - **Steps**: GitHub repo → Settings → Rules → Rulesets → New branch ruleset; target the default branch, set
+  - **Steps** (eos-2.8.0): one command, run by you in your own terminal —
+    `node .github/eos/harden-github.mjs --bot <agent-login> --apply`. It also protects the release tags and
+    sets up the `release` environment. Prefer to click? GitHub repo → Settings → Rules → Rulesets → New branch ruleset; target the default branch, set
     **Enforcement status: `Active`** (a new ruleset defaults to *Disabled*, and a Disabled ruleset enforces
     nothing no matter what else you tick), then enable *Require a pull request before merging* + *Require
     status checks to pass* → select `verify` (the `eos-ci.yml` job) + *Require review from Code Owners*.
@@ -44,11 +53,12 @@
   - **Plan limits**: on GitHub Free, a **private** repo does not enforce rulesets at all ("won't be enforced …
     until you upgrade"), and *Require review from Code Owners* is not offered. Make the repo public, upgrade to
     Pro/Team, or waive this line with exactly that reason.
-  - **Verify**: `gh api repos/<owner>/<repo>/rules/branches/main` — a non-empty array means **Active** rules
+  - **Verify**: `node .github/eos/harden-github.mjs --check` — read-only; it prints HARDENED or what is missing,
+    and reads rulesets and classic protection alike. By hand: `gh api repos/<owner>/<repo>/rules/branches/main` — a non-empty array means **Active** rules
     apply; `[]` means nothing is enforced (usually a ruleset left *Disabled*). Using classic protection instead?
     Then `gh api repos/<owner>/<repo>/branches/main/protection` returning 200. The legacy endpoint returns 404
-    for a ruleset, so do not read that as "not protected". **Local/offline cannot verify server-side state —
-    this is a reminder, not a gate.**
+    for a ruleset, so do not read that as "not protected". **A tick here is what a person claims; the check is
+    what GitHub says.**
 
 - [ ] CODEOWNERS: replace every `@niaodian` in `.github/CODEOWNERS` with your team handle
   - **Why**: combined with "Require review from Code Owners" above, this stops anyone (including an agent) from

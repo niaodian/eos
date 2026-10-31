@@ -13,6 +13,7 @@ import { project, write, run, runJson, cleanup, story, commitAll, releaseFiles, 
   writeManifest, APP_PROJECT, REPO_ROOT } from './test-support.mjs';
 import { resolve, result, consult, loadProviders, PROVIDER_STATUSES, resetProviderBreaker } from './adapters/contract.mjs';
 import { resetMockAttempts } from './adapters/mock.mjs';
+import { verifyArgs, check as checkAttestation } from './adapters/github-attestation.mjs';
 
 after(cleanup);
 
@@ -255,4 +256,25 @@ test('a PASS that exists only because a remote authority said so is marked REMOT
 
 test('a verdict EOS reached on its own is marked LOCAL, not remote', () => {
   assert.equal(resolve({ status: 'PASS', detail: 'proven offline' }, null).verification, 'LOCAL');
+});
+
+// ---------------------------------------------------------------- attestation: who signed (ADR-025)
+// Matching the repository alone accepted an attestation from ANY workflow run in it — one a pull
+// request added, or one a tag anybody could push started. The signer is now always pinned.
+test('the attestation check pins the workflow that signed, and refuses self-hosted runners', () => {
+  const { args } = verifyArgs('dist/app.tgz', { repo: 'acme/app' });
+  assert.deepEqual(args, ['attestation', 'verify', 'dist/app.tgz', '--repo', 'acme/app',
+    '--signer-workflow', 'acme/app/.github/workflows/eos-release.yml', '--deny-self-hosted-runners']);
+  const pinned = verifyArgs('oci://ghcr.io/acme/app@sha256:abc', { owner: 'acme', signerWorkflow: 'acme/ci/.github/workflows/build.yml', signerDigest: 'abc123', sourceRef: 'refs/tags/v1.0.0', denySelfHostedRunners: false }).args;
+  assert.deepEqual(pinned.slice(3), ['--owner', 'acme', '--signer-workflow', 'acme/ci/.github/workflows/build.yml', '--signer-digest', 'abc123', '--source-ref', 'refs/tags/v1.0.0']);
+  const unpinned = verifyArgs('dist/app.tgz', { owner: 'acme' });
+  assert.equal(unpinned.args, null);
+  assert.match(unpinned.problem, /the signer is not pinned/);
+});
+
+test('an owner-only attestation provider is UNVERIFIED, never a PASS', async () => {
+  const dir = project({ 'dist/app.tgz': 'x' });
+  const v = await checkAttestation({ root: dir, subject: 'evidence-provenance', options: { artifact: 'dist/app.tgz', owner: 'acme' }, now: new Date() });
+  assert.equal(v.status, 'UNVERIFIED');
+  assert.match(v.detail, /the signer is not pinned/);
 });

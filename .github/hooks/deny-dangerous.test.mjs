@@ -9,11 +9,12 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { mkdtempSync, copyFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, copyFileSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { boundedSpawnSync } from '../eos/test-spawn.mjs';
 import { evaluateToolCall } from './lib/secret-rules.mjs';
 import { executableText } from './lib/command-words.mjs';
+import { isTemplateRepository } from './lib/governance-rules.mjs';
 
 const HOOK = join(dirname(fileURLToPath(import.meta.url)), 'deny-dangerous.js');
 
@@ -30,8 +31,8 @@ const allows = (cmd) => assert.equal(decision(cmd), 'allow', `expected ALLOW but
 
 test('git push: --force-with-lease is ALLOWED (the fragile invariant — negative lookahead)', () => {
   allows('git push --force-with-lease');
-  allows('git push origin main --force-with-lease');
-  allows('git push --force-with-lease=origin/main');
+  allows('git push origin feat/login --force-with-lease');
+  allows('git push --force-with-lease=origin/feat/login');
 });
 
 test('git push: bare force IS denied (short + long, case-insensitive)', () => {
@@ -55,7 +56,8 @@ test('benign commands are ALLOWED (no over-blocking)', () => {
   allows('ls -la');
   allows('git status');
   allows('git commit -m "fix: thing"');
-  allows('git push origin main');  // ordinary (non-force) push must pass
+  allows('git push origin feat/login');  // ordinary (non-force) push of a working branch must pass
+  allows('git push -u origin feat/eos-2.8.0');
   allows('rm notes.txt');          // plain single-file rm is not a "destructive recursive" op
 });
 
@@ -246,10 +248,11 @@ test('--self is never typed by the agent, on any eos command', () => {
   assert.equal(run(`${EOS} approve release ${SELF} --reason "solo project"`), 'deny');
   assert.equal(run(`${EOS} policy lock --write --reason "r" ${SELF}`), 'deny');
   assert.equal(run(`eos waiver add x ${SELF}`), 'deny');
-  assert.equal(run(`${EOS} approve release --reason "mention ${SELF} in prose"`), 'allow', 'quoted text is not a flag');
+  assert.equal(run(`${EOS} waive --gate story-ready --scope S1 --reason "mention ${SELF} in prose"`), 'allow', 'quoted text is not a flag');
   assert.equal(run(`git commit -m "docs: eos approve ${SELF} is for solo projects"`), 'allow');
   assert.equal(run(`gh pr create --body-file - <<'EOF'\nUse eos approve ${SELF} when you work alone.\nEOF`), 'allow');
-  assert.equal(run(`${EOS} approve release --reason "ok"`), 'allow');
+  // eos-2.8.0: an approval is recorded by the person who gives it, never by the agent — with or without --self.
+  assert.equal(run(`${EOS} approve release --reason "ok"`), 'deny');
   assert.equal(write('docs/solo.md', `Run eos approve ${SELF}`), 'allow');
 });
 
@@ -273,4 +276,117 @@ test('executableText blanks data in place: same length, same line breaks', () =>
   assert.equal(out.split('\n').length, text.split('\n').length);
   assert.doesNotMatch(out, /-rf/);
   assert.match(out, /^git commit -m "_______"/);
+});
+
+// ---------------------------------------------------------------- the governance surface (eos-2.8.0, ADR-025)
+// The audit's PoC P6 sent twelve calls that tamper with what judges a project; all twelve were
+// allowed. Records are refused everywhere; a person's decisions are refused in a project; the judge
+// (engine, hooks, workflows, policy) needs a person's confirmation in a project and stays editable in
+// EOS's own repository, where it is the product. Built from fragments, like the fixtures above.
+const LEDGER = '.eos/' + 'ledger/events.jsonl';
+
+/** A project that is not EOS's own: its declaration does not carry the template marker. */
+function downstream() {
+  const dir = mkdtempSync(join(tmpdir(), 'eos-hook-project-'));
+  mkdirSync(join(dir, '.eos'), { recursive: true });
+  writeFileSync(join(dir, '.eos/project.json'), JSON.stringify({ projectType: 'application' }));
+  return dir;
+}
+const inProject = (dir) => (tool, input) => evaluateToolCall(JSON.stringify({ tool_name: tool, tool_input: input, cwd: dir })).decision;
+
+test('PoC P6: the twelve calls that tampered with the governance surface are refused, or put to a person', () => {
+  const dir = downstream();
+  try {
+    const call = inProject(dir);
+    const edit = (path, oldText, newText) => call('Edit', { path, old_str: oldText, new_str: newText });
+    const create = (path, text) => call('Write', { path, file_text: text });
+    const bash = (command) => call('Bash', { command });
+    assert.equal(edit(LEDGER, '"status":"FAIL"', '"status":"PASS"'), 'deny');
+    assert.equal(create('.eos/evidence/verified__story__S1.json', '{"status":"PASS"}'), 'deny');
+    assert.equal(edit('.eos/waivers/w.json', '"approver": ""', '"approver": "cto"'), 'deny');
+    assert.equal(edit('.eos/policy.lock.json', '"approver": ""', '"approver": "bob"'), 'deny');
+    assert.equal(bash(`EOS_ACTOR=alice ${EOS} approve --scope release --id R-1`), 'deny');
+    assert.equal(bash(`node -e "require('fs').appendFileSync('${LEDGER}', 'x')"`), 'deny');
+    assert.equal(create('.github/hooks/deny-dangerous.js', "process.stdout.write('{}')"), 'ask');
+    assert.equal(edit('.github/workflows/eos-ci.yml', 'run: node', 'run: "true"'), 'ask');
+    assert.equal(edit('.github/eos/lib/waivers.mjs', 'honored: false', 'honored: true'), 'ask');
+    assert.equal(edit('docs/eos/activation.md', '- [ ] Branch protection', '- [x] Branch protection'), 'deny');
+    assert.equal(bash('gh api -X DELETE repos/OWNER/REPO/branches/main/protection'), 'deny');
+    assert.equal(bash('git push --no-verify origin HEAD:feat/x'), 'deny');
+    // A shell write is read like an edit: a record is refused, a decision too, the judge is put to a person.
+    assert.equal(bash(`sed -i '' 's/FAIL/PASS/' ${LEDGER}`), 'deny');
+    assert.equal(bash("sed -i '' 's/- \\[ \\]/- [x]/' docs/eos/activation.md"), 'deny');
+    assert.equal(bash('cp /tmp/x .github/workflows/eos-ci.yml'), 'ask');
+    assert.equal(edit('src/login.js', 'a', 'b'), 'allow', 'product code is the agent\'s work');
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('what a person does is refused for the agent in any repository; EOS\'s own commands are not', () => {
+  for (const cmd of [
+    'gh pr merge 12 --squash', 'gh pr review 12 --approve', 'gh api --method=PUT repos/o/r/rulesets/7 --input -',
+    'gh api -X POST repos/o/r/collaborators/bot', 'gh auth token', 'gh auth switch --user owner', 'gh secret set RELEASE_KEY',
+    'gh release create v1.0.0', 'git push origin main', 'git push origin HEAD:main', 'git push origin v1.2.0', 'git push --tags',
+    'git update-index --cacheinfo 100644,abc,x', 'git hash-object -w /tmp/forged', 'node .github/eos/harden-github.mjs --bot b --apply',
+    'export EOS_ACTOR=alice',
+  ]) assert.equal(run(cmd), 'deny', cmd);
+  for (const cmd of [
+    `${EOS} check --gate verified --scope S1`, `${EOS} verify`, `${EOS} transition --scope story --id S1 --to IN_REVIEW`,
+    `${EOS} policy lock --write --reason "x"`, 'node .github/eos/harden-github.mjs --check', 'node .github/eos/harden-github.mjs --bot acme-bot',
+    'gh api repos/o/r/rulesets', 'gh pr create --fill', `git add ${LEDGER}`, `cat ${LEDGER}`,
+    'git commit -m "docs: never set EOS_ACTOR=someone by hand"', 'git push -u origin feat/x',
+  ]) assert.equal(run(cmd), 'allow', cmd);
+  assert.equal(decideRaw(`not json EOS_ACTOR=alice ${EOS} approve`).decision, 'deny', 'raw text is judged too');
+});
+
+test('in EOS\'s own repository the judge is the product and may be edited; its records still may not', () => {
+  // process.cwd() is EOS's repository here, whose declaration is the template's own.
+  assert.equal(write('.github/eos/lib/waivers.mjs', '// edited'), 'allow');
+  assert.equal(write('docs/eos/activation.md', '- [x] Branch protection'), 'allow');
+  assert.equal(write(LEDGER, '{}'), 'deny');
+  const dir = mkdtempSync(join(tmpdir(), 'eos-hook-marker-'));
+  try {
+    assert.equal(isTemplateRepository(dir), false, 'no declaration is not the template');
+    mkdirSync(join(dir, '.eos'));
+    writeFileSync(join(dir, '.eos/project.json'), '{ broken');
+    assert.equal(isTemplateRepository(dir), false, 'an unreadable declaration is not the template');
+    writeFileSync(join(dir, '.eos/project.json'), JSON.stringify({ templateDefault: true }));
+    assert.equal(isTemplateRepository(dir), true);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('GitHub MCP: merging and approving are refused; a write to the default branch or to a record is refused', () => {
+  const mcp = (tool, input) => evaluateToolCall(JSON.stringify({ tool_name: tool, tool_input: input })).decision;
+  assert.equal(mcp('mcp__github__merge_pull_request', { owner: 'o', repo: 'r', pullNumber: 1 }), 'deny');
+  assert.equal(mcp('github-mcp-server-pull_request_review_write', { method: 'submit_pending', event: 'APPROVE' }), 'deny');
+  assert.equal(mcp('mcp_github_push_files', { branch: 'main', files: [{ path: 'src/a.js', content: 'x' }] }), 'deny');
+  assert.equal(mcp('mcp_github_push_files', { branch: 'feat/x', files: [{ path: LEDGER, content: '{}' }] }), 'deny');
+  assert.equal(mcp('mcp_github_push_files', { branch: 'feat/x', files: [{ path: 'src/a.js', content: 'x' }] }), 'allow');
+  assert.equal(mcp('mcp_github_create_branch', { branch: 'feat/x' }), 'allow');
+});
+
+test('an "ask" reaches the person in each platform\'s dialect; a platform without one gets a deny', () => {
+  const dir = downstream();
+  try {
+    const payload = JSON.stringify({ tool_name: 'Edit', tool_input: { path: '.github/workflows/eos-ci.yml', old_str: 'a', new_str: 'b' }, cwd: dir });
+    const hook = (format) => JSON.parse(boundedSpawnSync(process.execPath, [HOOK, '--format', format], { input: payload, encoding: 'utf8' }).stdout || '{}');
+    assert.equal(hook('copilot').hookSpecificOutput.permissionDecision, 'ask');
+    assert.equal(hook('claude').hookSpecificOutput.permissionDecision, 'ask');
+    assert.equal(hook('cursor').permission, 'ask');
+    assert.equal(hook('gemini').decision, 'deny');
+    assert.equal(hook('cline').cancel, true);
+    const kiro = boundedSpawnSync(process.execPath, [HOOK, '--format', 'kiro'], { input: payload, encoding: 'utf8' });
+    assert.equal(kiro.status, 2, 'Kiro has no "ask": it blocks');
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('a call that touches a record fails CLOSED when the hook cannot load its rules', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'eos-hook-'));
+  try {
+    const orphan = join(dir, 'deny-dangerous.js'); // no ./lib beside it: the rule modules cannot load
+    copyFileSync(HOOK, orphan);
+    const r = decideRaw(JSON.stringify({ tool_name: 'Edit', tool_input: { path: LEDGER, old_str: 'a', new_str: 'b' } }), orphan);
+    assert.equal(r.decision, 'deny');
+    assert.match(r.stderr, /internal error/);
+    assert.equal(decideRaw(JSON.stringify({ tool_name: 'Edit', tool_input: { path: 'src/a.js', old_str: 'a', new_str: 'b' } }), orphan).decision, 'allow');
+  } finally { rmSync(dir, { recursive: true, force: true }); }
 });

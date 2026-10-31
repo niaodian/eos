@@ -24,6 +24,7 @@
 // all the one an AI assistant makes while it writes code — not to replace review.
 
 import { executableText } from './command-words.mjs';
+import { governanceVerdict } from './governance-rules.mjs';
 
 /** An environment-variable name that holds a secret: a literal fallback for one is a hardcoded secret. */
 const SECRET_NAME = /KEY|SECRET|TOKEN|PASSWORD|PASSWD|CREDENTIAL/i;
@@ -245,6 +246,8 @@ function writtenPart(text) {
 }
 
 const where = (key, targets) => `${key ? `the ${key} field` : 'the tool call'}${targets.length ? ` (${targets[0]})` : ''}`;
+/** How a field is read: executed (a command), described (prose), or written (content). */
+const kindOf = (key) => (key && COMMAND_KEY.test(key) ? 'command' : key && PROSE_KEY.test(key) ? 'prose' : 'content');
 const deny = (reason) => ({ decision: 'deny', reason: `Blocked by EOS guardrail: ${reason}` });
 const snippet = (text) => {
   const flat = String(text).replace(/\s+/g, ' ').trim();
@@ -262,7 +265,7 @@ function dangerous(executable, place) {
 
 function judge(strings) {
   for (const { key, text, target } of strings) {
-    const kind = key && COMMAND_KEY.test(key) ? 'command' : key && PROSE_KEY.test(key) ? 'prose' : 'content';
+    const kind = kindOf(key);
     let body = text;
     let targets = target ? [target] : [];
     if (kind === 'content') {
@@ -287,8 +290,11 @@ function judge(strings) {
 /**
  * Judge one PreToolUse payload (the hook's stdin). Strings are scanned the way the tool will use
  * them — field by field, line by line — not as a JSON re-encoding of the whole call.
+ *
+ * Since eos-2.8.0 the governance surface is judged too (governance-rules.mjs): a deny there wins;
+ * then the secret and destructive-command rules; then an "ask" (a person confirms the change).
  * @param {string} raw
- * @returns {{decision: 'allow'|'deny', reason?: string}}
+ * @returns {{decision: 'allow'|'deny'|'ask', reason?: string}}
  */
 export function evaluateToolCall(raw) {
   let payload;
@@ -297,16 +303,25 @@ export function evaluateToolCall(raw) {
   } catch {
     // The fields cannot be told apart, so every rule applies to the raw text. Before 2.0.1 an
     // unparseable payload was read as an empty one, and allowed.
-    return judge([{ key: 'command', text: String(raw), target: undefined }]);
+    const strings = [{ key: 'command', text: String(raw), target: undefined }];
+    const gov = governanceVerdict({ strings: strings.map((s) => ({ ...s, kind: 'command' })), root: process.cwd() });
+    return gov?.decision === 'deny' ? gov : judge(strings);
   }
   let input = payload;
+  let toolName = '';
+  let root = process.cwd();
   if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
     input = payload.tool_input ?? payload.toolArgs ?? payload.tool_args ?? payload.toolInput ?? payload;
+    toolName = String(payload.tool_name ?? payload.toolName ?? payload.toolCall?.name ?? '');
+    if (typeof payload.cwd === 'string' && payload.cwd) root = payload.cwd;
   }
   if (typeof input === 'string') {
     try { input = JSON.parse(input); } catch { /* plain text: scanned as content */ }
   }
   const strings = [];
   collect(input, typeof input === 'string' ? 'input' : undefined, undefined, strings);
-  return judge(strings);
+  const gov = governanceVerdict({ toolName, input, strings: strings.map((s) => ({ ...s, kind: kindOf(s.key) })), root });
+  if (gov?.decision === 'deny') return gov;
+  const base = judge(strings);
+  return base.decision === 'deny' ? base : gov || base;
 }
