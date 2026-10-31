@@ -7,6 +7,19 @@
 > [GitHub Releases](https://github.com/niaodian/eos/releases)。EOS 多久发一次版、补丁版可以包含什么：
 > [CONTRIBUTING.md](../../CONTRIBUTING.md#release-cadence)。
 
+## eos-2.8.0 — 2026-11-01
+
+- **一次由维护者要求的安全版本**（ADR-025；eos-2.7.0 的封版条款同时允许这两类改动）。2026-10-31 的审计复现了在仓库中工作的 Agent 绕过门禁的七种方式——以它自己键入的名字批准（P1、P3、P4）、为失败的门禁记录证据（P2）、替换发布密钥（P5）、在无人检查的情况下改动治理文件（P6）。把密钥藏在程序里无济于事：程序运行在 Agent 所在的机器上，Agent 可以让程序替它签名，或直接从中读出密钥。真正守得住的是 GitHub——前提是 Agent 是"另一个人"。门禁本身没有改变
+- **Agent 以"另一个人"的身份工作**——附录 D.5，每台电脑一次：给 Agent 它自己的 GitHub 账户（经典令牌，`public_repo` 或 `repo`，绝不含 `workflow`）和它自己的电脑用户，并在那里让 `gh` 以 Agent 身份登录。`activation.md` 新增一项：*Agent 账户*
+- **一条命令加固一个仓库**——`node .github/eos/harden-github.mjs --bot <agent-login>` 只读地列出缺少什么。仓库所有者在自己的终端里运行 `--apply`，每个仓库一次：默认分支上的规则集（拉取请求须经代码负责人批准、最后一次推送须由他人批准、过期的批准自动作废、必须通过 `verify`；管理员只能通过拉取请求绕过）、发布 tag `v*` 与 `eos-*` 上的规则集（只有管理员能创建、移动或删除）、一个由人批准的 `release` 环境，以及向 Agent 发出的协作邀请。`--check` 在已加固时退出码为 0，未加固为 1，无法判断为 3。该工具位于引擎之外：EOS 中没有任何东西会运行它，护栏也会拒绝 Agent 执行 `--apply`——这是对 ADR-005 D5 唯一一处明文例外
+- **治理适配器能读取规则集**——`github-governance` 过去只读经典分支保护，给 `gh api` 传了它并不存在的 `-R` 参数，还把 "Must have admin rights" 当成"未受保护"。现在它读取实际作用于该分支的规则（规则集与经典保护一视同仁），把必需检查与其所属应用绑定，并说明谁能绕过这些规则
+- **破坏性变更——信任锚与提供方纳入策略**——发布与基线公钥以 key id 的形式进入策略快照：替换或移除其中之一属于 WEAKENING，需要第二个人；指向仓库之外的密钥路径、或并非密钥的文件，都会被点名。`.eos/providers.json` 同样进入快照：新增提供方或修改其选项属于 REVIEW，配置 `mock` 适配器（它的结论完全由自身配置决定）属于 WEAKENING。声明了密钥或保留 `providers.json` 的项目需重新加锁一次——`eos policy lock --write`，无需任何确认
+- **破坏性变更——证明（attestation）：只针对发布、只在批准之后、签名者固定**——`eos-release.yml` 只为 tag 生成证明，且该 job 位于 `release` 环境之后，`slsa` 会等待它完成；演练（dry run）或拉取请求不再生成任何证明。`github-attestation` 校验时带上 `--signer-workflow`（默认为本仓库的 `eos-release.yml`）和 `--deny-self-hosted-runners`；只配置了 `owner` 的提供方结果为 UNVERIFIED
+- **破坏性变更——护栏覆盖治理面**——Agent 在以下情况会被拒绝：写入 EOS 的记录（`.eos/ledger/`、`.eos/evidence/`、`.eos/waivers/`、策略锁）或记录人的决定的文件（`activation.md`、`CODEOWNERS`）；设置 `EOS_ACTOR`；运行 `eos approve`；合并或批准拉取请求；修改保护规则、协作者、环境或密钥（secrets）；处理 GitHub 凭据；发布 release；推送到默认分支或发布 tag；使用 git 底层命令（plumbing）；或运行 `harden-github.mjs --apply`。会合并、批准或直接写入默认分支的 MCP 工具同样被拒绝，Claude Code 的钩子现在也匹配 MCP 工具（`mcp__.*`）。编辑引擎、钩子、工作流、`.eos/` 下的策略文件、密钥与 schema，或 Agent 平台设置，都要先征得人的同意。即使护栏自身出错，触及 EOS 记录的调用仍会被拒绝。在 EOS 自己的仓库中（`templateDefault: true`），引擎与决定类文件可以编辑
+- **激活行显示 CLAIMED**——全部打勾的 `activation.md` 只是人的声称；`eos-doctor` 现在如实说明这一点，并指向会去询问 GitHub 的 `harden-github.mjs --check`
+- **审计回归测试**——`.github/eos/audit-tamper.test.mjs` 重放这次审计。替换密钥（P5）、护栏（P6）与 `mock` 提供方已封堵。以 Agent 键入的名字批准（P1、P3、P4）与伪造证据（P2）标记为 `todo`，留待下一次迭代：届时批准将来自平台，记录的声称将在 CI 中重新证明
+- **已知局限**——在那次迭代之前，批准人姓名仍是自我声明（ADR-024）；"询问"可能拦不住无人值守的会话，所以真正守得住的是独立账户；单独的电脑用户是一项 EOS 无法检查的建议；策略确认只按变更 id 匹配，因此旧的确认可能覆盖之后 id 相同的变更（下一次迭代处理）
+
 ## eos-2.7.0 — 2026-10-06
 
 - **信任边界现已成文**（ADR-024）：EOS 是一套交付纪律和证据记录，不是针对"能写入仓库的角色"的安全边界。README 与 quickstart 的"已知局限"都已说明，并指出真正能阻止绕过的是平台控制，把批准人与 `approver` 字段标为自我声明，同时写明：在信任根移到仓库之外以前，Regulated 轨道无法证明职责分离。`eos approve` 现在会提示所记录的姓名是自我声明

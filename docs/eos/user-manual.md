@@ -1,6 +1,6 @@
 # EOS User Manual (Engineering Operating System)
 
-> Version: synced with `docs/eos/VERSION` (current `eos-2.7.0`)
+> Version: synced with `docs/eos/VERSION` (current `eos-2.8.0`)
 > Applies to: recent VS Code + GitHub Copilot Chat (custom agent / hooks are recent-version capabilities; confirm the version in the "About VS Code" panel), or Claude Code, OpenAI Codex or Google Antigravity ([Chapter 6.6](#chapter-66-using-eos-with-claude-code-codex-and-antigravity)) + 73 installed `bmad-*` skills (user-level)
 > Positioning: this manual is an **operating guide (how to use it)**; for design rationale and trade-offs, see `blueprint.md` in the same directory (why it is designed this way).
 > Conventions: prose in English; file names / paths / commands / config keys kept verbatim.
@@ -20,7 +20,7 @@
 | Want to look up a slash command / agent / rule | [Chapter 7 Complete reference](#chapter-7-complete-reference-quick-reference) |
 | Configuration is broken / Agent is not working as expected | [Chapter 9 Failure localization](#chapter-9-failure-localization-and-troubleshooting) |
 | Want to move this system to another project/team | [Chapter 10 Cross-project reuse and distribution](#chapter-10-cross-project-reuse-and-distribution) |
-| Upgrading to `eos-2.0.0`, choosing a governance track, or signing releases | [§10.5 Upgrading](#105-upgrading-from-eos-122x-to-eos-200) · [§10.6 Tracks and signed releases](#106-governance-tracks-signed-releases-and-central-policy) · [§10.7 The 2.0.1 security patch](#107-upgrading-from-eos-200-to-eos-201) · [§10.8 `eos upgrade` and 2.1.0](#108-upgrading-from-eos-20x-to-eos-210) · [§10.9 2.2.0](#109-upgrading-from-eos-21x-to-eos-220) · [§10.10 2.3.0](#1010-upgrading-from-eos-22x-to-eos-230) · [§10.11 2.4.0](#1011-upgrading-from-eos-23x-to-eos-240) · [§10.12 2.5.0](#1012-upgrading-from-eos-24x-to-eos-250) · [§10.13 2.6.0](#1013-upgrading-from-eos-25x-to-eos-260) · [§10.14 2.7.0](#1014-upgrading-from-eos-26x-to-eos-270) |
+| Upgrading to `eos-2.0.0`, choosing a governance track, or signing releases | [§10.5 Upgrading](#105-upgrading-from-eos-122x-to-eos-200) · [§10.6 Tracks and signed releases](#106-governance-tracks-signed-releases-and-central-policy) · [§10.7 The 2.0.1 security patch](#107-upgrading-from-eos-200-to-eos-201) · [§10.8 `eos upgrade` and 2.1.0](#108-upgrading-from-eos-20x-to-eos-210) · [§10.9 2.2.0](#109-upgrading-from-eos-21x-to-eos-220) · [§10.10 2.3.0](#1010-upgrading-from-eos-22x-to-eos-230) · [§10.11 2.4.0](#1011-upgrading-from-eos-23x-to-eos-240) · [§10.12 2.5.0](#1012-upgrading-from-eos-24x-to-eos-250) · [§10.13 2.6.0](#1013-upgrading-from-eos-25x-to-eos-260) · [§10.14 2.7.0](#1014-upgrading-from-eos-26x-to-eos-270) · [§10.15 2.8.0 — agent-safe setup](#1015-upgrading-from-eos-27x-to-eos-280) |
 
 ---
 
@@ -181,7 +181,7 @@ If you want to promote some `eos-*.agent.md` files to "available in all projects
 **Method A — degit (recommended, fastest)**
 ```sh
 # Public template — plain degit works (no auth needed)
-npx degit niaodian/eos#eos-2.7.0 my-new-app
+npx degit niaodian/eos#eos-2.8.0 my-new-app
 cd my-new-app
 git init && git add -A && git commit -m "chore: scaffold from eos"
 ```
@@ -232,7 +232,7 @@ Open `.github/instructions/00-workspace.instructions.md` and change it to the re
 ## 3.4 Full Day-1 sequence (copy-ready)
 
 ```sh
-npx degit niaodian/eos#eos-2.7.0 my-new-app && cd my-new-app
+npx degit niaodian/eos#eos-2.8.0 my-new-app && cd my-new-app
 git init && git add -A && git commit -q -m "chore: scaffold from eos"
 node .github/hooks/validate-config.mjs
 node .github/eos/eos.mjs init config-only --write   # declare it: no code yet (or init <pack> [--track regulated])
@@ -255,7 +255,7 @@ setup for each.
 A system that already runs does not have to be re-specified before EOS can help. Adopt it at the **delivery gates** with the `delivery-only` workflow profile (since eos-2.3.0): the running system is the baseline, and every change from now on is a story that must be ready (G5), verified (G7) and released (G8).
 
 ```sh
-npx degit niaodian/eos#eos-2.7.0 /tmp/eos                      # the template, outside your repository
+npx degit niaodian/eos#eos-2.8.0 /tmp/eos                      # the template, outside your repository
 # copy into your repository: .eos/ .agents/ .github/{eos,hooks,agents,instructions}/ docs/eos/
 # and merge by hand what you already have: AGENTS.md, .github/copilot-instructions.md, .github/workflows/eos-ci.yml
 node .github/hooks/validate-config.mjs                          # S7 names anything still missing
@@ -377,7 +377,7 @@ So EOS **never depends on "Rule A overriding Rule B"**. The only reliable contro
 | Item | Content |
 |---|---|
 | **Goal** | Get an empty project with healthy configuration from the template |
-| **How to start** | `npx degit niaodian/eos#eos-2.7.0 my-app && cd my-app`, then declare it: `node .github/eos/eos.mjs init config-only --write` (stack undecided) or `init <pack> --write` |
+| **How to start** | `npx degit niaodian/eos#eos-2.8.0 my-app && cd my-app`, then declare it: `node .github/eos/eos.mjs init config-only --write` (stack undecided) or `init <pack> --write` |
 | **Output** | Complete `.github/` + `docs/` skeleton |
 | **Gate** | `node .github/hooks/validate-config.mjs` → **PASS** |
 | **Must check** | PASS 0 errors. **If the stack is undecided, do not change** `00-workspace` yet--keep the Node placeholder; the stack is an irreversible decision, and the authority is locked in **Phase 4 (ADR)**. If the stack is known, copy `docs/eos/stack-presets.md` directly (fast path). |
@@ -640,7 +640,7 @@ So EOS **never depends on "Rule A overriding Rule B"**. The only reliable contro
 
 ### Step 0: Create project + choose stack (5 minutes)
 ```sh
-npx degit niaodian/eos#eos-2.7.0 todo-api && cd todo-api
+npx degit niaodian/eos#eos-2.8.0 todo-api && cd todo-api
 git init && git add -A && git commit -q -m "chore: scaffold from eos"
 node .github/hooks/validate-config.mjs          # expect PASS
 node .github/eos/eos.mjs init node-service --write   # declare the stack (or python-service, go-service… — `eos init` lists them)
@@ -703,7 +703,7 @@ The gate reads the *machine* result, not a hand-written PASS — and since eos-2
 
 ### Step 0: Create project + create AI directories
 ```sh
-npx degit niaodian/eos#eos-2.7.0 cs-agent && cd cs-agent
+npx degit niaodian/eos#eos-2.8.0 cs-agent && cd cs-agent
 git init && git add -A && git commit -q -m "chore: scaffold from eos"
 mkdir -p ai/prompts evals                       # AI code goes here; Agentic rules overlay automatically
 node .github/hooks/validate-config.mjs          # expect PASS
@@ -1325,12 +1325,12 @@ Agent output does not match expectation
 ```sh
 # Method A: degit (public repository — no auth needed)
 # Pin the release tag: the default branch moves, a tag does not.
-npx degit niaodian/eos#eos-2.7.0 my-app
+npx degit niaodian/eos#eos-2.8.0 my-app
 cd my-app && git init
 
 # Method B: git clone at the tag, into a fresh history
-git clone --depth 1 --branch eos-2.7.0 https://github.com/niaodian/eos.git my-app
-cd my-app && git checkout --orphan main && git commit -m "chore: start from eos-2.7.0"
+git clone --depth 1 --branch eos-2.8.0 https://github.com/niaodian/eos.git my-app
+cd my-app && git checkout --orphan main && git commit -m "chore: start from eos-2.8.0"
 
 # Either way, declare the project: the template's own declaration describes EOS, not you
 node .github/eos/eos.mjs init                       # the tracks, the packs, and what is declared
@@ -1340,7 +1340,7 @@ git add -A && git commit -q -m "chore: declare the project"   # the declaration,
 
 ## 10.3 Distribution to a team (purely local, no enterprise dependency)
 
-1. Everyone starts from the **same release tag** (`eos-2.7.0`). The default branch keeps moving, so
+1. Everyone starts from the **same release tag** (`eos-2.8.0`). The default branch keeps moving, so
    an unpinned copy is a slightly different EOS for every person who takes one.
 2. `【Needs org/GitHub settings】` The GitHub **template repository** setting is owner-level: EOS can
    neither apply nor verify it locally, so do not take this page's word for it —
@@ -1596,7 +1596,15 @@ does, so no provider problem can block day-to-day work.
 **EOS never handles a credential.** Adapters delegate to `gh`, which is already authenticated and
 keeps the token in its own store — EOS passes none, reads none, and can leak none. And EOS is
 **read-only**: it will tell you branch protection is missing; it will never configure it for you,
-because a tool that can grant itself enforcement authority can also remove it.
+because a tool that can grant itself enforcement authority can also remove it. (The setup tool of
+Appendix D, `harden-github.mjs`, is not part of the engine: you run it yourself, with your own
+credentials — ADR-025.)
+
+**Since eos-2.8.0 `.eos/providers.json` is policy.** A provider can raise a verdict, so adding one is
+a REVIEW and the `mock` adapter — which answers whatever its configuration says — a WEAKENING; both
+need a second person in `eos policy check`. The `github-governance` adapter reads rulesets as well as
+classic protection, and `github-attestation` pins the workflow that signed (`signerWorkflow`, by
+default your release workflow when `repo` is set).
 
 See [ADR-005](../adr/005-external-authority-boundary.md) and
 [ADR-006](../adr/006-provider-adapters.md).
@@ -1954,6 +1962,30 @@ node /tmp/eos-next/.github/eos/eos.mjs upgrade --from /tmp/eos-next --base /tmp/
 node .github/eos/eos.mjs policy check && node .github/eos/eos.mjs verify --full
 ```
 
+## 10.15 Upgrading from `eos-2.7.x` to `eos-2.8.0`
+
+**Agent-safe setup** (ADR-025). The gates did not change; what changed is what can get around them. Run `eos policy lock --write` once if your project declares a signing key or keeps `.eos/providers.json` (their identity is now part of the policy; nothing needs an approver). Then do Appendix D.0: once per computer, and one command per repository.
+
+| What changed | What you will see | What to do |
+|---|---|---|
+| **One command hardens a repository** (`harden-github.mjs`) | `node .github/eos/harden-github.mjs --bot <agent>` lists what is missing; `--apply` sets up the rulesets, the `release` environment and the agent's invitation, after asking; `--check` verifies, read-only | Run it yourself, in your own terminal (Appendix D.1) |
+| **Trust anchors and providers are policy** | Replacing the release or baseline key, or adding a provider, shows in `eos policy diff`; replacing a key or configuring `mock` is a WEAKENING | Re-lock once (`eos policy lock --write`) if you declare a key or keep `providers.json` |
+| **The governance adapter reads rulesets** | A ruleset-protected branch no longer reads as unprotected; `options.repo` works; the result says who can bypass the rules | Nothing |
+| **Attestations: only a release, only after approval, signer pinned** | Dry runs attest nothing; the attest job waits for the `release` environment; an attestation provider without `repo` or `signerWorkflow` is UNVERIFIED | Name `signerWorkflow` if your release is signed by another workflow |
+| **The guardrail covers the governance surface** | An agent is refused when it writes EOS's records, sets `EOS_ACTOR`, runs `eos approve`, merges, changes protection, pushes to the default branch or a release tag, or runs `harden-github.mjs --apply`; in a project it must ask you before it edits `.github/` or `.eos/` policy | Nothing — say yes to an edit you asked for |
+| **The activation line says CLAIMED** | `eos-doctor` reports a fully ticked `activation.md` as claimed and points at `harden-github.mjs --check` | Run the check |
+
+**Upgrade steps**
+
+```sh
+npx degit niaodian/eos#eos-2.7.0 /tmp/eos-base    # the version you are on — see docs/eos/VERSION
+npx degit niaodian/eos#eos-2.8.0 /tmp/eos-next
+node /tmp/eos-next/.github/eos/eos.mjs upgrade --from /tmp/eos-next --base /tmp/eos-base          # review the plan
+node /tmp/eos-next/.github/eos/eos.mjs upgrade --from /tmp/eos-next --base /tmp/eos-base --write  # apply it, and regenerate the agent-platform files
+node .github/eos/eos.mjs policy lock --write && node .github/eos/eos.mjs policy check
+node .github/eos/harden-github.mjs --bot <agent-login>                                              # then --apply, yourself
+```
+
 ---
 
 # Chapter 11 Adding a technology stack
@@ -2028,7 +2060,7 @@ EOS stack rules are **pluggable**. Adding a stack = add one `*.instructions.md` 
 
 ```
 # ── Terminal — the loop (this is all you need day to day) ──
-npx degit niaodian/eos#eos-2.7.0 my-app   # create new project
+npx degit niaodian/eos#eos-2.8.0 my-app   # create new project
 node .github/eos/eos.mjs init                       # what is declared, the two tracks, the starter packs
 node .github/eos/eos.mjs init <pack> --write        # declare it (config-only until the stack is decided; --track regulated)
 node .github/eos/eos.mjs init <pack> --solo --write  # one maintainer: the Standard track's labelled self-approval path
@@ -2099,7 +2131,7 @@ A real dry-run that passed end to end (feature: user login), **12/12 gates passe
 
 **Reproduce** (terminal):
 ```sh
-npx degit niaodian/eos#eos-2.7.0 my-app && cd my-app
+npx degit niaodian/eos#eos-2.8.0 my-app && cd my-app
 node .github/hooks/validate-config.mjs        # PASS
 npm test                                      # 10/10 green
 echo '{"tool_input":{"command":"rm -rf /tmp/x"}}' | node .github/hooks/deny-dangerous.js  # deny
@@ -2115,19 +2147,48 @@ echo '{"tool_input":{"command":"rm -rf /tmp/x"}}' | node .github/hooks/deny-dang
 
 > **Progress tracking**: this appendix is the "complete steps (how to do it)"; the repo's `docs/eos/activation.md` is the "checkable ledger (what is done)",
 > advisory-reminded by `eos-doctor` every run and rechecked before release by `/eos-release-gate` (G8). Use **`/eos-init`** for guided execution--
-> it does what can be done locally for you (replace handles, copy baseline) and prints the exact server-side branch-protection steps (the template cannot enable them for you).
+> it does what can be done locally for you (replace handles, copy baseline), shows you the one command that sets up the server side, and checks the result.
+
+## D.0 What you do once, per repository, and never
+
+Since eos-2.8.0 most of this appendix is done **once**. A new project from this template needs one command; after that, EOS checks for you (ADR-025).
+
+| When | What you do | Time | Where |
+|---|---|---|---|
+| Once per computer | Give the agent its own GitHub account and token, and its own workspace (a separate computer user) | about 30 minutes | D.5 |
+| Once per repository | Run one command in your own terminal, answer `y`, then accept one invitation as the agent's account | about 5 minutes | D.1 |
+| Every pull request | Read what the agent changed, and approve it on GitHub — the one thing only you can do | as long as the review takes | D.6 |
+| Every release | Approve the `release` job in GitHub Actions | one click | D.6 |
+| Never | Checking the setup by hand: `node .github/eos/harden-github.mjs --check` asks GitHub, read-only, and `/eos-init` runs it for you | — | D.1 |
 
 ## D.1 Make 3 CI hard gates "required checks" `【Needs org/GitHub settings】`
 
-GitHub repository → **Settings → Rules → Rulesets → New branch ruleset**, targeting the default branch:
+**Since eos-2.8.0 this is one command, run once per repository by its owner** — you, in your own terminal, never in an agent. EOS's engine stays read-only against GitHub; this setup tool is outside it, and the guardrail refuses an agent that tries `--apply` (ADR-025):
+
+```sh
+node .github/eos/harden-github.mjs --bot <agent-login>           # 1. read-only: what is in place, and what would change
+node .github/eos/harden-github.mjs --bot <agent-login> --apply   # 2. make the changes — it asks before it changes anything
+node .github/eos/harden-github.mjs --check --bot <agent-login>   # 3. read-only: HARDENED, or what is still missing
+```
+
+What `--apply` sets up, and only where it is missing:
+
+1. **The default branch** — a ruleset `eos-main-protection`, **Active**: a pull request; one approval from a Code Owner; the latest push approved by someone else; the `verify` check, from GitHub Actions. Administrators may merge a pull request around it (recorded in the audit log) but never push directly.
+2. **Release tags** (`v*`, `eos-*`) — only administrators create, move or delete them (`eos-release-tags`). A tag starts the release workflow.
+3. **Environment `release`** — you approve every release job before anything is signed or published.
+4. **The agent's account** (`--bot`, see D.5) — invited as a collaborator with write access, never admin. Sign in to GitHub as that account once and accept the invitation; `--apply` prints the link.
+
+Run step 3 any time — it only reads. The agent may run it too: it says which credentials it ran with, and whether they could get around the rules (for the agent's account they must not).
+
+**Prefer to click?** The same settings by hand — GitHub repository → **Settings → Rules → Rulesets → New branch ruleset**, targeting the default branch:
 
 1. Set **Enforcement status** to **`Active`**. A new ruleset is created **Disabled**, and a Disabled ruleset enforces nothing no matter what else you tick below -- this is the most common way a developer ends up believing they are protected when they are not.
 2. Check **Require a pull request before merging** (forbid direct push to the default branch).
 3. Check **Require status checks to pass before merging** → search and select **`verify`** (the job in `eos-ci.yml`).
    -- This step turns validate-config / eos-doctor / secret-scan from "green-light advice" into "red-light block".
    Select `verify` only: `coverage` and `cross-platform` test EOS itself and are skipped in your repository ([§8.4](#84-what-ci-runs-in-your-repository)).
-4. Check **Require review from Code Owners** (paired with CODEOWNERS in D.2).
-5. (Recommended) Check **Do not allow bypassing the above settings**, to avoid casual administrator bypass.
+4. Check **Require review from Code Owners** (paired with CODEOWNERS in D.2), **Require approval of the most recent reviewable push**, and **Dismiss stale pull request approvals when new commits are pushed**.
+5. In **Bypass list**, add **Repository admin** and set it to **For pull requests only** — never "Always allow" — and add nobody else. (Classic branch protection instead: check **Do not allow bypassing the above settings**.)
 
 **Plan limits -- read this before you start.** On GitHub Free, a **private** repository does not enforce rulesets at all: GitHub saves the ruleset and then tells you "Your rulesets won't be enforced on this private repository until you upgrade this organization account to GitHub Team". **Require review from Code Owners** is likewise not offered. Your three honest options are: make the repository public, upgrade to Pro/Team, or waive the ledger line with exactly that reason.
 
@@ -2142,7 +2203,7 @@ gh api repos/<owner>/<repo>/branches/main/protection   # classic protection only
 
 **On a private repository, prove it by behaviour.** A ruleset can be saved, show "Active" and still enforce nothing. Open a throwaway pull request that makes `verify` fail and look at the merge button: if it is enabled, or `verify` is not listed as required, the protection is not in force. Delete the branch afterwards.
 
-**One maintainer?** Branch protection and Code Owners review need someone else who can merge; on a private Free repository waive the item with a reason. Everything else EOS asks a second person for has the solo path (`approvalMode: "solo"`, §10.13): a labelled self-approval you type yourself, never an agent.
+**One maintainer?** GitHub never lets anyone approve their own pull request. So let the agent open pull requests from its own account (D.5) and approve them as yourself: author and approver are then two accounts GitHub has checked, and nobody else is needed. Your own pull requests merge through the administrators' pull-request-only bypass. On a private Free repository waive the item with a reason. Everything else EOS asks a second person for has the solo path (`approvalMode: "solo"`, §10.13): a labelled self-approval you type yourself, never an agent.
 
 ## D.2 Enable CODEOWNERS governance protection
 
@@ -2157,6 +2218,7 @@ cp .vscode/settings.json.example .vscode/settings.json    # active file remains 
 Key item: keep `chat.tools.global.autoApprove` as `false` (`true` equals /yolo and disables key safety protection);
 `chat.tools.terminal.autoApprove` has a built-in dangerous-command denylist (defense-in-depth with `deny-dangerous.js`).
 The setting keys have been checked against official `docs/agents/reference/ai-settings.md`; auto-approval evolves quickly, so re-verify in your version.
+Put the settings that protect you in your **user** settings, where an agent editing the repository cannot change them — for example `chat.tools.edits.autoApprove` with `"**/.eos/**": false` and `"**/.github/**": false`, so an edit there waits for you.
 
 ## D.4 Known trade-offs and residual risks (honest list)
 
@@ -2166,12 +2228,48 @@ The following are **intentional design trade-offs** in EOS (inherent costs of lo
 |---|---|---|
 | `.vscode/*` is gitignored by default; `mcp.json` remains local after opt-in (audit F2/C2) | Sandbox/approval baseline can be privately changed locally without detection | Repo-provided `settings.json.example`/`mcp.json.example` safety baselines + review; team convention |
 | `bmad-*` skills are installed **user-level** and not pinned (audit H4/T6) | Skill versions/presence differ across machines → agentic behavior is not fully reproducible | Record the team's unified bmad version in `docs/`; critical skills may be vendored/submoduled |
-| Hooks are Preview, per-machine, allow on parse failure, and CI does not call them (audit G2) | Real-time interception of destructive operations is not authoritative and can be bypassed | Authority is D.1 CI hard gates + human review; hooks are only speed bumps |
-| agent has `editFiles` (audit H5) | In principle it can modify its own governance files | D.2 CODEOWNERS + D.1 required review (blocks once enabled) |
+| Hooks are Preview, per-machine, allow on parse failure, and CI does not call them (audit G2) | Real-time interception of destructive operations is not authoritative and can be bypassed | Authority is D.1 CI hard gates + human review; hooks are only speed bumps. Since eos-2.8.0 they also refuse writes to EOS's records (and fail closed for them), forged identities, approvals, merges and protection changes |
+| agent has `editFiles` (audit H5) | In principle it can modify its own governance files | D.5 the agent's own account + D.2 CODEOWNERS + D.1 required review (blocks once enabled) |
 | `gitleaks` deep scan is an **optional enhancement locally**; if absent it degrades to the built-in rules | Running only zero-dependency built-in regexes is weaker than full gitleaks rules | Built-in `secret-scan.mjs` always runs as a CI hard gate (baseline). Since eos-2.3.0 EOS CI installs a pinned, checksum-verified `gitleaks` and sets `EOS_REQUIRE_GITLEAKS=1`, so there a missing gitleaks fails instead of degrading |
 | **Windows**: core hooks are Node (cross-platform); early `quality.json` once used `sh -c` (round-2 N1 changed it to `node .github/hooks/quality.mjs`, native Windows no longer needs WSL/Git-Bash) | Directory fallback traversal without `git` once showed absolute paths on Windows (normalized with `path.relative`); availability of external tools such as `bmad-*` and `act` (requires Docker Desktop) still varies by platform | Three core hooks + `quality.mjs` are implemented cross-platform; **authoritative quality gate is in CI (`ubuntu-latest`)**, independent of local OS |
 
 **Requires organization decision (template does not decide, `【Needs org standard】`)**: CI runner standard (currently `ubuntu-24.04`), approved secret store, namespace/repository ownership, model pin/registration strategy, artifact integrity (SBOM/signing/SLSA). These are not violations; they are organization-standard questions.
+
+## D.5 Agent-safe setup: give the agent its own account (once per computer)
+
+The rules in D.1 hold the agent only if it does not work with **your** credentials: an administrator can get around them, and an agent running in your computer account can use whatever that account can — `gh`, git's stored password, a browser where you are signed in. Do this once; every project afterwards reuses it.
+
+1. **Create the agent's GitHub account** — a *machine account*, which GitHub's terms allow for automation: for example `yourname-bot`, with its own e-mail address and two-factor authentication.
+2. **Create its token, signed in as that account**: `https://github.com/settings/tokens/new?description=eos-agent&scopes=public_repo` (a private repository needs `scopes=repo`). Keep exactly that scope — **not** `workflow`, so the agent cannot change CI, and nothing `admin`. It must be a classic token: a fine-grained token cannot be used by a collaborator on a personal repository.
+3. **Give the agent its own workspace — a separate computer user.** macOS: System Settings → Users & Groups → add a **Standard** user, for example `eos-dev`; Windows: a separate standard account. Then, in your own account, run `chmod 700 ~` (on macOS every local user can otherwise read the files in your home folder that its group may read).
+4. **In that user, sign the tools in as the agent:**
+
+```sh
+gh auth login --hostname github.com --with-token < agent-token.txt && rm agent-token.txt
+gh auth setup-git
+git config --global user.name "yourname-bot"
+git config --global user.email "$(gh api user --jq .id)+yourname-bot@users.noreply.github.com"
+gh auth status          # expect: yourname-bot, scope public_repo (or repo) — and nothing else
+```
+
+5. **Keep your own identity out of that user.** VS Code there may still be signed in to your GitHub account for Copilot; then do not install the GitHub Pull Requests extension there, set the GitHub MCP server to read-only (`https://api.githubcopilot.com/mcp/readonly`, or `--read-only` for a local one), and let browser automation (Playwright or Chrome DevTools MCP) use its own profile (`--isolated`), never your signed-in browser.
+6. **Run D.1 with `--bot yourname-bot`** in every repository the agent works in.
+
+**Not ready for a second user yet?** In your own account: `gh auth logout --user <you>`, sign `gh` in as the agent as in step 4, and do administrator work in the browser only. That stops an agent using your credentials by accident; it does not stop one that goes looking — your browser session and keychain are still within reach — so treat it as a step towards a separate user, not as a substitute.
+
+## D.6 What the agent can do afterwards — and what only you can do
+
+| | The agent, as its own account | You |
+|---|---|---|
+| Write code, run EOS's gates, push a branch, open a pull request | yes | yes |
+| Change CI (`.github/workflows/`) | no — its token has no `workflow` scope | yes |
+| Approve, or merge into the default branch | no — the rules need a Code Owner's approval, and it is not one | yes |
+| Push to the default branch, or push a release tag | no — the rulesets refuse it | merge a pull request; tag a release |
+| Change the repository's rules, collaborators or environments | no — it is not an administrator | yes, with D.1 |
+| Write EOS's records (ledger, evidence, waivers, policy lock) by hand | no — the guardrail refuses it; EOS's own commands write them | nobody does |
+| Record an approval (`eos approve`, a waiver's or an acknowledgement's `approver`) | no — the guardrail refuses it | yes |
+
+What still depends on you is **reading** a pull request before you approve it. The rules guarantee that nothing reaches the default branch without your approval; they cannot judge the change for you. `eos policy diff` lists what a pull request changed in the policy, and a change under `.eos/` or `.github/` deserves the closest reading.
 
 ---
 

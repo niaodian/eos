@@ -21,7 +21,9 @@ approval, and never pass `--self`, yourself** — print the command and let the 
 
 | Step | Needs a second person | One maintainer alone |
 |---|---|---|
-| Branch protection and Code Owners review (steps 5–6) | someone who can merge a pull request the author cannot | not available on a private Free repository — waive it with a reason (step 5) |
+| The agent's own GitHub account (step 5a, Appendix D.5) | nobody else — but only the person can create an account and a token | the same person, once per computer |
+| The one hardening command, `harden-github.mjs --apply` (step 5c) | the repository's owner, in their own terminal | the same person — never the agent |
+| Branch protection and Code Owners review (steps 5–6) | someone who can approve a pull request the author cannot | the agent opens pull requests as its own account and the person approves them; on a private Free repository it is not available — waive it with a reason (step 5b) |
 | The first declaration's policy REVIEW (`eos policy check` asks for an `approver`) | the approver fills in `.eos/policy.lock.json` | declare `eos init <pack> --solo --write`: the approver may then be written `<name> (self)`, recorded as a self-approval |
 | `eos approve` at `VERIFIED → APPROVED` | someone who did not prepare the candidate | `eos approve --self --reason "<why>"`, **typed by the person**, only with `approvalMode: "solo"` (Standard track) |
 | Confirming the one-way decision ADRs | the person who owns the decision | the same person: set `Status: accepted`, `Confirmed by`, `Confirmed at` |
@@ -98,50 +100,58 @@ Print this list, then do each one with the user:
    for the as-is documentation (`bmad-document-project` → `docs/index.md`), and every change after
    that is a story held to G5, G7 and G8 (manual §3.5).
 
-5. **Branch protection (SERVER-SIDE — you cannot do this for them).**
+5. **The server side — one command the OWNER runs in their own terminal (you never run `--apply`).**
 
-   First find out whether protection is even enforceable, because on GitHub Free **rulesets are not
-   enforced on private repositories** — the UI accepts the ruleset and then ignores it:
+   Everything server-side is one script (manual Appendix D.1, ADR-025). You run its read-only modes;
+   the person runs `--apply`, because it changes the repository's settings with their administrator
+   credentials — and the guardrail refuses it from you anyway.
+
+   **a. The agent's account comes first** (Appendix D.5, once per computer). Ask whether the agent
+   already works as its own GitHub account. If not, walk them through D.5 step by step — creating an
+   account and a token is something only they can do — and say why in one sentence: an agent working
+   with their credentials can merge, change the rules and push a release tag, so no rule holds it.
+
+   **b. Find out whether protection is even enforceable**, because on GitHub Free **rulesets are not
+   enforced on private repositories** — GitHub accepts the ruleset and then ignores it:
 
    ```sh
    gh repo view --json nameWithOwner,visibility,isPrivate
    ```
 
-   - **Private repo on a Free plan** → tell them the truth up front: the ruleset will save but never
-     enforce ("won't be enforced … until you upgrade"), and **Require review from Code Owners** is
-     not offered at all. Their real options are (a) make the repo public, (b) upgrade to
-     Pro/Team, or (c) waive the item honestly:
+   - **Private repo on a Free plan** → tell them the truth up front: their real options are (a) make the
+     repo public, (b) upgrade to Pro/Team, or (c) waive the item honestly:
      `- [~] Branch protection · Reason: private repo on a Free plan — rulesets are not enforced`.
-     Do not walk them through a click-path that cannot work.
-   - **How to tell whether protection actually holds on a private repository (do not trust the UI).**
-     A ruleset can be saved, show "Active", and still enforce nothing. The proof is behavioural: open a
-     throwaway pull request that makes `verify` fail, and look at the merge button — if it is enabled, or
-     the required check is not listed as *required*, the protection is not in force. Delete the throwaway
-     branch afterwards. Ask the user to do it; report what they see, never infer it.
-   - **Otherwise** print the click-path: repo → **Settings → Rules → Rulesets → New branch ruleset**
-     → target the default branch →
-     - **Enforcement status: `Active`** ← state this first and emphasise it. A new ruleset defaults
-       to **Disabled**; every other box ticked on a Disabled ruleset enforces exactly nothing, and
-       the user will believe they are protected.
-     - *Require a pull request before merging*
-     - *Require status checks to pass* → select **`verify`** (the job in `eos-ci.yml`)
-     - *Require review from Code Owners* (public repo, or Pro/Team private)
+     Do not walk them through settings that cannot work.
 
-6. **Verify it yourself — do not hand back homework.** Once they say it is enabled, check it. The
-   ruleset API is the one that matters; the legacy endpoint returns 404 for a ruleset and would make
-   you report a false negative:
+   **c. Show the plan — read-only, you may run it:**
 
    ```sh
-   gh api repos/<owner>/<repo>/rules/branches/main
+   node .github/eos/harden-github.mjs --bot <agent-login>
    ```
 
-   - A non-empty array → **Active** rules apply. Confirm `pull_request` and `required_status_checks`
-     with `verify` are among them, then check the ledger line.
-   - `[]` (empty array) → nothing is enforced. Most often the ruleset exists but is still
-     **Disabled** — send them back to the enforcement dropdown rather than the whole click-path.
-   - Also accept classic protection if that is what they used:
-     `gh api repos/<owner>/<repo>/branches/main/protection` returning 200.
-   - `gh` missing or offline → leave the line `- [ ]` and say the check was not run. Never infer.
+   Explain each ✗ line in plain words. Then give them the one command — **not in this chat**, and wait:
+
+   - the person runs, in their own terminal: `node .github/eos/harden-github.mjs --bot <agent-login> --apply`
+
+   They answer `y`, then accept the invitation as the agent's account, from the link it prints.
+   Prefer clicking? Appendix D.1 has the same settings by hand.
+
+6. **Verify it yourself — do not hand back homework.** Once they say it is done, check it — read-only:
+
+   ```sh
+   node .github/eos/harden-github.mjs --check --bot <agent-login>
+   ```
+
+   - `HARDENED` → check the ledger lines *Agent account* and *Branch protection*.
+   - `NOT HARDENED` → read the ✗ lines back to them; usually one setting is missing or the invitation
+     is not accepted yet.
+   - The first line says **"you: <their login> — an administrator"** while you are running it → **you
+     are working with the owner's credentials.** Say so plainly: that is the gap the hardening exists
+     to close, and Appendix D.5 is the fix. Do not tick *Agent account*.
+   - `gh` missing, offline or `CANNOT CONFIRM` → leave the lines `- [ ]` and say the check was not
+     run. Never infer.
+   - **On a private repository, prove it by behaviour** as well: a throwaway pull request that makes
+     `verify` fail must not be mergeable. Ask the user to look; report what they see.
 
    Then re-run the ledger check for them (this is the command they would otherwise have to guess):
 

@@ -5,7 +5,7 @@
 
 # EOS 用户手册（Engineering Operating System User Manual）
 
-> 版本：与 `docs/eos/VERSION` 同步（当前 `eos-2.7.0`）
+> 版本：与 `docs/eos/VERSION` 同步（当前 `eos-2.8.0`）
 > 适用：较新版本的 VS Code + GitHub Copilot Chat（自定义 agent / hooks 属近版能力，用「关于 VS Code」面板确认版本），或 Claude Code、OpenAI Codex、Google Antigravity（[第 6.6 章](#第-66-章-在-claude-code、codex-和-antigravity-中使用-eos)）+ 已安装 73 个 `bmad-*` skill（用户级）
 > 定位：本手册是**操作指南（怎么用）**；设计原理与取舍见同目录 `blueprint.md`（为什么这么设计）。
 > 约定：正文中文；文件名/路径/命令/配置键保留英文原文。
@@ -25,7 +25,7 @@
 | 想查某个斜杠命令 / agent / 规则 | [第 7 章 完整参考](#第-7-章-完整参考（速查）) |
 | 配置坏了 / Agent 不按预期工作 | [第 9 章 故障定位](#第-9-章-故障定位与排错) |
 | 想把这套搬到别的项目/团队 | [第 10 章 跨项目复用与分发](#第-10-章-跨项目复用与分发) |
-| 升级到 `eos-2.0.0`、选择治理轨道或为发布签名 | [§10.5 升级](#105-从-eos-122x-升级到-eos-200) · [§10.6 轨道与签名发布](#106-治理轨道、签名发布与中心策略) · [§10.7 2.0.1 安全补丁](#107-从-eos-200-升级到-eos-201) · [§10.8 `eos upgrade` 与 2.1.0](#108-从-eos-20x-升级到-eos-210) · [§10.9 2.2.0](#109-从-eos-21x-升级到-eos-220) · [§10.10 2.3.0](#1010-从-eos-22x-升级到-eos-230) · [§10.11 2.4.0](#1011-从-eos-23x-升级到-eos-240) · [§10.12 2.5.0](#1012-从-eos-24x-升级到-eos-250) · [§10.13 2.6.0](#1013-从-eos-25x-升级到-eos-260) · [§10.14 2.7.0](#1014-从-eos-26x-升级到-eos-270) |
+| 升级到 `eos-2.0.0`、选择治理轨道或为发布签名 | [§10.5 升级](#105-从-eos-122x-升级到-eos-200) · [§10.6 轨道与签名发布](#106-治理轨道、签名发布与中心策略) · [§10.7 2.0.1 安全补丁](#107-从-eos-200-升级到-eos-201) · [§10.8 `eos upgrade` 与 2.1.0](#108-从-eos-20x-升级到-eos-210) · [§10.9 2.2.0](#109-从-eos-21x-升级到-eos-220) · [§10.10 2.3.0](#1010-从-eos-22x-升级到-eos-230) · [§10.11 2.4.0](#1011-从-eos-23x-升级到-eos-240) · [§10.12 2.5.0](#1012-从-eos-24x-升级到-eos-250) · [§10.13 2.6.0](#1013-从-eos-25x-升级到-eos-260) · [§10.14 2.7.0](#1014-从-eos-26x-升级到-eos-270) · [§10.15 2.8.0 —— Agent 安全配置](#1015-从-eos-27x-升级到-eos-280) |
 
 ---
 
@@ -195,7 +195,7 @@ bmad-code-review                   → 审查无阻断项           (Gate G6)
 **方式 A — degit（推荐，最快）**
 ```sh
 # public 模板 —— 直接 degit（无需鉴权）
-npx degit niaodian/eos#eos-2.7.0 my-new-app
+npx degit niaodian/eos#eos-2.8.0 my-new-app
 cd my-new-app
 git init && git add -A && git commit -m "chore: scaffold from eos"
 ```
@@ -243,7 +243,7 @@ node .github/hooks/validate-config.mjs      # 期望：PASS
 ## 3.4 Day-1 完整序列（复制即用）
 
 ```sh
-npx degit niaodian/eos#eos-2.7.0 my-new-app && cd my-new-app
+npx degit niaodian/eos#eos-2.8.0 my-new-app && cd my-new-app
 git init && git add -A && git commit -q -m "chore: scaffold from eos"
 node .github/hooks/validate-config.mjs
 node .github/eos/eos.mjs init config-only --write   # 声明项目：还没有代码（或 init <pack> [--track regulated]）
@@ -265,7 +265,7 @@ code .
 已经在运行的系统，不必先重写规范才能用上 EOS。用 `delivery-only` 工作流 profile 在**交付门禁**处接入（自 eos-2.3.0 起）：正在运行的系统就是基线，此后的每一项改动都是一个 story，必须就绪（G5）、经过验证（G7）并通过发布门禁（G8）。
 
 ```sh
-npx degit niaodian/eos#eos-2.7.0 /tmp/eos                      # 模板，放在你的仓库之外
+npx degit niaodian/eos#eos-2.8.0 /tmp/eos                      # 模板，放在你的仓库之外
 # 复制到你的仓库：.eos/ .agents/ .github/{eos,hooks,agents,instructions}/ docs/eos/
 # 已有的文件请手工合并：AGENTS.md、.github/copilot-instructions.md、.github/workflows/eos-ci.yml
 node .github/hooks/validate-config.mjs                          # S7 会点名仍缺少的内容
@@ -387,7 +387,7 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 | 项 | 内容 |
 |---|---|
 | **目标** | 从模板得到一个配置健康的空项目 |
-| **怎么启动** | `npx degit niaodian/eos#eos-2.7.0 my-app && cd my-app`，然后声明项目：`node .github/eos/eos.mjs init config-only --write`（未定栈）或 `init <pack> --write` |
+| **怎么启动** | `npx degit niaodian/eos#eos-2.8.0 my-app && cd my-app`，然后声明项目：`node .github/eos/eos.mjs init config-only --write`（未定栈）或 `init <pack> --write` |
 | **产出** | 完整 `.github/` + `docs/` 骨架 |
 | **门** | `node .github/hooks/validate-config.mjs` → **PASS** |
 | **必查** | PASS 0 errors。**栈未定则先别改** `00-workspace`——保留 Node 占位即可；栈是不可逆决策，权威锁定在**阶段 4（ADR）**。已知栈可即抄 `docs/eos/stack-presets.md`（快路径）。 |
@@ -658,7 +658,7 @@ EOS 用 5 种 VS Code + Copilot 原生机制承载规则。**搞懂"何时被加
 
 ### 第 0 步：建项目 + 选栈（5 分钟）
 ```sh
-npx degit niaodian/eos#eos-2.7.0 todo-api && cd todo-api
+npx degit niaodian/eos#eos-2.8.0 todo-api && cd todo-api
 git init && git add -A && git commit -q -m "chore: scaffold from eos"
 node .github/hooks/validate-config.mjs          # 期望 PASS
 node .github/eos/eos.mjs init node-service --write   # 声明技术栈（或 python-service、go-service…——`eos init` 会列出全部）
@@ -725,7 +725,7 @@ SaaS 的 **G7** 要求：每条 AC ≥1 测试、**API 契约测试**（对 open
 
 ### 第 0 步：建项目 + 建 AI 目录
 ```sh
-npx degit niaodian/eos#eos-2.7.0 cs-agent && cd cs-agent
+npx degit niaodian/eos#eos-2.8.0 cs-agent && cd cs-agent
 git init && git add -A && git commit -q -m "chore: scaffold from eos"
 mkdir -p ai/prompts evals                       # AI 代码放这里，自动叠加 Agentic 规则
 node .github/hooks/validate-config.mjs          # 期望 PASS
@@ -1355,12 +1355,12 @@ Agent 输出不符预期
 ```sh
 # 方式 A：degit（public 仓库，无需鉴权）
 # 固定到 release tag：默认分支会移动，tag 不会。
-npx degit niaodian/eos#eos-2.7.0 my-app
+npx degit niaodian/eos#eos-2.8.0 my-app
 cd my-app && git init
 
 # 方式 B：在 tag 上 clone，并开一段全新历史
-git clone --depth 1 --branch eos-2.7.0 https://github.com/niaodian/eos.git my-app
-cd my-app && git checkout --orphan main && git commit -m "chore: start from eos-2.7.0"
+git clone --depth 1 --branch eos-2.8.0 https://github.com/niaodian/eos.git my-app
+cd my-app && git checkout --orphan main && git commit -m "chore: start from eos-2.8.0"
 
 # 两种方式之后都要声明项目：模板自带的声明描述的是 EOS，而不是你的项目
 node .github/eos/eos.mjs init                       # 两条轨道、所有起步包，以及当前的声明
@@ -1370,7 +1370,7 @@ git add -A && git commit -q -m "chore: declare the project"   # 提交声明，�
 
 ## 10.3 分发给团队（纯本地、无企业依赖）
 
-1. 所有人从**同一个 release tag**（`eos-2.7.0`）开始。默认分支会持续变动，
+1. 所有人从**同一个 release tag**（`eos-2.8.0`）开始。默认分支会持续变动，
    不固定版本就意味着每个人拿到的都是略有差异的 EOS。
 2. `【需组织/GitHub 设置】` GitHub **template repository** 属于所有者级设置：EOS 既无法替你设置，
    也无法在本地验证，所以别信本页面的说法——
@@ -1607,7 +1607,13 @@ node .github/eos/eos.mjs providers      # 配置了什么，以及它此刻怎�
 
 **EOS 从不接触凭据。** adapter 委托给 `gh` —— 它已鉴权，token 存在它自己的 store 里；EOS 不传、不读、
 也就不可能泄漏。而且 EOS 是**只读**的：它会告诉你分支保护缺失，但绝不会替你去设置 ——
-因为能给自己授予强制权的工具，也能撤销它。
+因为能给自己授予强制权的工具，也能撤销它。（附录 D 的配置工具 `harden-github.mjs` 不属于引擎：
+由你自己、用你自己的凭据运行——ADR-025。）
+
+**从 eos-2.8.0 起，`.eos/providers.json` 属于策略。** provider 能抬高结论，所以新增一个 provider 是
+REVIEW，而 `mock` adapter——它按自己的配置想答什么就答什么——是 WEAKENING；两者在 `eos policy check`
+里都需要第二个人。`github-governance` adapter 除经典保护外也读取规则集，`github-attestation`
+会固定签名的工作流（`signerWorkflow`；设置了 `repo` 时默认是你的发布工作流）。
 
 见 [ADR-005](../adr/005-external-authority-boundary.md) 与
 [ADR-006](../adr/006-provider-adapters.md)。
@@ -1949,6 +1955,30 @@ node /tmp/eos-next/.github/eos/eos.mjs upgrade --from /tmp/eos-next --base /tmp/
 node .github/eos/eos.mjs policy check && node .github/eos/eos.mjs verify --full
 ```
 
+## 10.15 从 `eos-2.7.x` 升级到 `eos-2.8.0`
+
+**Agent 安全配置**（ADR-025）。门禁没有变；变的是能绕过它们的东西。如果你的项目声明了签名密钥或保留着 `.eos/providers.json`，运行一次 `eos policy lock --write`（它们的身份现在属于策略；不需要批准人）。然后按附录 D.0 操作：每台电脑一次，每个仓库一条命令。
+
+| 改变了什么 | 你会看到什么 | 该怎么做 |
+|---|---|---|
+| **一条命令完成仓库加固**（`harden-github.mjs`） | `node .github/eos/harden-github.mjs --bot <agent>` 列出缺什么；`--apply` 在询问之后配置规则集、`release` 环境和 Agent 的邀请；`--check` 只读地验证 | 由你自己在自己的终端里运行（附录 D.1） |
+| **信任锚与 provider 属于策略** | 替换发布密钥或基线密钥、新增 provider，都会出现在 `eos policy diff` 里；替换密钥或配置 `mock` 是 WEAKENING | 如果你声明了密钥或保留着 `providers.json`，重新锁定一次（`eos policy lock --write`） |
+| **治理 adapter 会读取规则集** | 受规则集保护的分支不再被读成"未受保护"；`options.repo` 能用了；结果会说明谁能绕过规则 | 无需操作 |
+| **证明：只为发布签名、批准之后才签、签名者固定** | 演练不再生成证明；证明作业会等待 `release` 环境的批准；没有 `repo` 或 `signerWorkflow` 的证明 provider 结果为 UNVERIFIED | 如果你的发布由别的工作流签名，请写明 `signerWorkflow` |
+| **守卫覆盖治理面** | Agent 写入 EOS 的记录、设置 `EOS_ACTOR`、运行 `eos approve`、合并、修改保护、推送到默认分支或发布 tag、运行 `harden-github.mjs --apply` 时会被拒绝；在项目里编辑 `.github/` 或 `.eos/` 策略之前必须先问你 | 无需操作——对你自己要求的编辑点"是"即可 |
+| **激活行显示 CLAIMED** | `eos-doctor` 把全部勾选的 `activation.md` 报告为"声称"，并指向 `harden-github.mjs --check` | 运行这项检查 |
+
+**升级步骤**
+
+```sh
+npx degit niaodian/eos#eos-2.7.0 /tmp/eos-base    # 你当前所在的版本——见 docs/eos/VERSION
+npx degit niaodian/eos#eos-2.8.0 /tmp/eos-next
+node /tmp/eos-next/.github/eos/eos.mjs upgrade --from /tmp/eos-next --base /tmp/eos-base          # 查看计划
+node /tmp/eos-next/.github/eos/eos.mjs upgrade --from /tmp/eos-next --base /tmp/eos-base --write  # 应用，并重新生成各 agent 平台文件
+node .github/eos/eos.mjs policy lock --write && node .github/eos/eos.mjs policy check
+node .github/eos/harden-github.mjs --bot <agent-login>                                              # 然后由你自己运行 --apply
+```
+
 ---
 
 # 第 11 章 新增技术栈
@@ -2023,7 +2053,7 @@ EOS 的栈规则是**可插拔**的。新增一个栈 = 加一个 `*.instruction
 
 ```
 # ── 终端 —— 唯一循环（日常只需要这些）──
-npx degit niaodian/eos#eos-2.7.0 my-app   # 新建项目
+npx degit niaodian/eos#eos-2.8.0 my-app   # 新建项目
 node .github/eos/eos.mjs init                       # 当前声明、两条轨道、所有起步包
 node .github/eos/eos.mjs init <pack> --write        # 声明项目（未定栈时用 config-only；--track regulated）
 node .github/eos/eos.mjs init <pack> --solo --write  # 单人维护者：Standard 轨道带标签的自批准路径
@@ -2094,7 +2124,7 @@ bmad-tea / bmad-testarch-*   # 阶段7：测试+追溯        → G7
 
 **复现**（终端）：
 ```sh
-npx degit niaodian/eos#eos-2.7.0 my-app && cd my-app
+npx degit niaodian/eos#eos-2.8.0 my-app && cd my-app
 node .github/hooks/validate-config.mjs        # PASS
 npm test                                       # 10/10 green
 echo '{"tool_input":{"command":"rm -rf /tmp/x"}}' | node .github/hooks/deny-dangerous.js  # deny
@@ -2111,19 +2141,48 @@ echo '{"tool_input":{"command":"rm -rf /tmp/x"}}' | node .github/hooks/deny-dang
 
 > **进度追踪**：本附录是"完整步骤（怎么做）"；随仓的 `docs/eos/activation.md` 是"可勾选台账（做到哪了）"，
 > 被 `eos-doctor` 每次 advisory 提示、被 `/eos-release-gate`（G8）发布前再核。引导式执行用 **`/eos-init`**——
-> 它会替你做本地能做的（换 handle、拷基线），并把服务端分支保护的确切步骤打印给你（模板无法代开）。
+> 它会替你做本地能做的（换 handle、拷基线），把配置服务端的那一条命令给你看，并替你检查结果。
+
+## D.0 哪些只做一次、哪些每个仓库做一次、哪些永远不必再做
+
+从 eos-2.8.0 起，本附录的大部分内容只需做**一次**。用本模板新建的项目只需一条命令；之后由 EOS 替你检查（ADR-025）。
+
+| 什么时候 | 你要做什么 | 用时 | 在哪一节 |
+|---|---|---|---|
+| 每台电脑一次 | 给 Agent 一个自己的 GitHub 账户和令牌，以及它自己的工作区（一个单独的电脑用户） | 约 30 分钟 | D.5 |
+| 每个仓库一次 | 在你自己的终端里运行一条命令、回答 `y`，再以 Agent 的账户接受一次邀请 | 约 5 分钟 | D.1 |
+| 每个 PR | 看 Agent 改了什么，然后在 GitHub 上批准——这是只有你能做的事 | 取决于审阅时长 | D.6 |
+| 每次发布 | 在 GitHub Actions 里批准 `release` 作业 | 点一下 | D.6 |
+| 永远不必 | 手工检查配置：`node .github/eos/harden-github.mjs --check` 会只读地向 GitHub 查询，`/eos-init` 也会替你运行 | — | D.1 |
 
 ## D.1 让 3 道 CI 硬门成为"必需检查" `【需组织/GitHub 设置】`
 
-GitHub 仓库 → **Settings → Rules → Rulesets → New branch ruleset**，针对默认分支：
+**从 eos-2.8.0 起，这是一条命令，由仓库所有者对每个仓库运行一次**——就是你，在你自己的终端里，绝不在 Agent 里。EOS 的引擎对 GitHub 保持只读；这个配置工具在引擎之外，Agent 试图运行 `--apply` 时守卫会拒绝（ADR-025）：
+
+```sh
+node .github/eos/harden-github.mjs --bot <agent-login>           # 1. 只读：已经有什么，会改什么
+node .github/eos/harden-github.mjs --bot <agent-login> --apply   # 2. 执行修改——改之前会先问你
+node .github/eos/harden-github.mjs --check --bot <agent-login>   # 3. 只读：HARDENED，或者还缺什么
+```
+
+`--apply` 会配置以下内容，而且只在缺失时才配置：
+
+1. **默认分支**——规则集 `eos-main-protection`，状态 **Active**：必须走 PR；需要一位 Code Owner 的批准；最新一次推送须由他人批准；需要来自 GitHub Actions 的 `verify` 检查。管理员可以通过合并 PR 绕过（会记入审计日志），但永远不能直接推送。
+2. **发布 tag**（`v*`、`eos-*`）——只有管理员能创建、移动或删除（`eos-release-tags`）。打 tag 会启动发布流水线。
+3. **`release` 环境**——每个发布作业在签名或发布之前，都要由你批准。
+4. **Agent 的账户**（`--bot`，见 D.5）——以写权限协作者的身份被邀请，绝不是管理员。以该账户登录 GitHub 一次并接受邀请；`--apply` 会打印链接。
+
+第 3 步可以随时运行——它只读取。Agent 也可以运行它：输出会说明用的是哪个身份，以及这个身份能否绕过规则（对 Agent 的账户来说，必须不能）。
+
+**更喜欢手动点击？** 同样的设置手工完成——GitHub 仓库 → **Settings → Rules → Rulesets → New branch ruleset**，针对默认分支：
 
 1. 先把 **Enforcement status** 设为 **`Active`**。新建的 ruleset 默认是 **Disabled**，处于 Disabled 时无论下面勾选什么都不会生效 —— 这是开发者"以为已受保护、实则毫无保护"的最常见原因。
 2. 勾选 **Require a pull request before merging**（禁止直接 push 到默认分支）。
 3. 勾选 **Require status checks to pass before merging** → 搜索并选中 **`verify`**（`eos-ci.yml` 的 job）。
    —— 这一步把 validate-config / eos-doctor / secret-scan 从"绿灯建议"变成"红灯阻断"。
    只选 `verify`：`coverage` 与 `cross-platform` 测试的是 EOS 自身，在你的仓库里会被跳过（见 [§8.4](#84-你的仓库里-ci-运行什么)）。
-4. 勾选 **Require review from Code Owners**（配合 D.2 的 CODEOWNERS）。
-5. （推荐）勾选 **Do not allow bypassing the above settings**，避免管理员随手绕过。
+4. 勾选 **Require review from Code Owners**（配合 D.2 的 CODEOWNERS）、**Require approval of the most recent reviewable push**，以及 **Dismiss stale pull request approvals when new commits are pushed**。
+5. 在 **Bypass list** 中添加 **Repository admin**，并设为 **For pull requests only**——不要选 "Always allow"——不要添加任何其他人。（若用经典分支保护：勾选 **Do not allow bypassing the above settings**。）
 
 **计划限制 —— 动手前先看这一段。** 在 GitHub Free 下，**私有**仓库根本不会强制执行 ruleset：GitHub 会保存该 ruleset，然后提示 "Your rulesets won't be enforced on this private repository until you upgrade this organization account to GitHub Team"。**Require review from Code Owners** 同样不提供。你只有三个诚实的选择：把仓库改为公开、升级到 Pro/Team，或以该理由豁免台账中的这一项。
 
@@ -2138,7 +2197,7 @@ gh api repos/<owner>/<repo>/branches/main/protection   # 仅用于经典分支�
 
 **私有仓库要用行为来证明。** ruleset 可能已保存、显示 "Active"，却什么也没强制。开一个会让 `verify` 失败的临时 PR，看合并按钮：如果它可点，或者 `verify` 没有被列为必需，保护就没有生效。之后删掉那个分支。
 
-**只有一个维护者？** 分支保护与 Code Owners 评审需要另一个能合并的人；在私有的 Free 仓库里请带理由地豁免这一项。EOS 要求第二个人的其他环节都有 solo 路径（`approvalMode: "solo"`，§10.13）：一次由你自己输入的带标签自批准，绝不是 agent。
+**只有一个维护者？** GitHub 从不允许任何人批准自己的 PR。所以让 Agent 用它自己的账户开 PR（D.5），由你本人批准：作者和批准者是 GitHub 核验过的两个不同账户，不需要再找第二个人。你自己的 PR 通过管理员"仅限 PR"的绕过合并。在私有的 Free 仓库里请带理由地豁免这一项。EOS 要求第二个人的其他环节都有 solo 路径（`approvalMode: "solo"`，§10.13）：一次由你自己输入的带标签自批准，绝不是 agent。
 
 ## D.2 启用 CODEOWNERS 治理保护
 
@@ -2156,6 +2215,7 @@ cp .vscode/settings.json.example .vscode/settings.json    # 活跃文件保持�
 关键项：`chat.tools.global.autoApprove` 保持 `false`（`true` 等于 /yolo，关闭关键安全保护）；
 `chat.tools.terminal.autoApprove` 内置危险命令 denylist（与 `deny-dangerous.js` 纵深防御）。
 设置键均已核对官方 `docs/agents/reference/ai-settings.md`；自动审批演进较快，请在你的版本复核。
+把保护你的设置放在**用户级**设置里，修改仓库的 Agent 改不了它们——例如 `chat.tools.edits.autoApprove` 设为 `"**/.eos/**": false` 和 `"**/.github/**": false`，这样对这些位置的编辑会等你确认。
 
 ## D.4 已知取舍与残余风险（诚实清单）
 
@@ -2166,13 +2226,49 @@ cp .vscode/settings.json.example .vscode/settings.json    # 活跃文件保持�
 |---|---|---|
 | `.vscode/*` 默认 gitignore，`mcp.json` opt-in 后本地留存（审计 F2/C2） | 沙箱/审批基线可被本地私改而无人发现 | 随仓 `settings.json.example`/`mcp.json.example` 安全基线 + 评审；团队约定 |
 | `bmad-*` 技能装在**用户级**、未 pin 版本（审计 H4/T6） | 不同机器技能版本/存否不一 → agentic 行为不完全可复现 | 在 `docs/` 记录团队统一的 bmad 版本；关键技能可 vendor/子模块化 |
-| Hooks 是 Preview、逐机器、解析失败放行、CI 不调用（审计 G2） | 破坏性操作实时拦截非权威，可绕过 | 权威在 D.1 的 CI 硬门 + 人工评审；hooks 仅作减速带 |
-| agent 具 `editFiles`（审计 H5） | 原则上可改自身治理文件 | D.2 CODEOWNERS + D.1 必审（开启后即阻断） |
+| Hooks 是 Preview、逐机器、解析失败放行、CI 不调用（审计 G2） | 破坏性操作实时拦截非权威，可绕过 | 权威在 D.1 的 CI 硬门 + 人工评审；hooks 仅作减速带。从 eos-2.8.0 起它们还会拒绝写入 EOS 的记录（对这些记录出错时也会拒绝）、伪造身份、批准、合并以及修改保护设置 |
+| agent 具 `editFiles`（审计 H5） | 原则上可改自身治理文件 | D.5 Agent 自己的账户 + D.2 CODEOWNERS + D.1 必审（开启后即阻断） |
 | `gitleaks` 深扫在**本地是可选增强**，未装即回退到内置规则 | 只跑零依赖内置正则时，覆盖弱于 gitleaks 全量规则 | 内置 `secret-scan.mjs` 始终作为 CI 硬门运行（保底）。自 eos-2.3.0 起，EOS CI 会安装固定版本、校验过校验和的 `gitleaks` 并设置 `EOS_REQUIRE_GITLEAKS=1`，因此在 CI 中缺少 gitleaks 会失败而不是降级 |
 | **Windows**：核心 hook 为 Node（跨平台）；早期 `quality.json` 曾用 `sh -c`（round-2 N1 已改为 `node .github/hooks/quality.mjs`，原生 Windows 无需 WSL/Git-Bash） | 无 `git` 时的目录回退遍历在 Windows 上曾显示绝对路径（已用 `path.relative` 归一化）；`bmad-*` 与 `act`（需 Docker Desktop）等外部工具的可用性仍随平台 | 三个核心 hook + `quality.mjs` 已按跨平台实现；**权威质量门在 CI（`ubuntu-latest`）**，与本机 OS 无关 |
 
 **须组织决策（模板不代做，`【需组织标准】`）**：CI runner 标准（现 `ubuntu-24.04`）、批准的密钥库、
 命名空间/仓库归属、模型 pin/注册策略、制品完整性（SBOM/签名/SLSA）。这些不是违规，是组织标准问题。
+
+## D.5 Agent 安全配置：给 Agent 一个自己的账户（每台电脑一次）
+
+D.1 的规则只有在 Agent **不用你的凭据**工作时才约束得住它：管理员可以绕过规则，而在你的电脑账户里运行的 Agent，能用你这个账户能用的一切——`gh`、git 保存的密码、已登录的浏览器。这一步只做一次，之后的每个项目都沿用。
+
+1. **创建 Agent 的 GitHub 账户**——一个 *machine account*（GitHub 条款允许用于自动化的账户），例如 `yourname-bot`，使用独立邮箱，并开启两步验证。
+2. **以该账户登录后创建令牌**：`https://github.com/settings/tokens/new?description=eos-agent&scopes=public_repo`（私有仓库需要 `scopes=repo`）。范围就只保留这一个——**不要** `workflow`，这样 Agent 改不了 CI，也不要任何 `admin`。必须是经典令牌：fine-grained 令牌不能用于个人仓库的协作者。
+3. **给 Agent 一个自己的工作区——一个单独的电脑用户。** macOS：系统设置 → 用户与群组 → 添加一个**标准**用户，例如 `eos-dev`；Windows：一个单独的标准账户。然后在你自己的账户里运行 `chmod 700 ~`（否则在 macOS 上，任何本地用户都能读到你主目录中对其所在组可读的文件）。
+4. **在那个用户里，让各工具以 Agent 的身份登录：**
+
+```sh
+gh auth login --hostname github.com --with-token < agent-token.txt && rm agent-token.txt
+gh auth setup-git
+git config --global user.name "yourname-bot"
+git config --global user.email "$(gh api user --jq .id)+yourname-bot@users.noreply.github.com"
+gh auth status          # 期望：yourname-bot，范围 public_repo（或 repo）——没有别的
+```
+
+5. **不要把你自己的身份带进那个用户。** 那里的 VS Code 仍可以用你的 GitHub 账户登录以使用 Copilot；这时不要在那里安装 GitHub Pull Requests 扩展，把 GitHub MCP 服务器设为只读（`https://api.githubcopilot.com/mcp/readonly`，本地服务器用 `--read-only`），并让浏览器自动化（Playwright 或 Chrome DevTools MCP）使用它自己的 profile（`--isolated`），绝不连接你已登录的浏览器。
+6. **在 Agent 工作的每个仓库里，用 `--bot yourname-bot` 运行 D.1。**
+
+**暂时还不想建第二个用户？** 在你自己的账户里：`gh auth logout --user <you>`，按第 4 步让 `gh` 以 Agent 身份登录，管理员操作只在浏览器里做。这能防止 Agent 意外用上你的凭据；但挡不住一个主动去找的 Agent——你的浏览器会话和钥匙串仍在它够得着的地方——所以把它当作迈向单独用户的一步，而不是替代。
+
+## D.6 之后 Agent 能做什么——以及只有你能做什么
+
+| | Agent（用它自己的账户） | 你 |
+|---|---|---|
+| 写代码、运行 EOS 的门禁、推送分支、开 PR | 可以 | 可以 |
+| 修改 CI（`.github/workflows/`） | 不能——它的令牌没有 `workflow` 范围 | 可以 |
+| 批准，或合并到默认分支 | 不能——规则要求 Code Owner 批准，而它不是 | 可以 |
+| 推送到默认分支，或推送发布 tag | 不能——规则集会拒绝 | 合并 PR；为发布打 tag |
+| 修改仓库的规则、协作者或环境 | 不能——它不是管理员 | 可以，用 D.1 |
+| 手工写 EOS 的记录（账本、证据、豁免、策略锁） | 不能——守卫会拒绝；这些由 EOS 自己的命令写入 | 谁都不写 |
+| 记录批准（`eos approve`、豁免或确认里的 `approver`） | 不能——守卫会拒绝 | 可以 |
+
+仍然要靠你的，是在批准之前**读**这个 PR。规则保证没有你的批准就没有任何东西进入默认分支；它们替你判断不了改动本身。`eos policy diff` 会列出 PR 对策略做了哪些修改，`.eos/` 或 `.github/` 下的改动最值得仔细看。
 
 ---
 
