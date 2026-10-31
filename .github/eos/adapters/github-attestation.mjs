@@ -14,10 +14,33 @@ import { result } from './contract.mjs';
 
 const PROVIDER = 'github-attestation';
 
+/**
+ * The `gh attestation verify` arguments, or why there are none (eos-2.8.0, ADR-025).
+ *
+ * Matching the repository alone accepts an attestation made by ANY workflow run in it — one a pull
+ * request added, or one a tag anybody could push started — so the signer is pinned: the project's
+ * release workflow unless `signerWorkflow` names another. Self-hosted runners are refused by default
+ * (whoever runs one controls what it signs); `sourceRef` and `signerDigest` pin further when declared.
+ * @returns {{args: string[]|null, problem: string|null}}
+ */
+export function verifyArgs(target, options = {}) {
+  const signerWorkflow = options.signerWorkflow || (options.repo ? `${options.repo}/.github/workflows/eos-release.yml` : null);
+  if (!signerWorkflow) {
+    return { args: null, problem: 'the signer is not pinned: set options.repo (the release workflow .github/workflows/eos-release.yml is then expected) or options.signerWorkflow — matching only an owner would accept an attestation made by any workflow' };
+  }
+  const args = ['attestation', 'verify', target];
+  if (options.owner) args.push('--owner', options.owner);
+  if (options.repo) args.push('--repo', options.repo);
+  args.push('--signer-workflow', signerWorkflow);
+  if (options.signerDigest) args.push('--signer-digest', options.signerDigest);
+  if (options.sourceRef) args.push('--source-ref', options.sourceRef);
+  if (options.denySelfHostedRunners !== false) args.push('--deny-self-hosted-runners');
+  return { args, problem: null };
+}
+
 export async function check({ root, subject, options, now }) {
   const timeoutMs = options.timeoutMs ?? 15000;
   const artifact = options.artifact || null;
-  const owner = options.owner || null;
 
   if (!artifact) {
     return result({ provider: PROVIDER, subject, status: 'UNVERIFIED', now,
@@ -29,11 +52,10 @@ export async function check({ root, subject, options, now }) {
     return result({ provider: PROVIDER, subject, status: 'UNVERIFIED', now, detail: `the configured artifact ${artifact} does not exist here` });
   }
 
-  const args = ['attestation', 'verify', isPath ? join(root, artifact) : artifact];
-  if (owner) args.push('--owner', owner);
-  if (options.repo) args.push('--repo', options.repo);
+  const pinned = verifyArgs(isPath ? join(root, artifact) : artifact, options);
+  if (!pinned.args) return result({ provider: PROVIDER, subject, status: 'UNVERIFIED', now, detail: pinned.problem });
 
-  const r = spawnSync('gh', args, { cwd: root, encoding: 'utf8', timeout: timeoutMs });
+  const r = spawnSync('gh', pinned.args, { cwd: root, encoding: 'utf8', timeout: timeoutMs });
   if (r.error) {
     // A missing binary is a permanent fact about this machine; a timeout is not. Only the second
     // is worth asking again.
@@ -47,7 +69,7 @@ export async function check({ root, subject, options, now }) {
 
   if (r.status === 0) {
     return result({ provider: PROVIDER, subject, status: 'PASS', now, evidenceRef: artifact,
-      detail: `provenance for ${artifact} verified${owner ? ` against owner ${owner}` : ''}` });
+      detail: `provenance for ${artifact} verified, signed by ${pinned.args[pinned.args.indexOf('--signer-workflow') + 1]}` });
   }
   // "No attestation exists" and "the attestation does not match" are VERIFIED negatives — the
   // authority answered, and the answer was no.
