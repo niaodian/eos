@@ -14,8 +14,9 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { project, write, run, runJson, git, commitAll, cleanup, APP_PROJECT, REPO_ROOT } from './test-support.mjs';
-import { policySnapshot, diffPolicy, policyDigest, acknowledgementProblem, SOLO_SWITCH } from './lib/policy.mjs';
+import { policySnapshot, diffPolicy, policyDigest, acknowledgementProblem, SOLO_SWITCH, readPolicy } from './lib/policy.mjs';
 import { schemaTightenings } from './lib/schema-diff.mjs';
+import { generateSigningKey } from './lib/signing.mjs';
 
 after(cleanup);
 
@@ -444,4 +445,106 @@ test('solo cannot be combined with a regulated or controlled track', () => {
   assert.match(r.out, /approvalMode "solo" is a Standard-track exit/);
   const dir2 = project({ '.eos/project.json': { ...APP_PROJECT, approvalMode: 'solo', complianceProfile: 'regulated', evidencePolicy: 'ci' } });
   assert.match(run(dir2, ['status']).out, /approvalMode "solo" is a Standard-track exit/);
+});
+
+// -------------------------------------------------------------------------- eos-2.8.0 (ADR-025)
+// The keys signatures are checked against are policy: before 2.8.0, pointing release.signing at a key
+// the agent generated changed no digest, so `policy check` passed and the agent could sign its own
+// release. Audit PoC P5.
+test('a trust anchor is part of the policy only where one is declared, identified by path and key', () => {
+  const base = shipped();
+  assert.equal(policySnapshot(base).project.releaseSigningKey, undefined, 'no key declared, nothing recorded');
+  const keyed = clone(base);
+  keyed.project.release = { signing: { publicKey: '.eos/keys/release.pub' } };
+  keyed.project.policyUpstream = { source: 'https://example.invalid/policy.json', publicKey: '.eos/keys/org.pub' };
+  const ids = { '.eos/keys/release.pub': 'aaaa1111', '.eos/keys/org.pub': 'bbbb2222' };
+  const snap = policySnapshot({ ...keyed, readAnchor: (p) => ids[p] ?? null });
+  assert.deepEqual(snap.project.releaseSigningKey, { path: '.eos/keys/release.pub', keyId: 'aaaa1111' });
+  assert.deepEqual(snap.project.baselineSigningKey, { path: '.eos/keys/org.pub', keyId: 'bbbb2222' });
+});
+
+test('replacing, moving or removing a trust anchor is a weakening; adding one is not', () => {
+  const declare = (path) => { const p = shipped(); p.project.release = { signing: { publicKey: path } }; return p; };
+  const snap = (p, keys) => policySnapshot({ ...p, readAnchor: (path) => keys[path] ?? null });
+  const kinds = (changes) => changes.filter((c) => /trust-anchor/.test(c.id)).map((c) => `${c.kind} ${c.id}`);
+
+  const before = snap(declare('.eos/keys/release.pub'), { '.eos/keys/release.pub': 'aaaa1111' });
+  const overwritten = snap(declare('.eos/keys/release.pub'), { '.eos/keys/release.pub': 'cccc3333' });
+  assert.deepEqual(kinds(diffPolicy(before, overwritten)), ['WEAKENING project:trust-anchor-changed:release-signing:cccc3333'],
+    'overwriting the key file in place is the same swap');
+  const moved = snap(declare('keys/mine.pub'), { 'keys/mine.pub': 'dddd4444' });
+  assert.deepEqual(kinds(diffPolicy(before, moved)), ['WEAKENING project:trust-anchor-changed:release-signing:dddd4444']);
+  assert.deepEqual(kinds(diffPolicy(before, snap(shipped(), {}))), ['WEAKENING project:trust-anchor-removed:release-signing:aaaa1111']);
+  assert.deepEqual(kinds(diffPolicy(snap(shipped(), {}), before)), ['STRENGTHENING project:trust-anchor-added:release-signing']);
+  assert.deepEqual(kinds(diffPolicy(before, snap(declare('.eos/keys/release.pub'), { '.eos/keys/release.pub': 'aaaa1111' }))), []);
+});
+
+test('a file that is not a key, or a path outside the repository, is still identified', () => {
+  const dir = lockedRepo();
+  write(dir, '.eos/project.json', { ...APP_PROJECT, release: { signing: { publicKey: 'keys/not-a-key.txt' } } });
+  write(dir, 'keys/not-a-key.txt', 'hello');
+  const first = runJson(dir, ['policy', 'diff', '--against', 'main']);
+  assert.ok(first.json.changes.some((c) => c.id === 'project:trust-anchor-added:release-signing'), first.out);
+  const { files } = readPolicy(dir);
+  assert.match(files.readAnchor('keys/not-a-key.txt'), /^not-a-key:[0-9a-f]{64}$/);
+  // The declaration schema already refuses such a path; the reader never follows one either.
+  assert.equal(files.readAnchor('../outside.pub'), 'outside-repository');
+  assert.equal(files.readAnchor('/etc/hosts'), 'outside-repository');
+  assert.equal(files.readAnchor('keys/missing.pub'), null);
+});
+
+test('PoC P5: swapping the release key for your own needs a second person — in place or by path', () => {
+  const dir = project({ '.eos/project.json': APP_PROJECT });
+  const keygen = run(dir, ['release', 'keygen', '--out', join(dir, '..', `${Date.now()}-release.pem`), '--write']);
+  assert.equal(keygen.code, 0, keygen.out);
+  assert.equal(run(dir, ['policy', 'lock', '--write']).code, 0);
+  commitAll(dir, 'declare the release key and pin the policy');
+  git(dir, ['checkout', '-q', '-b', 'feature']);
+  const declared = JSON.parse(readFileSync(join(dir, '.eos/project.json'), 'utf8')).release.signing.publicKey;
+
+  // In place: the declaration is untouched, the key in the file is not.
+  write(dir, declared, generateSigningKey().publicPem);
+  const inPlace = run(dir, ['policy', 'check', '--against', 'main']);
+  assert.equal(inPlace.code, 1, inPlace.out);
+  assert.match(inPlace.out, /WEAKENING project:trust-anchor-changed:release-signing:/);
+
+  // By path: the declaration points at a key the agent holds.
+  git(dir, ['checkout', '-q', '--', declared]);
+  write(dir, 'keys/agent.pub', generateSigningKey().publicPem);
+  write(dir, '.eos/project.json', { ...JSON.parse(readFileSync(join(dir, '.eos/project.json'), 'utf8')), release: { signing: { publicKey: 'keys/agent.pub' } } });
+  run(dir, ['policy', 'lock', '--write', '--reason', 'rotating the release key after the old one was exposed']);
+  const awaiting = run(dir, ['policy', 'check', '--against', 'main']);
+  assert.equal(awaiting.code, 1, awaiting.out);
+  assert.match(awaiting.out, /trust-anchor-changed:release-signing.*awaiting an approver/);
+  approve(dir, 'alice');
+  assert.equal(run(dir, ['policy', 'check', '--against', 'main']).code, 0);
+});
+
+// The authorities EOS consults are policy (ADR-025): `.eos/providers.json` choosing the mock adapter
+// made activation-authority and evidence-provenance PASS with nothing checked (audit finding F12).
+test('consulting a new authority is a REVIEW; the mock adapter is a WEAKENING; neither is ever silent', () => {
+  const base = shipped();
+  assert.equal(policySnapshot(base).providers, undefined, 'no providers.json, nothing recorded — the digest every project locked with');
+  const withProviders = (providers) => ({ ...clone(base), providers: { schemaVersion: 1, providers } });
+  const gov = { adapter: 'github-governance', subjects: ['enforcement-authority'], options: { branch: 'main' } };
+  const changes = (from, to) => diffPolicy(policySnapshot(from), policySnapshot(to)).filter((c) => c.id.startsWith('providers:'));
+  const added = changes(base, withProviders([gov]));
+  assert.deepEqual(added.map((c) => c.kind), ['REVIEW']);
+  assert.match(added[0].id, /^providers:added:github-governance:enforcement-authority:[0-9a-f]{8}$/);
+  const mock = changes(base, withProviders([{ adapter: 'mock', subjects: ['enforcement-authority', 'evidence-provenance'] }]));
+  assert.deepEqual(mock.map((c) => c.kind), ['WEAKENING']);
+  assert.match(mock[0].detail, /answers whatever its own configuration says/);
+  const changed = changes(withProviders([gov]), withProviders([{ ...gov, options: { branch: 'release' } }]));
+  assert.deepEqual(changed.map((c) => c.kind), ['REVIEW']);
+  assert.match(changed[0].id, /^providers:options-changed:/);
+  assert.deepEqual(changes(withProviders([gov]), withProviders([gov])), []);
+  assert.deepEqual(changes(withProviders([gov]), base).map((c) => c.kind), ['INFO'], 'dropping an authority cannot raise anything');
+});
+
+test('PoC F12: an agent that adds the mock provider needs a second person in CI', () => {
+  const dir = lockedRepo();
+  write(dir, '.eos/providers.json', { schemaVersion: 1, providers: [{ adapter: 'mock', subjects: ['enforcement-authority'] }] });
+  const r = run(dir, ['policy', 'check', '--against', 'main']);
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.out, /WEAKENING providers:mock:enforcement-authority/);
 });
