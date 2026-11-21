@@ -33,7 +33,7 @@
 - [ ] Agent 账户：Agent 以它自己的 GitHub 账户工作，没有管理员权限、没有 `workflow` 范围，并在它自己的电脑用户里运行
   - **为什么**：用*你的*凭据工作的 Agent 能做你能做的一切——合并、改规则、推送发布 tag。只有当它是"另一个人"时，
     下面的规则才约束得住它。（ADR-025；2026-10-31 的审计。）
-  - **步骤**：每台电脑一次——见附录 D.5（创建账户和 `public_repo` 令牌、一个单独的电脑用户、在那里让 `gh`
+  - **步骤**：每台电脑一次——见附录 D.5（创建账户和含 `repo`、`read:org` 的令牌，绝不含 `workflow`；一个单独的电脑用户；在那里让 `gh`
     以 Agent 身份登录）。
   - **验证**：在 Agent 的终端里，`gh auth status` 显示的是 Agent 的账户；`node .github/eos/harden-github.mjs --check --bot <agent-login>` 显示 ✓ agent account。
 

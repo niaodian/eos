@@ -35,8 +35,8 @@
 - [ ] Agent account: the agent works as its own GitHub account, without admin rights or the `workflow` scope, in its own computer user
   - **Why**: an agent working with *your* credentials can do whatever you can — merge, change the rules, push
     a release tag. The rules below hold it only when it is someone else. (ADR-025; the audit of 2026-10-31.)
-  - **Steps**: once per computer — Appendix D.5 (create the account and a `public_repo` token, a separate
-    computer user, sign `gh` in as the agent there).
+  - **Steps**: once per computer — Appendix D.5 (create the account and a token with `repo` and `read:org`, never
+    `workflow`; a separate computer user; sign `gh` in as the agent there).
   - **Verify**: in the agent's terminal, `gh auth status` names the agent's account; `node .github/eos/harden-github.mjs --check --bot <agent-login>` shows ✓ agent account.
 
 - [ ] Branch protection: default branch requires a PR + the required check `verify` + Code Owner review
