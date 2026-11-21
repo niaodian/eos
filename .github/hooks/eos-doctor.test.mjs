@@ -511,3 +511,13 @@ test('D8: with the committed example but no settings.json, doctor names the comm
   const { out } = run(project({ ...DECLARED, '.vscode/settings.json.example': '{}\n' }));
   assert.match(out, /D8 Approval baseline: no \.vscode\/settings\.json.*init --write/);
 });
+
+// ---------- activation: a ticked ledger is a claim, never an attestation (eos-2.8.0, ADR-025) ----------
+test('a fully ticked activation ledger is reported as CLAIMED, with the command that verifies it', () => {
+  const ticked = run(project({ 'docs/eos/activation.md': '# Activation\n\n- [x] Branch protection\n- [~] Compliance · Reason: no regulated data\n' }));
+  assert.match(ticked.out, /enforcement authority CLAIMED \(docs\/eos\/activation\.md — 0 pending, ticked by hand\)/);
+  assert.match(ticked.out, /node \.github\/eos\/harden-github\.mjs --check/);
+  assert.doesNotMatch(ticked.out, /attested/, 'a tick in a file an agent can edit attests nothing');
+  const pending = run(project({ 'docs/eos/activation.md': '# Activation\n\n- [ ] Branch protection\n' }));
+  assert.match(pending.out, /CONTRACTUAL: 1 one-time hardening item\(s\) pending/);
+});

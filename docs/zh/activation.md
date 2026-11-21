@@ -30,10 +30,19 @@
 
 ## 一、拿回"强制权威"轴（约 +4 分）——每个真实仓库都应做
 
+- [ ] Agent 账户：Agent 以它自己的 GitHub 账户工作，没有管理员权限、没有 `workflow` 范围，并在它自己的电脑用户里运行
+  - **为什么**：用*你的*凭据工作的 Agent 能做你能做的一切——合并、改规则、推送发布 tag。只有当它是"另一个人"时，
+    下面的规则才约束得住它。（ADR-025；2026-10-31 的审计。）
+  - **步骤**：每台电脑一次——见附录 D.5（创建账户和 `public_repo` 令牌、一个单独的电脑用户、在那里让 `gh`
+    以 Agent 身份登录）。
+  - **验证**：在 Agent 的终端里，`gh auth status` 显示的是 Agent 的账户；`node .github/eos/harden-github.mjs --check --bot <agent-login>` 显示 ✓ agent account。
+
 - [ ] Branch protection: default branch 要求 PR + 必需检查 `verify` + Code Owner 评审
   - **为什么**：没有它，CI 只是"绿灯建议"，任何写权限者（或获 `editFiles` 的 agent）可不评审直接合并——
     审计判定"契约性而非技术权威"的根因，也是失分最大的一项。
-  - **步骤**：GitHub 仓库 → Settings → Rules → Rulesets → New branch ruleset，对默认分支先把
+  - **步骤**（eos-2.8.0）：一条命令，由你在自己的终端里运行——
+    `node .github/eos/harden-github.mjs --bot <agent-login> --apply`。它还会保护发布 tag，并配置 `release`
+    环境。更喜欢手动点击？GitHub 仓库 → Settings → Rules → Rulesets → New branch ruleset，对默认分支先把
     **Enforcement status 设为 `Active`**（新建 ruleset 默认是 *Disabled*，处于 Disabled 时无论勾选什么都
     不会生效），再勾选 *Require a pull request before merging* + *Require status checks to pass* →
     选中 `verify`（`eos-ci.yml` 的 job）+ *Require review from Code Owners*。
@@ -41,10 +50,11 @@
   - **计划限制**：GitHub Free 下**私有**仓库根本不会强制执行 ruleset（提示 "won't be enforced … until you
     upgrade"），且不提供 *Require review from Code Owners*。请改为公开仓库、升级到 Pro/Team，
     或以该理由豁免此项。
-  - **验证**：`gh api repos/<owner>/<repo>/rules/branches/main` —— 返回非空数组表示 **Active** 规则已生效；
+  - **验证**：`node .github/eos/harden-github.mjs --check` —— 只读；它会输出 HARDENED 或缺少什么，
+    规则集与经典保护都会读取。手工验证：`gh api repos/<owner>/<repo>/rules/branches/main` —— 返回非空数组表示 **Active** 规则已生效；
     返回 `[]` 表示没有任何强制（多半是 ruleset 仍为 *Disabled*）。若使用的是经典分支保护，
     则用 `gh api repos/<owner>/<repo>/branches/main/protection` 返回 200。旧端点对 ruleset 会返回 404，
-    不要据此判断"未受保护"。**本地/离线无法验证服务端状态——这是提醒，不是门禁。**
+    不要据此判断"未受保护"。**这里打勾是人的声称；检查结果才是 GitHub 的说法。**
 
 - [ ] CODEOWNERS: 把 `.github/CODEOWNERS` 里的 `@niaodian` 全部换成你的团队 handle
   - **为什么**：配合上面的 "Require review from Code Owners"，阻止任何人（含 agent）**免评审改动治理文件**

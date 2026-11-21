@@ -214,7 +214,9 @@ export const CONFIG_FILES = [
       // blocked every tool call. The command line runs under sh, Git Bash and PowerShell alike, so it
       // also works on native Windows, where PowerShell is the shell tool. Hooks start in the project
       // root; from anywhere else the hook errors and the call proceeds — CI stays the authority.
-      matcher: 'Bash|PowerShell|Write|Edit|MultiEdit|NotebookEdit',
+      // `mcp__.*` (eos-2.8.0): MCP tools — a GitHub server's merge or approve among them — reach the
+      // governance rules too.
+      matcher: 'Bash|PowerShell|Write|Edit|MultiEdit|NotebookEdit|mcp__.*',
       hooks: [{ type: 'command', command: hook('claude'), timeout: 30 }],
     }) }],
   },

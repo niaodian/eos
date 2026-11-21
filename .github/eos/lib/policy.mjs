@@ -20,16 +20,18 @@
 import { canonicalJson } from './canonical.mjs';
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { isAbsolute, join } from 'node:path';
 import { writeFileAtomic } from './atomic.mjs';
 import { loadSchema, validate } from './schema.mjs';
 import { resolveBaseRef, fileAt, gitOut } from './git-base.mjs';
 import { schemaChanges } from './schema-diff.mjs';
-import { verifyDocument, loadPublicKey } from './signing.mjs';
+import { verifyDocument, loadPublicKey, keyId } from './signing.mjs';
 import { isSoloProject } from '../../hooks/lib/project-config.mjs';
 
 export const POLICY_LOCK_PATH = '.eos/policy.lock.json';
-export const POLICY_FILES = { gates: '.eos/gates.json', workflow: '.eos/workflow.json', project: '.eos/project.json' };
+// `.eos/providers.json` is policy too (eos-2.8.0, ADR-025): a provider may RAISE a verdict, so who is
+// consulted decides what can pass. The `mock` adapter answers whatever its own configuration says.
+export const POLICY_FILES = { gates: '.eos/gates.json', workflow: '.eos/workflow.json', project: '.eos/project.json', providers: '.eos/providers.json' };
 
 /** The one change a self-approval can never stand behind (ADR-023). */
 export const SOLO_SWITCH = 'project:approvalMode:independent->solo';
@@ -44,10 +46,39 @@ const rankOf = (policy) => POLICY_RANK[policy ?? 'not_applicable'] ?? 0;
 const canonical = canonicalJson;
 
 /**
+ * The keys a project's signatures are checked against are policy too (ADR-025): swapping the release
+ * key for one you hold lets you sign your own release, and before eos-2.8.0 that swap changed no
+ * digest at all. A trust anchor is identified by its declared path AND the key in the file, so
+ * overwriting the file in place is caught as well. Present only when a key is declared, so a project
+ * without one keeps the digest it was locked with.
+ */
+const TRUST_ANCHORS = [
+  { field: 'releaseSigningKey', name: 'release-signing', path: (p) => p.release?.signing?.publicKey, what: 'release manifests' },
+  { field: 'baselineSigningKey', name: 'baseline-signing', path: (p) => p.policyUpstream?.publicKey, what: 'the vendored organization baseline' },
+];
+
+/**
+ * Identify the key in a declared file, read through `read(rel)` (the working tree, or a revision).
+ * A file that is not a usable key is still identified, by its content, so replacing it is visible.
+ */
+function anchorReader(read) {
+  return (rel) => {
+    if (isAbsolute(rel) || rel.split(/[\\/]/).includes('..')) return 'outside-repository';
+    const pem = read(rel);
+    if (pem === null || pem === undefined) return null;
+    try { return keyId(loadPublicKey(pem)); } catch {
+      return `not-a-key:${createHash('sha256').update(String(pem)).digest('hex')}`;
+    }
+  };
+}
+
+/**
  * Everything that decides how strictly work is verified, and nothing that merely describes it.
  * A pure function of parsed files, so it can be computed from the working tree or from any ref.
+ * `readAnchor` (set by readPolicy / readPolicyAt) identifies a declared trust-anchor file; without
+ * it a declared anchor is recorded by path alone.
  */
-export function policySnapshot({ gates, workflow, project }) {
+export function policySnapshot({ gates, workflow, project, providers = null, readAnchor = null }) {
   const gateMap = {};
   for (const def of gates?.gates || []) {
     gateMap[def.id] = {
@@ -108,8 +139,22 @@ export function policySnapshot({ gates, workflow, project }) {
       ...(project.approvalMode === 'solo' ? { approvalMode: 'solo' } : {}),
       ...((project.productTree?.exclude || []).length ? { productTreeExclude: [...project.productTree.exclude].sort() } : {}),
     };
+    for (const anchor of TRUST_ANCHORS) {
+      const path = anchor.path(project);
+      if (typeof path === 'string' && path) proj[anchor.field] = { path, keyId: readAnchor ? readAnchor(path) : null };
+    }
   }
-  return { gates: gateMap, workflow: { defaultProfile: workflow?.defaultProfile ?? null, profiles, stateMachines }, project: proj };
+  // Present only when the file exists, so every project without one keeps the digest it was locked with.
+  const consulted = Array.isArray(providers?.providers)
+    ? providers.providers.map((p) => ({ adapter: String(p?.adapter ?? ''), subjects: [...(p?.subjects || [])].map(String).sort(), options: canonical(p?.options || {}) }))
+      .sort((x, y) => `${x.adapter}|${x.subjects}|${x.options}`.localeCompare(`${y.adapter}|${y.subjects}|${y.options}`))
+    : null;
+  return {
+    gates: gateMap,
+    workflow: { defaultProfile: workflow?.defaultProfile ?? null, profiles, stateMachines },
+    project: proj,
+    ...(consulted ? { providers: consulted } : {}),
+  };
 }
 
 export const policyDigest = (snapshot) => createHash('sha256').update(canonical(snapshot)).digest('hex');
@@ -249,6 +294,19 @@ export function diffPolicy(a, b) {
     if (ua && !ub) add('WEAKENING', `project:upstream:${ua}->none`, `the project no longer follows the organization baseline ${ua}`);
     else if (ua && ub && ua !== ub) add('WEAKENING', `project:upstream:${ua}->${ub}`, `the project now follows ${ub} instead of the organization baseline ${ua} — it may be weaker`);
     else if (!ua && ub) add('STRENGTHENING', `project:upstream:none->${ub}`, `the project now follows the organization baseline ${ub}`);
+    // A new key is a new id, so an acknowledgement given for one key never covers the next swap.
+    const short = (k) => String(k?.keyId ?? 'unknown').replace(/^not-a-key:/, '').slice(0, 12);
+    for (const { field, name, what } of TRUST_ANCHORS) {
+      const ka = pa[field] ?? null;
+      const kb = pb[field] ?? null;
+      if (ka && !kb) {
+        add('WEAKENING', `project:trust-anchor-removed:${name}:${short(ka)}`, `no key is declared for ${what} any more (was ${ka.path}) — their signatures are no longer checked`);
+      } else if (ka && kb && (ka.path !== kb.path || ka.keyId !== kb.keyId)) {
+        add('WEAKENING', `project:trust-anchor-changed:${name}:${short(kb)}`, `the key ${what} are checked against changed (${ka.path} ${short(ka)} → ${kb.path} ${short(kb)}) — whoever holds the new private key can now sign them`);
+      } else if (!ka && kb) {
+        add('STRENGTHENING', `project:trust-anchor-added:${name}`, `${what} are now checked against ${kb.path}`);
+      }
+    }
     if (pa.workflowProfile !== pb.workflowProfile) {
       const before = a.workflow.profiles[pa.workflowProfile];
       const after = b.workflow.profiles[pb.workflowProfile];
@@ -297,6 +355,26 @@ export function diffPolicy(a, b) {
         : `the verified gate now reads its test results from ${pb.evidence}${pa.evidence === undefined ? '' : ` instead of ${pa.evidence}`}`);
     }
   }
+  // Who EOS consults (eos-2.8.0, ADR-025). A provider can only RAISE a verdict, so a new one, or new
+  // options for one, is a REVIEW: EOS cannot tell whether that authority deserves the trust. The mock
+  // adapter answers whatever its configuration says, so configuring it is a WEAKENING. The ids carry a
+  // digest of the configuration, so an acknowledgement given for one never covers the next.
+  const key = (p) => `${p.adapter}:${p.subjects.join('+') || 'all'}`;
+  const tag = (p) => createHash('sha256').update(p.options).digest('hex').slice(0, 8);
+  const before = new Map((a.providers || []).map((p) => [key(p), p]));
+  const after = new Map((b.providers || []).map((p) => [key(p), p]));
+  for (const [k, p] of after) {
+    const old = before.get(k);
+    if (old && old.options === p.options) continue;
+    if (p.adapter === 'mock') {
+      add('WEAKENING', `providers:mock:${p.subjects.join('+') || 'all'}:${tag(p)}`, `the mock adapter answers whatever its own configuration says — it can pass ${p.subjects.join(', ') || 'every subject'} with nothing checked`);
+    } else if (old) {
+      add('REVIEW', `providers:options-changed:${k}:${tag(p)}`, `${p.adapter} is now consulted with different options about ${p.subjects.join(', ') || 'every subject'}`);
+    } else {
+      add('REVIEW', `providers:added:${k}:${tag(p)}`, `${p.adapter} may now raise the verdict on ${p.subjects.join(', ') || 'every subject'} — EOS cannot tell whether that authority deserves the trust`);
+    }
+  }
+  for (const k of before.keys()) if (!after.has(k)) add('INFO', `providers:removed:${k}`, `${k} is no longer consulted — EOS's own verdict stands where it would have raised one`);
   return changes;
 }
 
@@ -312,6 +390,7 @@ export function readPolicy(root) {
   const errors = [];
   const read = (rel) => (existsSync(join(root, rel)) ? readFileSync(join(root, rel), 'utf8') : null);
   const files = Object.fromEntries(Object.entries(POLICY_FILES).map(([k, rel]) => [k, parseOrNull(read(rel), rel, errors)]));
+  files.readAnchor = anchorReader(read);
   return { files, errors };
 }
 
@@ -319,6 +398,7 @@ export function readPolicy(root) {
 export function readPolicyAt(root, rev) {
   const errors = [];
   const files = Object.fromEntries(Object.entries(POLICY_FILES).map(([k, rel]) => [k, parseOrNull(fileAt(root, rev, rel), `${rev}:${rel}`, errors)]));
+  files.readAnchor = anchorReader((rel) => fileAt(root, rev, rel));
   return { files, errors };
 }
 

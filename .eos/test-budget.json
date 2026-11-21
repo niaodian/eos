@@ -40,6 +40,8 @@
         ".github/eos/atomic.test.mjs",
         ".github/eos/ci-workflow.test.mjs",
         ".github/eos/gate-registry.test.mjs",
+        ".github/eos/github-governance.test.mjs",
+        ".github/eos/harden-github.test.mjs",
         ".github/eos/junit.test.mjs",
         ".github/eos/migrate.test.mjs",
         ".github/eos/packs.test.mjs",
@@ -111,7 +113,8 @@
         ".github/eos/audit-release.test.mjs",
         ".github/eos/audit-review.test.mjs",
         ".github/eos/audit-robustness.test.mjs",
-        ".github/eos/audit-secrets.test.mjs"
+        ".github/eos/audit-secrets.test.mjs",
+        ".github/eos/audit-tamper.test.mjs"
       ]
     }
   }

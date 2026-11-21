@@ -25,14 +25,15 @@ export function planRelease({ root, event, refType, refName, requested = 'auto',
   const track = requested === 'auto' ? trackOf(config).name : requested;
   const isTag = event === 'push' && refType === 'tag';
   const release = isTag ? refName : 'dry-run';
-  // A pull request from a fork gets no OIDC token, so nothing there can be attested.
-  const fork = event === 'pull_request' && !!headRepo && !!repo && headRepo !== repo;
   const project = (repo.split('/')[1] || basename(root)).replace(/[^A-Za-z0-9._-]/g, '-');
   return {
     track,
     release,
     manifest: isTag && readManifest(root, release).manifest ? 'true' : 'false',
-    attest: fork ? 'false' : 'true',
+    // Only a release is attested (eos-2.8.0, ADR-025). A dispatch or a pull request is a dry run, and
+    // an attestation made there would be a genuine signature on something nobody released — accepted
+    // by anyone who verifies with `-R <repo>` alone. (A fork never had an OIDC token to sign with.)
+    attest: isTag ? 'true' : 'false',
     publish: isTag ? 'true' : 'false',
     // A tag that already names the project (eos-2.0.0 in niaodian/eos) is not prefixed twice.
     name: release.startsWith(`${project}-`) ? release : `${project}-${release}`,

@@ -325,7 +325,9 @@ if (!existsSync(ledgerPath)) {
     for (const p of pending) activationOut.push('              \u25B8 ' + p);
     activationOut.push('              \u2192 run /eos-init, or see docs/eos/activation.md \u00B7 Appendix D. Mark [x] done or [~] waived-with-reason to clear.');
   } else {
-    activationOut.push('  ACTIVATION  enforcement authority attested \u2713 (docs/eos/activation.md \u2014 0 pending).');
+    // Every line ticked is what a person SAYS. Whether the server enforces it is a question for GitHub
+    // (eos-2.8.0, ADR-025): the hardening tool asks it, read-only, and so can anyone — an agent too.
+    activationOut.push('  ACTIVATION  enforcement authority CLAIMED (docs/eos/activation.md \u2014 0 pending, ticked by hand). Verify it against GitHub: node .github/eos/harden-github.mjs --check');
   }
 }
 
