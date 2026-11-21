@@ -80,7 +80,9 @@ key, the decision and the check are all out of the agent's reach.
    confirmation in a project, where the platform has an "ask"; in EOS's own repository it is the product
    and stays editable. Forging an identity, approving, merging, changing protection or credentials,
    pushing to the default branch or a release tag, git plumbing and `harden-github.mjs --apply` are
-   refused everywhere. It remains a speed bump: the authority is decision 1 and 2.
+   refused everywhere — by `gh` or `gh api` (REST and GraphQL), behind git's global options or under
+   a quoted name alike, and a push that names no branch is judged by the branch checked out. It
+   remains a speed bump: the authority is decision 1 and 2.
 
 7. **A ticked activation ledger is a claim.** `eos-doctor` reports it as CLAIMED and points at
    `harden-github.mjs --check`, which asks GitHub.

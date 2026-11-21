@@ -30,9 +30,10 @@ const denies = (cmd) => assert.equal(decision(cmd), 'deny', `expected DENY but g
 const allows = (cmd) => assert.equal(decision(cmd), 'allow', `expected ALLOW but got DENY: ${cmd}`);
 
 test('git push: --force-with-lease is ALLOWED (the fragile invariant — negative lookahead)', () => {
-  allows('git push --force-with-lease');
+  // Each names its branch: a push that names none is judged by the branch checked out (tested below).
+  allows('git push --force-with-lease origin feat/login');
   allows('git push origin feat/login --force-with-lease');
-  allows('git push --force-with-lease=origin/feat/login');
+  allows('git push --force-with-lease=feat/login origin feat/login');
 });
 
 test('git push: bare force IS denied (short + long, case-insensitive)', () => {
@@ -336,6 +337,61 @@ test('what a person does is refused for the agent in any repository; EOS\'s own 
     'git commit -m "docs: never set EOS_ACTOR=someone by hand"', 'git push -u origin feat/x',
   ]) assert.equal(run(cmd), 'allow', cmd);
   assert.equal(decideRaw(`not json EOS_ACTOR=alice ${EOS} approve`).decision, 'deny', 'raw text is judged too');
+});
+
+test('the same action spelled another way is refused the same way: gh api, git -C, a quoted name, --follow-tags', () => {
+  for (const cmd of [
+    'gh api -X PUT repos/o/r/pulls/27/merge', 'gh api --method PUT repos/o/r/pulls/27/merge -f merge_method=squash',
+    'gh api repos/o/r/git/refs -f ref=refs/tags/eos-2.8.0 -f sha=abc', 'gh api -XPATCH repos/o/r/git/refs/heads/main -F force=true',
+    'gh api repos/o/r/releases -f tag_name=v1.0.0', 'gh api -X POST repos/o/r/pulls/27/reviews -f event=APPROVE',
+    'gh api -X POST repos/o/r/merges -f base=main -f head=feat/x', 'gh api -X PUT repos/o/r/contents/README.md -f message=x -f content=eA==',
+    'gh api -X POST repos/o/r/actions/runs/9/pending_deployments -f state=approved', 'gh api -X PATCH repos/o/r -f default_branch=feat/x',
+    `gh api graphql -f query='mutation { mergePullRequest(input: {pullRequestId: "X"}) { clientMutationId } }'`,
+    `gh api graphql -f query='mutation { enablePullRequestAutoMerge(input: {pullRequestId: "X"}) { clientMutationId } }'`,
+    `gh api graphql -f query='mutation { addPullRequestReview(input: {pullRequestId: "X", event: APPROVE}) { clientMutationId } }'`,
+    `gh api graphql -f query='mutation { mergeBranch(input: {repositoryId: "R", base: "feat/x", head: "y"}) { clientMutationId } }'`,
+    `gh api graphql -f query='mutation { createRef(input: {name: "refs/tags/v2", oid: "abc", repositoryId: "R"}) { clientMutationId } }'`,
+    `gh api graphql -f query='mutation { createCommitOnBranch(input: {branch: {branchName: "main"}}) { clientMutationId } }'`,
+    `gh api graphql -f query='mutation { updateRepositoryRuleset(input: {repositoryRulesetId: "X"}) { clientMutationId } }'`,
+    `gh api graphql -f query='mutation { approveDeployments(input: {workflowRunId: "W"}) { clientMutationId } }'`,
+    'gh api -X DELETE "repos/o/r/branches/main/protection"', 'gh pr review 27 -a', 'gh repo edit --default-branch feat/x', 'gh ssh-key add k.pub',
+    'git -C . push origin eos-2.8.0', 'git -c core.hooksPath=/dev/null push origin HEAD:main', 'git --no-pager push origin main',
+    'git push origin "eos-2.8.0"', "git push origin 'HEAD:main'", 'git push --follow-tags origin feat/x', "git push origin 'refs/tags/*'",
+    'git push origin +refs/tags/eos-2.8.0', 'git push origin :refs/heads/main', 'git push origin tag very-first', 'git push origin :',
+    'git config push.followTags true', 'git -c push.followTags push origin feat/x', 'git -C . update-ref refs/heads/main HEAD',
+    'bash -c "git push origin eos-2.8.0"',
+  ]) assert.equal(run(cmd), 'deny', cmd);
+  for (const cmd of [
+    'git -C sub push origin feat/x', 'git push origin --delete feat/old', 'git push -u origin feat/x 2>&1 | tail -3', 'git push -o ci.skip origin feat/x',
+    'gh api repos/o/r/pulls/27', 'gh api repos/o/r/pulls/27/comments -f body="looks good"', 'gh api -X POST repos/o/r/issues/27/comments -f body=x',
+    'gh api repos/o/r/git/refs -f ref=refs/heads/feat/x -f sha=abc', 'gh api -X PUT repos/o/r/contents/README.md -f branch=feat/x -f message=x -f content=eA==',
+    `gh api graphql -f query='query { viewer { login } }'`, 'gh api -X GET repos/o/r/releases -f per_page=5', 'gh api --paginate repos/o/r/releases',
+    'gh api -X POST repos/o/r/releases/generate-notes -f tag_name=v2', 'gh api -H "Accept: application/vnd.github+json" repos/o/r',
+    'git config push.followTags false', 'git config --get push.followTags', 'gh pr review 27 --comment -b "nit"',
+    'git commit -m "docs: gh api -X PUT repos/o/r/pulls/1/merge is refused, and so is git push origin main"',
+  ]) assert.equal(run(cmd), 'allow', cmd);
+});
+
+test('a push that names no branch is judged by the branch checked out: the default branch is refused', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'eos-hook-push-'));
+  try {
+    const git = (...args) => boundedSpawnSync('git', args, { cwd: dir });
+    git('init', '-q');
+    git('symbolic-ref', 'HEAD', 'refs/heads/main');
+    const push = (command) => evaluateToolCall(JSON.stringify({ tool_name: 'Bash', tool_input: { command }, cwd: dir })).decision;
+    assert.equal(push('git push'), 'deny');
+    assert.equal(push('git push --force-with-lease'), 'deny', 'a lease makes it safe, not reviewed');
+    assert.equal(push('git push -u origin HEAD 2>&1 | tail -3'), 'deny');
+    git('symbolic-ref', 'HEAD', 'refs/heads/feat/x');
+    assert.equal(push('git push'), 'allow');
+    assert.equal(push('git push --force-with-lease'), 'allow');
+    assert.equal(push('git -C . push -u origin HEAD'), 'allow');
+    assert.equal(push('git switch main && git push'), 'deny', 'it checks out the default branch first');
+    const outside = mkdtempSync(join(tmpdir(), 'eos-hook-nogit-'));
+    try {
+      assert.equal(evaluateToolCall(JSON.stringify({ tool_name: 'Bash', tool_input: { command: 'git push' }, cwd: outside })).decision, 'allow', 'no repository: nothing to tell');
+    } finally { rmSync(outside, { recursive: true, force: true }); }
+  } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
 test('in EOS\'s own repository the judge is the product and may be edited; its records still may not', () => {
