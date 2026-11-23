@@ -2239,7 +2239,7 @@ cp .vscode/settings.json.example .vscode/settings.json    # 活跃文件保持�
 D.1 的规则只有在 Agent **不用你的凭据**工作时才约束得住它：管理员可以绕过规则，而在你的电脑账户里运行的 Agent，能用你这个账户能用的一切——`gh`、git 保存的密码、已登录的浏览器。这一步只做一次，之后的每个项目都沿用。
 
 1. **创建 Agent 的 GitHub 账户**——一个 *machine account*（GitHub 条款允许用于自动化的账户），例如 `yourname-bot`，使用独立邮箱，并开启两步验证。
-2. **以该账户登录后创建令牌**：`https://github.com/settings/tokens/new?description=eos-agent&scopes=public_repo`（私有仓库需要 `scopes=repo`）。范围就只保留这一个——**不要** `workflow`，这样 Agent 改不了 CI，也不要任何 `admin`。必须是经典令牌：fine-grained 令牌不能用于个人仓库的协作者。
+2. **以该账户登录后创建令牌**：`https://github.com/settings/tokens/new?description=eos-agent&scopes=repo,read:org`。范围只保留这两个：GitHub CLI 会拒绝缺少 `repo` 和 `read:org` 的经典令牌（`gh auth login` 会报 "error validating token: missing required scopes"），而 `repo` 只能访问这个账户受邀的仓库。**不要** `workflow`，这样 Agent 改不了 CI，也不要任何 `admin`。必须是经典令牌：fine-grained 令牌不能用于个人仓库的协作者。
 3. **给 Agent 一个自己的工作区——一个单独的电脑用户。** macOS：系统设置 → 用户与群组 → 添加一个**标准**用户，例如 `eos-dev`；Windows：一个单独的标准账户。然后在你自己的账户里运行 `chmod 700 ~`（否则在 macOS 上，任何本地用户都能读到你主目录中对其所在组可读的文件）。
 4. **在那个用户里，让各工具以 Agent 的身份登录：**
 
@@ -2248,10 +2248,10 @@ gh auth login --hostname github.com --with-token < agent-token.txt && rm agent-t
 gh auth setup-git
 git config --global user.name "yourname-bot"
 git config --global user.email "$(gh api user --jq .id)+yourname-bot@users.noreply.github.com"
-gh auth status          # 期望：yourname-bot，范围 public_repo（或 repo）——没有别的
+gh auth status          # 期望：yourname-bot，范围 'read:org'、'repo'——没有别的
 ```
 
-5. **不要把你自己的身份带进那个用户。** 那里的 VS Code 仍可以用你的 GitHub 账户登录以使用 Copilot；这时不要在那里安装 GitHub Pull Requests 扩展，把 GitHub MCP 服务器设为只读（`https://api.githubcopilot.com/mcp/readonly`，本地服务器用 `--read-only`），并让浏览器自动化（Playwright 或 Chrome DevTools MCP）使用它自己的 profile（`--isolated`），绝不连接你已登录的浏览器。
+5. **不要把你自己的身份带进那个用户。** 那里的 VS Code 仍可以用你的 GitHub 账户登录以使用 Copilot；这时不要在那里安装 GitHub Pull Requests 扩展，把 GitHub MCP 服务器设为只读（`https://api.githubcopilot.com/mcp/readonly`，本地服务器用 `--read-only`），在 VS Code 设置里关闭 `git.terminalAuthentication` 和 `github.gitAuthentication`（否则 VS Code 可能用你的账户回应 git 的密码提示），并让浏览器自动化（Playwright 或 Chrome DevTools MCP）使用它自己的 profile（`--isolated`），绝不连接你已登录的浏览器。
 6. **在 Agent 工作的每个仓库里，用 `--bot yourname-bot` 运行 D.1。**
 
 **暂时还不想建第二个用户？** 在你自己的账户里：`gh auth logout --user <you>`，按第 4 步让 `gh` 以 Agent 身份登录，管理员操作只在浏览器里做。这能防止 Agent 意外用上你的凭据；但挡不住一个主动去找的 Agent——你的浏览器会话和钥匙串仍在它够得着的地方——所以把它当作迈向单独用户的一步，而不是替代。

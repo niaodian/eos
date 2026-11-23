@@ -34,7 +34,8 @@ key, the decision and the check are all out of the agent's reach.
 ## Decision
 
 1. **The agent works as its own account.** The manual's Appendix D.5 sets up a GitHub machine account
-   for the agent, with a classic token limited to `public_repo` (or `repo`) and never `workflow`, in a
+   for the agent, with a classic token limited to `repo` and `read:org` (the GitHub CLI accepts no less)
+   and never `workflow`, in a
    separate computer user. GitHub's own rules then hold the agent: it cannot change CI, cannot change
    settings, cannot approve as a Code Owner, cannot merge into the default branch.
 

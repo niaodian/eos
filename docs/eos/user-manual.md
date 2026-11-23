@@ -2240,7 +2240,7 @@ The following are **intentional design trade-offs** in EOS (inherent costs of lo
 The rules in D.1 hold the agent only if it does not work with **your** credentials: an administrator can get around them, and an agent running in your computer account can use whatever that account can — `gh`, git's stored password, a browser where you are signed in. Do this once; every project afterwards reuses it.
 
 1. **Create the agent's GitHub account** — a *machine account*, which GitHub's terms allow for automation: for example `yourname-bot`, with its own e-mail address and two-factor authentication.
-2. **Create its token, signed in as that account**: `https://github.com/settings/tokens/new?description=eos-agent&scopes=public_repo` (a private repository needs `scopes=repo`). Keep exactly that scope — **not** `workflow`, so the agent cannot change CI, and nothing `admin`. It must be a classic token: a fine-grained token cannot be used by a collaborator on a personal repository.
+2. **Create its token, signed in as that account**: `https://github.com/settings/tokens/new?description=eos-agent&scopes=repo,read:org`. Keep exactly those two scopes: the GitHub CLI refuses a classic token without `repo` and `read:org` (`gh auth login` reports "error validating token: missing required scopes"), and `repo` reaches only the repositories the account is invited to. **Not** `workflow`, so the agent cannot change CI, and nothing `admin`. It must be a classic token: a fine-grained token cannot be used by a collaborator on a personal repository.
 3. **Give the agent its own workspace — a separate computer user.** macOS: System Settings → Users & Groups → add a **Standard** user, for example `eos-dev`; Windows: a separate standard account. Then, in your own account, run `chmod 700 ~` (on macOS every local user can otherwise read the files in your home folder that its group may read).
 4. **In that user, sign the tools in as the agent:**
 
@@ -2249,10 +2249,10 @@ gh auth login --hostname github.com --with-token < agent-token.txt && rm agent-t
 gh auth setup-git
 git config --global user.name "yourname-bot"
 git config --global user.email "$(gh api user --jq .id)+yourname-bot@users.noreply.github.com"
-gh auth status          # expect: yourname-bot, scope public_repo (or repo) — and nothing else
+gh auth status          # expect: yourname-bot, scopes 'read:org', 'repo' — and nothing else
 ```
 
-5. **Keep your own identity out of that user.** VS Code there may still be signed in to your GitHub account for Copilot; then do not install the GitHub Pull Requests extension there, set the GitHub MCP server to read-only (`https://api.githubcopilot.com/mcp/readonly`, or `--read-only` for a local one), and let browser automation (Playwright or Chrome DevTools MCP) use its own profile (`--isolated`), never your signed-in browser.
+5. **Keep your own identity out of that user.** VS Code there may still be signed in to your GitHub account for Copilot; then do not install the GitHub Pull Requests extension there, set the GitHub MCP server to read-only (`https://api.githubcopilot.com/mcp/readonly`, or `--read-only` for a local one), turn off `git.terminalAuthentication` and `github.gitAuthentication` in VS Code's settings (otherwise VS Code can answer git's password prompt with your account), and let browser automation (Playwright or Chrome DevTools MCP) use its own profile (`--isolated`), never your signed-in browser.
 6. **Run D.1 with `--bot yourname-bot`** in every repository the agent works in.
 
 **Not ready for a second user yet?** In your own account: `gh auth logout --user <you>`, sign `gh` in as the agent as in step 4, and do administrator work in the browser only. That stops an agent using your credentials by accident; it does not stop one that goes looking — your browser session and keychain are still within reach — so treat it as a step towards a separate user, not as a substitute.
